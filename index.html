@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#eaf3dc">
   <title>消えたタオルと白い記憶（テスト版）</title>
-  <link rel="stylesheet" href="css/style.css?v=1">
+  <link rel="stylesheet" href="css/style.css?v=2">
 </head>
 <body>
   <div id="app">
@@ -25,6 +25,7 @@
         <div class="fuwari-line"><span class="fuwari-icon"></span>ふわりのカード <b id="title-cards">0</b> 枚</div>
         <button id="btn-start" class="btn btn-main">はじめる</button>
         <p class="title-note">音が出ます</p>
+        <button id="btn-reset" class="link-btn">記録を消す</button>
       </div>
     </section>
 
@@ -41,6 +42,7 @@
         <p id="quiz-question" class="quiz-question"></p>
         <div id="quiz-choices" class="quiz-choices"></div>
         <div id="quiz-feedback" class="quiz-feedback hidden"></div>
+        <div id="quiz-get" class="quiz-get hidden"></div>
       </div>
     </section>
 
@@ -60,6 +62,7 @@
       <div class="recipe-box">
         <p class="recipe-label">レシピ完成</p>
         <h2 id="recipe-name" class="recipe-name"></h2>
+        <div id="recipe-fluff" class="recipe-fluff"></div>
         <div class="recipe-art"><div class="recipe-towel"></div></div>
         <ol id="recipe-words" class="recipe-words"></ol>
         <p id="recipe-next" class="recipe-next"></p>
@@ -71,12 +74,12 @@
   <!-- 横向きのとき -->
   <div id="rotate"><div><div class="rotate-icon"></div><p>縦にしてね</p></div></div>
 
-  <script src="data/words.js?v=1"></script>
-  <script src="data/stages.js?v=1"></script>
-  <script src="js/audio.js?v=1"></script>
-  <script src="js/game.js?v=1"></script>
-  <script src="js/quiz.js?v=1"></script>
-  <script src="js/cards.js?v=1"></script>
-  <script src="js/main.js?v=1"></script>
+  <script src="data/words.js?v=2"></script>
+  <script src="data/stages.js?v=2"></script>
+  <script src="js/audio.js?v=2"></script>
+  <script src="js/game.js?v=2"></script>
+  <script src="js/quiz.js?v=2"></script>
+  <script src="js/cards.js?v=2"></script>
+  <script src="js/main.js?v=2"></script>
 </body>
 </html>

@@ -36,6 +36,12 @@ const Main = (() => {
     if ($("screen-battle").classList.contains("active")) Battle.resize();
   }
 
+  // ふわりの色を、集めたカードの枚数に合わせる
+  function paintFuwari() {
+    const lv = fuwariLevel(Save.cardCount());
+    document.querySelectorAll(".fuwari-icon").forEach(el => { el.style.background = lv.body; el.style.borderColor = lv.line; });
+  }
+
   function showScreen(name) {
     document.querySelectorAll(".screen").forEach(s => s.classList.toggle("active", s.id === `screen-${name}`));
   }
@@ -46,6 +52,7 @@ const Main = (() => {
     $("title-world").textContent = `世界${world.id}　${world.name}`;
     $("title-stage").textContent = stage.name;
     $("title-cards").textContent = Save.cardCount();
+    paintFuwari();
     showScreen("title");
   }
 
@@ -71,6 +78,7 @@ const Main = (() => {
   function toCards(results) {
     Sound.setTempo(1);
     // 正解した語句がカードになる
+    const newIds = results.filter(r => r.correct && !Save.data.cards[r.id]).map(r => r.id);
     results.forEach(r => { if (r.correct) Save.data.cards[r.id] = true; });
     const owned = Save.data.cards;
     if (words.filter(w => owned[w.id]).length >= CARDS.clearCount) Save.data.cleared[STAGE_ID] = true;
@@ -78,7 +86,7 @@ const Main = (() => {
     showScreen("cards");
     $("screen-cards").scrollTop = 0;
     Cards.showCards({
-      stage, words, results, owned,
+      stage, words, results, owned, newIds,
       onRecipe: toRecipe,
       onRetry: toBattle,
       onTitle: toTitle
@@ -115,9 +123,31 @@ const Main = (() => {
       toBattle();
     });
 
+    // 記録を消す（試すとき用）
+    $("btn-reset").addEventListener("click", () => {
+      if (!window.confirm("集めたカードの記録を消しますか？")) return;
+      Save.data.cards = {};
+      Save.data.cleared = {};
+      Save.store();
+      $("title-cards").textContent = 0;
+      paintFuwari();
+    });
+
+    // アプリが裏に回ったら、バトルと音を止める
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        if ($("screen-battle").classList.contains("active")) Battle.pause();
+        Sound.suspend();
+      } else {
+        Sound.resume();
+      }
+    });
+    window.addEventListener("pagehide", () => Battle.pause());
+
     $("title-world").textContent = `世界${world.id}　${world.name}`;
     $("title-stage").textContent = stage.name;
     $("title-cards").textContent = Save.cardCount();
+    paintFuwari();
     showScreen("title");
   }
 

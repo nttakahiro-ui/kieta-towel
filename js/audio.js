@@ -165,11 +165,30 @@ const Sound = (() => {
       sweep(320, 110, 0.5, "triangle", 0.5);
     } else if (name === "hit") {     // 弾が当たった（ごく小さく）
       sweep(900, 700, 0.06, "sine", 0.06);
+    } else if (name === "boss") {    // 大ボスが出た
+      tone(freq("A5"), t, 0.3, "triangle", 0.3);
+      tone(freq("F5"), t + 0.15, 0.3, "triangle", 0.3);
+      tone(freq("D5"), t + 0.3, 0.6, "triangle", 0.35);
+    } else if (name === "card") {    // カードゲット
+      tone(freq("C6"), t, 0.2, "sine", 0.25);
+      tone(freq("E6"), t + 0.07, 0.2, "sine", 0.25);
+      tone(freq("G6"), t + 0.14, 0.4, "sine", 0.25);
     } else if (name === "start") {
       tone(freq("C5"), t, 0.3, "triangle", 0.35);
       tone(freq("G5"), t + 0.1, 0.4, "triangle", 0.35);
     }
   }
 
-  return { unlock, play, stop, setTempo, se };
+  // アプリが裏に回ったときに止める／戻ったときに再開する
+  function suspend() {
+    try { if (ctx && ctx.state === "running") ctx.suspend(); } catch (e) {}
+    if (fileAudio) fileAudio.pause();
+  }
+  function resume() {
+    try { if (ctx && ctx.state !== "running") ctx.resume(); } catch (e) {}
+    if (fileAudio) fileAudio.play().catch(() => {});
+    if (ctx && current && !fileAudio) nextTime = Math.max(nextTime, ctx.currentTime + 0.05);
+  }
+
+  return { unlock, play, stop, setTempo, se, suspend, resume };
 })();

@@ -71,7 +71,14 @@ const Quiz = (() => {
     dots();
     if (ok) {
       Sound.se("correct");
+      setTimeout(() => Sound.se("card"), 250);
       say(w.sayCorrect || "そうだ！思い出した！");
+      // 正解した語句がカードになる
+      const get = $("quiz-get");
+      get.textContent = `カードゲット！「${w.word}」`;
+      get.classList.remove("hidden");
+      get.style.animation = "none"; void get.offsetWidth; get.style.animation = "";
+      setTimeout(() => get.classList.add("hidden"), QUIZ.nextDelay * 1000);
       setTimeout(next, QUIZ.nextDelay * 1000);
     } else {
       // 不正解: 正解と一言メモをその場で見せてから次へ

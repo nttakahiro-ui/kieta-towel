@@ -15,7 +15,7 @@ const Cards = (() => {
   }
 
   // カード表示
-  // o: { stage, words(このステージの10語), results(今回のクイズ結果), owned(id→true 集めたカード), onRecipe, onRetry, onTitle }
+  // o: { stage, words(このステージの10語), results(今回のクイズ結果), owned(id→true 集めたカード), newIds(今回はじめて集めたid), onRecipe, onRetry, onTitle }
   function showCards(o) {
     Sound.play("card");
     const got = o.results.filter(r => r.correct).map(r => r.id);
@@ -33,6 +33,10 @@ const Cards = (() => {
       const wd = document.createElement("div"); wd.className = "w"; wd.textContent = w.word;
       const m = document.createElement("div"); m.className = "m"; m.textContent = w.memo;
       c.append(wd, m);
+      if (o.newIds && o.newIds.includes(w.id)) {
+        const nb = document.createElement("span"); nb.className = "new"; nb.textContent = "NEW";
+        c.appendChild(nb);
+      }
       list.appendChild(c);
     });
 
@@ -57,6 +61,18 @@ const Cards = (() => {
   function showRecipe(o) {
     Sound.play("recipe");
     $("recipe-name").textContent = o.stage.recipe;
+    // 綿毛がふわふわ舞う（仮の演出）
+    const fl = $("recipe-fluff");
+    fl.innerHTML = "";
+    for (let i = 0; i < 18; i++) {
+      const sp = document.createElement("span");
+      sp.style.left = `${Math.random() * 100}%`;
+      sp.style.animationDelay = `${Math.random() * 5}s`;
+      sp.style.animationDuration = `${5 + Math.random() * 4}s`;
+      const sz = 6 + Math.random() * 10;
+      sp.style.width = sp.style.height = `${sz}px`;
+      fl.appendChild(sp);
+    }
     const ol = $("recipe-words");
     ol.innerHTML = "";
     o.words.forEach(w => { const li = document.createElement("li"); li.textContent = w.word; ol.appendChild(li); });

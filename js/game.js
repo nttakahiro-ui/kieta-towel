@@ -56,6 +56,19 @@ const ENEMY_BULLET_ART = {
 
 // 敵の文字の色（役割ごと）
 const ENEMY_COLOR = { zako: "#5f8a3c", mid: "#b2733d", boss: "#c4577a" };
+// ふわりの強さ。集めたカードの総数で、色と弾の数が変わる（cards 枚以上でその段階）
+const FUWARI_LEVELS = [
+  { cards: 0,  body: "#fffdf7", line: "#c9d9b4", shots: 1, rate: 1 },
+  { cards: 10, body: "#eef8df", line: "#8fbf5e", shots: 2, rate: 1 },
+  { cards: 20, body: "#fff4cf", line: "#dcb64e", shots: 3, rate: 1 },
+  { cards: 30, body: "#fde6ee", line: "#e08aa6", shots: 3, rate: 0.8 },   // rate: 弾の間隔の倍率（小さいほど速い）
+];
+function fuwariLevel(count) {
+  let lv = FUWARI_LEVELS[0];
+  for (const l of FUWARI_LEVELS) if (count >= l.cards) lv = l;
+  return lv;
+}
+
 const FONT_FAMILY = '"Hiragino Maru Gothic ProN","Hiragino Maru Gothic Pro","Zen Maru Gothic","Rounded Mplus 1c",sans-serif';
 
 const Battle = (() => {
@@ -72,6 +85,11 @@ const Battle = (() => {
   let spawnTimer, shotTimer;
   let showWord = null;       // 画面中央に出している語句
   let drag = null;
+  let paused = false;        // アプリが裏に回ったときなど
+  let moved = false;         // 一度でもドラッグしたか（操作のヒント用）
+  let banner = null;         // 「大ボス あらわる！」などの帯
+  let shake = 0;             // 画面のゆれ（被弾したとき）
+  let level = FUWARI_LEVELS[0];
 
   function font(size) { return `bold ${size}px ${FONT_FAMILY}`; }
   const hasKanji = s => /[一-龯々]/.test(s);
@@ -94,12 +112,14 @@ const Battle = (() => {
   // ===== 操作: 指一本のドラッグ（指の動いたぶんだけ自機が動く） =====
   function onDown(e) {
     e.preventDefault();
+    if (paused) { resume(); return; }
     drag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, px: player.x, py: player.y };
     try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
   }
   function onMove(e) {
     if (!drag || e.pointerId !== drag.id) return;
     e.preventDefault();
+    moved = true;
     player.x = Math.min(Math.max(drag.px + (e.clientX - drag.sx) * 1.15, 24), W - 24);
     player.y = Math.min(Math.max(drag.py + (e.clientY - drag.sy) * 1.15, 80), H - 40);
   }
@@ -125,7 +145,9 @@ const Battle = (() => {
     bossWord = words.find(w => w.role === "boss") || words[words.length - 1];
     fluff = Array.from({ length: 26 }, () => ({ x: Math.random() * W, y: Math.random() * H, r: 2 + Math.random() * 5, v: 12 + Math.random() * 22, p: Math.random() * 6 }));
     resetRound(words.filter(w => w !== bossWord));
-    player = { x: W / 2, y: H * 0.8, hp: BATTLE.playerMaxHp, inv: 0 };
+    player = { x: W / 2, y: H * 0.8, hp: BATTLE.playerMaxHp, inv: 0, glow: 0, hurt: 0 };
+    level = fuwariLevel(opts.fuwariCount);
+    paused = false; moved = false; banner = null; shake = 0; showWord = null; threads = [];
     state = "intro"; stateTimer = 2;
     running = true;
     lastTs = performance.now();
@@ -147,6 +169,17 @@ const Battle = (() => {
     running = false;
     cancelAnimationFrame(rafId);
     drag = null;
+  }
+
+  // 一時停止（アプリが裏に回ったとき）。画面をタップすると再開
+  function pause() {
+    if (!running || state === "clear") return;
+    paused = true;
+    drag = null;
+  }
+  function resume() {
+    paused = false;
+    lastTs = performance.now();
   }
 
   function shuffle(a) {
@@ -182,7 +215,12 @@ const Battle = (() => {
   }
 
   function update(dt) {
+    if (paused) return;
     t += dt;
+    shake = Math.max(0, shake - dt);
+    player.glow = Math.max(0, player.glow - dt);
+    player.hurt = Math.max(0, player.hurt - dt);
+    if (banner) { banner.t -= dt; if (banner.t <= 0) banner = null; }
     // 背景の綿毛
     for (const f of fluff) { f.y += f.v * dt; f.x += Math.sin(t + f.p) * 8 * dt; if (f.y > H + 10) { f.y = -10; f.x = Math.random() * W; } }
     if (showWord) { showWord.t -= dt; if (showWord.t <= 0) showWord = null; }
@@ -221,15 +259,19 @@ const Battle = (() => {
     if (!bossSpawned && absorbed.length === opts.total - 1 && !absorbed.includes(bossWord) && enemies.length === 0) {
       spawn(bossWord);
       bossSpawned = true;
+      banner = { text: "大ボス あらわる！", t: 1.8 };
+      Sound.se("boss");
     }
 
     // 自機の弾（自動で連射）
     shotTimer -= dt;
     if (shotTimer <= 0) {
-      shots.push({ x: player.x, y: player.y - 22 });
-      shotTimer = BATTLE.shotInterval;
+      // ふわりの段階で弾の数が増える
+      const spread = { 1: [0], 2: [-1, 1], 3: [-1, 0, 1] }[level.shots] || [0];
+      for (const k of spread) shots.push({ x: player.x + k * 9, y: player.y - 22, vx: k * 55 });
+      shotTimer = BATTLE.shotInterval * level.rate;
     }
-    for (const s of shots) s.y -= BATTLE.shotSpeed * dt;
+    for (const s of shots) { s.y -= BATTLE.shotSpeed * dt; s.x += s.vx * dt; }
     shots = shots.filter(s => s.y > -20);
 
     // 敵の動き
@@ -260,6 +302,7 @@ const Battle = (() => {
     // 弾が敵に当たったか
     for (const s of shots) {
       for (const e of enemies) {
+        if (e.role === "boss" && e.age < BATTLE.bossEnterTime) continue;   // 大ボスは降りてくる間は当たらない
         if (e.hp > 0 && Math.abs(s.x - e.x) < e.w / 2 + 4 && Math.abs(s.y - e.y) < e.h / 2) {
           s.y = -999;
           e.hp--;
@@ -317,6 +360,7 @@ const Battle = (() => {
       ebullets = [];
       state = "clear";
       stateTimer = 2;
+      banner = null;
     }
   }
 
@@ -332,7 +376,7 @@ const Battle = (() => {
         const k = Math.min(1, (th.age - th.scatter) * 3.2);
         th.x += (tx - th.x) * k * dt * 9;
         th.y += (ty - th.y) * k * dt * 9;
-        if (Math.hypot(tx - th.x, ty - th.y) < 8) th.done = true;
+        if (Math.hypot(tx - th.x, ty - th.y) < 8) { th.done = true; player.glow = 0.35; }
       }
       if (th.age > 2.5) th.done = true;
     }
@@ -342,6 +386,8 @@ const Battle = (() => {
   function hurt() {
     player.hp -= BATTLE.damage;
     player.inv = BATTLE.invincibleTime;
+    player.hurt = 0.4;
+    shake = 0.25;
     Sound.se("damage");
     if (player.hp <= 0) {
       player.hp = 0;
@@ -364,6 +410,8 @@ const Battle = (() => {
 
   // ===== 描く =====
   function draw() {
+    ctx.save();
+    if (shake > 0) ctx.translate((Math.random() - 0.5) * 10 * shake / 0.25, (Math.random() - 0.5) * 10 * shake / 0.25);
     // 背景: 畑の空（緑と生成り）
     const g = ctx.createLinearGradient(0, 0, 0, H);
     g.addColorStop(0, "#e3f0d0");
@@ -391,6 +439,7 @@ const Battle = (() => {
     ctx.textBaseline = "middle";
     for (const e of enemies) {
       ctx.font = font(e.size);
+      ctx.globalAlpha = e.role === "boss" && e.age < BATTLE.bossEnterTime ? 0.55 : 1;   // 降りてくる間はうすく（まだ当たらない）
       const wob = e.flash > 0 ? (Math.random() - 0.5) * 4 : 0;
       ctx.lineJoin = "round";
       ctx.lineWidth = 7;
@@ -408,6 +457,7 @@ const Battle = (() => {
           ctx.fill();
         }
       }
+      ctx.globalAlpha = 1;
     }
 
     // 敵の弾
@@ -428,7 +478,28 @@ const Battle = (() => {
     ctx.globalAlpha = 1;
 
     drawPlayer();
+    ctx.restore();
+
+    // 被弾したとき、画面のふちをうすく赤く
+    if (player.hurt > 0) {
+      const a = player.hurt / 0.4 * 0.45;
+      const rg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75);
+      rg.addColorStop(0, "rgba(232,130,150,0)");
+      rg.addColorStop(1, `rgba(232,130,150,${a})`);
+      ctx.fillStyle = rg;
+      ctx.fillRect(0, 0, W, H);
+    }
     drawHud();
+    // 操作のヒント（まだ動かしていないとき）
+    if (!moved && state !== "clear") {
+      ctx.globalAlpha = 0.6 + Math.sin(t * 4) * 0.3;
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.font = font(16);
+      ctx.fillStyle = "#48693a";
+      ctx.fillText("← ゆびでドラッグしてうごかそう →", W / 2, Math.min(H - 24, player.y + 48));
+      ctx.globalAlpha = 1;
+    }
+    if (banner) drawBanner();
 
     // 吸い込んだ語句を画面中央に大きく（読み仮名つき）
     if (showWord) drawBigWord(showWord.word, showWord.t);
@@ -437,6 +508,24 @@ const Battle = (() => {
     if (state === "intro") centerText(opts.stageName, "スタート！", 1);
     if (state === "down") centerText("やられた…", `${Math.ceil(stateTimer)}秒後に再開`, 1);
     if (state === "clear") centerText("10語あつまった！", "クイズへ", 1);
+    if (paused) {
+      ctx.fillStyle = "rgba(248,243,228,0.85)";
+      ctx.fillRect(0, 0, W, H);
+      centerText("ひとやすみ中", "画面をタップするとつづきから", 1);
+    }
+  }
+
+  function drawBanner() {
+    const a = Math.min(1, banner.t / 0.3, (1.8 - banner.t) / 0.2);
+    ctx.globalAlpha = Math.max(0, a);
+    const y = H * 0.42;
+    ctx.fillStyle = "rgba(196,87,122,0.88)";
+    ctx.fillRect(0, y - 30, W, 60);
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.font = font(28);
+    ctx.fillStyle = "#fffdf7";
+    ctx.fillText(banner.text, W / 2 + (1 - a) * 40, y);
+    ctx.globalAlpha = 1;
   }
 
   function drawEnemyBullet(b) {
@@ -470,10 +559,18 @@ const Battle = (() => {
 
     // ふわり（白い小さなタオル）。集めたカードの枚数を数字で表示
     const fx = x + 34, fy = y - 8 + Math.sin(t * 3) * 3;
-    ctx.fillStyle = "#fffdf7";
-    ctx.strokeStyle = "#c9d9b4";
+    if (player.glow > 0) {   // 吸い込むときに光る
+      const gr = ctx.createRadialGradient(fx, fy, 2, fx, fy, 30);
+      gr.addColorStop(0, `rgba(255,248,200,${player.glow / 0.35})`);
+      gr.addColorStop(1, "rgba(255,248,200,0)");
+      ctx.fillStyle = gr;
+      ctx.beginPath(); ctx.arc(fx, fy, 30, 0, Math.PI * 2); ctx.fill();
+    }
+    const sc = 1 + player.glow * 0.6;
+    ctx.fillStyle = level.body;
+    ctx.strokeStyle = level.line;
     ctx.lineWidth = 2;
-    roundRect(fx - 12, fy - 10, 24, 20, 6);
+    roundRect(fx - 12 * sc, fy - 10 * sc, 24 * sc, 20 * sc, 6);
     ctx.fill(); ctx.stroke();
     ctx.fillStyle = "#6f9a4a";
     ctx.font = font(11);
@@ -487,7 +584,7 @@ const Battle = (() => {
     ctx.fillStyle = "rgba(255,255,255,0.8)";
     roundRect(12, top, 130, 16, 8); ctx.fill();
     const rate = player.hp / BATTLE.playerMaxHp;
-    ctx.fillStyle = rate > 0.4 ? "#8cbf5a" : "#e39a8e";
+    ctx.fillStyle = rate > 0.4 ? "#8cbf5a" : (Math.floor(t * 4) % 2 ? "#e39a8e" : "#f2c4bb");
     roundRect(14, top + 2, 126 * rate, 12, 6); ctx.fill();
     ctx.font = font(12);
     ctx.textAlign = "left"; ctx.textBaseline = "top";
@@ -550,5 +647,5 @@ const Battle = (() => {
     ctx.closePath();
   }
 
-  return { start, stop, resize };
+  return { start, stop, resize, pause };
 })();
