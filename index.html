@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#eaf3dc">
   <title>消えたタオルと白い記憶（テスト版）</title>
-  <link rel="stylesheet" href="css/style.css?v=2">
+  <link rel="stylesheet" href="css/style.css?v=3">
 </head>
 <body>
   <div id="app">
@@ -26,6 +26,7 @@
         <button id="btn-start" class="btn btn-main">はじめる</button>
         <p class="title-note">音が出ます</p>
         <button id="btn-reset" class="link-btn">記録を消す</button>
+        <button id="btn-tune" class="link-btn hidden">調整パネル</button>
       </div>
     </section>
 
@@ -71,15 +72,30 @@
     </section>
   </div>
 
+  <!-- 調整パネル（URLの最後に ?tune をつけると出る。試すとき用） -->
+  <div id="tune" class="tune hidden">
+    <div class="tune-box">
+      <h2>バトルの調整</h2>
+      <p class="tune-note">動かすとすぐ反映されます。この端末にだけ保存されます。</p>
+      <div id="tune-list"></div>
+      <textarea id="tune-text" class="hidden" readonly></textarea>
+      <div class="btn-row">
+        <button id="tune-copy" class="btn">数値をコピー</button>
+        <button id="tune-reset" class="btn btn-sub">もとにもどす</button>
+        <button id="tune-close" class="btn btn-sub">とじる</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 横向きのとき -->
   <div id="rotate"><div><div class="rotate-icon"></div><p>縦にしてね</p></div></div>
 
-  <script src="data/words.js?v=2"></script>
-  <script src="data/stages.js?v=2"></script>
-  <script src="js/audio.js?v=2"></script>
-  <script src="js/game.js?v=2"></script>
-  <script src="js/quiz.js?v=2"></script>
-  <script src="js/cards.js?v=2"></script>
-  <script src="js/main.js?v=2"></script>
+  <script src="data/words.js?v=3"></script>
+  <script src="data/stages.js?v=3"></script>
+  <script src="js/audio.js?v=3"></script>
+  <script src="js/game.js?v=3"></script>
+  <script src="js/quiz.js?v=3"></script>
+  <script src="js/cards.js?v=3"></script>
+  <script src="js/main.js?v=3"></script>
 </body>
 </html>

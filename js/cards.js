@@ -21,6 +21,10 @@ const Cards = (() => {
     const got = o.results.filter(r => r.correct).map(r => r.id);
     const ownedCount = o.words.filter(w => o.owned[w.id]).length;
     $("cards-summary").textContent = `今回 ${got.length} 枚 ／ このステージ ${ownedCount} / ${o.words.length} 枚`;
+    if (o.stats) {
+      const st = o.stats, m = Math.floor(st.time / 60), sec = String(Math.floor(st.time % 60)).padStart(2, "0");
+      $("cards-summary").textContent += `\nバトル ${m}:${sec}　被弾 ${st.hits}回${st.downs ? `　やられた ${st.downs}回` : ""}`;
+    }
     const list = $("cards-list");
     list.innerHTML = "";
     // 今回のクイズの順に並べる。カードは語句＋一言メモだけ

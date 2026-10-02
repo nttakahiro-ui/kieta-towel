@@ -4,15 +4,26 @@ const QUIZ = {
   nextDelay: 1.1,                    // 正解のあと、次の問題へ進むまでの秒数
 };
 
+// ふわりのセリフ（仮）。data/words.js の sayCorrect / sayWrong が空のときは、この中からえらぶ
+const FUWARI_SAY = {
+  start:   ["吸い込んだ語句を思い出そう！", "さあ、記憶をとりもどそう！"],
+  correct: ["そうだ！思い出した！", "あったかい記憶がもどってきた！", "ふわっ…ひとつ思い出したよ！", "それそれ！", "からだが白くなってきた気がする！"],
+  wrong:   ["うーん、まだぼんやりしてる…", "あれ？ちがったみたい…", "だいじょうぶ、いっしょに覚えよう", "メモを読んだら、きっと思い出せるよ"],
+  streak:  ["{n}問れんぞく！ふわりがぽかぽかしてきた！", "{n}問れんぞく正解！すごい！"],
+  last:    ["さいごの問題だよ！"],
+};
+const pick = a => a[Math.floor(Math.random() * a.length)];
+
 const Quiz = (() => {
-  let list = [], idx = 0, results = [], onEnd = null, locked = false;
+  let list = [], idx = 0, results = [], onEnd = null, locked = false, streak = 0;
   const $ = id => document.getElementById(id);
 
   // words: 吸い込んだ順の語句、end(results): 終わったときに呼ぶ。results は [{ id, correct }]
   function start(words, end) {
-    list = words; idx = 0; results = []; onEnd = end;
+    list = words; idx = 0; results = []; onEnd = end; streak = 0;
     Sound.play("quiz");
-    say("吸い込んだ語句を思い出そう！");
+    Sound.setTempo(1);
+    say(pick(FUWARI_SAY.start));
     show();
   }
 
@@ -37,6 +48,7 @@ const Quiz = (() => {
   function show() {
     if (idx >= list.length) { onEnd(results); return; }
     if (QUIZ.tempoUpAt[idx]) Sound.setTempo(QUIZ.tempoUpAt[idx]);
+    if (idx === list.length - 1 && idx > 0) say(pick(FUWARI_SAY.last));
     const w = list[idx];
     locked = false;
     $("quiz-count").textContent = `クイズ ${idx + 1} / ${list.length}`;
@@ -72,7 +84,8 @@ const Quiz = (() => {
     if (ok) {
       Sound.se("correct");
       setTimeout(() => Sound.se("card"), 250);
-      say(w.sayCorrect || "そうだ！思い出した！");
+      streak++;
+      say(w.sayCorrect || (streak >= 3 ? pick(FUWARI_SAY.streak).replace("{n}", streak) : pick(FUWARI_SAY.correct)));
       // 正解した語句がカードになる
       const get = $("quiz-get");
       get.textContent = `カードゲット！「${w.word}」`;
@@ -84,7 +97,8 @@ const Quiz = (() => {
       // 不正解: 正解と一言メモをその場で見せてから次へ
       Sound.se("wrong");
       btn.classList.add("wrong");
-      say(w.sayWrong || "うーん、まだぼんやりしてる…");
+      streak = 0;
+      say(w.sayWrong || pick(FUWARI_SAY.wrong));
       const fb = $("quiz-feedback");
       fb.innerHTML = "";
       const p1 = document.createElement("p"); p1.style.margin = "0"; p1.textContent = "正解は";

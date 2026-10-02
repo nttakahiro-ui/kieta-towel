@@ -25,6 +25,8 @@ const BATTLE = {
   respawnDelay: 3,             // 下へ抜けた語句が、また上から出てくるまでの秒数
   reviveDelay: 3,              // 体力ゼロのあと、再開するまでの秒数
   wordShowTime: 0.6,           // 吸い込んだ語句を画面中央に大きく出す秒数
+  hpOverride: { zako: 0, mid: 0, boss: 0 },   // 0 のときは data/words.js の hp を使う。0より大きいと役割ごとにこの硬さにする
+  shotPattern: { zako: [0], mid: [-0.18, 0.18], boss: [-0.25, 0, 0.25] },   // 敵の弾の向き（自機をねらう向きからのずれ）
 };
 
 // ===== 敵の弾の絵（ここだけ書き換えれば、弾の見た目が変わる） =====
@@ -90,6 +92,7 @@ const Battle = (() => {
   let banner = null;         // 「大ボス あらわる！」などの帯
   let shake = 0;             // 画面のゆれ（被弾したとき）
   let level = FUWARI_LEVELS[0];
+  let hits = 0, downs = 0;   // 被弾した回数、やられた回数
 
   function font(size) { return `bold ${size}px ${FONT_FAMILY}`; }
   const hasKanji = s => /[一-龯々]/.test(s);
@@ -147,6 +150,7 @@ const Battle = (() => {
     resetRound(words.filter(w => w !== bossWord));
     player = { x: W / 2, y: H * 0.8, hp: BATTLE.playerMaxHp, inv: 0, glow: 0, hurt: 0 };
     level = fuwariLevel(opts.fuwariCount);
+    hits = 0; downs = 0;
     paused = false; moved = false; banner = null; shake = 0; showWord = null; threads = [];
     state = "intro"; stateTimer = 2;
     running = true;
@@ -199,7 +203,7 @@ const Battle = (() => {
     const x = role === "boss" ? W / 2 : margin + Math.random() * Math.max(1, W - margin * 2);
     enemies.push({
       word, role, size, w, h: size * 1.2,
-      bx: x, x, y: -size, hp: word.hp, maxHp: word.hp,
+      bx: x, x, y: -size, hp: BATTLE.hpOverride[role] || word.hp, maxHp: BATTLE.hpOverride[role] || word.hp,
       age: 0, phase: Math.random() * 6, fire: 1 + Math.random() * 1.5, flash: 0
     });
   }
@@ -238,7 +242,7 @@ const Battle = (() => {
     }
     if (state === "clear") {
       stateTimer -= dt;
-      if (stateTimer <= 0) { stop(); opts.onEnd(absorbed.map(w => w.id)); }
+      if (stateTimer <= 0) { stop(); opts.onEnd(absorbed.map(w => w.id), { time: t, hits, downs }); }
       return;
     }
 
@@ -292,7 +296,7 @@ const Battle = (() => {
       if (e.fire <= 0 && e.y > 0 && e.y < H * 0.62) {
         e.fire = BATTLE.enemyFireInterval[e.role] * (0.8 + Math.random() * 0.4);
         const ang = Math.atan2(player.y - e.y, player.x - e.x);
-        const bullets = e.role === "boss" ? [-0.25, 0, 0.25] : [0];
+        const bullets = BATTLE.shotPattern[e.role] || [0];
         for (const da of bullets) {
           ebullets.push({ x: e.x, y: e.y + e.h / 2, vx: Math.cos(ang + da) * BATTLE.enemyBulletSpeed, vy: Math.sin(ang + da) * BATTLE.enemyBulletSpeed });
         }
@@ -387,11 +391,13 @@ const Battle = (() => {
     player.hp -= BATTLE.damage;
     player.inv = BATTLE.invincibleTime;
     player.hurt = 0.4;
+    hits++;
     shake = 0.25;
     Sound.se("damage");
     if (player.hp <= 0) {
       player.hp = 0;
       state = "down";
+      downs++;
       stateTimer = BATTLE.reviveDelay;
       ebullets = [];
     }
@@ -507,7 +513,7 @@ const Battle = (() => {
     // 状態の文字
     if (state === "intro") centerText(opts.stageName, "スタート！", 1);
     if (state === "down") centerText("やられた…", `${Math.ceil(stateTimer)}秒後に再開`, 1);
-    if (state === "clear") centerText("10語あつまった！", "クイズへ", 1);
+    if (state === "clear") centerText("10語あつまった！", `タイム ${fmtTime(t)}　被弾 ${hits}回`, 1);
     if (paused) {
       ctx.fillStyle = "rgba(248,243,228,0.85)";
       ctx.fillRect(0, 0, W, H);
@@ -595,7 +601,7 @@ const Battle = (() => {
     ctx.font = font(18);
     ctx.fillText(`${absorbed.length} / ${opts.total} 語`, W - 14, top);
     ctx.font = font(12);
-    ctx.fillText(`${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`, W - 14, top + 24);
+    ctx.fillText(fmtTime(t), W - 14, top + 24);
   }
 
   function drawBigWord(word, remain) {
@@ -636,6 +642,8 @@ const Battle = (() => {
     ctx.strokeText(small, W / 2, H * 0.32 + 40);
     ctx.fillText(small, W / 2, H * 0.32 + 40);
   }
+
+  function fmtTime(sec) { return `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, "0")}`; }
 
   function roundRect(x, y, w, h, r) {
     ctx.beginPath();
