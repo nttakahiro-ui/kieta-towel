@@ -2,25 +2,27 @@
 // 空中と地上の2つの層がある
 //   空中の敵 … 自機の弾（自動で連射）で倒す
 //   地上の敵 … 自機の前にある照準◎に入ると、自動で「たね」を落として倒す
-// 主役は語句の敵。語句は1バトルで2回出る
-//   1回目 … 倒すと、ふわりが反応して光って消えるだけ（吸い込まない）
-//   2回目 … 倒すと、糸のようにほどけて自機のほうへ吸い込まれる（クイズに出る）
+// 主役は語句の敵。バトルは「1周目 → 2周目 → 大ボス」の台本で進む（出る順番・出方・時刻はデータで固定）
+//   1周目 … 大ボス以外の語句が決まった順に出る。倒すと、ふわりが反応して光って消えるだけ（吸い込まない）
+//   2周目 … 同じ語句が同じ順番・同じ出方で出る。倒すと、糸のようにほどけて吸い込まれる（クイズに出る）
+//            取り逃がした語句は、そのバトルでは取れない
+//   大ボス … 2周目のあとに1回。倒して吸い込むとバトル終了
 // 雑魚（語句ではない敵）は小さく薄く。倒すとぽんっと花になり、ときどき体力が回復する「綿のたね」を落とす
 
 // ===== 調整用の数値（速さ・弾の量・硬さなど）はここにまとめる =====
 const BATTLE = {
-  // --- 語句の敵 ---
-  spawnInterval: 6,            // 語句の敵が出てくる間隔（秒）
-  emptyWait: 3,                // 画面に語句の敵がいないときは、この秒数より長く待たない
+  // --- 台本（2周＋大ボス） ---
+  roundInterval1: 4.5,         // 1周目に語句が出てくる間隔（秒）。目安は1周50秒
+  roundInterval2: 5,           // 2周目に語句が出てくる間隔（秒）
+  round1Speed: 1.25,           // 1周目の語句の動く速さの倍率（1周目は速く流す）
+  round1FillerScale: 2,        // 1周目の雑魚の出る間隔の倍率（大きいほど雑魚が少ない）
+  roundGap: 2.5,               // 周と周のあいだの秒数（帯を出す）
   firstSpawnDelay: 2.2,        // 始まってから最初の語句が出るまで（秒）
-  maxOnScreen: 3,              // 同時に出ている語句の敵の最大数（大ボスは別）
   fallTime: { zako: 12, mid: 15 },  // 空中の語句が画面の上から下まで降りる秒数（大きいほどゆっくり）
   edgeFallTime: 16,            // 「端にかくれる」語句が降りる秒数
   crossTime: 7,                // 「横切る」語句が画面を横切る秒数
   crossY: 0.2,                 // 「横切る」語句が通る高さ（画面の高さに対する割合）
   escortCount: 4,              // 「雑魚のうしろ」の語句を守る雑魚の数
-  wordPasses: 2,               // 語句が出てくる回数。最後の回で倒すと吸い込む（それより前は光って消えるだけ）
-  bossPasses: 1,               // 大ボスが出てくる回数
   kanaSize: 13,                // 敵の語句の上に出すふりがなの大きさ（px）
   bossStopY: 0.22,             // 大ボスが止まる高さ（画面の高さに対する割合）
   bossEnterTime: 3,            // 大ボスが止まる位置まで降りてくる秒数（この間は弾が当たらない）
@@ -67,7 +69,6 @@ const BATTLE = {
   damage: 20,                  // 敵の弾に当たったときに減る体力
   healOnAbsorb: 12,            // 語句を吸い込んだときに回復する体力
   invincibleTime: 1.3,         // 当たったあと、しばらく無敵になる秒数
-  respawnDelay: 2,             // 下へ抜けた語句が、また上から出てくるまでの秒数
   reviveDelay: 3,              // 体力ゼロのあと、再開するまでの秒数
   wordShowTime: 1.0,           // 吸い込んだ語句を画面中央に大きく出す秒数（この間は弾が当たらない）
   slowTime: 0.3,               // 吸い込む瞬間に画面全体がゆっくりになる秒数
@@ -141,10 +142,13 @@ const Battle = (() => {
   let stateTimer = 0;
   let player, shots, enemies, ebullets, threads, fluff;
   let fillers, bombs, pops, items, terrain, cloudShadows;
-  let queue, waiting, absorbed, bossWord, bossSpawned, groundIds;
-  let passes;                // 語句ごとに、何回倒したか（id → 回数）
-  let vanish;                // 1回目に倒した語句が、光って消えていく演出
-  let spawnTimer, shotTimer, fillerTimer, bombTimer;
+  let script, absorbed, missed, bossWord, groundIds;
+  let phase;                 // "round1" / "round2" / "boss"
+  let nextIdx, nextAt;       // 台本: 次に出す語句の番号と、出す時刻（その周の中の時間）
+  let roundT;                // 今の周の中の経過時間（秒）
+  let gapT;                  // 周と周のあいだの残り時間（秒）
+  let vanish;                // 1周目に倒した語句が、光って消えていく演出
+  let shotTimer, fillerTimer, bombTimer;
   let showWord = null;       // 画面中央に出している語句
   let drag = null;
   let paused = false;        // アプリが裏に回ったときなど
@@ -215,17 +219,20 @@ const Battle = (() => {
       canvas._bound = true;
     }
     t = 0;
-    absorbed = [];
+    absorbed = []; missed = [];
     bossWord = words.find(w => w.role === "boss") || words[words.length - 1];
     // 地上に出る語句は、データの出方（pattern）が "ground" のもの
     groundIds = new Set(words.filter(w => w.pattern === "ground" && w !== bossWord).map(w => w.id));
-    passes = {};
+    // 台本: 大ボス以外の語句を、データの順番（order）でならべる
+    script = words.filter(w => w !== bossWord).sort((a, b) => (a.order || 0) - (b.order || 0));
     vanish = [];
     fluff = Array.from({ length: 18 }, () => ({ x: Math.random() * W, y: Math.random() * H, r: 2 + Math.random() * 4, v: 30 + Math.random() * 40, p: Math.random() * 6 }));
     cloudShadows = Array.from({ length: 3 }, (_, i) => ({ x: Math.random() * W, y: (i / 3) * H, rx: rand(70, 120), ry: rand(35, 55) }));
     terrain = [];
     fillTerrain();
-    resetRound(words.filter(w => w !== bossWord));
+    shots = []; enemies = []; ebullets = []; fillers = []; bombs = []; items = [];
+    startPhase("round1");
+    fillerTimer = 1.2; shotTimer = 0; bombTimer = 0;
     player = { x: W / 2, y: H * 0.8, hp: BATTLE.playerMaxHp, inv: 0, glow: 0, hurt: 0 };
     level = POWER_LEVELS[0];
     score = 0; combo = 0; maxCombo = 0; floats = [];
@@ -239,18 +246,15 @@ const Battle = (() => {
     rafId = requestAnimationFrame(loop);
   }
 
-  // 残りの語句で（再）スタートする
-  function resetRound(rest) {
-    queue = rest.slice().sort((a, b) => (a.order || 0) - (b.order || 0));   // 出る順番はデータで固定
-    waiting = [];
-    shots = []; enemies = []; ebullets = []; fillers = []; bombs = []; items = [];
-    threads = threads || []; pops = pops || [];
-    bossSpawned = false;
-    spawnTimer = BATTLE.firstSpawnDelay;
-    fillerTimer = 1.2;
-    shotTimer = 0;
-    bombTimer = 0;
+  // 周を始める
+  function startPhase(p) {
+    phase = p;
+    nextIdx = 0;
+    roundT = 0;
+    gapT = 0;
+    nextAt = p === "round1" ? BATTLE.firstSpawnDelay : 0.8;
   }
+  const roundInterval = () => phase === "round1" ? BATTLE.roundInterval1 : BATTLE.roundInterval2;
 
   function stop() {
     running = false;
@@ -317,10 +321,10 @@ const Battle = (() => {
     if (pattern === "edge") x = lane < 0.5 ? -w / 2 : W + w / 2;
     if (pattern === "cross") { x = lane < 0.5 ? -w / 2 - 10 : W + w / 2 + 10; y = H * BATTLE.crossY; }
     const hp = BATTLE.hpOverride[role] || word.hp;
-    const need = role === "boss" ? BATTLE.bossPasses : BATTLE.wordPasses;
     const e = {
       word, role, size, w, h: size * 1.2, ground, pattern, lane,
-      last: (passes[word.id] || 0) + 1 >= need,   // この回で倒せば吸い込む
+      last: phase !== "round1",                    // 2周目と大ボスは、倒せば吸い込む
+      spd: phase === "round1" ? BATTLE.round1Speed : 1,
       bx: x, x, y, hp, maxHp: hp,
       age: 0, phase: (word.id * 1.7) % 6, fire: 1.2, flash: 0
     };
@@ -439,36 +443,43 @@ const Battle = (() => {
     }
     if (state === "clear") {
       stateTimer -= dt;
-      if (stateTimer <= 0) { stop(); opts.onEnd(absorbed.map(w => w.id), { time: t, hits, downs, score, maxCombo }); }
+      if (stateTimer <= 0) { stop(); opts.onEnd(absorbed.map(w => w.id), { time: t, hits, downs, score, maxCombo, missed: missed.map(w => w.id) }); }
       return;
     }
 
-    // 下へ抜けた語句を、しばらくしてから列に戻す
-    for (let i = waiting.length - 1; i >= 0; i--) {
-      if (t >= waiting[i].at) { queue.push(waiting[i].word); waiting.splice(i, 1); }
+    // ===== 台本: 決まった時刻に、決まった順番で語句を出す（倒したかどうかには関係しない） =====
+    if (gapT > 0) {
+      // 周と周のあいだ
+      gapT -= dt;
+      if (gapT <= 0) {
+        if (phase === "round1") {
+          startPhase("round2");
+          banner = { text: "2周目　こんどは吸い込める！", t: 2.2, color: "rgba(220,170,60,0.92)" };
+          Sound.se("power");
+        } else {
+          startPhase("boss");
+          spawn(bossWord);
+          banner = { text: "大ボス あらわる！", t: 1.8 };
+          Sound.se("boss");
+        }
+      }
+    } else if (phase !== "boss") {
+      roundT += dt;
+      while (nextIdx < script.length && roundT >= nextAt) {
+        spawn(script[nextIdx]);
+        nextIdx++;
+        nextAt += roundInterval();
+      }
+      // その周の語句が全部出て、画面からいなくなったら次へ
+      if (nextIdx >= script.length && enemies.every(e => e.role === "boss")) gapT = BATTLE.roundGap;
     }
 
-    // 語句の敵を出す
-    spawnTimer -= dt;
-    if (enemies.length === 0) spawnTimer = Math.min(spawnTimer, BATTLE.emptyWait);
-    const normalOnScreen = enemies.filter(e => e.role !== "boss").length;
-    if (spawnTimer <= 0 && queue.length && normalOnScreen < BATTLE.maxOnScreen) {
-      spawn(queue.shift());
-      spawnTimer = BATTLE.spawnInterval;
-    }
-    // ほかの語句をすべて吸い込んだら、最後に大ボス
-    if (!bossSpawned && absorbed.length === opts.total - 1 && !absorbed.includes(bossWord) && enemies.length === 0) {
-      spawn(bossWord);
-      bossSpawned = true;
-      banner = { text: "大ボス あらわる！", t: 1.8 };
-      Sound.se("boss");
-    }
-
-    // 雑魚の群れを出す（大ボスのときは少なめ）
+    // 雑魚の群れを出す（1周目と大ボスのときは少なめ）
     fillerTimer -= dt;
     if (fillerTimer <= 0) {
       if (fillers.length < BATTLE.fillerMax) spawnWave();
-      fillerTimer = BATTLE.fillerInterval * (bossSpawned ? 1.6 : 1) * rand(0.8, 1.2);
+      const scale = phase === "round1" ? BATTLE.round1FillerScale : (phase === "boss" ? 1.6 : 1);
+      fillerTimer = BATTLE.fillerInterval * scale * rand(0.8, 1.2);
     }
 
     // 自機の弾（自動で連射）
@@ -511,16 +522,16 @@ const Battle = (() => {
         e.y += sc * dt;     // 地上の語句は地面といっしょに流れる
       } else if (e.pattern === "edge") {
         // 端にかくれる: 半分だけ顔を出して、出たり引っこんだりしながら降りる
-        e.y += (H + e.size * 2) / BATTLE.edgeFallTime * dt;
+        e.y += (H + e.size * 2) / BATTLE.edgeFallTime * dt * e.spd;
         const show = 0.35 + 0.3 * Math.sin(e.age * 1.2);   // 見えている割合
         e.x = e.lane < 0.5 ? -e.w / 2 + e.w * show : W + e.w / 2 - e.w * show;
       } else if (e.pattern === "cross") {
         // 横切る: 上のほうを横に通りすぎる
         const dir = e.lane < 0.5 ? 1 : -1;
-        e.x += dir * (W + e.w + 20) / BATTLE.crossTime * dt;
+        e.x += dir * (W + e.w + 20) / BATTLE.crossTime * dt * e.spd;
         e.y = H * BATTLE.crossY + Math.sin(e.age * 2) * 14;
       } else {
-        e.y += (H + e.size * 2) / BATTLE.fallTime[e.role] * dt;
+        e.y += (H + e.size * 2) / BATTLE.fallTime[e.role] * dt * e.spd;
         e.x = e.bx + Math.sin(e.age * BATTLE.swaySpeed + e.phase) * BATTLE.sway;
       }
       // 弾を撃つ（画面の上のほうにいる間だけ）
@@ -599,7 +610,7 @@ const Battle = (() => {
       if (e.role !== "boss" && gone) {
         e.hp = 0;
         combo = 0;
-        waiting.push({ word: e.word, at: t + BATTLE.respawnDelay });
+        if (e.last) missed.push(e.word);   // 2周目に逃がした語句は、このバトルではもう取れない
       }
     }
     enemies = enemies.filter(e => e.hp > 0);
@@ -690,7 +701,6 @@ const Battle = (() => {
 
   // 語句を倒した
   function defeat(e) {
-    passes[e.word.id] = (passes[e.word.id] || 0) + 1;
     // 語句を続けて倒すとコンボ（語句を下へ逃がすか、弾に当たると0にもどる）
     combo++;
     maxCombo = Math.max(maxCombo, combo);
@@ -702,7 +712,7 @@ const Battle = (() => {
     absorb(e);
   }
 
-  // 1回目: 吸い込まずに、光って消えるだけ。ふわりが反応する。しばらくしてまた出てくる
+  // 1周目: 吸い込まずに、光って消えるだけ。ふわりが反応する
   function firstPass(e) {
     vanish.push({ word: e.word, x: e.x, y: e.y, size: e.size, w: e.w, ground: e.ground, age: 0 });
     for (let i = 0; i < 14; i++) {
@@ -713,10 +723,9 @@ const Battle = (() => {
     player.glow = 0.35;
     player.notice = 0.8;   // ふわりの「！」
     Sound.se("shine");
-    waiting.push({ word: e.word, at: t + BATTLE.respawnDelay });
   }
 
-  // 最後の回: 糸がほどけるように散って、自機へ吸い込まれる
+  // 2周目・大ボス: 糸がほどけるように散って、自機へ吸い込まれる
   function absorb(e) {
     absorbed.push(e.word);
     const lv = POWER_LEVELS[Math.min(Math.floor(absorbed.length / BATTLE.powerEvery), POWER_LEVELS.length - 1)];
@@ -746,8 +755,8 @@ const Battle = (() => {
     fillers.forEach(f => addPop(f.x, f.y, "#fff8d8", 0.8, f.layer === "ground"));
     fillers = [];
     ebullets = [];
-    if (absorbed.length >= opts.total) {
-      // 10語そろったら、残っている雑魚はみんな花になる
+    if (e.role === "boss") {
+      // 大ボスを吸い込んだらバトル終了。残っている雑魚はみんな花になる
       enemies.forEach(x => (x.hp = 0));
       fillers.forEach(f => addPop(f.x, f.y, "#fff2b8", 1, f.layer === "ground"));
       fillers = []; ebullets = []; bombs = [];
@@ -798,11 +807,8 @@ const Battle = (() => {
     }
   }
 
-  // 吸い込み済みの語句はそのままで、残りの語句だけで再開
+  // やられたあと: 止めていた台本の同じところからつづける（出ていた語句もそのまま）
   function revive() {
-    const rest = [];
-    for (const w of opts.words) if (!absorbed.includes(w) && w !== bossWord) rest.push(w);
-    resetRound(rest);
     player.hp = BATTLE.playerMaxHp;
     player.inv = BATTLE.invincibleTime;
     state = "play";
@@ -955,9 +961,9 @@ const Battle = (() => {
     if (showWord) drawBigWord(showWord.word, showWord.t);
 
     // 状態の文字
-    if (state === "intro") centerText(opts.stageName, "スタート！");
+    if (state === "intro") centerText(opts.stageName, "1周目　ことばを見つけよう");
     if (state === "down") centerText("やられた…", `${Math.ceil(stateTimer)}秒後に再開`);
-    if (state === "clear") centerText("10語あつまった！", `${score}点　タイム ${fmtTime(t)}`);
+    if (state === "clear") centerText(`${absorbed.length}語あつまった！`, `${score}点　タイム ${fmtTime(t)}`);
     if (paused) {
       ctx.fillStyle = "rgba(248,243,228,0.85)";
       ctx.fillRect(0, 0, W, H);
@@ -1307,8 +1313,9 @@ const Battle = (() => {
     ctx.strokeText(`${absorbed.length} / ${opts.total} 語`, W - 14, top);
     ctx.fillText(`${absorbed.length} / ${opts.total} 語`, W - 14, top);
     ctx.font = font(12);
-    ctx.strokeText(fmtTime(t), W - 14, top + 24);
-    ctx.fillText(fmtTime(t), W - 14, top + 24);
+    const ph = { round1: "1周目", round2: "2周目", boss: "大ボス" }[phase] || "";
+    ctx.strokeText(`${ph}　${fmtTime(t)}`, W - 14, top + 24);
+    ctx.fillText(`${ph}　${fmtTime(t)}`, W - 14, top + 24);
     drawStrip(top + 42);
   }
 
