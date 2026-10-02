@@ -1148,9 +1148,10 @@ const Battle = (() => {
   function drawHpDots(e) {
     if (e.maxHp <= 1) return;
     const n = e.maxHp, gap = 10, x0 = e.x - (n - 1) * gap / 2;
+    const dy = e.y - e.h / 2 - 10 - (hasKanji(e.word.word) ? BATTLE.kanaSize + 4 : 0);   // ふりがなより上に出す
     for (let i = 0; i < n; i++) {
       ctx.beginPath();
-      ctx.arc(x0 + i * gap, e.y - e.h / 2 - 10, 3.5, 0, Math.PI * 2);
+      ctx.arc(x0 + i * gap, dy, 3.5, 0, Math.PI * 2);
       ctx.fillStyle = i < e.hp ? ENEMY_COLOR[e.role] : "rgba(0,0,0,0.12)";
       ctx.fill();
     }
