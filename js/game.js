@@ -1,33 +1,69 @@
 // バトル（縦スクロールのシューティング）
-// 敵は語句の文字。倒すと糸のようにほどけて、自機のほうへ吸い込まれる
+// 空中と地上の2つの層がある
+//   空中の敵 … 自機の弾（自動で連射）で倒す
+//   地上の敵 … 自機の前にある照準◎に入ると、自動で「たね」を落として倒す
+// 語句の敵を倒すと、糸のようにほどけて自機のほうへ吸い込まれる（クイズに出る）
+// 雑魚（語句ではない敵）は、倒すとぽんっと花になり、ときどき体力が回復する「綿のたね」を落とす
 
 // ===== 調整用の数値（速さ・弾の量・硬さなど）はここにまとめる =====
 const BATTLE = {
-  spawnInterval: 10,           // 敵が出てくる間隔（秒）
-  emptyWait: 6,                // 画面に敵がいないときは、この秒数より長く待たない
-  firstSpawnDelay: 2.2,        // 始まってから最初の敵が出るまで（秒）
-  maxOnScreen: 3,              // 同時に出ている敵の最大数（大ボスは別）
-  fallTime: { zako: 12, mid: 15 },  // 画面の上から下まで降りる秒数（大きいほどゆっくり）
+  // --- 語句の敵 ---
+  spawnInterval: 10,           // 語句の敵が出てくる間隔（秒）
+  emptyWait: 6,                // 画面に語句の敵がいないときは、この秒数より長く待たない
+  firstSpawnDelay: 2.2,        // 始まってから最初の語句が出るまで（秒）
+  maxOnScreen: 3,              // 同時に出ている語句の敵の最大数（大ボスは別）
+  fallTime: { zako: 12, mid: 15 },  // 空中の語句が画面の上から下まで降りる秒数（大きいほどゆっくり）
+  groundWordCount: 3,          // 10語のうち、地上に出す語句の数（大ボスはいつも空中）
   bossStopY: 0.22,             // 大ボスが止まる高さ（画面の高さに対する割合）
-  bossEnterTime: 3,            // 大ボスが止まる位置まで降りてくる秒数
-  sway: 16,                    // ザコ・中ボスの左右の振れ幅（px）
+  bossEnterTime: 3,            // 大ボスが止まる位置まで降りてくる秒数（この間は弾が当たらない）
+  sway: 16,                    // 空中の語句の左右の振れ幅（px）
   swaySpeed: 0.9,              // 左右に振れる速さ
   bossSway: 0.28,              // 大ボスの左右の動き（画面の幅に対する割合）
   fontSize: { zako: 26, mid: 30, boss: 36 },   // 敵の文字の大きさ（px）。24以上
-  enemyFireInterval: { zako: 3.4, mid: 2.4, boss: 1.4 },  // 敵が弾を撃つ間隔（秒）
+  enemyFireInterval: { zako: 3.4, mid: 2.4, boss: 1.4 },  // 語句の敵が弾を撃つ間隔（秒）
   enemyBulletSpeed: 140,       // 敵の弾の速さ（px/秒）
+  hpOverride: { zako: 0, mid: 0, boss: 0 },   // 0 のときは data/words.js の hp を使う。0より大きいと役割ごとにこの硬さにする
+  shotPattern: { zako: [0], mid: [-0.18, 0.18], boss: [-0.25, 0, 0.25] },   // 語句の敵の弾の向き（自機をねらう向きからのずれ）
+
+  // --- 雑魚 ---
+  fillerInterval: 3.2,         // 雑魚の群れが出てくる間隔（秒）
+  fillerMax: 12,               // 同時に出ている雑魚の最大数
+  fillerFireScale: 1.5,         // 雑魚が撃つ間隔の倍率（大きいほど撃たない）
+  dropRate: 0.3,               // 雑魚が「綿のたね」を落とす確率（0〜1）
+  healItem: 8,                 // 綿のたねで回復する体力
+
+  // --- 地上 ---
+  scrollTime: 14,              // 地面が画面の高さぶん流れる秒数（大きいほどゆっくり）
+  bombRange: 170,              // 照準◎の位置（自機からどれだけ前か、px）
+  lockRadius: 26,              // 照準◎の大きさ（この中に地上の敵が入ると、たねを落とす）
+  bombInterval: 0.3,           // たねを落とす間隔（秒）
+  bombFlight: 0.4,             // たねが地面に届くまでの秒数
+  bombRadius: 36,              // たねが当たる広さ（px）
+
+  // --- 自機 ---
   shotInterval: 0.16,          // 自機の弾の間隔（秒）
   shotSpeed: 640,              // 自機の弾の速さ（px/秒）
   playerMaxHp: 100,            // 体力
   damage: 20,                  // 敵の弾に当たったときに減る体力
-  healOnAbsorb: 12,            // 吸い込んだときに回復する体力
+  healOnAbsorb: 12,            // 語句を吸い込んだときに回復する体力
   invincibleTime: 1.3,         // 当たったあと、しばらく無敵になる秒数
   respawnDelay: 3,             // 下へ抜けた語句が、また上から出てくるまでの秒数
   reviveDelay: 3,              // 体力ゼロのあと、再開するまでの秒数
   wordShowTime: 0.6,           // 吸い込んだ語句を画面中央に大きく出す秒数
-  hpOverride: { zako: 0, mid: 0, boss: 0 },   // 0 のときは data/words.js の hp を使う。0より大きいと役割ごとにこの硬さにする
-  shotPattern: { zako: [0], mid: [-0.18, 0.18], boss: [-0.25, 0, 0.25] },   // 敵の弾の向き（自機をねらう向きからのずれ）
 };
+
+// ===== 雑魚の種類 =====
+// layer: "air"（空中・弾で倒す）/ "ground"（地上・たねで倒す）
+// hp: 硬さ、r: 当たりの大きさ、fire: 弾を撃つ間隔（秒・0なら撃たない）、spread: 弾の向き
+const FILLER_TYPES = {
+  ladybug: { layer: "air",    hp: 1, r: 13, fire: 0 },                       // てんとう虫: 横から列になって飛んでくる
+  bee:     { layer: "air",    hp: 1, r: 13, fire: 2.2 },                     // ハチ: 上から自機のほうへ急に降りてきて、引き返す
+  ghost:   { layer: "air",    hp: 2, r: 16, fire: 2.8 },                     // 綿毛おばけ: ゆらゆら降りてくる
+  weed:    { layer: "ground", hp: 2, r: 18, fire: 2.6 },                     // からまり草: 畑に生えている
+  thorn:   { layer: "ground", hp: 3, r: 20, fire: 3.4, spread: [-0.3, 0, 0.3] }, // いばらの株: 3方向に撃つ
+};
+// 雑魚の群れの出やすさ（数が大きいほどよく出る）
+const FILLER_WAVES = { ladybugs: 3, bees: 2, ghost: 2, weeds: 3, thorn: 1 };
 
 // ===== 敵の弾の絵（ここだけ書き換えれば、弾の見た目が変わる） =====
 // image に画像のパスを入れると、その画像で描く（例: "img/seed.png"）
@@ -58,6 +94,7 @@ const ENEMY_BULLET_ART = {
 
 // 敵の文字の色（役割ごと）
 const ENEMY_COLOR = { zako: "#5f8a3c", mid: "#b2733d", boss: "#c4577a" };
+
 // ふわりの強さ。集めたカードの総数で、色と弾の数が変わる（cards 枚以上でその段階）
 const FUWARI_LEVELS = [
   { cards: 0,  body: "#fffdf7", line: "#c9d9b4", shots: 1, rate: 1 },
@@ -83,19 +120,24 @@ const Battle = (() => {
   let state = "play";        // "intro" / "play" / "down" / "clear"
   let stateTimer = 0;
   let player, shots, enemies, ebullets, threads, fluff;
-  let queue, waiting, absorbed, bossWord, bossSpawned;
-  let spawnTimer, shotTimer;
+  let fillers, bombs, pops, items, terrain, cloudShadows;
+  let queue, waiting, absorbed, bossWord, bossSpawned, groundIds;
+  let spawnTimer, shotTimer, fillerTimer, bombTimer;
   let showWord = null;       // 画面中央に出している語句
   let drag = null;
   let paused = false;        // アプリが裏に回ったときなど
   let moved = false;         // 一度でもドラッグしたか（操作のヒント用）
+  let groundHinted = false;  // 地上の敵のヒントを出したか
   let banner = null;         // 「大ボス あらわる！」などの帯
   let shake = 0;             // 画面のゆれ（被弾したとき）
   let level = FUWARI_LEVELS[0];
   let hits = 0, downs = 0;   // 被弾した回数、やられた回数
+  let lock = false;          // 照準に地上の敵が入っているか
 
   function font(size) { return `bold ${size}px ${FONT_FAMILY}`; }
   const hasKanji = s => /[一-龯々]/.test(s);
+  const scrollSpeed = () => H / BATTLE.scrollTime;
+  const rand = (a, b) => a + Math.random() * (b - a);
 
   // 画面の大きさに合わせる
   function resize() {
@@ -108,14 +150,17 @@ const Battle = (() => {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (player) {
       player.x = Math.min(Math.max(player.x, 24), W - 24);
-      player.y = Math.min(Math.max(player.y, 80), H - 40);
+      player.y = Math.min(Math.max(player.y, minPlayerY()), H - 40);
     }
   }
+  // 照準が画面の中に入るように、自機は上に行きすぎない
+  function minPlayerY() { return Math.min(H - 60, BATTLE.bombRange + 60); }
 
   // ===== 操作: 指一本のドラッグ（指の動いたぶんだけ自機が動く） =====
   function onDown(e) {
     e.preventDefault();
     if (paused) { resume(); return; }
+    if (!player) return;
     drag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, px: player.x, py: player.y };
     try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
   }
@@ -124,12 +169,12 @@ const Battle = (() => {
     e.preventDefault();
     moved = true;
     player.x = Math.min(Math.max(drag.px + (e.clientX - drag.sx) * 1.15, 24), W - 24);
-    player.y = Math.min(Math.max(drag.py + (e.clientY - drag.sy) * 1.15, 80), H - 40);
+    player.y = Math.min(Math.max(drag.py + (e.clientY - drag.sy) * 1.15, minPlayerY()), H - 40);
   }
   function onUp(e) { if (drag && e.pointerId === drag.id) drag = null; }
 
   // ===== 始める =====
-  // words: このステージの10語、o: { stageName, fuwariCount, onEnd(吸い込んだ順のid配列) }
+  // words: このステージの10語、o: { stageName, fuwariCount, onEnd(吸い込んだ順のid配列, 記録) }
   function start(words, o) {
     opts = Object.assign({}, o, { words, total: words.length });
     canvas = document.getElementById("battle-canvas");
@@ -146,12 +191,18 @@ const Battle = (() => {
     t = 0;
     absorbed = [];
     bossWord = words.find(w => w.role === "boss") || words[words.length - 1];
-    fluff = Array.from({ length: 26 }, () => ({ x: Math.random() * W, y: Math.random() * H, r: 2 + Math.random() * 5, v: 12 + Math.random() * 22, p: Math.random() * 6 }));
+    // 地上に出す語句をえらぶ（ザコからえらぶ。足りないときだけ中ボスも。大ボスはいつも空中）
+    const cand = shuffle(words.filter(w => w !== bossWord && w.role === "zako")).concat(shuffle(words.filter(w => w !== bossWord && w.role === "mid")));
+    groundIds = new Set(cand.slice(0, BATTLE.groundWordCount).map(w => w.id));
+    fluff = Array.from({ length: 18 }, () => ({ x: Math.random() * W, y: Math.random() * H, r: 2 + Math.random() * 4, v: 30 + Math.random() * 40, p: Math.random() * 6 }));
+    cloudShadows = Array.from({ length: 3 }, (_, i) => ({ x: Math.random() * W, y: (i / 3) * H, rx: rand(70, 120), ry: rand(35, 55) }));
+    terrain = [];
+    fillTerrain();
     resetRound(words.filter(w => w !== bossWord));
     player = { x: W / 2, y: H * 0.8, hp: BATTLE.playerMaxHp, inv: 0, glow: 0, hurt: 0 };
     level = fuwariLevel(opts.fuwariCount);
     hits = 0; downs = 0;
-    paused = false; moved = false; banner = null; shake = 0; showWord = null; threads = [];
+    paused = false; moved = false; groundHinted = false; banner = null; shake = 0; showWord = null; threads = []; pops = [];
     state = "intro"; stateTimer = 2;
     running = true;
     lastTs = performance.now();
@@ -163,10 +214,13 @@ const Battle = (() => {
   function resetRound(rest) {
     queue = shuffle(rest.slice());
     waiting = [];
-    shots = []; enemies = []; ebullets = []; threads = threads || [];
+    shots = []; enemies = []; ebullets = []; fillers = []; bombs = []; items = [];
+    threads = threads || []; pops = pops || [];
     bossSpawned = false;
     spawnTimer = BATTLE.firstSpawnDelay;
+    fillerTimer = 1.2;
     shotTimer = 0;
+    bombTimer = 0;
   }
 
   function stop() {
@@ -191,21 +245,83 @@ const Battle = (() => {
     return a;
   }
 
-  // ===== 敵を出す =====
+  // ===== 地面（畑・小川・あぜ道）。下へ流れていく =====
+  const SEG_H = 240;
+  function makeSegment(y) {
+    const kinds = ["field", "field", "meadow", "creek", "path"];
+    const kind = kinds[Math.floor(Math.random() * kinds.length)];
+    const seg = { kind, y, deco: [] };
+    if (kind === "field") {           // 畝（うね）のある綿畑
+      seg.x0 = rand(-40, W * 0.3); seg.x1 = rand(W * 0.7, W + 40);
+      for (let i = 0; i < 10; i++) seg.deco.push({ x: rand(seg.x0 + 10, seg.x1 - 10), y: rand(20, SEG_H - 20), r: rand(5, 9) });
+    } else if (kind === "meadow") {   // 花の咲く草地
+      for (let i = 0; i < 22; i++) seg.deco.push({ x: rand(0, W), y: rand(0, SEG_H), c: ["#f6d6e0", "#fff6c9", "#ffffff", "#e3d6f4"][i % 4] });
+    } else if (kind === "creek") {    // 小川
+      seg.cy = rand(70, SEG_H - 70); seg.ph = rand(0, 6);
+    } else {                          // あぜ道
+      seg.px = rand(W * 0.25, W * 0.75); seg.ph = rand(0, 6);
+      for (let i = 0; i < 8; i++) seg.deco.push({ x: rand(0, W), y: rand(0, SEG_H), r: rand(10, 18) });
+    }
+    return seg;
+  }
+  function fillTerrain() {
+    if (!terrain.length) terrain.push(makeSegment(H - SEG_H));
+    while (terrain[terrain.length - 1].y > -SEG_H) terrain.push(makeSegment(terrain[terrain.length - 1].y - SEG_H));
+    terrain = terrain.filter(s => s.y < H + 10);
+  }
+
+  // ===== 語句の敵を出す =====
   function spawn(word) {
     const role = word.role;
+    const ground = groundIds.has(word.id) && role !== "boss";
     let size = BATTLE.fontSize[role] || 26;
     ctx.font = font(size);
     let w = ctx.measureText(word.word).width;
     // 画面からはみ出す長い語句は、24pxまで小さくする
     while (w > W - 40 && size > 24) { size -= 2; ctx.font = font(size); w = ctx.measureText(word.word).width; }
-    const margin = w / 2 + 20 + BATTLE.sway;
+    const margin = w / 2 + 20 + (ground ? 0 : BATTLE.sway);
     const x = role === "boss" ? W / 2 : margin + Math.random() * Math.max(1, W - margin * 2);
+    const hp = BATTLE.hpOverride[role] || word.hp;
     enemies.push({
-      word, role, size, w, h: size * 1.2,
-      bx: x, x, y: -size, hp: BATTLE.hpOverride[role] || word.hp, maxHp: BATTLE.hpOverride[role] || word.hp,
+      word, role, size, w, h: size * 1.2, ground,
+      bx: x, x, y: -size, hp, maxHp: hp,
       age: 0, phase: Math.random() * 6, fire: 1 + Math.random() * 1.5, flash: 0
     });
+    if (ground) groundHint();
+  }
+
+  function groundHint() {
+    if (groundHinted) return;
+    groundHinted = true;
+    banner = { text: "じめんの敵は ◎ をあわせよう", t: 2.4, color: "rgba(111,154,74,0.9)" };
+  }
+
+  // ===== 雑魚の群れを出す =====
+  function spawnFiller(type, x, y, extra) {
+    const def = FILLER_TYPES[type];
+    fillers.push(Object.assign({ type, layer: def.layer, hp: def.hp, r: def.r, x, y, age: 0, flash: 0,
+      fire: def.fire ? rand(0.8, 1.6) * def.fire * BATTLE.fillerFireScale : 0 }, extra || {}));
+  }
+  function spawnWave() {
+    const names = Object.keys(FILLER_WAVES);
+    let sum = names.reduce((a, n) => a + FILLER_WAVES[n], 0), r = Math.random() * sum, name = names[0];
+    for (const n of names) { r -= FILLER_WAVES[n]; if (r <= 0) { name = n; break; } }
+    if (name === "ladybugs") {        // 横から5匹が列になって飛んでくる
+      const fromLeft = Math.random() < 0.5, y0 = rand(H * 0.12, H * 0.38);
+      for (let i = 0; i < 5; i++) spawnFiller("ladybug", fromLeft ? -20 : W + 20, y0, { dir: fromLeft ? 1 : -1, y0, delay: i * 0.32 });
+    } else if (name === "bees") {     // 2〜3匹が上から急に降りてくる
+      const n = 2 + Math.floor(Math.random() * 2);
+      for (let i = 0; i < n; i++) spawnFiller("bee", rand(30, W - 30), -20, { delay: i * 0.45, tx: null });
+    } else if (name === "ghost") {    // 綿毛おばけが1〜2匹
+      const n = 1 + Math.floor(Math.random() * 2);
+      for (let i = 0; i < n; i++) spawnFiller("ghost", rand(40, W - 40), -24 - i * 60, { bx: 0 });
+    } else if (name === "weeds") {    // からまり草が2〜3株、横にならんで生えている
+      const n = 2 + Math.floor(Math.random() * 2), gap = W / (n + 1);
+      for (let i = 0; i < n; i++) spawnFiller("weed", gap * (i + 1) + rand(-20, 20), -24 - rand(0, 40));
+    } else {                          // いばらの株が1つ
+      spawnFiller("thorn", rand(50, W - 50), -26);
+    }
+    if (FILLER_TYPES[{ ladybugs: "ladybug", bees: "bee", ghost: "ghost", weeds: "weed", thorn: "thorn" }[name]].layer === "ground") groundHint();
   }
 
   // ===== 毎フレームの処理 =====
@@ -225,10 +341,16 @@ const Battle = (() => {
     player.glow = Math.max(0, player.glow - dt);
     player.hurt = Math.max(0, player.hurt - dt);
     if (banner) { banner.t -= dt; if (banner.t <= 0) banner = null; }
-    // 背景の綿毛
+    const sc = scrollSpeed();
+
+    // 地面・雲の影・綿毛（奥行きのために、速さを変えて流す）
+    for (const s of terrain) s.y += sc * dt;
+    fillTerrain();
+    for (const c of cloudShadows) { c.y += sc * 1.5 * dt; c.x += 8 * dt; if (c.y - c.ry > H) { c.y = -c.ry - rand(0, 200); c.x = rand(0, W); } }
     for (const f of fluff) { f.y += f.v * dt; f.x += Math.sin(t + f.p) * 8 * dt; if (f.y > H + 10) { f.y = -10; f.x = Math.random() * W; } }
     if (showWord) { showWord.t -= dt; if (showWord.t <= 0) showWord = null; }
     updateThreads(dt);
+    updatePops(dt);
 
     if (state === "intro") {
       stateTimer -= dt;
@@ -251,7 +373,7 @@ const Battle = (() => {
       if (t >= waiting[i].at) { queue.push(waiting[i].word); waiting.splice(i, 1); }
     }
 
-    // 敵を出す
+    // 語句の敵を出す
     spawnTimer -= dt;
     if (enemies.length === 0) spawnTimer = Math.min(spawnTimer, BATTLE.emptyWait);
     const normalOnScreen = enemies.filter(e => e.role !== "boss").length;
@@ -267,6 +389,13 @@ const Battle = (() => {
       Sound.se("boss");
     }
 
+    // 雑魚の群れを出す（大ボスのときは少なめ）
+    fillerTimer -= dt;
+    if (fillerTimer <= 0) {
+      if (fillers.length < BATTLE.fillerMax) spawnWave();
+      fillerTimer = BATTLE.fillerInterval * (bossSpawned ? 1.6 : 1) * rand(0.8, 1.2);
+    }
+
     // 自機の弾（自動で連射）
     shotTimer -= dt;
     if (shotTimer <= 0) {
@@ -278,7 +407,23 @@ const Battle = (() => {
     for (const s of shots) { s.y -= BATTLE.shotSpeed * dt; s.x += s.vx * dt; }
     shots = shots.filter(s => s.y > -20);
 
-    // 敵の動き
+    // 地上の攻撃: 照準に地上の敵が入ったら、自動でたねを落とす
+    const rx = player.x, ry = player.y - BATTLE.bombRange;
+    lock = groundTargets().some(g => inReach(g, rx, ry, BATTLE.lockRadius));
+    bombTimer -= dt;
+    if (lock && bombTimer <= 0) {
+      bombs.push({ sx: player.x, sy: player.y - 10, tx: rx, ty: ry, age: 0 });
+      bombTimer = BATTLE.bombInterval;
+      Sound.se("bomb");
+    }
+    for (const b of bombs) {
+      b.age += dt;
+      b.ty += sc * dt;   // 落ちる先も地面といっしょに流れる
+      if (b.age >= BATTLE.bombFlight && !b.done) { b.done = true; landBomb(b.tx, b.ty); }
+    }
+    bombs = bombs.filter(b => !b.done);
+
+    // 語句の敵の動き
     for (const e of enemies) {
       e.age += dt;
       e.flash = Math.max(0, e.flash - dt);
@@ -287,6 +432,8 @@ const Battle = (() => {
         e.y = -e.size + (H * BATTLE.bossStopY + e.size) * (1 - Math.pow(1 - enter, 2));
         const range = Math.min(W * BATTLE.bossSway, Math.max(0, W / 2 - e.w / 2 - 12));
         e.x = W / 2 + Math.sin(e.age * 0.7) * range;
+      } else if (e.ground) {
+        e.y += sc * dt;     // 地上の語句は地面といっしょに流れる
       } else {
         e.y += (H + e.size * 2) / BATTLE.fallTime[e.role] * dt;
         e.x = e.bx + Math.sin(e.age * BATTLE.swaySpeed + e.phase) * BATTLE.sway;
@@ -295,31 +442,65 @@ const Battle = (() => {
       e.fire -= dt;
       if (e.fire <= 0 && e.y > 0 && e.y < H * 0.62) {
         e.fire = BATTLE.enemyFireInterval[e.role] * (0.8 + Math.random() * 0.4);
-        const ang = Math.atan2(player.y - e.y, player.x - e.x);
-        const bullets = BATTLE.shotPattern[e.role] || [0];
-        for (const da of bullets) {
-          ebullets.push({ x: e.x, y: e.y + e.h / 2, vx: Math.cos(ang + da) * BATTLE.enemyBulletSpeed, vy: Math.sin(ang + da) * BATTLE.enemyBulletSpeed });
+        fireAt(e.x, e.y + (e.ground ? 0 : e.h / 2), BATTLE.shotPattern[e.role] || [0]);
+      }
+    }
+
+    // 雑魚の動き
+    for (const f of fillers) {
+      f.age += dt;
+      f.flash = Math.max(0, f.flash - dt);
+      const def = FILLER_TYPES[f.type];
+      if (f.delay > 0) { f.delay -= dt; continue; }
+      if (f.type === "ladybug") {
+        f.x += f.dir * 115 * dt;
+        f.y = f.y0 + Math.sin(f.x / 60) * 28 + f.age * 6;
+        f.ang = Math.atan2(Math.cos(f.x / 60) * 28 / 60 * f.dir, f.dir);
+      } else if (f.type === "bee") {
+        if (f.tx === null) { f.tx = player.x; f.turn = H * rand(0.38, 0.5); }
+        if (!f.back) {
+          f.y += 230 * dt;
+          f.x += (f.tx - f.x) * 2 * dt;
+          if (f.y > f.turn) { f.back = true; f.vx = (f.x < W / 2 ? 1 : -1) * 160; }
+        } else {
+          f.y -= 90 * dt; f.x += f.vx * dt;
+        }
+      } else if (f.type === "ghost") {
+        f.y += H / 16 * dt;
+        f.x += Math.sin(f.age * 1.3) * 40 * dt;
+      } else {
+        f.y += sc * dt;     // 地上の雑魚は地面といっしょに流れる
+      }
+      if (def.fire) {
+        f.fire -= dt;
+        if (f.fire <= 0 && f.y > 0 && f.y < H * 0.68) {
+          f.fire = def.fire * BATTLE.fillerFireScale * rand(0.8, 1.2);
+          fireAt(f.x, f.y, def.spread || [0]);
         }
       }
     }
 
-    // 弾が敵に当たったか
+    // 自機の弾が空中の敵に当たったか（地上の敵には当たらない）
     for (const s of shots) {
+      let hit = false;
       for (const e of enemies) {
+        if (e.ground || e.hp <= 0) continue;
         if (e.role === "boss" && e.age < BATTLE.bossEnterTime) continue;   // 大ボスは降りてくる間は当たらない
-        if (e.hp > 0 && Math.abs(s.x - e.x) < e.w / 2 + 4 && Math.abs(s.y - e.y) < e.h / 2) {
-          s.y = -999;
-          e.hp--;
-          e.flash = 0.12;
-          Sound.se("hit");
-          if (e.hp <= 0) defeat(e);
-          break;
+        if (Math.abs(s.x - e.x) < e.w / 2 + 4 && Math.abs(s.y - e.y) < e.h / 2) {
+          hit = true; damageWord(e); break;
         }
       }
+      if (!hit) {
+        for (const f of fillers) {
+          if (f.layer !== "air" || f.hp <= 0 || f.delay > 0) continue;
+          if (Math.hypot(s.x - f.x, s.y - f.y) < f.r + 4) { hit = true; damageFiller(f); break; }
+        }
+      }
+      if (hit) s.y = -999;
     }
     enemies = enemies.filter(e => e.hp > 0);
 
-    // 下へ抜けた敵
+    // 下へ抜けた語句の敵
     for (const e of enemies) {
       if (e.role !== "boss" && e.y > H + e.size) {
         e.hp = 0;
@@ -327,6 +508,22 @@ const Battle = (() => {
       }
     }
     enemies = enemies.filter(e => e.hp > 0);
+    // 画面の外へ出た雑魚
+    fillers = fillers.filter(f => f.hp > 0 && f.y < H + 40 && f.y > -200 && f.x > -60 && f.x < W + 60);
+
+    // 綿のたね（体力が回復する）
+    for (const it of items) {
+      it.age += dt;
+      it.y += (sc * 0.7 + 12) * dt;
+      if (Math.hypot(it.x - player.x, it.y - player.y) < 28) {
+        it.got = true;
+        player.hp = Math.min(BATTLE.playerMaxHp, player.hp + BATTLE.healItem);
+        player.glow = 0.3;
+        Sound.se("item");
+        addPop(it.x, it.y, "#fff8d0", 0.6);
+      }
+    }
+    items = items.filter(it => !it.got && it.y < H + 20);
 
     // 敵の弾
     player.inv = Math.max(0, player.inv - dt);
@@ -341,10 +538,60 @@ const Battle = (() => {
     ebullets = ebullets.filter(b => b.y < H + 20 && b.y > -20 && b.x > -20 && b.x < W + 20);
   }
 
-  // 倒した: 糸がほどけるように散って、自機へ吸い込まれる
+  function fireAt(x, y, pattern) {
+    const ang = Math.atan2(player.y - y, player.x - x);
+    for (const da of pattern) {
+      ebullets.push({ x, y, vx: Math.cos(ang + da) * BATTLE.enemyBulletSpeed, vy: Math.sin(ang + da) * BATTLE.enemyBulletSpeed });
+    }
+  }
+
+  // 地上の的（地上の語句と、地上の雑魚）
+  function groundTargets() {
+    return enemies.filter(e => e.ground && e.hp > 0 && e.y > 0).concat(fillers.filter(f => f.layer === "ground" && f.hp > 0 && f.y > 0));
+  }
+  function inReach(g, x, y, r) {
+    if (g.word) return Math.abs(x - g.x) < g.w / 2 + r && Math.abs(y - g.y) < g.h / 2 + r;
+    return Math.hypot(x - g.x, y - g.y) < g.r + r;
+  }
+  // たねが地面に届いた: ぽんっと花が咲いて、まわりの地上の敵に当たる
+  function landBomb(x, y) {
+    addPop(x, y, "#ffffff", 1.1, true);
+    Sound.se("pop");
+    for (const g of groundTargets()) {
+      if (!inReach(g, x, y, BATTLE.bombRadius * 0.6)) continue;
+      if (g.word) damageWord(g); else damageFiller(g);
+    }
+  }
+
+  function damageWord(e) {
+    e.hp--;
+    e.flash = 0.12;
+    Sound.se("hit");
+    if (e.hp <= 0) defeat(e);
+  }
+  function damageFiller(f) {
+    f.hp--;
+    f.flash = 0.12;
+    if (f.hp > 0) { Sound.se("hit"); return; }
+    // 倒した雑魚は、ぽんっと花になる
+    addPop(f.x, f.y, f.layer === "ground" ? "#f6c9d6" : "#fff2b8", 1, f.layer === "ground");
+    Sound.se("pop");
+    if (Math.random() < BATTLE.dropRate) items.push({ x: f.x, y: f.y, age: 0 });
+  }
+
+  // 花が咲くような小さな演出
+  function addPop(x, y, color, scale, ground) {
+    pops.push({ x, y, color, scale, ground: !!ground, age: 0 });
+  }
+  function updatePops(dt) {
+    const sc = scrollSpeed();
+    for (const p of pops) { p.age += dt; if (p.ground) p.y += sc * dt; }
+    pops = pops.filter(p => p.age < 0.7);
+  }
+
+  // 語句を倒した: 糸がほどけるように散って、自機へ吸い込まれる
   function defeat(e) {
     absorbed.push(e.word);
-    ctx.font = font(e.size);
     const n = Math.min(60, 14 + e.word.word.length * 5);
     for (let i = 0; i < n; i++) {
       const a = Math.random() * Math.PI * 2;
@@ -360,8 +607,10 @@ const Battle = (() => {
     player.hp = Math.min(BATTLE.playerMaxHp, player.hp + BATTLE.healOnAbsorb);
     showWord = { word: e.word, t: BATTLE.wordShowTime };
     if (absorbed.length >= opts.total) {
+      // 10語そろったら、残っている雑魚はみんな花になる
       enemies.forEach(x => (x.hp = 0));
-      ebullets = [];
+      fillers.forEach(f => addPop(f.x, f.y, "#fff2b8", 1, f.layer === "ground"));
+      fillers = []; ebullets = []; bombs = [];
       state = "clear";
       stateTimer = 2;
       banner = null;
@@ -406,8 +655,7 @@ const Battle = (() => {
   // 吸い込み済みの語句はそのままで、残りの語句だけで再開
   function revive() {
     const rest = [];
-    const all = opts.words;
-    for (const w of all) if (!absorbed.includes(w) && w !== bossWord) rest.push(w);
+    for (const w of opts.words) if (!absorbed.includes(w) && w !== bossWord) rest.push(w);
     resetRound(rest);
     player.hp = BATTLE.playerMaxHp;
     player.inv = BATTLE.invincibleTime;
@@ -415,24 +663,35 @@ const Battle = (() => {
   }
 
   // ===== 描く =====
+  // 描く順番: 地面 → 地上の敵 → 照準 → 空中のものの影 → 空中の敵 → 弾 → 自機 → 文字
   function draw() {
     ctx.save();
     if (shake > 0) ctx.translate((Math.random() - 0.5) * 10 * shake / 0.25, (Math.random() - 0.5) * 10 * shake / 0.25);
-    // 背景: 畑の空（緑と生成り）
-    const g = ctx.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, "#e3f0d0");
-    g.addColorStop(1, "#f8f2e2");
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, W, H);
-    // 遠くの丘
-    ctx.fillStyle = "#d3e6bb";
-    ctx.beginPath();
-    ctx.moveTo(0, H);
-    for (let x = 0; x <= W; x += 20) ctx.lineTo(x, H - 50 - Math.sin(x / 70 + t * 0.15) * 14);
-    ctx.lineTo(W, H); ctx.fill();
-    // 綿毛
-    ctx.fillStyle = "rgba(255,255,255,0.85)";
-    for (const f of fluff) { ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2); ctx.fill(); }
+
+    drawTerrain();
+
+    // 地上の花（たねが咲いたあと）
+    for (const p of pops) if (p.ground) drawPop(p);
+    // 地上の雑魚と、地上の語句
+    for (const f of fillers) if (f.layer === "ground") drawFiller(f);
+    for (const e of enemies) if (e.ground) drawGroundWord(e);
+    // 落ちていくたね
+    for (const b of bombs) drawBomb(b);
+    // 照準
+    if (state === "play") drawReticle();
+
+    // 雲の影（地面の上を流れる）
+    ctx.fillStyle = "rgba(70,90,50,0.07)";
+    for (const c of cloudShadows) { ctx.beginPath(); ctx.ellipse(c.x, c.y, c.rx, c.ry, 0, 0, Math.PI * 2); ctx.fill(); }
+
+    // 空中のものの影（右下にずらして、浮いているように見せる）
+    ctx.fillStyle = "rgba(60,80,40,0.16)";
+    for (const f of fillers) if (f.layer === "air" && !(f.delay > 0)) { ctx.beginPath(); ctx.ellipse(f.x + 16, f.y + 26, f.r * 0.9, f.r * 0.5, 0, 0, Math.PI * 2); ctx.fill(); }
+    for (const it of items) { ctx.beginPath(); ctx.ellipse(it.x + 8, it.y + 14, 7, 4, 0, 0, Math.PI * 2); ctx.fill(); }
+    ctx.beginPath(); ctx.ellipse(player.x + 20, player.y + 34, 26, 10, 0, 0, Math.PI * 2); ctx.fill();
+
+    // 綿のたね（体力回復）
+    for (const it of items) drawItem(it);
 
     // 自機の弾（小さな光のつぶ）
     ctx.fillStyle = "#fff9d6";
@@ -440,31 +699,32 @@ const Battle = (() => {
     ctx.lineWidth = 1.5;
     for (const s of shots) { ctx.beginPath(); ctx.ellipse(s.x, s.y, 3.5, 7, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
 
-    // 敵（語句の文字）
+    // 空中の雑魚
+    for (const f of fillers) if (f.layer === "air") drawFiller(f);
+
+    // 空中の語句の敵
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     for (const e of enemies) {
+      if (e.ground) continue;
       ctx.font = font(e.size);
       ctx.globalAlpha = e.role === "boss" && e.age < BATTLE.bossEnterTime ? 0.55 : 1;   // 降りてくる間はうすく（まだ当たらない）
       const wob = e.flash > 0 ? (Math.random() - 0.5) * 4 : 0;
+      // 影
+      ctx.fillStyle = "rgba(60,80,40,0.16)";
+      ctx.fillText(e.word.word, e.x + 14, e.y + 22);
       ctx.lineJoin = "round";
       ctx.lineWidth = 7;
       ctx.strokeStyle = e.flash > 0 ? "#fff6c8" : "#ffffff";
       ctx.strokeText(e.word.word, e.x + wob, e.y);
       ctx.fillStyle = ENEMY_COLOR[e.role];
       ctx.fillText(e.word.word, e.x + wob, e.y);
-      // 中ボス・大ボスは硬さを小さな丸で表示
-      if (e.maxHp > 1) {
-        const n = e.maxHp, gap = 10, x0 = e.x - (n - 1) * gap / 2;
-        for (let i = 0; i < n; i++) {
-          ctx.beginPath();
-          ctx.arc(x0 + i * gap, e.y - e.h / 2 - 6, 3.5, 0, Math.PI * 2);
-          ctx.fillStyle = i < e.hp ? ENEMY_COLOR[e.role] : "rgba(0,0,0,0.12)";
-          ctx.fill();
-        }
-      }
+      drawHpDots(e);
       ctx.globalAlpha = 1;
     }
+
+    // 空の花（空中の雑魚が咲いたあと）
+    for (const p of pops) if (!p.ground) drawPop(p);
 
     // 敵の弾
     for (const b of ebullets) drawEnemyBullet(b);
@@ -484,6 +744,10 @@ const Battle = (() => {
     ctx.globalAlpha = 1;
 
     drawPlayer();
+
+    // いちばん上を舞う綿毛
+    ctx.fillStyle = "rgba(255,255,255,0.8)";
+    for (const f of fluff) { ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2); ctx.fill(); }
     ctx.restore();
 
     // 被弾したとき、画面のふちをうすく赤く
@@ -501,8 +765,11 @@ const Battle = (() => {
       ctx.globalAlpha = 0.6 + Math.sin(t * 4) * 0.3;
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
       ctx.font = font(16);
+      ctx.lineWidth = 5; ctx.strokeStyle = "#ffffff"; ctx.lineJoin = "round";
+      const hy = Math.min(H - 24, player.y + 54);
+      ctx.strokeText("← ゆびでドラッグしてうごかそう →", W / 2, hy);
       ctx.fillStyle = "#48693a";
-      ctx.fillText("← ゆびでドラッグしてうごかそう →", W / 2, Math.min(H - 24, player.y + 48));
+      ctx.fillText("← ゆびでドラッグしてうごかそう →", W / 2, hy);
       ctx.globalAlpha = 1;
     }
     if (banner) drawBanner();
@@ -511,24 +778,227 @@ const Battle = (() => {
     if (showWord) drawBigWord(showWord.word, showWord.t);
 
     // 状態の文字
-    if (state === "intro") centerText(opts.stageName, "スタート！", 1);
-    if (state === "down") centerText("やられた…", `${Math.ceil(stateTimer)}秒後に再開`, 1);
-    if (state === "clear") centerText("10語あつまった！", `タイム ${fmtTime(t)}　被弾 ${hits}回`, 1);
+    if (state === "intro") centerText(opts.stageName, "スタート！");
+    if (state === "down") centerText("やられた…", `${Math.ceil(stateTimer)}秒後に再開`);
+    if (state === "clear") centerText("10語あつまった！", `タイム ${fmtTime(t)}　被弾 ${hits}回`);
     if (paused) {
       ctx.fillStyle = "rgba(248,243,228,0.85)";
       ctx.fillRect(0, 0, W, H);
-      centerText("ひとやすみ中", "画面をタップするとつづきから", 1);
+      centerText("ひとやすみ中", "画面をタップするとつづきから");
+    }
+  }
+
+  // 地面: 草地のうえに、畑・花・小川・あぜ道
+  function drawTerrain() {
+    ctx.fillStyle = "#dcebc4";
+    ctx.fillRect(-10, -10, W + 20, H + 20);
+    for (const s of terrain) {
+      const y = s.y;
+      if (s.kind === "field") {
+        ctx.fillStyle = "#e8dcbc";
+        roundRect(s.x0, y + 8, s.x1 - s.x0, SEG_H - 16, 18); ctx.fill();
+        ctx.strokeStyle = "#d8c9a2"; ctx.lineWidth = 6; ctx.lineCap = "round";
+        for (let yy = y + 26; yy < y + SEG_H - 16; yy += 22) { ctx.beginPath(); ctx.moveTo(s.x0 + 14, yy); ctx.lineTo(s.x1 - 14, yy); ctx.stroke(); }
+        for (const d of s.deco) {   // 綿の実
+          ctx.fillStyle = "#7fa85a"; ctx.beginPath(); ctx.arc(d.x, y + d.y + 3, d.r * 0.7, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(d.x, y + d.y, d.r * 0.6, 0, Math.PI * 2); ctx.fill();
+        }
+      } else if (s.kind === "meadow") {
+        for (const d of s.deco) { ctx.fillStyle = d.c; ctx.beginPath(); ctx.arc(d.x, y + d.y, 3, 0, Math.PI * 2); ctx.fill(); }
+      } else if (s.kind === "creek") {
+        ctx.strokeStyle = "#c4e0e4"; ctx.lineWidth = 34; ctx.lineCap = "round";
+        ctx.beginPath();
+        for (let x = -20; x <= W + 20; x += 16) { const yy = y + s.cy + Math.sin(x / 55 + s.ph) * 18; x === -20 ? ctx.moveTo(x, yy) : ctx.lineTo(x, yy); }
+        ctx.stroke();
+        ctx.strokeStyle = "rgba(255,255,255,0.7)"; ctx.lineWidth = 3;
+        ctx.beginPath();
+        for (let x = -20; x <= W + 20; x += 16) { const yy = y + s.cy - 4 + Math.sin(x / 55 + s.ph) * 18; x === -20 ? ctx.moveTo(x, yy) : ctx.lineTo(x, yy); }
+        ctx.stroke();
+      } else {
+        ctx.strokeStyle = "#efe4c8"; ctx.lineWidth = 26; ctx.lineCap = "round";
+        ctx.beginPath();
+        for (let yy = 0; yy <= SEG_H; yy += 20) { const xx = s.px + Math.sin(yy / 60 + s.ph) * 30; yy === 0 ? ctx.moveTo(xx, y + yy) : ctx.lineTo(xx, y + yy); }
+        ctx.stroke();
+        ctx.fillStyle = "#cfe3b3";
+        for (const d of s.deco) { ctx.beginPath(); ctx.arc(d.x, y + d.y, d.r, 0, Math.PI * 2); ctx.fill(); }
+      }
+    }
+  }
+
+  // 照準◎（自機の前の地面）。地上の敵が入ると色が変わる
+  function drawReticle() {
+    const x = player.x, y = player.y - BATTLE.bombRange, r = BATTLE.lockRadius;
+    ctx.save();
+    ctx.globalAlpha = lock ? 0.95 : 0.55;
+    ctx.strokeStyle = lock ? "#d0607f" : "#6f9a4a";
+    ctx.lineWidth = 2.5;
+    ctx.setLineDash([6, 5]);
+    ctx.lineDashOffset = -t * 20;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawBomb(b) {
+    const k = Math.min(1, b.age / BATTLE.bombFlight);
+    const x = b.sx + (b.tx - b.sx) * k, y = b.sy + (b.ty - b.sy) * k;
+    const r = 7 - k * 3;   // 地面に近づくほど小さく（落ちていく感じ）
+    ctx.fillStyle = "rgba(60,80,40,0.18)";
+    ctx.beginPath(); ctx.arc(b.tx, b.ty, 4 + k * 3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#9a7650";
+    ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.75, k * 6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath(); ctx.arc(x - r * 0.3, y - r * 0.3, r * 0.3, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // 花がひらく（倒したとき・たねが落ちたとき）
+  function drawPop(p) {
+    const k = p.age / 0.7;
+    const r = (8 + k * 22) * p.scale;
+    ctx.globalAlpha = 1 - k;
+    ctx.fillStyle = p.color;
+    for (let i = 0; i < 6; i++) {
+      const a = i / 6 * Math.PI * 2 + k;
+      ctx.beginPath(); ctx.ellipse(p.x + Math.cos(a) * r * 0.6, p.y + Math.sin(a) * r * 0.6, r * 0.35, r * 0.2, a, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.fillStyle = "#f3d27a";
+    ctx.beginPath(); ctx.arc(p.x, p.y, r * 0.18, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  function drawItem(it) {
+    const y = it.y + Math.sin(it.age * 5) * 2;
+    ctx.save();
+    ctx.globalAlpha = 0.6 + Math.sin(it.age * 8) * 0.3;
+    const gr = ctx.createRadialGradient(it.x, y, 2, it.x, y, 18);
+    gr.addColorStop(0, "rgba(255,250,210,0.9)"); gr.addColorStop(1, "rgba(255,250,210,0)");
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(it.x, y, 18, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    // 金色のたねに、緑の葉っぱ（敵の弾とまちがえないように色を変える）
+    ctx.fillStyle = "#7fbf4f";
+    ctx.beginPath(); ctx.ellipse(it.x + 5, y - 8, 6, 3, -0.7, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#f5cf5a"; ctx.strokeStyle = "#d8a93a"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.ellipse(it.x, y, 7, 9, 0.3, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath(); ctx.arc(it.x - 2, y - 3, 2, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // 雑魚の絵（仮）
+  function drawFiller(f) {
+    if (f.delay > 0) return;
+    const { x, y, r } = f;
+    ctx.save();
+    ctx.translate(x, y);
+    if (f.flash > 0) ctx.translate((Math.random() - 0.5) * 3, 0);
+    const lit = f.flash > 0;
+    if (f.type === "ladybug") {
+      ctx.rotate((f.ang || 0) + (f.dir > 0 ? Math.PI / 2 : -Math.PI / 2));
+      ctx.fillStyle = "rgba(255,255,255,0.7)";   // はね
+      ctx.beginPath(); ctx.ellipse(-8, 2, 8, 4, 0.5 + Math.sin(t * 40) * 0.3, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(8, 2, 8, 4, -0.5 - Math.sin(t * 40) * 0.3, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = lit ? "#ffb3a8" : "#e86f5f";
+      ctx.beginPath(); ctx.arc(0, 0, r * 0.85, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#4b3a35";
+      ctx.beginPath(); ctx.arc(0, -r * 0.75, r * 0.4, 0, Math.PI * 2); ctx.fill();
+      for (const [dx, dy] of [[-4, -2], [4, -2], [-4, 5], [4, 5]]) { ctx.beginPath(); ctx.arc(dx, dy, 2, 0, Math.PI * 2); ctx.fill(); }
+    } else if (f.type === "bee") {
+      ctx.fillStyle = "rgba(255,255,255,0.75)";
+      ctx.beginPath(); ctx.ellipse(-7, -8, 7, 4, -0.6 + Math.sin(t * 45) * 0.4, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(7, -8, 7, 4, 0.6 - Math.sin(t * 45) * 0.4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = lit ? "#fff0a8" : "#f2c84b";
+      ctx.beginPath(); ctx.ellipse(0, 0, r * 0.7, r * 0.9, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#6b5232";
+      ctx.fillRect(-r * 0.62, -2, r * 1.24, 3); ctx.fillRect(-r * 0.55, 4, r * 1.1, 3);
+      ctx.beginPath(); ctx.arc(-3, -6, 1.5, 0, Math.PI * 2); ctx.arc(3, -6, 1.5, 0, Math.PI * 2); ctx.fill();
+    } else if (f.type === "ghost") {
+      ctx.fillStyle = lit ? "#fff6c8" : "#ffffff";
+      ctx.strokeStyle = "#d6dcc8"; ctx.lineWidth = 1.5;
+      for (let i = 0; i < 7; i++) {
+        const a = i / 7 * Math.PI * 2 + t;
+        ctx.beginPath(); ctx.arc(Math.cos(a) * r * 0.55, Math.sin(a) * r * 0.55, r * 0.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      }
+      ctx.beginPath(); ctx.arc(0, 0, r * 0.6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#6c7562";
+      ctx.beginPath(); ctx.arc(-4, -1, 2, 0, Math.PI * 2); ctx.arc(4, -1, 2, 0, Math.PI * 2); ctx.fill();
+    } else if (f.type === "weed") {
+      ctx.fillStyle = "rgba(90,110,60,0.25)";
+      ctx.beginPath(); ctx.ellipse(0, 4, r, r * 0.6, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = lit ? "#b8dc8c" : "#5e8a3a"; ctx.lineWidth = 3; ctx.lineCap = "round";
+      for (let i = 0; i < 5; i++) {
+        const a = i / 5 * Math.PI * 2 + Math.sin(t * 2 + i) * 0.2;
+        ctx.beginPath(); ctx.moveTo(0, 0);
+        ctx.quadraticCurveTo(Math.cos(a + 0.6) * r, Math.sin(a + 0.6) * r, Math.cos(a) * r * 0.9, Math.sin(a) * r * 0.9);
+        ctx.stroke();
+      }
+      ctx.fillStyle = "#4b6b2e";
+      ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath(); ctx.arc(-2, -1, 1.4, 0, Math.PI * 2); ctx.arc(2, -1, 1.4, 0, Math.PI * 2); ctx.fill();
+    } else {   // thorn
+      ctx.fillStyle = "rgba(90,110,60,0.25)";
+      ctx.beginPath(); ctx.ellipse(0, 5, r * 1.05, r * 0.65, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = lit ? "#a7c88a" : "#557a41";
+      ctx.beginPath();
+      for (let i = 0; i < 16; i++) {
+        const a = i / 16 * Math.PI * 2, rr = i % 2 ? r * 0.7 : r;
+        i === 0 ? ctx.moveTo(Math.cos(a) * rr, Math.sin(a) * rr) : ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+      }
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "#f2a7bd";
+      for (const [dx, dy] of [[-5, -4], [6, 2], [-1, 7]]) { ctx.beginPath(); ctx.arc(dx, dy, 3, 0, Math.PI * 2); ctx.fill(); }
+    }
+    ctx.restore();
+    // 硬い雑魚は、のこりの硬さを小さな点で
+    if (FILLER_TYPES[f.type].hp > 1 && f.hp < FILLER_TYPES[f.type].hp) {
+      ctx.fillStyle = "rgba(0,0,0,0.25)";
+      for (let i = 0; i < f.hp; i++) { ctx.beginPath(); ctx.arc(x - (f.hp - 1) * 4 + i * 8, y - r - 6, 2.5, 0, Math.PI * 2); ctx.fill(); }
+    }
+  }
+
+  // 地上の語句: 畑にうまった土の盛り上がりの上に文字
+  function drawGroundWord(e) {
+    const wob = e.flash > 0 ? (Math.random() - 0.5) * 4 : 0;
+    ctx.fillStyle = "#c9ab7f";
+    roundRect(e.x - e.w / 2 - 14, e.y - e.h / 2 - 6, e.w + 28, e.h + 12, 16); ctx.fill();
+    ctx.fillStyle = "#dcc297";
+    roundRect(e.x - e.w / 2 - 10, e.y - e.h / 2 - 4, e.w + 20, e.h + 4, 14); ctx.fill();
+    // 小さな芽
+    ctx.fillStyle = "#7fae55";
+    ctx.beginPath(); ctx.ellipse(e.x + e.w / 2 + 6, e.y - e.h / 2 - 4, 5, 2.5, -0.6, 0, Math.PI * 2); ctx.fill();
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.font = font(e.size);
+    ctx.lineJoin = "round"; ctx.lineWidth = 6;
+    ctx.strokeStyle = e.flash > 0 ? "#fff6c8" : "#fffaf0";
+    ctx.strokeText(e.word.word, e.x + wob, e.y);
+    ctx.fillStyle = ENEMY_COLOR[e.role];
+    ctx.fillText(e.word.word, e.x + wob, e.y);
+    drawHpDots(e);
+  }
+
+  // 中ボス・大ボスは硬さを小さな丸で表示
+  function drawHpDots(e) {
+    if (e.maxHp <= 1) return;
+    const n = e.maxHp, gap = 10, x0 = e.x - (n - 1) * gap / 2;
+    for (let i = 0; i < n; i++) {
+      ctx.beginPath();
+      ctx.arc(x0 + i * gap, e.y - e.h / 2 - 10, 3.5, 0, Math.PI * 2);
+      ctx.fillStyle = i < e.hp ? ENEMY_COLOR[e.role] : "rgba(0,0,0,0.12)";
+      ctx.fill();
     }
   }
 
   function drawBanner() {
-    const a = Math.min(1, banner.t / 0.3, (1.8 - banner.t) / 0.2);
+    const total = banner.total || (banner.total = banner.t);
+    const a = Math.min(1, banner.t / 0.3, (total - banner.t) / 0.2);
     ctx.globalAlpha = Math.max(0, a);
     const y = H * 0.42;
-    ctx.fillStyle = "rgba(196,87,122,0.88)";
+    ctx.fillStyle = banner.color || "rgba(196,87,122,0.88)";
     ctx.fillRect(0, y - 30, W, 60);
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.font = font(28);
+    let size = 28;
+    ctx.font = font(size);
+    while (ctx.measureText(banner.text).width > W - 24 && size > 18) { size -= 2; ctx.font = font(size); }
     ctx.fillStyle = "#fffdf7";
     ctx.fillText(banner.text, W / 2 + (1 - a) * 40, y);
     ctx.globalAlpha = 1;
@@ -587,20 +1057,24 @@ const Battle = (() => {
   function drawHud() {
     const top = 14;
     // 体力
-    ctx.fillStyle = "rgba(255,255,255,0.8)";
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
     roundRect(12, top, 130, 16, 8); ctx.fill();
     const rate = player.hp / BATTLE.playerMaxHp;
     ctx.fillStyle = rate > 0.4 ? "#8cbf5a" : (Math.floor(t * 4) % 2 ? "#e39a8e" : "#f2c4bb");
     roundRect(14, top + 2, 126 * rate, 12, 6); ctx.fill();
     ctx.font = font(12);
     ctx.textAlign = "left"; ctx.textBaseline = "top";
+    ctx.lineWidth = 4; ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.lineJoin = "round";
+    ctx.strokeText("たいりょく", 14, top + 20);
     ctx.fillStyle = "#4b5e3a";
     ctx.fillText("たいりょく", 14, top + 20);
     // 集めた語句の数
     ctx.textAlign = "right";
     ctx.font = font(18);
+    ctx.strokeText(`${absorbed.length} / ${opts.total} 語`, W - 14, top);
     ctx.fillText(`${absorbed.length} / ${opts.total} 語`, W - 14, top);
     ctx.font = font(12);
+    ctx.strokeText(fmtTime(t), W - 14, top + 24);
     ctx.fillText(fmtTime(t), W - 14, top + 24);
   }
 
@@ -614,7 +1088,7 @@ const Battle = (() => {
     const w = Math.max(ctx.measureText(word.word).width, 160) + 48;
     const h = size + (showKana ? 56 : 36);
     const cy = H * 0.45;
-    ctx.fillStyle = "rgba(255,253,245,0.94)";
+    ctx.fillStyle = "rgba(255,253,245,0.95)";
     ctx.strokeStyle = "#cfe0b6";
     ctx.lineWidth = 3;
     roundRect(W / 2 - w / 2, cy - h / 2, w, h, 22);

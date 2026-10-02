@@ -173,6 +173,14 @@ const Sound = (() => {
       tone(freq("C6"), t, 0.2, "sine", 0.25);
       tone(freq("E6"), t + 0.07, 0.2, "sine", 0.25);
       tone(freq("G6"), t + 0.14, 0.4, "sine", 0.25);
+    } else if (name === "bomb") {    // たねを落とす（ひゅっ）
+      sweep(1200, 500, 0.18, "sine", 0.08);
+    } else if (name === "pop") {     // 花がぽんっと咲く
+      sweep(700, 1100, 0.09, "triangle", 0.18);
+      tone(freq("E6"), t + 0.05, 0.15, "sine", 0.06);
+    } else if (name === "item") {    // 綿のたねを拾う
+      tone(freq("G5"), t, 0.15, "sine", 0.25);
+      tone(freq("D6"), t + 0.06, 0.25, "sine", 0.25);
     } else if (name === "start") {
       tone(freq("C5"), t, 0.3, "triangle", 0.35);
       tone(freq("G5"), t + 0.1, 0.4, "triangle", 0.35);
