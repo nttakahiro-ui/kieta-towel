@@ -175,9 +175,14 @@ const Main = (() => {
   }
 
   function toQuiz(ids) {
-    showScreen("quiz");
     const ordered = ids.map(id => words.find(w => w.id === id));
-    Quiz.start(ordered, results => toCards(results));
+    // クイズの前に「今日あつめたことば」を3秒見せる
+    showScreen("review");
+    Sound.play("card");
+    Quiz.review(ordered, () => {
+      showScreen("quiz");
+      Quiz.start(ordered, results => toCards(results));
+    });
   }
 
   function toCards(results) {

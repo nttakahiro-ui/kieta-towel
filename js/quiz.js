@@ -1,5 +1,6 @@
 // クイズ。バトルで吸い込んだ順に出題する
 const QUIZ = {
+  reviewTime: 3,                     // クイズの前に「今日あつめたことば」を見せる秒数
   tempoUpAt: { 2: 1.15, 7: 1.3 },   // 何問目（0から数える）で音楽のテンポを上げるか。3問目と8問目
   nextDelay: 1.1,                    // 正解のあと、次の問題へ進むまでの秒数
 };
@@ -117,5 +118,24 @@ const Quiz = (() => {
     show();
   }
 
-  return { start };
+  // クイズの前に、今日あつめたことば（吸い込んだ順）を見せる
+  function review(words, done) {
+    const ol = $("review-list");
+    ol.innerHTML = "";
+    words.forEach((w, i) => {
+      const li = document.createElement("li");
+      li.style.animationDelay = `${i * 0.06}s`;
+      const k = document.createElement("span"); k.className = "k"; k.textContent = /[一-龯々]/.test(w.word) ? w.kana : "";
+      const t = document.createElement("span"); t.className = "w"; t.textContent = w.word;
+      li.append(k, t); ol.appendChild(li);
+    });
+    const bar = $("review-bar");
+    bar.style.transition = "none"; bar.style.width = "0";
+    void bar.offsetWidth;
+    bar.style.transition = `width ${QUIZ.reviewTime}s linear`;
+    bar.style.width = "100%";
+    setTimeout(done, QUIZ.reviewTime * 1000);
+  }
+
+  return { start, review };
 })();

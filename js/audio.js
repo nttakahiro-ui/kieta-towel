@@ -30,6 +30,9 @@ const SONGS = {
   }
 };
 
+// 語句の読み上げ（仮）。端末の読み上げ機能を使う。本番で声のファイルに替えるときは speak() を書き換える
+const SPEECH = { enabled: true, lang: "ja-JP", rate: 0.95, pitch: 1.1, volume: 1 };
+
 const Sound = (() => {
   let ctx = null;        // AudioContext
   let master = null;     // 全体の音量
@@ -67,6 +70,7 @@ const Sound = (() => {
       const src = ctx.createBufferSource();
       src.buffer = b; src.connect(ctx.destination); src.start(0);
     } catch (e) { ctx = null; }
+    speak(" ", true);   // 読み上げの解禁
   }
 
   // やわらかい音をひとつ鳴らす
@@ -190,6 +194,20 @@ const Sound = (() => {
     }
   }
 
+  // 読み上げ。iOS は最初のタップの中で一度話しておく必要があるので、unlock でも呼ぶ
+  function speak(text, silent) {
+    try {
+      if (!SPEECH.enabled || !window.speechSynthesis) return;
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = SPEECH.lang; u.rate = SPEECH.rate; u.pitch = SPEECH.pitch;
+      u.volume = silent ? 0 : SPEECH.volume;
+      const v = window.speechSynthesis.getVoices().find(x => x.lang && x.lang.replace("_", "-").startsWith("ja"));
+      if (v) u.voice = v;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(u);
+    } catch (e) { /* 読み上げが使えなくても続ける */ }
+  }
+
   // アプリが裏に回ったときに止める／戻ったときに再開する
   function suspend() {
     try { if (ctx && ctx.state === "running") ctx.suspend(); } catch (e) {}
@@ -201,5 +219,5 @@ const Sound = (() => {
     if (ctx && current && !fileAudio) nextTime = Math.max(nextTime, ctx.currentTime + 0.05);
   }
 
-  return { unlock, play, stop, setTempo, se, suspend, resume };
+  return { unlock, play, stop, setTempo, se, suspend, resume, speak };
 })();

@@ -57,7 +57,10 @@ const BATTLE = {
   invincibleTime: 1.3,         // 当たったあと、しばらく無敵になる秒数
   respawnDelay: 2,             // 下へ抜けた語句が、また上から出てくるまでの秒数
   reviveDelay: 3,              // 体力ゼロのあと、再開するまでの秒数
-  wordShowTime: 0.6,           // 吸い込んだ語句を画面中央に大きく出す秒数
+  wordShowTime: 1.0,           // 吸い込んだ語句を画面中央に大きく出す秒数（この間は弾が当たらない）
+  slowTime: 0.3,               // 吸い込む瞬間に画面全体がゆっくりになる秒数
+  slowScale: 0.25,             // ゆっくりのときの速さ（1でふつう、小さいほどゆっくり）
+  stripRows: 2,                // 「集めたことば」の帯の行数
 };
 
 // ===== 雑魚の種類 =====
@@ -143,6 +146,8 @@ const Battle = (() => {
   let level = FUWARI_LEVELS[0];
   let hits = 0, downs = 0;   // 被弾した回数、やられた回数
   let lock = false;          // 照準に地上の敵が入っているか
+  let slow = 0;              // ゆっくりの残り時間（秒）
+  let wave = null;           // 吸い込んだときに広がる光
 
   function font(size) { return `bold ${size}px ${FONT_FAMILY}`; }
   const hasKanji = s => /[一-龯々]/.test(s);
@@ -215,6 +220,7 @@ const Battle = (() => {
     level = fuwariLevel(opts.fuwariCount);
     hits = 0; downs = 0;
     paused = false; moved = false; groundHinted = false; banner = null; shake = 0; showWord = null; threads = []; pops = [];
+    slow = 0; wave = null;
     state = "intro"; stateTimer = 2;
     running = true;
     lastTs = performance.now();
@@ -367,8 +373,14 @@ const Battle = (() => {
     rafId = requestAnimationFrame(loop);
   }
 
-  function update(dt) {
+  function update(realDt) {
     if (paused) return;
+    // 吸い込む瞬間は、画面全体がゆっくりになる
+    let dt = realDt;
+    if (slow > 0) { slow -= realDt; dt = realDt * BATTLE.slowScale; }
+    // 吸い込んだ語句の表示と、広がる光は実際の時間で進める
+    if (showWord) { showWord.t -= realDt; if (showWord.t <= 0) showWord = null; }
+    if (wave) { wave.age += realDt; if (wave.age > 0.6) wave = null; }
     t += dt;
     shake = Math.max(0, shake - dt);
     player.glow = Math.max(0, player.glow - dt);
@@ -381,7 +393,6 @@ const Battle = (() => {
     fillTerrain();
     for (const c of cloudShadows) { c.y += sc * 1.5 * dt; c.x += 8 * dt; if (c.y - c.ry > H) { c.y = -c.ry - rand(0, 200); c.x = rand(0, W); } }
     for (const f of fluff) { f.y += f.v * dt; f.x += Math.sin(t + f.p) * 8 * dt; if (f.y > H + 10) { f.y = -10; f.x = Math.random() * W; } }
-    if (showWord) { showWord.t -= dt; if (showWord.t <= 0) showWord = null; }
     updateThreads(dt);
     updatePops(dt);
     for (const v of vanish) { v.age += dt; if (v.ground) v.y += scrollSpeed() * dt; }
@@ -566,7 +577,7 @@ const Battle = (() => {
     const R = ENEMY_BULLET_ART.radius;
     for (const b of ebullets) {
       b.x += b.vx * dt; b.y += b.vy * dt;
-      if (player.inv <= 0 && Math.hypot(b.x - player.x, b.y - player.y) < R + 10) {
+      if (player.inv <= 0 && !showWord && Math.hypot(b.x - player.x, b.y - player.y) < R + 10) {
         b.y = H + 999;
         hurt();
       }
@@ -661,8 +672,15 @@ const Battle = (() => {
       });
     }
     Sound.se("absorb");
+    Sound.speak(e.word.kana || e.word.word);   // 語句を読み上げる（仮: 端末の読み上げ機能）
     player.hp = Math.min(BATTLE.playerMaxHp, player.hp + BATTLE.healOnAbsorb);
     showWord = { word: e.word, t: BATTLE.wordShowTime };
+    slow = BATTLE.slowTime;
+    // 光が広がって、画面上の雑魚と敵の弾が全部消える
+    wave = { x: e.x, y: e.y, age: 0 };
+    fillers.forEach(f => addPop(f.x, f.y, "#fff8d8", 0.8, f.layer === "ground"));
+    fillers = [];
+    ebullets = [];
     if (absorbed.length >= opts.total) {
       // 10語そろったら、残っている雑魚はみんな花になる
       enemies.forEach(x => (x.hp = 0));
@@ -815,6 +833,17 @@ const Battle = (() => {
     ctx.globalAlpha = 1;
 
     drawPlayer();
+
+    // 吸い込んだときに広がる光
+    if (wave) {
+      const k = wave.age / 0.6, R = Math.hypot(W, H) * k;
+      const g = ctx.createRadialGradient(wave.x, wave.y, R * 0.6, wave.x, wave.y, R);
+      g.addColorStop(0, "rgba(255,250,215,0)");
+      g.addColorStop(0.8, `rgba(255,248,200,${0.55 * (1 - k)})`);
+      g.addColorStop(1, "rgba(255,250,215,0)");
+      ctx.fillStyle = g;
+      ctx.fillRect(-10, -10, W + 20, H + 20);
+    }
 
     // いちばん上を舞う綿毛
     ctx.fillStyle = "rgba(255,255,255,0.8)";
@@ -1179,13 +1208,42 @@ const Battle = (() => {
     ctx.font = font(12);
     ctx.strokeText(fmtTime(t), W - 14, top + 24);
     ctx.fillText(fmtTime(t), W - 14, top + 24);
+    drawStrip(top + 42);
+  }
+
+  // 「集めたことば」の帯: 吸い込んだ語句が順にならんでいく
+  function drawStrip(y0) {
+    const pad = 8, rowH = 22, x0 = 10, maxX = W - 10;
+    ctx.font = font(12);
+    ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    const rows = Math.max(1, BATTLE.stripRows);
+    ctx.fillStyle = "rgba(255,253,245,0.6)";
+    roundRect(x0 - 4, y0 - 4, maxX - x0 + 8, rows * rowH + 6, 10); ctx.fill();
+    ctx.fillStyle = "#7a8a68";
+    let x = x0 + 2, row = 0;
+    const label = "集めたことば";
+    ctx.fillText(label, x, y0 + rowH / 2 - 1);
+    x += ctx.measureText(label).width + 8;
+    absorbed.forEach((w, i) => {
+      const tw = ctx.measureText(w.word).width + pad * 2;
+      if (x + tw > maxX) { row++; x = x0 + 2; }
+      if (row >= rows) return;   // 入りきらない分は出さない
+      const y = y0 + row * rowH;
+      const isNew = i === absorbed.length - 1 && showWord;
+      ctx.fillStyle = isNew ? "#fff3c4" : "#ffffff";
+      ctx.strokeStyle = ENEMY_COLOR[w.role]; ctx.lineWidth = 1.5;
+      roundRect(x, y + 1, tw, rowH - 4, 8); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = ENEMY_COLOR[w.role];
+      ctx.fillText(w.word, x + pad, y + rowH / 2 - 1);
+      x += tw + 5;
+    });
   }
 
   function drawBigWord(word, remain) {
-    const a = Math.min(1, remain / 0.12, (BATTLE.wordShowTime - remain) / 0.08 + 0.2);
+    const a = Math.min(1, remain / 0.15, (BATTLE.wordShowTime - remain) / 0.08 + 0.2);
     ctx.globalAlpha = Math.max(0, a);
     const showKana = hasKanji(word.word);
-    let size = 48;
+    let size = 52;
     ctx.font = font(size);
     while (ctx.measureText(word.word).width > W - 60 && size > 24) { size -= 2; ctx.font = font(size); }
     const w = Math.max(ctx.measureText(word.word).width, 160) + 48;
@@ -1198,8 +1256,8 @@ const Battle = (() => {
     ctx.fill(); ctx.stroke();
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     if (showKana) {
-      ctx.font = font(18);
-      ctx.fillStyle = "#7a8a68";
+      ctx.font = font(20);
+      ctx.fillStyle = "#6b7a5a";
       ctx.fillText(word.kana, W / 2, cy - size / 2 - 4);
     }
     ctx.font = font(size);
