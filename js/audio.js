@@ -173,6 +173,9 @@ const Sound = (() => {
       tone(freq("C6"), t, 0.2, "sine", 0.25);
       tone(freq("E6"), t + 0.07, 0.2, "sine", 0.25);
       tone(freq("G6"), t + 0.14, 0.4, "sine", 0.25);
+    } else if (name === "shine") {   // 1回目の語句が光って消える（きらん）
+      tone(freq("B6"), t, 0.25, "sine", 0.18);
+      tone(freq("E7"), t + 0.08, 0.35, "sine", 0.12);
     } else if (name === "bomb") {    // たねを落とす（ひゅっ）
       sweep(1200, 500, 0.18, "sine", 0.08);
     } else if (name === "pop") {     // 花がぽんっと咲く

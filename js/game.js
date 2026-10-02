@@ -2,18 +2,23 @@
 // 空中と地上の2つの層がある
 //   空中の敵 … 自機の弾（自動で連射）で倒す
 //   地上の敵 … 自機の前にある照準◎に入ると、自動で「たね」を落として倒す
-// 語句の敵を倒すと、糸のようにほどけて自機のほうへ吸い込まれる（クイズに出る）
-// 雑魚（語句ではない敵）は、倒すとぽんっと花になり、ときどき体力が回復する「綿のたね」を落とす
+// 主役は語句の敵。語句は1バトルで2回出る
+//   1回目 … 倒すと、ふわりが反応して光って消えるだけ（吸い込まない）
+//   2回目 … 倒すと、糸のようにほどけて自機のほうへ吸い込まれる（クイズに出る）
+// 雑魚（語句ではない敵）は小さく薄く。倒すとぽんっと花になり、ときどき体力が回復する「綿のたね」を落とす
 
 // ===== 調整用の数値（速さ・弾の量・硬さなど）はここにまとめる =====
 const BATTLE = {
   // --- 語句の敵 ---
-  spawnInterval: 10,           // 語句の敵が出てくる間隔（秒）
-  emptyWait: 6,                // 画面に語句の敵がいないときは、この秒数より長く待たない
+  spawnInterval: 6,            // 語句の敵が出てくる間隔（秒）
+  emptyWait: 3,                // 画面に語句の敵がいないときは、この秒数より長く待たない
   firstSpawnDelay: 2.2,        // 始まってから最初の語句が出るまで（秒）
   maxOnScreen: 3,              // 同時に出ている語句の敵の最大数（大ボスは別）
   fallTime: { zako: 12, mid: 15 },  // 空中の語句が画面の上から下まで降りる秒数（大きいほどゆっくり）
   groundWordCount: 3,          // 10語のうち、地上に出す語句の数（大ボスはいつも空中）
+  wordPasses: 2,               // 語句が出てくる回数。最後の回で倒すと吸い込む（それより前は光って消えるだけ）
+  bossPasses: 1,               // 大ボスが出てくる回数
+  kanaSize: 13,                // 敵の語句の上に出すふりがなの大きさ（px）
   bossStopY: 0.22,             // 大ボスが止まる高さ（画面の高さに対する割合）
   bossEnterTime: 3,            // 大ボスが止まる位置まで降りてくる秒数（この間は弾が当たらない）
   sway: 16,                    // 空中の語句の左右の振れ幅（px）
@@ -26,8 +31,11 @@ const BATTLE = {
   shotPattern: { zako: [0], mid: [-0.18, 0.18], boss: [-0.25, 0, 0.25] },   // 語句の敵の弾の向き（自機をねらう向きからのずれ）
 
   // --- 雑魚 ---
-  fillerInterval: 3.2,         // 雑魚の群れが出てくる間隔（秒）
-  fillerMax: 12,               // 同時に出ている雑魚の最大数
+  fillerInterval: 4.5,         // 雑魚の群れが出てくる間隔（秒）
+  fillerMax: 6,                // 同時に出ている雑魚の最大数
+  fillerScale: 0.8,            // 雑魚の大きさの倍率（語句より目立たないように小さく）
+  fillerAlpha: 0.72,           // 雑魚の濃さ（1でふつう。小さいほど薄い）
+  fillerAvoid: 90,             // 語句のまわり、この距離（px）には雑魚を出さない
   fillerFireScale: 1.5,         // 雑魚が撃つ間隔の倍率（大きいほど撃たない）
   dropRate: 0.3,               // 雑魚が「綿のたね」を落とす確率（0〜1）
   healItem: 8,                 // 綿のたねで回復する体力
@@ -47,7 +55,7 @@ const BATTLE = {
   damage: 20,                  // 敵の弾に当たったときに減る体力
   healOnAbsorb: 12,            // 語句を吸い込んだときに回復する体力
   invincibleTime: 1.3,         // 当たったあと、しばらく無敵になる秒数
-  respawnDelay: 3,             // 下へ抜けた語句が、また上から出てくるまでの秒数
+  respawnDelay: 2,             // 下へ抜けた語句が、また上から出てくるまでの秒数
   reviveDelay: 3,              // 体力ゼロのあと、再開するまでの秒数
   wordShowTime: 0.6,           // 吸い込んだ語句を画面中央に大きく出す秒数
 };
@@ -122,6 +130,8 @@ const Battle = (() => {
   let player, shots, enemies, ebullets, threads, fluff;
   let fillers, bombs, pops, items, terrain, cloudShadows;
   let queue, waiting, absorbed, bossWord, bossSpawned, groundIds;
+  let passes;                // 語句ごとに、何回倒したか（id → 回数）
+  let vanish;                // 1回目に倒した語句が、光って消えていく演出
   let spawnTimer, shotTimer, fillerTimer, bombTimer;
   let showWord = null;       // 画面中央に出している語句
   let drag = null;
@@ -194,6 +204,8 @@ const Battle = (() => {
     // 地上に出す語句をえらぶ（ザコからえらぶ。足りないときだけ中ボスも。大ボスはいつも空中）
     const cand = shuffle(words.filter(w => w !== bossWord && w.role === "zako")).concat(shuffle(words.filter(w => w !== bossWord && w.role === "mid")));
     groundIds = new Set(cand.slice(0, BATTLE.groundWordCount).map(w => w.id));
+    passes = {};
+    vanish = [];
     fluff = Array.from({ length: 18 }, () => ({ x: Math.random() * W, y: Math.random() * H, r: 2 + Math.random() * 4, v: 30 + Math.random() * 40, p: Math.random() * 6 }));
     cloudShadows = Array.from({ length: 3 }, (_, i) => ({ x: Math.random() * W, y: (i / 3) * H, rx: rand(70, 120), ry: rand(35, 55) }));
     terrain = [];
@@ -282,8 +294,10 @@ const Battle = (() => {
     const margin = w / 2 + 20 + (ground ? 0 : BATTLE.sway);
     const x = role === "boss" ? W / 2 : margin + Math.random() * Math.max(1, W - margin * 2);
     const hp = BATTLE.hpOverride[role] || word.hp;
+    const need = role === "boss" ? BATTLE.bossPasses : BATTLE.wordPasses;
     enemies.push({
       word, role, size, w, h: size * 1.2, ground,
+      last: (passes[word.id] || 0) + 1 >= need,   // この回で倒せば吸い込む
       bx: x, x, y: -size, hp, maxHp: hp,
       age: 0, phase: Math.random() * 6, fire: 1 + Math.random() * 1.5, flash: 0
     });
@@ -299,27 +313,46 @@ const Battle = (() => {
   // ===== 雑魚の群れを出す =====
   function spawnFiller(type, x, y, extra) {
     const def = FILLER_TYPES[type];
-    fillers.push(Object.assign({ type, layer: def.layer, hp: def.hp, r: def.r, x, y, age: 0, flash: 0,
+    fillers.push(Object.assign({ type, layer: def.layer, hp: def.hp, r: def.r * BATTLE.fillerScale, x, y, age: 0, flash: 0,
       fire: def.fire ? rand(0.8, 1.6) * def.fire * BATTLE.fillerFireScale : 0 }, extra || {}));
   }
+  // 語句の近くかどうか（雑魚を出す場所をえらぶとき用）
+  function nearWord(x, y, layer) {
+    const A = BATTLE.fillerAvoid;
+    return enemies.some(e => (layer ? (layer === "ground") === e.ground : true) &&
+      Math.abs(x - e.x) < e.w / 2 + A && Math.abs(y - e.y) < e.h / 2 + A);
+  }
+  // 語句から離れた x をえらぶ（見つからなければ null）
+  function freeX(y, layer, margin) {
+    for (let i = 0; i < 8; i++) { const x = rand(margin, W - margin); if (!nearWord(x, y, layer)) return x; }
+    return null;
+  }
+  // 横に通る列が、空中の語句と重ならない高さをえらぶ
+  function freeRow() {
+    for (let i = 0; i < 8; i++) {
+      const y = rand(H * 0.12, H * 0.4);
+      if (!enemies.some(e => !e.ground && Math.abs(e.y + (H / BATTLE.fallTime.zako) * 3 - y) < e.h / 2 + BATTLE.fillerAvoid)) return y;
+    }
+    return null;
+  }
+
   function spawnWave() {
     const names = Object.keys(FILLER_WAVES);
     let sum = names.reduce((a, n) => a + FILLER_WAVES[n], 0), r = Math.random() * sum, name = names[0];
     for (const n of names) { r -= FILLER_WAVES[n]; if (r <= 0) { name = n; break; } }
-    if (name === "ladybugs") {        // 横から5匹が列になって飛んでくる
-      const fromLeft = Math.random() < 0.5, y0 = rand(H * 0.12, H * 0.38);
-      for (let i = 0; i < 5; i++) spawnFiller("ladybug", fromLeft ? -20 : W + 20, y0, { dir: fromLeft ? 1 : -1, y0, delay: i * 0.32 });
-    } else if (name === "bees") {     // 2〜3匹が上から急に降りてくる
-      const n = 2 + Math.floor(Math.random() * 2);
-      for (let i = 0; i < n; i++) spawnFiller("bee", rand(30, W - 30), -20, { delay: i * 0.45, tx: null });
-    } else if (name === "ghost") {    // 綿毛おばけが1〜2匹
-      const n = 1 + Math.floor(Math.random() * 2);
-      for (let i = 0; i < n; i++) spawnFiller("ghost", rand(40, W - 40), -24 - i * 60, { bx: 0 });
-    } else if (name === "weeds") {    // からまり草が2〜3株、横にならんで生えている
-      const n = 2 + Math.floor(Math.random() * 2), gap = W / (n + 1);
-      for (let i = 0; i < n; i++) spawnFiller("weed", gap * (i + 1) + rand(-20, 20), -24 - rand(0, 40));
+    // 語句の近くには出さない。場所が見つからなければ、その回は出さない
+    if (name === "ladybugs") {        // 横から4匹が列になって飛んでくる
+      const fromLeft = Math.random() < 0.5, y0 = freeRow();
+      if (y0 === null) return;
+      for (let i = 0; i < 4; i++) spawnFiller("ladybug", fromLeft ? -20 : W + 20, y0, { dir: fromLeft ? 1 : -1, y0, delay: i * 0.32 });
+    } else if (name === "bees") {     // 2匹が上から急に降りてくる
+      for (let i = 0; i < 2; i++) { const x = freeX(0, "air", 30); if (x !== null) spawnFiller("bee", x, -20, { delay: i * 0.45, tx: null }); }
+    } else if (name === "ghost") {    // 綿毛おばけが1匹
+      const x = freeX(0, "air", 40); if (x !== null) spawnFiller("ghost", x, -24, { bx: 0 });
+    } else if (name === "weeds") {    // からまり草が2株
+      for (let i = 0; i < 2; i++) { const x = freeX(0, "ground", 40); if (x !== null) spawnFiller("weed", x, -24 - rand(0, 40)); }
     } else {                          // いばらの株が1つ
-      spawnFiller("thorn", rand(50, W - 50), -26);
+      const x = freeX(0, "ground", 50); if (x !== null) spawnFiller("thorn", x, -26);
     }
     if (FILLER_TYPES[{ ladybugs: "ladybug", bees: "bee", ghost: "ghost", weeds: "weed", thorn: "thorn" }[name]].layer === "ground") groundHint();
   }
@@ -351,6 +384,9 @@ const Battle = (() => {
     if (showWord) { showWord.t -= dt; if (showWord.t <= 0) showWord = null; }
     updateThreads(dt);
     updatePops(dt);
+    for (const v of vanish) { v.age += dt; if (v.ground) v.y += scrollSpeed() * dt; }
+    vanish = vanish.filter(v => v.age < 0.8);
+    player.notice = Math.max(0, (player.notice || 0) - dt);
 
     if (state === "intro") {
       stateTimer -= dt;
@@ -589,8 +625,29 @@ const Battle = (() => {
     pops = pops.filter(p => p.age < 0.7);
   }
 
-  // 語句を倒した: 糸がほどけるように散って、自機へ吸い込まれる
+  // 語句を倒した
   function defeat(e) {
+    passes[e.word.id] = (passes[e.word.id] || 0) + 1;
+    if (!e.last) { firstPass(e); return; }
+    absorb(e);
+  }
+
+  // 1回目: 吸い込まずに、光って消えるだけ。ふわりが反応する。しばらくしてまた出てくる
+  function firstPass(e) {
+    vanish.push({ word: e.word, x: e.x, y: e.y, size: e.size, w: e.w, ground: e.ground, age: 0 });
+    for (let i = 0; i < 14; i++) {
+      const a = Math.random() * Math.PI * 2;
+      threads.push({ x: e.x + (Math.random() - 0.5) * e.w, y: e.y, vx: Math.cos(a) * 90, vy: Math.sin(a) * 90 - 30,
+        len: 3, curl: 0, rot: 0, color: "#ffe9a0", age: 0, scatter: 9, sparkle: true });
+    }
+    player.glow = 0.35;
+    player.notice = 0.8;   // ふわりの「！」
+    Sound.se("shine");
+    waiting.push({ word: e.word, at: t + BATTLE.respawnDelay });
+  }
+
+  // 最後の回: 糸がほどけるように散って、自機へ吸い込まれる
+  function absorb(e) {
     absorbed.push(e.word);
     const n = Math.min(60, 14 + e.word.word.length * 5);
     for (let i = 0; i < n; i++) {
@@ -621,6 +678,11 @@ const Battle = (() => {
     for (const th of threads) {
       th.age += dt;
       th.rot += th.curl * dt * 4;
+      if (th.sparkle) {               // 1回目の光の粒: その場で散って消える
+        th.x += th.vx * dt; th.y += th.vy * dt; th.vx *= 0.92; th.vy *= 0.92;
+        if (th.age > 0.7) th.done = true;
+        continue;
+      }
       if (th.age < th.scatter) {      // ほどけて散る
         th.x += th.vx * dt; th.y += th.vy * dt;
         th.vx *= 0.93; th.vy *= 0.93;
@@ -708,19 +770,28 @@ const Battle = (() => {
     for (const e of enemies) {
       if (e.ground) continue;
       ctx.font = font(e.size);
-      ctx.globalAlpha = e.role === "boss" && e.age < BATTLE.bossEnterTime ? 0.55 : 1;   // 降りてくる間はうすく（まだ当たらない）
+      const alpha = e.role === "boss" && e.age < BATTLE.bossEnterTime ? 0.55 : 1;   // 降りてくる間はうすく（まだ当たらない）
       const wob = e.flash > 0 ? (Math.random() - 0.5) * 4 : 0;
       // 影
       ctx.fillStyle = "rgba(60,80,40,0.16)";
       ctx.fillText(e.word.word, e.x + 14, e.y + 22);
-      ctx.lineJoin = "round";
-      ctx.lineWidth = 7;
-      ctx.strokeStyle = e.flash > 0 ? "#fff6c8" : "#ffffff";
-      ctx.strokeText(e.word.word, e.x + wob, e.y);
-      ctx.fillStyle = ENEMY_COLOR[e.role];
-      ctx.fillText(e.word.word, e.x + wob, e.y);
+      drawWordText(e, e.x + wob, e.y, alpha);
+      ctx.globalAlpha = alpha;
       drawHpDots(e);
       ctx.globalAlpha = 1;
+    }
+
+    // 1回目に倒した語句: 光ってふわっと上へ消える
+    for (const v of vanish) {
+      const k = v.age / 0.8;
+      ctx.save();
+      ctx.globalAlpha = 1 - k;
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.font = font(v.size * (1 + k * 0.3));
+      ctx.shadowColor = "rgba(255,240,180,1)"; ctx.shadowBlur = 20;
+      ctx.fillStyle = "#fffbe8";
+      ctx.fillText(v.word.word, v.x, v.y - k * 20);
+      ctx.restore();
     }
 
     // 空の花（空中の雑魚が咲いたあと）
@@ -887,9 +958,12 @@ const Battle = (() => {
   // 雑魚の絵（仮）
   function drawFiller(f) {
     if (f.delay > 0) return;
-    const { x, y, r } = f;
+    const { x, y } = f;
+    const r = FILLER_TYPES[f.type].r;
     ctx.save();
+    ctx.globalAlpha = BATTLE.fillerAlpha;
     ctx.translate(x, y);
+    ctx.scale(BATTLE.fillerScale, BATTLE.fillerScale);
     if (f.flash > 0) ctx.translate((Math.random() - 0.5) * 3, 0);
     const lit = f.flash > 0;
     if (f.type === "ladybug") {
@@ -952,11 +1026,41 @@ const Battle = (() => {
     // 硬い雑魚は、のこりの硬さを小さな点で
     if (FILLER_TYPES[f.type].hp > 1 && f.hp < FILLER_TYPES[f.type].hp) {
       ctx.fillStyle = "rgba(0,0,0,0.25)";
-      for (let i = 0; i < f.hp; i++) { ctx.beginPath(); ctx.arc(x - (f.hp - 1) * 4 + i * 8, y - r - 6, 2.5, 0, Math.PI * 2); ctx.fill(); }
+      for (let i = 0; i < f.hp; i++) { ctx.beginPath(); ctx.arc(x - (f.hp - 1) * 4 + i * 8, y - f.r - 6, 2.5, 0, Math.PI * 2); ctx.fill(); }
     }
   }
 
   // 地上の語句: 畑にうまった土の盛り上がりの上に文字
+  // 語句の文字: 光る縁取りと、漢字の上に小さくふりがな
+  // 吸い込める回（最後の回）は金色に光る。それより前は白く光る
+  function drawWordText(e, x, y, alpha) {
+    const word = e.word;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.font = font(e.size);
+    ctx.lineJoin = "round";
+    const pulse = 0.6 + Math.sin(t * 5 + e.phase) * 0.4;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.shadowColor = e.last ? `rgba(255,214,90,${0.7 + pulse * 0.3})` : "rgba(255,255,255,0.95)";
+    ctx.shadowBlur = e.last ? 10 + pulse * 8 : 10;
+    ctx.lineWidth = 8;
+    ctx.strokeStyle = e.flash > 0 ? "#fff6c8" : (e.last ? "#fff6d8" : "#ffffff");
+    ctx.strokeText(word.word, x, y);
+    ctx.restore();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = ENEMY_COLOR[e.role];
+    ctx.fillText(word.word, x, y);
+    if (hasKanji(word.word)) {
+      ctx.font = font(BATTLE.kanaSize);
+      ctx.lineWidth = 4; ctx.strokeStyle = "#ffffff";
+      const ky = y - e.size / 2 - BATTLE.kanaSize / 2 - 1;
+      ctx.strokeText(word.kana, x, ky);
+      ctx.fillStyle = "#5d6b4c";
+      ctx.fillText(word.kana, x, ky);
+    }
+    ctx.globalAlpha = 1;
+  }
+
   function drawGroundWord(e) {
     const wob = e.flash > 0 ? (Math.random() - 0.5) * 4 : 0;
     ctx.fillStyle = "#c9ab7f";
@@ -966,13 +1070,7 @@ const Battle = (() => {
     // 小さな芽
     ctx.fillStyle = "#7fae55";
     ctx.beginPath(); ctx.ellipse(e.x + e.w / 2 + 6, e.y - e.h / 2 - 4, 5, 2.5, -0.6, 0, Math.PI * 2); ctx.fill();
-    ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.font = font(e.size);
-    ctx.lineJoin = "round"; ctx.lineWidth = 6;
-    ctx.strokeStyle = e.flash > 0 ? "#fff6c8" : "#fffaf0";
-    ctx.strokeText(e.word.word, e.x + wob, e.y);
-    ctx.fillStyle = ENEMY_COLOR[e.role];
-    ctx.fillText(e.word.word, e.x + wob, e.y);
+    drawWordText(e, e.x + wob, e.y, 1);
     drawHpDots(e);
   }
 
@@ -1041,6 +1139,11 @@ const Battle = (() => {
       gr.addColorStop(1, "rgba(255,248,200,0)");
       ctx.fillStyle = gr;
       ctx.beginPath(); ctx.arc(fx, fy, 30, 0, Math.PI * 2); ctx.fill();
+    }
+    if (player.notice > 0) {   // 1回目の語句に反応した「！」
+      ctx.font = font(16); ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.lineWidth = 4; ctx.strokeStyle = "#ffffff"; ctx.strokeText("！", fx + 2, fy - 24);
+      ctx.fillStyle = "#e0a93a"; ctx.fillText("！", fx + 2, fy - 24);
     }
     const sc = 1 + player.glow * 0.6;
     ctx.fillStyle = level.body;
