@@ -15,7 +15,10 @@ const BATTLE = {
   firstSpawnDelay: 2.2,        // 始まってから最初の語句が出るまで（秒）
   maxOnScreen: 3,              // 同時に出ている語句の敵の最大数（大ボスは別）
   fallTime: { zako: 12, mid: 15 },  // 空中の語句が画面の上から下まで降りる秒数（大きいほどゆっくり）
-  groundWordCount: 3,          // 10語のうち、地上に出す語句の数（大ボスはいつも空中）
+  edgeFallTime: 16,            // 「端にかくれる」語句が降りる秒数
+  crossTime: 7,                // 「横切る」語句が画面を横切る秒数
+  crossY: 0.2,                 // 「横切る」語句が通る高さ（画面の高さに対する割合）
+  escortCount: 4,              // 「雑魚のうしろ」の語句を守る雑魚の数
   wordPasses: 2,               // 語句が出てくる回数。最後の回で倒すと吸い込む（それより前は光って消えるだけ）
   bossPasses: 1,               // 大ボスが出てくる回数
   kanaSize: 13,                // 敵の語句の上に出すふりがなの大きさ（px）
@@ -214,9 +217,8 @@ const Battle = (() => {
     t = 0;
     absorbed = [];
     bossWord = words.find(w => w.role === "boss") || words[words.length - 1];
-    // 地上に出す語句をえらぶ（ザコからえらぶ。足りないときだけ中ボスも。大ボスはいつも空中）
-    const cand = shuffle(words.filter(w => w !== bossWord && w.role === "zako")).concat(shuffle(words.filter(w => w !== bossWord && w.role === "mid")));
-    groundIds = new Set(cand.slice(0, BATTLE.groundWordCount).map(w => w.id));
+    // 地上に出る語句は、データの出方（pattern）が "ground" のもの
+    groundIds = new Set(words.filter(w => w.pattern === "ground" && w !== bossWord).map(w => w.id));
     passes = {};
     vanish = [];
     fluff = Array.from({ length: 18 }, () => ({ x: Math.random() * W, y: Math.random() * H, r: 2 + Math.random() * 4, v: 30 + Math.random() * 40, p: Math.random() * 6 }));
@@ -239,7 +241,7 @@ const Battle = (() => {
 
   // 残りの語句で（再）スタートする
   function resetRound(rest) {
-    queue = shuffle(rest.slice());
+    queue = rest.slice().sort((a, b) => (a.order || 0) - (b.order || 0));   // 出る順番はデータで固定
     waiting = [];
     shots = []; enemies = []; ebullets = []; fillers = []; bombs = []; items = [];
     threads = threads || []; pops = pops || [];
@@ -306,16 +308,31 @@ const Battle = (() => {
     let w = ctx.measureText(word.word).width;
     // 画面からはみ出す長い語句は、24pxまで小さくする
     while (w > W - 40 && size > 24) { size -= 2; ctx.font = font(size); w = ctx.measureText(word.word).width; }
+    // 出方（pattern）と位置（lane）はデータで固定。ランダムには出ない
+    const pattern = role === "boss" ? "boss" : (word.pattern || "normal");
+    const lane = word.lane === undefined ? 0.5 : word.lane;
     const margin = w / 2 + 20 + (ground ? 0 : BATTLE.sway);
-    const x = role === "boss" ? W / 2 : margin + Math.random() * Math.max(1, W - margin * 2);
+    let x = role === "boss" ? W / 2 : margin + lane * Math.max(1, W - margin * 2);
+    let y = -size;
+    if (pattern === "edge") x = lane < 0.5 ? -w / 2 : W + w / 2;
+    if (pattern === "cross") { x = lane < 0.5 ? -w / 2 - 10 : W + w / 2 + 10; y = H * BATTLE.crossY; }
     const hp = BATTLE.hpOverride[role] || word.hp;
     const need = role === "boss" ? BATTLE.bossPasses : BATTLE.wordPasses;
-    enemies.push({
-      word, role, size, w, h: size * 1.2, ground,
+    const e = {
+      word, role, size, w, h: size * 1.2, ground, pattern, lane,
       last: (passes[word.id] || 0) + 1 >= need,   // この回で倒せば吸い込む
-      bx: x, x, y: -size, hp, maxHp: hp,
-      age: 0, phase: Math.random() * 6, fire: 1 + Math.random() * 1.5, flash: 0
-    });
+      bx: x, x, y, hp, maxHp: hp,
+      age: 0, phase: (word.id * 1.7) % 6, fire: 1.2, flash: 0
+    };
+    enemies.push(e);
+    // 雑魚のうしろ: 語句の前（下）に雑魚がならんで守る
+    if (pattern === "behind") {
+      const n = BATTLE.escortCount;
+      for (let i = 0; i < n; i++) {
+        const dx = (i - (n - 1) / 2) * Math.max(26, (w + 20) / n);
+        spawnFiller("ghost", x + dx, y + e.h / 2 + 22, { escort: e, dx, dy: e.h / 2 + 22 + (i % 2) * 10 });
+      }
+    }
     if (ground) groundHint();
   }
 
@@ -492,6 +509,16 @@ const Battle = (() => {
         e.x = W / 2 + Math.sin(e.age * 0.7) * range;
       } else if (e.ground) {
         e.y += sc * dt;     // 地上の語句は地面といっしょに流れる
+      } else if (e.pattern === "edge") {
+        // 端にかくれる: 半分だけ顔を出して、出たり引っこんだりしながら降りる
+        e.y += (H + e.size * 2) / BATTLE.edgeFallTime * dt;
+        const show = 0.35 + 0.3 * Math.sin(e.age * 1.2);   // 見えている割合
+        e.x = e.lane < 0.5 ? -e.w / 2 + e.w * show : W + e.w / 2 - e.w * show;
+      } else if (e.pattern === "cross") {
+        // 横切る: 上のほうを横に通りすぎる
+        const dir = e.lane < 0.5 ? 1 : -1;
+        e.x += dir * (W + e.w + 20) / BATTLE.crossTime * dt;
+        e.y = H * BATTLE.crossY + Math.sin(e.age * 2) * 14;
       } else {
         e.y += (H + e.size * 2) / BATTLE.fallTime[e.role] * dt;
         e.x = e.bx + Math.sin(e.age * BATTLE.swaySpeed + e.phase) * BATTLE.sway;
@@ -510,7 +537,14 @@ const Battle = (() => {
       f.flash = Math.max(0, f.flash - dt);
       const def = FILLER_TYPES[f.type];
       if (f.delay > 0) { f.delay -= dt; continue; }
-      if (f.type === "ladybug") {
+      if (f.escort) {
+        if (f.escort.hp > 0 && enemies.includes(f.escort)) {
+          f.x = f.escort.x + f.dx + Math.sin(f.age * 2 + f.dx) * 4;
+          f.y = f.escort.y + f.dy;
+        } else {
+          f.escort = null;   // 守る相手がいなくなったら、ふつうの綿毛おばけになる
+        }
+      } else if (f.type === "ladybug") {
         f.x += f.dir * 115 * dt;
         f.y = f.y0 + Math.sin(f.x / 60) * 28 + f.age * 6;
         f.ang = Math.atan2(Math.cos(f.x / 60) * 28 / 60 * f.dir, f.dir);
@@ -539,19 +573,20 @@ const Battle = (() => {
     }
 
     // 自機の弾が空中の敵に当たったか（地上の敵には当たらない）
+    // 雑魚に先に当たる（「雑魚のうしろ」の語句は、前の雑魚をどけないと弾が届かない）
     for (const s of shots) {
       let hit = false;
-      for (const e of enemies) {
-        if (e.ground || e.hp <= 0) continue;
-        if (e.role === "boss" && e.age < BATTLE.bossEnterTime) continue;   // 大ボスは降りてくる間は当たらない
-        if (Math.abs(s.x - e.x) < e.w / 2 + 4 && Math.abs(s.y - e.y) < e.h / 2) {
-          hit = true; damageWord(e); break;
-        }
+      for (const f of fillers) {
+        if (f.layer !== "air" || f.hp <= 0 || f.delay > 0) continue;
+        if (Math.hypot(s.x - f.x, s.y - f.y) < f.r + 4) { hit = true; damageFiller(f); break; }
       }
       if (!hit) {
-        for (const f of fillers) {
-          if (f.layer !== "air" || f.hp <= 0 || f.delay > 0) continue;
-          if (Math.hypot(s.x - f.x, s.y - f.y) < f.r + 4) { hit = true; damageFiller(f); break; }
+        for (const e of enemies) {
+          if (e.ground || e.hp <= 0) continue;
+          if (e.role === "boss" && e.age < BATTLE.bossEnterTime) continue;   // 大ボスは降りてくる間は当たらない
+          if (Math.abs(s.x - e.x) < e.w / 2 + 4 && Math.abs(s.y - e.y) < e.h / 2) {
+            hit = true; damageWord(e); break;
+          }
         }
       }
       if (hit) s.y = -999;
@@ -560,7 +595,8 @@ const Battle = (() => {
 
     // 下へ抜けた語句の敵
     for (const e of enemies) {
-      if (e.role !== "boss" && e.y > H + e.size) {
+      const gone = e.y > H + e.size || (e.pattern === "cross" && e.age > 1 && (e.x < -e.w / 2 - 20 || e.x > W + e.w / 2 + 20));
+      if (e.role !== "boss" && gone) {
         e.hp = 0;
         combo = 0;
         waiting.push({ word: e.word, at: t + BATTLE.respawnDelay });
@@ -568,7 +604,7 @@ const Battle = (() => {
     }
     enemies = enemies.filter(e => e.hp > 0);
     // 画面の外へ出た雑魚
-    fillers = fillers.filter(f => f.hp > 0 && f.y < H + 40 && f.y > -200 && f.x > -60 && f.x < W + 60);
+    fillers = fillers.filter(f => f.hp > 0 && f.y < H + 40 && f.y > -200 && f.x > -80 && f.x < W + 80);
 
     // 綿のたね（体力が回復する）
     for (const it of items) {
@@ -1142,6 +1178,14 @@ const Battle = (() => {
     ctx.beginPath(); ctx.ellipse(e.x + e.w / 2 + 6, e.y - e.h / 2 - 4, 5, 2.5, -0.6, 0, Math.PI * 2); ctx.fill();
     drawWordText(e, e.x + wob, e.y, 1);
     drawHpDots(e);
+    // 地上のかげ: 木のかげが語句の上にかかっていて、見えにくい
+    const cx = e.x - e.w * 0.25, cy = e.y - e.h * 0.3;
+    ctx.fillStyle = "rgba(60,90,45,0.32)";
+    ctx.beginPath(); ctx.ellipse(cx, cy, e.w * 0.55, e.h * 0.95, -0.2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(110,150,80,0.55)";
+    for (const [dx, dy, r] of [[-0.45, -0.7, 0.22], [-0.15, -0.95, 0.26], [0.15, -0.75, 0.2], [-0.6, -0.25, 0.18]]) {
+      ctx.beginPath(); ctx.arc(cx + dx * e.w * 0.6, cy + dy * e.h, r * e.w * 0.5, 0, Math.PI * 2); ctx.fill();
+    }
   }
 
   // 中ボス・大ボスは硬さを小さな丸で表示
