@@ -140,12 +140,6 @@ const Main = (() => {
     if ($("screen-battle").classList.contains("active")) Battle.resize();
   }
 
-  // ふわりの色を、集めたカードの枚数に合わせる
-  function paintFuwari() {
-    const lv = fuwariLevel(Save.cardCount());
-    document.querySelectorAll(".fuwari-icon").forEach(el => { el.style.background = lv.body; el.style.borderColor = lv.line; });
-  }
-
   function showScreen(name) {
     document.querySelectorAll(".screen").forEach(s => s.classList.toggle("active", s.id === `screen-${name}`));
   }
@@ -156,7 +150,6 @@ const Main = (() => {
     $("title-world").textContent = `世界${world.id}　${world.name}`;
     $("title-stage").textContent = stage.name;
     $("title-cards").textContent = Save.cardCount();
-    paintFuwari();
     showTuneTag();
     showScreen("title");
   }
@@ -241,7 +234,6 @@ const Main = (() => {
       Save.data.cleared = {};
       Save.store();
       $("title-cards").textContent = 0;
-      paintFuwari();
     });
 
     // アプリが裏に回ったら、バトルと音を止める
@@ -264,7 +256,6 @@ const Main = (() => {
     $("title-world").textContent = `世界${world.id}　${world.name}`;
     $("title-stage").textContent = stage.name;
     $("title-cards").textContent = Save.cardCount();
-    paintFuwari();
     showTuneTag();
     showScreen("title");
   }

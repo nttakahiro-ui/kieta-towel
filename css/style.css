@@ -184,6 +184,16 @@ body { position: fixed; inset: 0; }
 .quiz-feedback .memo { margin: 0 0 14px; }
 .quiz-feedback .btn { display: block; margin: 0 auto; }
 
+/* 点数とランク */
+.cards-rank { margin: 4px 0 6px; }
+.rank-score { font-size: 30px; font-weight: bold; color: #c98a1e; }
+.rank-name {
+  display: inline-block; margin-top: 4px; font-size: 20px; color: var(--white);
+  background: var(--green); border-radius: 999px; padding: 6px 18px;
+  animation: rank-in .5s ease-out both;
+}
+@keyframes rank-in { from { transform: scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
+
 /* カード */
 .cards-box { max-width: 440px; margin: 0 auto; text-align: center; }
 .cards-title { font-size: 24px; color: var(--green-dark); margin: 8px 0 4px; }

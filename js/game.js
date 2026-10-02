@@ -48,6 +48,15 @@ const BATTLE = {
   bombFlight: 0.4,             // たねが地面に届くまでの秒数
   bombRadius: 36,              // たねが当たる広さ（px）
 
+  // --- 強さ（1945型） ---
+  powerEvery: 3,               // 語句を何語吸い込むごとに1段階強くなるか
+
+  // --- 得点 ---
+  scoreFiller: 100,            // 雑魚を倒した点
+  scoreWord: 1000,             // 語句を倒した点（雑魚の10倍）
+  comboStep: 0.5,              // 語句を続けて倒すたびに増える倍率（1 → 1.5 → 2 …）
+  comboMax: 3,                 // コンボ倍率のいちばん上
+
   // --- 自機 ---
   shotInterval: 0.16,          // 自機の弾の間隔（秒）
   shotSpeed: 640,              // 自機の弾の速さ（px/秒）
@@ -106,18 +115,15 @@ const ENEMY_BULLET_ART = {
 // 敵の文字の色（役割ごと）
 const ENEMY_COLOR = { zako: "#5f8a3c", mid: "#b2733d", boss: "#c4577a" };
 
-// ふわりの強さ。集めたカードの総数で、色と弾の数が変わる（cards 枚以上でその段階）
-const FUWARI_LEVELS = [
-  { cards: 0,  body: "#fffdf7", line: "#c9d9b4", shots: 1, rate: 1 },
-  { cards: 10, body: "#eef8df", line: "#8fbf5e", shots: 2, rate: 1 },
-  { cards: 20, body: "#fff4cf", line: "#dcb64e", shots: 3, rate: 1 },
-  { cards: 30, body: "#fde6ee", line: "#e08aa6", shots: 3, rate: 0.8 },   // rate: 弾の間隔の倍率（小さいほど速い）
+// バトルの中での強さ（1945型）。語句を BATTLE.powerEvery 語吸い込むごとに1段階上がる。毎バトル最初の段階から
+// shots: 弾の本数、rate: 弾の間隔の倍率（小さいほど速い）、body / line: ふわりの色
+// カードの総数は、ふわりの横の数字に出すだけで、強さには関係しない
+const POWER_LEVELS = [
+  { shots: 1, rate: 1,    body: "#fffdf7", line: "#c9d9b4" },
+  { shots: 2, rate: 1,    body: "#eef8df", line: "#8fbf5e" },
+  { shots: 3, rate: 1,    body: "#fff4cf", line: "#dcb64e" },
+  { shots: 3, rate: 0.75, body: "#fde6ee", line: "#e08aa6" },
 ];
-function fuwariLevel(count) {
-  let lv = FUWARI_LEVELS[0];
-  for (const l of FUWARI_LEVELS) if (count >= l.cards) lv = l;
-  return lv;
-}
 
 const FONT_FAMILY = '"Hiragino Maru Gothic ProN","Hiragino Maru Gothic Pro","Zen Maru Gothic","Rounded Mplus 1c",sans-serif';
 
@@ -143,7 +149,9 @@ const Battle = (() => {
   let groundHinted = false;  // 地上の敵のヒントを出したか
   let banner = null;         // 「大ボス あらわる！」などの帯
   let shake = 0;             // 画面のゆれ（被弾したとき）
-  let level = FUWARI_LEVELS[0];
+  let level = POWER_LEVELS[0];
+  let score = 0, combo = 0, maxCombo = 0;
+  let floats = [];           // 点数が浮かぶ表示
   let hits = 0, downs = 0;   // 被弾した回数、やられた回数
   let lock = false;          // 照準に地上の敵が入っているか
   let slow = 0;              // ゆっくりの残り時間（秒）
@@ -217,7 +225,8 @@ const Battle = (() => {
     fillTerrain();
     resetRound(words.filter(w => w !== bossWord));
     player = { x: W / 2, y: H * 0.8, hp: BATTLE.playerMaxHp, inv: 0, glow: 0, hurt: 0 };
-    level = fuwariLevel(opts.fuwariCount);
+    level = POWER_LEVELS[0];
+    score = 0; combo = 0; maxCombo = 0; floats = [];
     hits = 0; downs = 0;
     paused = false; moved = false; groundHinted = false; banner = null; shake = 0; showWord = null; threads = []; pops = [];
     slow = 0; wave = null;
@@ -396,6 +405,8 @@ const Battle = (() => {
     updateThreads(dt);
     updatePops(dt);
     for (const v of vanish) { v.age += dt; if (v.ground) v.y += scrollSpeed() * dt; }
+    for (const fl of floats) fl.age += realDt;
+    floats = floats.filter(fl => fl.age < 0.9);
     vanish = vanish.filter(v => v.age < 0.8);
     player.notice = Math.max(0, (player.notice || 0) - dt);
 
@@ -411,7 +422,7 @@ const Battle = (() => {
     }
     if (state === "clear") {
       stateTimer -= dt;
-      if (stateTimer <= 0) { stop(); opts.onEnd(absorbed.map(w => w.id), { time: t, hits, downs }); }
+      if (stateTimer <= 0) { stop(); opts.onEnd(absorbed.map(w => w.id), { time: t, hits, downs, score, maxCombo }); }
       return;
     }
 
@@ -551,6 +562,7 @@ const Battle = (() => {
     for (const e of enemies) {
       if (e.role !== "boss" && e.y > H + e.size) {
         e.hp = 0;
+        combo = 0;
         waiting.push({ word: e.word, at: t + BATTLE.respawnDelay });
       }
     }
@@ -616,10 +628,14 @@ const Battle = (() => {
     Sound.se("hit");
     if (e.hp <= 0) defeat(e);
   }
+  function comboMul() { return Math.min(1 + BATTLE.comboStep * Math.max(0, combo - 1), BATTLE.comboMax); }
+
   function damageFiller(f) {
     f.hp--;
     f.flash = 0.12;
     if (f.hp > 0) { Sound.se("hit"); return; }
+    score += BATTLE.scoreFiller;
+    floats.push({ x: f.x, y: f.y - 10, text: `+${BATTLE.scoreFiller}`, big: false, age: 0 });
     // 倒した雑魚は、ぽんっと花になる
     addPop(f.x, f.y, f.layer === "ground" ? "#f6c9d6" : "#fff2b8", 1, f.layer === "ground");
     Sound.se("pop");
@@ -639,6 +655,13 @@ const Battle = (() => {
   // 語句を倒した
   function defeat(e) {
     passes[e.word.id] = (passes[e.word.id] || 0) + 1;
+    // 語句を続けて倒すとコンボ（語句を下へ逃がすか、弾に当たると0にもどる）
+    combo++;
+    maxCombo = Math.max(maxCombo, combo);
+    const mul = comboMul();
+    const pts = Math.round(BATTLE.scoreWord * mul);
+    score += pts;
+    floats.push({ x: e.x, y: e.y - e.size, text: `+${pts}` + (mul > 1 ? ` ×${mul}` : ""), big: true, age: 0 });
     if (!e.last) { firstPass(e); return; }
     absorb(e);
   }
@@ -660,6 +683,12 @@ const Battle = (() => {
   // 最後の回: 糸がほどけるように散って、自機へ吸い込まれる
   function absorb(e) {
     absorbed.push(e.word);
+    const lv = POWER_LEVELS[Math.min(Math.floor(absorbed.length / BATTLE.powerEvery), POWER_LEVELS.length - 1)];
+    if (lv !== level && absorbed.length < opts.total) {
+      level = lv;
+      banner = { text: "パワーアップ！", t: 1.2, color: "rgba(220,170,60,0.9)" };
+      setTimeout(() => Sound.se("power"), 350);
+    }
     const n = Math.min(60, 14 + e.word.word.length * 5);
     for (let i = 0; i < n; i++) {
       const a = Math.random() * Math.PI * 2;
@@ -721,6 +750,7 @@ const Battle = (() => {
     player.inv = BATTLE.invincibleTime;
     player.hurt = 0.4;
     hits++;
+    combo = 0;
     shake = 0.25;
     Sound.se("damage");
     if (player.hp <= 0) {
@@ -859,6 +889,17 @@ const Battle = (() => {
       ctx.fillStyle = rg;
       ctx.fillRect(0, 0, W, H);
     }
+    // 浮かぶ点数
+    ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
+    for (const fl of floats) {
+      ctx.globalAlpha = 1 - fl.age / 0.9;
+      ctx.font = font(fl.big ? 18 : 12);
+      ctx.lineWidth = 4; ctx.strokeStyle = "#ffffff";
+      ctx.strokeText(fl.text, fl.x, fl.y - fl.age * 30);
+      ctx.fillStyle = fl.big ? "#c98a1e" : "#8a9a78";
+      ctx.fillText(fl.text, fl.x, fl.y - fl.age * 30);
+    }
+    ctx.globalAlpha = 1;
     drawHud();
     // 操作のヒント（まだ動かしていないとき）
     if (!moved && state !== "clear") {
@@ -880,7 +921,7 @@ const Battle = (() => {
     // 状態の文字
     if (state === "intro") centerText(opts.stageName, "スタート！");
     if (state === "down") centerText("やられた…", `${Math.ceil(stateTimer)}秒後に再開`);
-    if (state === "clear") centerText("10語あつまった！", `タイム ${fmtTime(t)}　被弾 ${hits}回`);
+    if (state === "clear") centerText("10語あつまった！", `${score}点　タイム ${fmtTime(t)}`);
     if (paused) {
       ctx.fillStyle = "rgba(248,243,228,0.85)";
       ctx.fillRect(0, 0, W, H);
@@ -1197,9 +1238,24 @@ const Battle = (() => {
     ctx.font = font(12);
     ctx.textAlign = "left"; ctx.textBaseline = "top";
     ctx.lineWidth = 4; ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.lineJoin = "round";
-    ctx.strokeText("たいりょく", 14, top + 20);
+    const lvNo = POWER_LEVELS.indexOf(level) + 1;
+    const lvText = `たいりょく　パワー${"★".repeat(lvNo)}`;
+    ctx.strokeText(lvText, 14, top + 20);
     ctx.fillStyle = "#4b5e3a";
-    ctx.fillText("たいりょく", 14, top + 20);
+    ctx.fillText(lvText, 14, top + 20);
+    // 点数とコンボ（まん中）
+    ctx.textAlign = "center";
+    ctx.font = font(16);
+    ctx.strokeText(String(score), W / 2, top);
+    ctx.fillText(String(score), W / 2, top);
+    if (combo >= 2) {
+      ctx.font = font(12);
+      ctx.fillStyle = "#c98a1e";
+      const ct = `コンボ ${combo}　×${comboMul()}`;
+      ctx.strokeText(ct, W / 2, top + 20);
+      ctx.fillText(ct, W / 2, top + 20);
+      ctx.fillStyle = "#4b5e3a";
+    }
     // 集めた語句の数
     ctx.textAlign = "right";
     ctx.font = font(18);

@@ -180,6 +180,8 @@ const Sound = (() => {
     } else if (name === "shine") {   // 1回目の語句が光って消える（きらん）
       tone(freq("B6"), t, 0.25, "sine", 0.18);
       tone(freq("E7"), t + 0.08, 0.35, "sine", 0.12);
+    } else if (name === "power") {   // パワーアップ
+      ["C6", "E6", "G6", "C7"].forEach((n, i) => tone(freq(n), t + i * 0.06, 0.25, "triangle", 0.2));
     } else if (name === "bomb") {    // たねを落とす（ひゅっ）
       sweep(1200, 500, 0.18, "sine", 0.08);
     } else if (name === "pop") {     // 花がぽんっと咲く

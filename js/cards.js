@@ -3,6 +3,19 @@ const CARDS = {
   clearCount: 7,   // ステージクリアに必要なカードの枚数（7割）
 };
 
+// バトルの点数によるランク（仮）。min 点以上でそのランク
+const RANKS = [
+  { min: 0,     name: "タオル見習い" },
+  { min: 25000, name: "タオル職人" },
+  { min: 35000, name: "タオル名人" },
+  { min: 45000, name: "タオル博士" },
+];
+function rankOf(score) {
+  let r = RANKS[0];
+  for (const x of RANKS) if (score >= x.min) r = x;
+  return r;
+}
+
 const Cards = (() => {
   const $ = id => document.getElementById(id);
 
@@ -21,9 +34,16 @@ const Cards = (() => {
     const got = o.results.filter(r => r.correct).map(r => r.id);
     const ownedCount = o.words.filter(w => o.owned[w.id]).length;
     $("cards-summary").textContent = `今回 ${got.length} 枚 ／ このステージ ${ownedCount} / ${o.words.length} 枚`;
+    const rk = $("cards-rank");
+    rk.innerHTML = "";
     if (o.stats) {
       const st = o.stats, m = Math.floor(st.time / 60), sec = String(Math.floor(st.time % 60)).padStart(2, "0");
-      $("cards-summary").textContent += `\nバトル ${m}:${sec}　被弾 ${st.hits}回${st.downs ? `　やられた ${st.downs}回` : ""}`;
+      $("cards-summary").textContent += `\nバトル ${m}:${sec}　被弾 ${st.hits}回${st.downs ? `　やられた ${st.downs}回` : ""}　最大コンボ ${st.maxCombo}`;
+      // 点数とランク
+      const r = rankOf(st.score);
+      const sc = document.createElement("div"); sc.className = "rank-score"; sc.textContent = `${st.score} 点`;
+      const nm = document.createElement("div"); nm.className = "rank-name"; nm.textContent = `ランク：${r.name}`;
+      rk.append(sc, nm);
     }
     const list = $("cards-list");
     list.innerHTML = "";
