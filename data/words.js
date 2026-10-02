@@ -3,17 +3,17 @@
 // 欄: id, stage, word(敵の語句), kana(読み), question, choices(2〜3個), answer(正解の位置),
 //     memo(一言メモ), role("zako"/"mid"/"boss"), hp(何発で倒れるか),
 //     sayCorrect / sayWrong(その語句だけのふわりのセリフ。空なら js/quiz.js の FUWARI_SAY からえらぶ)
-// 役割は仮置き。大ボス＝v53のboss欄（一覧にない語は近い語に置きかえ）、中ボス＝各ステージ2語を仮に選んだもの
+// 役割: ステージ1は決定（大ボス 天然の撚り、中ボス ルーメン・繊維長）。ステージ2〜12は仮置き（大ボス＝v53のboss欄、中ボス＝2語を仮に選んだもの）
 window.WORDS = [
   // ---- ステージ1 ----
   {"id": 1, "stage": 1, "word": "アオイ科", "kana": "あおいか", "question": "綿(めん)は何科の植物?", "choices": ["アオイ科", "ミカン科"], "answer": 0, "memo": "綿はアオイ科の植物。試験にもよく出るよ", "role": "zako", "hp": 1, "sayCorrect": "", "sayWrong": ""},
-  {"id": 2, "stage": 1, "word": "コットンボール", "kana": "こっとんぼーる", "question": "実がはじけてふくらんだ、綿のかたまりを何と呼ぶ?", "choices": ["コットンボール", "コットンキャンディ"], "answer": 0, "memo": "綿花(めんか)とはこのコットンボールのこと", "role": "boss", "hp": 6, "sayCorrect": "", "sayWrong": ""},
-  {"id": 3, "stage": 1, "word": "ルーメン", "kana": "るーめん", "question": "綿がよく水を吸うのは、繊維(せんい)の中がストローのように空洞(くうどう)だから。この空洞の名前は?", "choices": ["ルーメン", "トンネル"], "answer": 0, "memo": "ルーメンのおかげで吸水・保温・ふっくら復元!", "role": "zako", "hp": 1, "sayCorrect": "", "sayWrong": ""},
-  {"id": 4, "stage": 1, "word": "リント", "kana": "りんと", "question": "綿の繊維(せんい)のうち、糸に紡(つむ)がれる「長い繊維(せんい)」を何と呼ぶ?", "choices": ["リント", "リンター"], "answer": 0, "memo": "短い方のリンターは油や不織布(ふしょくふ)に使われる", "role": "mid", "hp": 3, "sayCorrect": "", "sayWrong": ""},
+  {"id": 2, "stage": 1, "word": "コットンボール", "kana": "こっとんぼーる", "question": "実がはじけてふくらんだ、綿のかたまりを何と呼ぶ?", "choices": ["コットンボール", "コットンキャンディ"], "answer": 0, "memo": "綿花(めんか)とはこのコットンボールのこと", "role": "zako", "hp": 1, "sayCorrect": "", "sayWrong": ""},
+  {"id": 3, "stage": 1, "word": "ルーメン", "kana": "るーめん", "question": "綿がよく水を吸うのは、繊維(せんい)の中がストローのように空洞(くうどう)だから。この空洞の名前は?", "choices": ["ルーメン", "トンネル"], "answer": 0, "memo": "ルーメンのおかげで吸水・保温・ふっくら復元!", "role": "mid", "hp": 3, "sayCorrect": "", "sayWrong": ""},
+  {"id": 4, "stage": 1, "word": "リント", "kana": "りんと", "question": "綿の繊維(せんい)のうち、糸に紡(つむ)がれる「長い繊維(せんい)」を何と呼ぶ?", "choices": ["リント", "リンター"], "answer": 0, "memo": "短い方のリンターは油や不織布(ふしょくふ)に使われる", "role": "zako", "hp": 1, "sayCorrect": "", "sayWrong": ""},
   {"id": 5, "stage": 1, "word": "リンター", "kana": "りんたー", "question": "種に残った短い繊維(せんい)「リンター」は、どうなる?", "choices": ["油や不織布の原料になる", "捨てられる"], "answer": 0, "memo": "綿はぜんぶ使い切れるエコな植物!", "role": "zako", "hp": 1, "sayCorrect": "", "sayWrong": ""},
-  {"id": 6, "stage": 1, "word": "天然の撚り", "kana": "てんねんのより", "question": "綿の繊維(せんい)は自然に◯◯◯いるから、糸にしたとき強くなる。◯◯◯は?", "choices": ["よじれて", "まっすぐで"], "answer": 0, "memo": "天然のよじれ(撚(よ)り)が繊維(せんい)同士をからませる", "role": "zako", "hp": 1, "sayCorrect": "", "sayWrong": ""},
-  {"id": 7, "stage": 1, "word": "繊維長", "kana": "せんいちょう", "question": "綿の品質は、まず繊維(せんい)の何で区別する?", "choices": ["長さ", "色"], "answer": 0, "memo": "長いほど高級。繊維長(せんいちょう)がものさし", "role": "zako", "hp": 1, "sayCorrect": "", "sayWrong": ""},
-  {"id": 8, "stage": 1, "word": "綿の花", "kana": "めんのはな", "question": "綿の花は、さいたあと何色に変わっていく?", "choices": ["乳白色から赤むらさき色へ", "ずっと真っ白のまま"], "answer": 0, "memo": "花の色が変わるのが綿のふしぎ", "role": "mid", "hp": 3, "sayCorrect": "", "sayWrong": ""},
+  {"id": 6, "stage": 1, "word": "天然の撚り", "kana": "てんねんのより", "question": "綿の繊維(せんい)は自然に◯◯◯いるから、糸にしたとき強くなる。◯◯◯は?", "choices": ["よじれて", "まっすぐで"], "answer": 0, "memo": "天然のよじれ(撚(よ)り)が繊維(せんい)同士をからませる", "role": "boss", "hp": 6, "sayCorrect": "", "sayWrong": ""},
+  {"id": 7, "stage": 1, "word": "繊維長", "kana": "せんいちょう", "question": "綿の品質は、まず繊維(せんい)の何で区別する?", "choices": ["長さ", "色"], "answer": 0, "memo": "長いほど高級。繊維長(せんいちょう)がものさし", "role": "mid", "hp": 3, "sayCorrect": "", "sayWrong": ""},
+  {"id": 8, "stage": 1, "word": "綿の花", "kana": "めんのはな", "question": "綿の花は、さいたあと何色に変わっていく?", "choices": ["乳白色から赤むらさき色へ", "ずっと真っ白のまま"], "answer": 0, "memo": "花の色が変わるのが綿のふしぎ", "role": "zako", "hp": 1, "sayCorrect": "", "sayWrong": ""},
   {"id": 9, "stage": 1, "word": "一年生植物", "kana": "いちねんせいしょくぶつ", "question": "綿は春に種をまいて、どのくらいで1mほどに育つ?", "choices": ["3〜4ヶ月", "3〜4年"], "answer": 0, "memo": "綿は一年で育つ「一年生」として育てられる", "role": "zako", "hp": 1, "sayCorrect": "", "sayWrong": ""},
   {"id": 10, "stage": 1, "word": "植物繊維", "kana": "しょくぶつせんい", "question": "綿と麻(あさ)は、天然繊維(せんい)のうちどっちの仲間?", "choices": ["植物繊維(せんい)", "動物繊維(せんい)"], "answer": 0, "memo": "動物繊維(せんい)は毛(ウール)や絹(シルク)", "role": "zako", "hp": 1, "sayCorrect": "", "sayWrong": ""},
   // ---- ステージ2 ----
