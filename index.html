@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#eaf3dc">
   <title>消えたタオルと白い記憶（テスト版）</title>
-  <link rel="stylesheet" href="css/style.css?v=17">
+  <link rel="stylesheet" href="css/style.css?v=19">
 </head>
 <body>
   <div id="app">
@@ -43,6 +43,7 @@
     <!-- バトル -->
     <section id="screen-battle" class="screen">
       <canvas id="battle-canvas"></canvas>
+      <button id="btn-pause" class="pause-btn" aria-label="ひとやすみ">Ⅱ</button>
     </section>
 
     <!-- クイズの前に、今日あつめたことばを見せる -->
@@ -64,6 +65,7 @@
         <div id="quiz-choices" class="quiz-choices"></div>
         <div id="quiz-feedback" class="quiz-feedback hidden"></div>
         <div id="quiz-get" class="quiz-get hidden"></div>
+        <div class="btn-row"><button id="btn-quiz-quit" class="link-btn">とちゅうでやめる</button></div>
       </div>
     </section>
 
@@ -93,6 +95,42 @@
     </section>
   </div>
 
+  <!-- バトルの一時停止メニュー -->
+  <div id="pause-menu" class="overlay hidden">
+    <div class="overlay-box">
+      <h2>ひとやすみ</h2>
+      <div class="btn-row">
+        <button id="pm-continue" class="btn btn-main">つづける</button>
+        <button id="pm-retry" class="btn btn-sub">はじめからやりなおす</button>
+        <button id="pm-stages" class="btn btn-sub">ステージ一覧へ</button>
+        <button id="pm-title" class="btn btn-sub">タイトルへ</button>
+      </div>
+      <div id="pm-debug" class="debug-box hidden">
+        <p class="debug-label">デバッグ</p>
+        <button id="dbg-skip-recon" class="btn btn-debug">偵察をとばす</button>
+        <button id="dbg-skip-boss" class="btn btn-debug">大ボスへとぶ</button>
+        <button id="dbg-clear" class="btn btn-debug">すぐクリア（10語ぜんぶ）</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- デバッグメニュー（タイトルの文字を5回続けて押すと出る） -->
+  <div id="debug-menu" class="overlay hidden">
+    <div class="overlay-box">
+      <h2>デバッグ</h2>
+      <p class="tune-note">試すとき用。バトル中は、右下の「Ⅱ」の一時停止メニューに、とばす操作が出ます。</p>
+      <div class="btn-row">
+        <button id="dbg-tune" class="btn btn-debug">調整パネルを開く</button>
+        <button id="dbg-open-all" class="btn btn-debug">すべてのステージを開く: オフ</button>
+        <button id="dbg-invincible" class="btn btn-debug">無敵: オフ</button>
+        <button id="dbg-odai" class="btn btn-debug">お題バトル: オン</button>
+        <button id="dbg-reset" class="btn btn-debug">記録を消す</button>
+        <button id="dbg-off" class="btn btn-sub">デバッグをやめる</button>
+        <button id="dbg-close" class="btn btn-main">とじる</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 調整パネル（URLの最後に ?tune をつけると出る。試すとき用） -->
   <div id="tune" class="tune hidden">
     <div class="tune-box">
@@ -111,12 +149,12 @@
   <!-- 横向きのとき -->
   <div id="rotate"><div><div class="rotate-icon"></div><p>縦にしてね</p></div></div>
 
-  <script src="data/words.js?v=17"></script>
-  <script src="data/stages.js?v=17"></script>
-  <script src="js/audio.js?v=17"></script>
-  <script src="js/game.js?v=17"></script>
-  <script src="js/quiz.js?v=17"></script>
-  <script src="js/cards.js?v=17"></script>
-  <script src="js/main.js?v=17"></script>
+  <script src="data/words.js?v=19"></script>
+  <script src="data/stages.js?v=19"></script>
+  <script src="js/audio.js?v=19"></script>
+  <script src="js/game.js?v=19"></script>
+  <script src="js/quiz.js?v=19"></script>
+  <script src="js/cards.js?v=19"></script>
+  <script src="js/main.js?v=19"></script>
 </body>
 </html>

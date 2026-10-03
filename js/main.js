@@ -184,6 +184,9 @@ const Main = (() => {
   }
   let stage, world, words, lastStats = null, lastIds = [];
   const tuneMode = /[?&]tune/.test(window.location.search);
+  // デバッグ（タイトルの文字を5回続けて押すとオン。このページを開いている間だけ）
+  let debugMode = false, openAll = false;
+  let titleTaps = [];
 
   // 調整中なら、タイトルに印を出す
   function showTuneTag() {
@@ -288,15 +291,16 @@ const Main = (() => {
       box.appendChild(h);
       window.STAGES.filter(s => s.world === wd.id).forEach(s => {
         const row = document.createElement("button");
-        row.className = "stage-row" + (s.open ? "" : " locked");
-        row.disabled = !s.open;
+        const open = s.open || openAll;   // デバッグ: すべてのステージを開く
+        row.className = "stage-row" + (open ? "" : " locked");
+        row.disabled = !open;
         const b = Save.data.best[s.id];
         const got = window.WORDS.filter(w => w.stage === s.id && Save.data.cards[w.id]).length;
         const no = document.createElement("span"); no.className = "no"; no.textContent = s.id;
         const main = document.createElement("span"); main.className = "main";
         const nm = document.createElement("span"); nm.className = "nm"; nm.textContent = s.name;
         const sub = document.createElement("span"); sub.className = "sub";
-        sub.textContent = s.open ? `難易度 ${s.difficulty || 1}　ベスト ${b ? b.score : 0}点　カード ${got}/10` : "まだあそべません";
+        sub.textContent = open ? `難易度 ${s.difficulty || 1}　ベスト ${b ? b.score : 0}点　カード ${got}/10` : "まだあそべません";
         const marks = document.createElement("span"); marks.className = "marks";
         [["all", "10語"], ["noDown", "無事"], ["noHit", "無傷"]].forEach(([k, label]) => {
           const m = document.createElement("span"); m.className = "mark" + (b && b[k] ? " on" : ""); m.textContent = label;
@@ -304,14 +308,43 @@ const Main = (() => {
         });
         main.append(nm, sub);
         row.append(no, main);
-        if (s.open) row.appendChild(marks);
-        if (s.open) row.addEventListener("click", () => { Sound.se("start"); selectStage(s.id); toBattle(); });
+        if (open) row.appendChild(marks);
+        if (open) row.addEventListener("click", () => { Sound.se("start"); selectStage(s.id); toBattle(); });
         box.appendChild(row);
       });
     });
     showScreen("stages");
     $("screen-stages").scrollTop = 0;
   }
+
+  // ===== バトルの一時停止メニュー =====
+  function openPause() {
+    if (!$("screen-battle").classList.contains("active")) return;
+    Battle.pause();
+    Sound.suspend();
+    $("pm-debug").classList.toggle("hidden", !debugMode);
+    $("pause-menu").classList.remove("hidden");
+  }
+  function closePause(after) {
+    $("pause-menu").classList.add("hidden");
+    Sound.resume();
+    after && after();
+  }
+  function quitBattle(to) {   // バトルをやめる（記録はのこさない）
+    Battle.stop();
+    closePause(to);
+  }
+
+  // ===== デバッグメニュー =====
+  function refreshDebugButtons() {
+    $("dbg-open-all").textContent = `すべてのステージを開く: ${openAll ? "オン" : "オフ"}`;
+    $("dbg-invincible").textContent = `無敵: ${BATTLE.debugInvincible ? "オン" : "オフ"}`;
+    $("dbg-odai").textContent = `お題バトル: ${BATTLE.odai ? "オン" : "オフ"}`;
+    const el = $("title-stage");
+    el.querySelectorAll(".title-tag.dbg").forEach(x => x.remove());
+    if (debugMode) { const t = document.createElement("span"); t.className = "title-tag dbg"; t.textContent = "デバッグ"; el.appendChild(t); }
+  }
+  function openDebug() { refreshDebugButtons(); $("debug-menu").classList.remove("hidden"); }
 
   function init() {
     Save.load();
@@ -324,7 +357,7 @@ const Main = (() => {
 
     // ドラッグ中に画面がスクロールしないようにする（クイズなどスクロールできる画面は除く）
     document.addEventListener("touchmove", e => {
-      if (!e.target.closest || !e.target.closest(".screen.scroll, .tune")) e.preventDefault();
+      if (!e.target.closest || !e.target.closest(".screen.scroll, .tune, .overlay")) e.preventDefault();
     }, { passive: false });
     // ダブルタップでの拡大を防ぐ
     document.addEventListener("dblclick", e => e.preventDefault());
@@ -336,6 +369,37 @@ const Main = (() => {
       toStages();
     });
     $("btn-stages-back").addEventListener("click", toTitle);
+
+    // バトルの一時停止メニュー
+    $("btn-pause").addEventListener("click", openPause);
+    $("pm-continue").addEventListener("click", () => closePause(() => Battle.resume()));
+    $("pm-retry").addEventListener("click", () => quitBattle(toBattle));
+    $("pm-stages").addEventListener("click", () => quitBattle(toStages));
+    $("pm-title").addEventListener("click", () => quitBattle(toTitle));
+    $("dbg-skip-recon").addEventListener("click", () => closePause(() => Battle.debug.skipRecon()));
+    $("dbg-skip-boss").addEventListener("click", () => closePause(() => Battle.debug.skipToBoss()));
+    $("dbg-clear").addEventListener("click", () => closePause(() => Battle.debug.clearAll()));
+
+    // クイズのとちゅうでやめる
+    $("btn-quiz-quit").addEventListener("click", () => {
+      if (!window.confirm("クイズをやめて、ステージ一覧にもどりますか？（このバトルの記録はのこりません）")) return;
+      Sound.setTempo(1);
+      toStages();
+    });
+
+    // デバッグ: タイトルの文字を5回続けて押す（1.5秒以内）
+    document.querySelector(".title-main").addEventListener("click", () => {
+      const now = Date.now();
+      titleTaps = titleTaps.filter(x => now - x < 1500).concat(now);
+      if (titleTaps.length >= 5) { titleTaps = []; debugMode = true; openDebug(); }
+    });
+    $("dbg-tune").addEventListener("click", () => { $("debug-menu").classList.add("hidden"); Tune.open(); });
+    $("dbg-open-all").addEventListener("click", () => { openAll = !openAll; refreshDebugButtons(); });
+    $("dbg-invincible").addEventListener("click", () => { BATTLE.debugInvincible = !BATTLE.debugInvincible; refreshDebugButtons(); });
+    $("dbg-odai").addEventListener("click", () => { BATTLE.odai = !BATTLE.odai; refreshDebugButtons(); });
+    $("dbg-reset").addEventListener("click", () => $("btn-reset").click());
+    $("dbg-off").addEventListener("click", () => { debugMode = false; openAll = false; BATTLE.debugInvincible = false; $("debug-menu").classList.add("hidden"); refreshDebugButtons(); });
+    $("dbg-close").addEventListener("click", () => $("debug-menu").classList.add("hidden"));
 
     // 記録を消す（試すとき用）
     $("btn-reset").addEventListener("click", () => {

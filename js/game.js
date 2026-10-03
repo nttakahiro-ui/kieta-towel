@@ -115,6 +115,8 @@ const BATTLE = {
   },
   autoGroundCount: 2,          // patterns が "auto" のステージで、地上（地上のかげ）に出すザコの語句の数
 
+  debugInvincible: false,      // デバッグ: 自機が弾に当たらない
+
   // --- 自機 ---
   shotInterval: 0.11,          // 自機の弾の間隔（秒）
   shotSpeed: 640,              // 自機の弾の速さ（px/秒）
@@ -1282,6 +1284,7 @@ const Battle = (() => {
   }
 
   function hurt() {
+    if (BATTLE.debugInvincible) return;   // デバッグ: 無敵
     if (shield > 0) {   // 盾: 1回だけ弾を防ぐ
       shield = 0;
       player.inv = 1;
@@ -1715,12 +1718,16 @@ const Battle = (() => {
         ctx.fillStyle = ENEMY_COLOR[e.role]; ctx.fillRect(x + e.w / 2 + 2, py + bh / 2 - bh * p.hp / p.maxHp, 3, bh * p.hp / p.maxHp);
       }
     }
-    // ふりがなは列の上に横書きで
+    // ふりがなは列の右に縦書きで（となりの列とぶつからないように）
     if (hasKanji(e.word.word)) {
       ctx.globalAlpha = alpha;
-      ctx.font = font(BATTLE.kanaSize); ctx.lineWidth = 4; ctx.strokeStyle = "#ffffff";
-      const ky = y - e.h / 2 - BATTLE.kanaSize / 2 - 2;
-      ctx.strokeText(e.word.kana, x, ky); ctx.fillStyle = "#5d6b4c"; ctx.fillText(e.word.kana, x, ky);
+      const ks = Math.max(9, Math.min(BATTLE.kanaSize, Math.floor(e.h / Math.max(1, Array.from(e.word.kana).length))));
+      ctx.font = font(ks); ctx.lineWidth = 3; ctx.strokeStyle = "#ffffff"; ctx.fillStyle = "#5d6b4c";
+      const kx = x + e.w / 2 + ks / 2 + 2;
+      Array.from(e.word.kana).forEach((ch, i) => {
+        const c = VERTICAL_GLYPH[ch] || ch, ky = y - e.h / 2 + ks / 2 + i * ks;
+        ctx.strokeText(c, kx, ky); ctx.fillText(c, kx, ky);
+      });
     }
     ctx.restore();
   }
@@ -2178,5 +2185,33 @@ const Battle = (() => {
     ctx.closePath();
   }
 
-  return { start, stop, resize, pause, choiceRects };   // （自動プレイヤーで確かめるときは、ここで中の状態を外に出している）   // （自動プレイヤーで確かめるときは、ここで中の状態を外に出している）
+  // ===== デバッグ用（タイトルを5回続けて押すと使える） =====
+  const debug = {
+    // 偵察をとばして、「本番に持っていくもの」を選ぶ画面へ
+    skipRecon() {
+      if (!running || phase !== "round1") return;
+      enemies = []; fillers = []; ebullets = []; bombs = []; items = []; odai = null;
+      nextIdx = script.length;
+      for (const w of script) found.add(w.id);
+      reacted = found.size;
+      state = "sortie"; sortieNo = 2; choiceT = BATTLE.choiceTime; paused = false; drag = null;
+    },
+    // 本番をとばして、大ボスへ
+    skipToBoss() {
+      if (!running || phase === "boss") return;
+      if (phase === "round1") { chooseLoadout("power"); startPhase("round2"); }
+      enemies = enemies.filter(e => e.role === "boss"); fillers = []; ebullets = []; odai = null; obs = [];
+      nextIdx = script.length;
+      gapT = 0.01; state = "play"; paused = false;
+    },
+    // すぐクリア（10語ぜんぶ吸い込んだことにする）
+    clearAll() {
+      if (!running || state === "clear") return;
+      absorbed = slots.slice(); missed = [];
+      enemies = []; fillers = []; ebullets = []; odai = null;
+      state = "clear"; stateTimer = 1; paused = false;
+    },
+  };
+
+  return { start, stop, resize, pause, resume, choiceRects, debug };   // （自動プレイヤーで確かめるときは、ここで中の状態を外に出している）
 })();
