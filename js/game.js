@@ -75,7 +75,7 @@ const BATTLE = {
   // --- お題バトル（2周目の中ボス2回と大ボス1回） ---
   odai: true,                  // お題バトルのスイッチ（true＝オン、false＝オフ。オフで今までの中ボス・大ボス戦）
   odaiIntroTime: 2.5,          // 始まりのスローと、問題文を画面中央に大きく出す秒数（この間は弾が当たらない）。10/8に2.5秒に
-  odaiBigFont: 34,             // 問題文を画面中央に出すときの文字の大きさのいちばん上（px）。長い問題は3行に収まるまで小さくする
+  odaiBigFont: 26,             // 問題文を画面中央に出すときの文字の大きさのいちばん上（px）。長い問題は3行に収まるまで小さくする
   odaiSmallFont: 20,           // 問題文を上の帯の下に移したあとの文字の大きさのいちばん上（px）。同じく3行に収まるまで小さくする
   odaiMaxLines: 3,             // 問題文の行数の上限
   odaiMinFont: 12,             // 問題文の文字の大きさのいちばん下（px）
@@ -100,8 +100,8 @@ const BATTLE = {
   // --- 天気（data/stages.js の weather） ---
   windDir: 1,                  // 風で自機が流される向き（1 ＝ 右へ、-1 ＝ 左へ）
   windStrength: 26,            // 風で自機が流される速さ（px/秒）
-  fogTop: 0.33,                // 霧: 画面の上からこの割合までは見えない（そこに入ってから見える）
-  fogColor: "rgba(48,58,84,0.97)",   // 霧の色
+  fogTop: 0.25,                // 霧: 画面の上からこの割合までが霧（半透明。敵の影がうっすら見え、語句の光る縁取りは霧の上に出る）
+  fogColor: "rgba(48,58,84,0.78)",   // 霧の色（最後の数が濃さ。1 で何も見えない）
 
   // --- 障害物（data/stages.js の obstacles） ---
   shadeHoldY: 0.2,             // 「木のかげ」の語句が止まって待つ高さ（画面の高さに対する割合）
@@ -1693,11 +1693,24 @@ const Battle = (() => {
     ctx.fillStyle = BATTLE.fogColor;
     ctx.fillRect(-10, -10, W + 20, y1 + 10);
     const g = ctx.createLinearGradient(0, y1, 0, y2);
-    g.addColorStop(0, BATTLE.fogColor); g.addColorStop(1, "rgba(48,58,84,0)");
+    g.addColorStop(0, BATTLE.fogColor); g.addColorStop(1, BATTLE.fogColor.replace(/[\d.]+\)$/, "0)"));
     ctx.fillStyle = g; ctx.fillRect(-10, y1, W + 20, y2 - y1);
     // もやもや
     ctx.fillStyle = "rgba(200,210,235,0.12)";
     for (let i = 0; i < 6; i++) { const x = ((i * 97 + t * 14) % (W + 160)) - 80; ctx.beginPath(); ctx.ellipse(x, y1 - 10 + (i % 3) * 14, 90, 22, 0, 0, Math.PI * 2); ctx.fill(); }
+    // 語句の光る縁取りだけは霧の上に出す（霧の中でも「語句がいる」とわかる）
+    ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
+    for (const e of enemies) {
+      if (e.ground || e.vertical || e.y - e.size > y2) continue;
+      const k = e.y < y1 ? 1 : Math.max(0, 1 - (e.y - y1) / (y2 - y1));
+      if (k <= 0) continue;
+      ctx.globalAlpha = fogLevel * k * (e.last ? 0.9 : 0.6);
+      ctx.font = font(e.size);
+      ctx.shadowColor = e.last ? "rgba(255,214,90,1)" : "rgba(255,255,255,1)"; ctx.shadowBlur = 14;
+      ctx.lineWidth = 3; ctx.strokeStyle = e.last ? "#ffe9a0" : "#ffffff";
+      if (e.parts) { for (const q of e.parts) if (!q.broken) ctx.strokeText(q.ch, e.x + q.ox, e.y); }
+      else ctx.strokeText(e.word.word, e.x, e.y);
+    }
     ctx.restore();
   }
   // 風・雨・雪の粒（見た目だけ）
