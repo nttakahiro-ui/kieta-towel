@@ -230,8 +230,8 @@ const POWER_LEVELS = [
 ];
 // 本番に持っていくもの（仮の3つ）。選ばなければ最初の「つよい弾」になる
 const LOADOUTS = [
-  { id: "power",  name: "つよい弾",       desc: "弾1本分強い状態で始まる" },
-  { id: "shield", name: "盾",             desc: "1回だけ弾を防ぐ" },
+  { id: "power",  name: "つよい光",       desc: "光が1本ふえた状態で始まる" },
+  { id: "shield", name: "まもりの綿",     desc: "1回だけまもってくれる" },
   { id: "bomb",   name: "大きなふわりタイフーン", desc: "ふわりタイフーンのゲージが速くたまる" },
 ];
 
@@ -557,11 +557,11 @@ const Battle = (() => {
     retryMain = false;
     Sound.se("start");
     if (sortieNo === 1) {
-      fsay = { text: "ことばを見つけよう（まだあつめられないよ）", t: BATTLE.fuwariSayTime };
+      fsay = { text: "ことばをさがそう！ 円の中で見つめてね", t: BATTLE.fuwariSayTime };
     } else {
       startPhase("round2");
       stripFlash = 0.6;   // 帯の灰色の名前がいっせいに光る
-      fsay = { text: "思い出した！今度はあつめられる！", t: BATTLE.fuwariSayTime, big: true };
+      fsay = { text: "ことばを助けよう！", t: BATTLE.fuwariSayTime, big: true };
       Sound.se("power");
     }
   }
@@ -717,7 +717,7 @@ const Battle = (() => {
   function groundHint() {
     if (groundHinted) return;
     groundHinted = true;
-    banner = { text: "じめんの敵は ◎ をあわせよう", t: 2.4, color: "rgba(111,154,74,0.9)" };
+    banner = { text: "じめんのことばは ◎ をあわせよう", t: 2.4, color: "rgba(111,154,74,0.9)" };
   }
 
   // ===== 雑魚の群れを出す =====
@@ -856,7 +856,7 @@ const Battle = (() => {
         } else {
           startPhase("boss");
           if (BATTLE.odai) startOdai(bossWord, true); else spawn(bossWord);
-          banner = { text: "大ボス あらわる！", t: 1.8 };
+          banner = { text: "大きな殻があらわれた！", t: 1.8 };
           Sound.se("boss");
         }
       }
@@ -1256,7 +1256,7 @@ const Battle = (() => {
     const size = Math.max(24, Math.min(BATTLE.fontSize[role], Math.floor(room / (longest * 1.12))));
     cands.forEach((w, i) => spawn(w, { role, size, slot: i, real: w === real }));
     slow = BATTLE.odaiIntroTime;   // 吸い込みと同じスロー。読む時間をつくる
-    fsay = { text: "お題だよ！ 答えの語句を撃とう", t: 2.5 };
+    fsay = { text: "お題だよ！ 答えのことばに光を当てよう", t: 2.5 };
     Sound.se("odai");
   }
 
@@ -1393,7 +1393,7 @@ const Battle = (() => {
     const lv = POWER_LEVELS[Math.min(Math.floor(absorbed.length / BATTLE.powerEvery) + powerBonus, POWER_LEVELS.length - 1)];
     if (lv !== level && absorbed.length < opts.total) {
       level = lv;
-      banner = { text: "パワーアップ！", t: 1.2, color: "rgba(220,170,60,0.9)" };
+      banner = { text: "光が強くなった！", t: 1.2, color: "rgba(220,170,60,0.9)" };
       setTimeout(() => Sound.se("power"), 350);
     }
     const n = Math.min(60, 14 + e.word.word.length * 5);
@@ -1458,7 +1458,7 @@ const Battle = (() => {
       shield = 0;
       player.inv = 1;
       player.glow = 0.35;
-      floats.push({ x: player.x, y: player.y - 40, text: "盾がまもった！", big: true, age: 0 });
+      floats.push({ x: player.x, y: player.y - 40, text: "まもりの綿がまもった！", big: true, age: 0 });
       Sound.se("shield");
       return;
     }
@@ -2270,17 +2270,17 @@ const Battle = (() => {
     ctx.font = font(15); ctx.fillStyle = "#7a8a68";
     ctx.fillText(opts.stageName, W / 2, cy - 110);
     ctx.font = font(44); ctx.fillStyle = sortieNo === 1 ? "#48693a" : "#b0801a";
-    ctx.fillText(`出撃${sortieNo}`, W / 2, cy - 60);
+    ctx.fillText(`${sortieNo}回目の旅`, W / 2, cy - 60);
     ctx.font = font(30);
-    ctx.fillText(sortieNo === 1 ? "探検（たんけん）" : "本番（あつめる）", W / 2, cy - 12);
+    ctx.fillText(sortieNo === 1 ? "ことばをさがす" : "ことばを助ける", W / 2, cy - 12);
     ctx.font = font(16); ctx.fillStyle = "#4b5e3a";
     const lines = sortieNo === 1
-      ? ["いちど見にいこう。まだ吸い込めないよ", "ことばを見つけて、", "どこから来るか、おぼえておこう"]
-      : [`探検で見つけたことば ${reacted}語`, "同じ順番で、もう一度来るよ。", "今度はあつめられる！"];
+      ? ["双眼鏡で、ただよっていることばをさがそう。", "円の中で少し見つめると", "見つかるよ"]
+      : [`1回目の旅で見つけたことば ${reacted}語`, "ことばは殻にとらわれている。", "ふわりの光でほどいて、助けよう！"];
     lines.forEach((l, i) => ctx.fillText(l, W / 2, cy + 36 + i * 24));
     ctx.globalAlpha = 0.6 + Math.sin(performance.now() / 250) * 0.4;
     ctx.font = font(22); ctx.fillStyle = sortieNo === 1 ? "#6f9a4a" : "#c98a1e";
-    ctx.fillText("タップで出撃！", W / 2, cy + 150);
+    ctx.fillText("タップで出発！", W / 2, cy + 150);
     ctx.restore();
   }
 
@@ -2343,11 +2343,11 @@ const Battle = (() => {
       ctx.font = font(15); ctx.fillStyle = "#9a7a40";
       ctx.fillText(opts.stageName, W / 2, cy - 120);
       ctx.font = font(56); ctx.fillStyle = "#b0801a";
-      ctx.fillText("出撃2", W / 2, cy - 64);
+      ctx.fillText("2回目の旅", W / 2, cy - 64);
       ctx.font = font(44);
-      ctx.fillText("本番", W / 2, cy - 6);
+      ctx.fillText("ことばを助ける", W / 2, cy - 6);
       // ふわり（仮の絵）と吹き出し
-      const by = cy + 70, text = "ことばを集めに行こう！";
+      const by = cy + 70, text = "ことばを助けに行こう！";
       ctx.font = font(17);
       const tw = ctx.measureText(text).width, bw = tw + 28, bx = W / 2 - bw / 2 + 22;
       ctx.fillStyle = "#fffdf7"; ctx.strokeStyle = "#dcb64e"; ctx.lineWidth = 2;
@@ -2358,13 +2358,13 @@ const Battle = (() => {
       ctx.fillStyle = "#6b4a10"; ctx.fillText(text, bx + bw / 2, by);
       ctx.globalAlpha = 0.6 + Math.sin(performance.now() / 250) * 0.4;
       ctx.font = font(22); ctx.fillStyle = "#c98a1e";
-      ctx.fillText("タップで出撃！", W / 2, cy + 160);
+      ctx.fillText("タップで出発！", W / 2, cy + 160);
       ctx.globalAlpha = 1;
       return;
     }
     // カウント
     const n = countStepNo(), local = n < 3 ? (countT % BATTLE.countStep) / BATTLE.countStep : (countT - BATTLE.countStep * 3) / BATTLE.countGo;
-    const txt = n < 3 ? String(3 - n) : "出撃！";
+    const txt = n < 3 ? String(3 - n) : "出発！";
     ctx.save();
     ctx.globalAlpha = Math.max(0, 1 - local * 0.6);
     ctx.font = font(n < 3 ? 110 : 64);
@@ -2379,8 +2379,8 @@ const Battle = (() => {
   function drawChoice() {
     // ふわりのセリフ（探検の終わり）
     const say = retryMain
-      ? "3機ともやられちゃった…。でも、見つけたことばはおぼえてるよ。本番の最初から、もう一回！"
-      : `${reacted}のことばを見つけたね。でもまだ記憶がぼんやり…。同じ道をもう一回飛べば、吸い込める気がする！`;
+      ? "ふわりの元気がなくなっちゃった…。でも、見つけたことばはおぼえてるよ。2回目の旅の最初から、もう一回！"
+      : `${reacted}のことばを見つけたね。ことばは殻にとらわれているみたい。ふわりの光で殻をほどいて、助けに行こう！`;
     ctx.font = font(14);
     const lines = wrapText(say, W - 92);
     const bh = lines.length * 20 + 16, by = H * 0.03;
@@ -2393,11 +2393,11 @@ const Battle = (() => {
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     const top = by + bh + 8;
     ctx.font = font(34); ctx.fillStyle = "#b0801a";
-    ctx.fillText("出撃2　本番", W / 2, top + 24);
+    ctx.fillText("2回目の旅", W / 2, top + 24);
     ctx.font = font(16);
-    ctx.fillText("（あつめる）", W / 2, top + 52);
+    ctx.fillText("（ことばを助ける）", W / 2, top + 52);
     ctx.font = font(16); ctx.fillStyle = "#4b5e3a";
-    ctx.fillText("本番に持っていくものを1つえらぼう", W / 2, top + 82);
+    ctx.fillText("2回目の旅に持っていくものを1つえらぼう", W / 2, top + 82);
     choiceRects().forEach((r, i) => {
       const l = LOADOUTS[i];
       ctx.fillStyle = "#fffdf7"; ctx.strokeStyle = "#e0b03a"; ctx.lineWidth = 3;
@@ -2501,11 +2501,11 @@ const Battle = (() => {
     const b = bombButton();
     ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.font = font(11);
     const lvNo = POWER_LEVELS.indexOf(level) + 1;
-    const lvText = `パワー${"★".repeat(lvNo)}`;
+    const lvText = `ひかり${"★".repeat(lvNo)}`;
     ctx.strokeText(lvText, b.x + b.r + 8, b.y - 8); ctx.fillText(lvText, b.x + b.r + 8, b.y - 8);
     if (loadout) {   // 持っていったもの（盾は使うと消える）
       const l = LOADOUTS.find(x => x.id === loadout);
-      const txt = loadout === "shield" && !shield ? "盾（使った）" : l.name;
+      const txt = loadout === "shield" && !shield ? "まもりの綿（使った）" : l.name;
       ctx.strokeText(`持ちもの: ${txt}`, b.x + b.r + 8, b.y + 8); ctx.fillText(`持ちもの: ${txt}`, b.x + b.r + 8, b.y + 8);
     }
     drawStrip();
@@ -2578,14 +2578,14 @@ const Battle = (() => {
         ctx.fillStyle = "#ffffff";
         ctx.fillText("地", x + cw + 9, y + sh / 2);
       }
-      // 大ボスの枠: 吸い込むまで小さく「大ボス」の印（帯の右に出す）
+      // 大ボスの枠: 助けるまで小さく「さいご」の印（帯の右に出す）
       if (w === bossWord && !got) {
         ctx.font = font(8);
-        const tw = ctx.measureText("大ボス").width + 6;
+        const tw = ctx.measureText("さいご").width + 6;
         ctx.fillStyle = ENEMY_COLOR.boss;
         roundRect(x + cw + 2, y + sh / 2 - 6, tw, 12, 5); ctx.fill();
         ctx.fillStyle = "#ffffff";
-        ctx.fillText("大ボス", x + cw + 2 + tw / 2, y + sh / 2);
+        ctx.fillText("さいご", x + cw + 2 + tw / 2, y + sh / 2);
       }
     });
     ctx.restore();

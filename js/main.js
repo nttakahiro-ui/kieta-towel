@@ -321,7 +321,7 @@ const Main = (() => {
         const sub = document.createElement("span"); sub.className = "sub";
         sub.textContent = open ? `難易度 ${s.difficulty || 1}　ベスト ${b ? b.score : 0}点　カード ${got}/10` : "まだあそべません";
         const marks = document.createElement("span"); marks.className = "marks";
-        [["all", "10語"], ["noDown", "無事"], ["noHit", "無傷"]].forEach(([k, label]) => {
+        [["all", "10語"], ["noDown", "元気"], ["noHit", "ぶつからず"]].forEach(([k, label]) => {
           const m = document.createElement("span"); m.className = "mark" + (b && b[k] ? " on" : ""); m.textContent = label;
           marks.appendChild(m);
         });
