@@ -195,6 +195,9 @@ const Sound = (() => {
       sweep(520, 300, 0.15, "sine", 0.18, 0.1);
     } else if (name === "hirameki") { // ひらめき
       ["G6", "C7", "E7"].forEach((n, i) => tone(freq(n), t + i * 0.05, 0.5, "sine", 0.16));
+    } else if (name === "shield") {  // 盾が守った
+      tone(freq("E5"), t, 0.3, "triangle", 0.25);
+      tone(freq("B5"), t + 0.06, 0.4, "sine", 0.2);
     } else if (name === "bomb") {    // たねを落とす（ひゅっ）
       sweep(1200, 500, 0.18, "sine", 0.08);
     } else if (name === "pop") {     // 花がぽんっと咲く

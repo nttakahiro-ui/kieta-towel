@@ -88,6 +88,10 @@ const BATTLE = {
     boss:   { filler: 1.3, fire: 1.2 },   // 大ボス: いちばん濃い
   },
 
+  // --- 本番に持っていくもの（出撃2の前に3つから1つ選ぶ） ---
+  choiceTime: 10,              // 選ぶ時間（秒）。選ばなければ「つよい弾」になる
+  bigBombMul: 2,               // 「大きな記憶の光」のときの、ゲージのたまる速さの倍率
+
   // --- 「記憶の光」ボム ---
   bombGain: 12,                // 語句を倒したときにたまるゲージ（×コンボ倍率）。100で満タン
   bombButtonR: 26,             // 画面左下のふわりマーク（ボムのボタン）の大きさ（px）
@@ -179,6 +183,13 @@ const POWER_LEVELS = [
   { shots: 4, rate: 1, thick: false, body: "#fff4cf", line: "#dcb64e" },
   { shots: 4, rate: 1, thick: true,  body: "#fde6ee", line: "#e08aa6" },
 ];
+// 本番に持っていくもの（仮の3つ）。選ばなければ最初の「つよい弾」になる
+const LOADOUTS = [
+  { id: "power",  name: "つよい弾",       desc: "弾1本分強い状態で始まる" },
+  { id: "shield", name: "盾",             desc: "1回だけ弾を防ぐ" },
+  { id: "bomb",   name: "大きな記憶の光", desc: "記憶の光のゲージが速くたまる" },
+];
+
 // 弾の本数ごとの、横のならび
 const SHOT_SPREAD = { 1: [0], 2: [-0.6, 0.6], 3: [-1, 0, 1], 4: [-1.5, -0.5, 0.5, 1.5] };
 
@@ -274,6 +285,11 @@ const Battle = (() => {
   let odai = null;           // いまのお題バトル（なければ null）
   let sortieNo = 1;          // 出撃の画面に出している番号（1＝偵察、2＝本番）
   let reacted = 0;           // 偵察で見つけた（反応させた）語句の数
+  let loadout = null;        // 本番に持っていくもの（LOADOUTS の id）
+  let choiceT = 0;           // 選ぶ時間の残り（秒）
+  let powerBonus = 0;        // 「つよい弾」で上がる強さの段階
+  let shield = 0;            // 「盾」の残り（1回だけ防ぐ）
+  let gaugeMul = 1;          // 「大きな記憶の光」のゲージ倍率
   let bounces = [];          // ダミーではね返った弾
   let bombsUsed = 0;
   let bombing = false;       // 「記憶の光」で反応させている最中（ゲージをためない）
@@ -309,7 +325,16 @@ const Battle = (() => {
     e.preventDefault();
     if (paused) { resume(); return; }
     if (!player) return;
-    if (state === "sortie") startSortie();
+    if (state === "sortie") {
+      if (sortieNo === 2) {
+        const rect = canvas.getBoundingClientRect();
+        const px = e.clientX - rect.left, py = e.clientY - rect.top;
+        const c = choiceRects().find(r => px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h);
+        if (!c) return;   // 選ぶまで出撃しない（10秒で「つよい弾」）
+        chooseLoadout(c.id);
+      }
+      startSortie();
+    }
     // ふわりマークをタップ: ゲージが満タンなら「記憶の光」
     const rect = canvas.getBoundingClientRect(), bb = bombButton();
     if (Math.hypot(e.clientX - rect.left - bb.x, e.clientY - rect.top - bb.y) < bb.r + 10) {
@@ -367,6 +392,7 @@ const Battle = (() => {
     paused = false; moved = false; groundHinted = false; banner = null; shake = 0; showWord = null; threads = []; pops = [];
     slow = 0; wave = null; gauge = 0; bombsUsed = 0; fsay = null; odai = null; bounces = [];
     state = "sortie"; sortieNo = 1; reacted = 0;   // 「出撃1 偵察」の画面から始める
+    loadout = null; powerBonus = 0; shield = 0; gaugeMul = 1;
     running = true;
     lastTs = performance.now();
     cancelAnimationFrame(rafId);
@@ -396,6 +422,21 @@ const Battle = (() => {
       fsay = { text: "思い出した！今度はあつめられる！", t: BATTLE.fuwariSayTime, big: true };
       Sound.se("power");
     }
+  }
+
+  // 持っていくものを決める
+  function chooseLoadout(id) {
+    loadout = id;
+    if (id === "power") powerBonus = 1;
+    if (id === "shield") shield = 1;
+    if (id === "bomb") gaugeMul = BATTLE.bigBombMul;
+    level = POWER_LEVELS[Math.min(Math.floor(absorbed.length / BATTLE.powerEvery) + powerBonus, POWER_LEVELS.length - 1)];
+    Sound.se("item");
+  }
+  // 出撃2の画面の、3つの選ぶボタンの場所
+  function choiceRects() {
+    const bw = Math.min(W - 48, 320), bh = 62, gap = 12, x = W / 2 - bw / 2, y0 = H * 0.36;
+    return LOADOUTS.map((l, i) => ({ id: l.id, x, y: y0 + i * (bh + gap), w: bw, h: bh }));
   }
 
   function stop() {
@@ -585,7 +626,13 @@ const Battle = (() => {
 
   function update(realDt) {
     if (paused) return;
-    if (state === "sortie") return;   // 出撃の画面のあいだは止まっている
+    if (state === "sortie") {   // 出撃の画面のあいだは止まっている
+      if (sortieNo === 2) {
+        choiceT -= realDt;
+        if (choiceT <= 0) { chooseLoadout("power"); startSortie(); }   // 選ばなければ「つよい弾」
+      }
+      return;
+    }
     // 吸い込む瞬間は、画面全体がゆっくりになる
     let dt = realDt;
     if (slow > 0) { slow -= realDt; dt = realDt * BATTLE.slowScale; }
@@ -636,7 +683,7 @@ const Battle = (() => {
           // 偵察が終わった: 画面の雑魚と弾を片づけて、「出撃2 本番」の画面で止まる
           fillers.forEach(f => addPop(f.x, f.y, "#fff8d8", 0.8, f.layer === "ground"));
           fillers = []; ebullets = []; bombs = []; items = [];
-          state = "sortie"; sortieNo = 2;
+          state = "sortie"; sortieNo = 2; choiceT = BATTLE.choiceTime;
           drag = null;
         } else {
           startPhase("boss");
@@ -1068,7 +1115,7 @@ const Battle = (() => {
     score += pts;
     floats.push({ x: e.x, y: e.y - e.size, text: `+${pts}` + (mul > 1 ? ` ×${mul}` : ""), big: true, age: 0 });
     const before = gauge;
-    if (!bombing) gauge = Math.min(100, gauge + BATTLE.bombGain * mul);
+    if (!bombing) gauge = Math.min(100, gauge + BATTLE.bombGain * mul * gaugeMul);
     if (before < 100 && gauge >= 100) { floats.push({ x: bombButton().x + 40, y: bombButton().y - 34, text: "記憶の光 OK！", big: true, age: 0 }); Sound.se("item"); }
     if (!e.last) { firstPass(e); return; }
     absorb(e);
@@ -1092,7 +1139,7 @@ const Battle = (() => {
   function absorb(e) {
     absorbed.push(e.word);
     if (e.odaiReal && odai) endOdai(true);
-    const lv = POWER_LEVELS[Math.min(Math.floor(absorbed.length / BATTLE.powerEvery), POWER_LEVELS.length - 1)];
+    const lv = POWER_LEVELS[Math.min(Math.floor(absorbed.length / BATTLE.powerEvery) + powerBonus, POWER_LEVELS.length - 1)];
     if (lv !== level && absorbed.length < opts.total) {
       level = lv;
       banner = { text: "パワーアップ！", t: 1.2, color: "rgba(220,170,60,0.9)" };
@@ -1155,6 +1202,14 @@ const Battle = (() => {
   }
 
   function hurt() {
+    if (shield > 0) {   // 盾: 1回だけ弾を防ぐ
+      shield = 0;
+      player.inv = 1;
+      player.glow = 0.35;
+      floats.push({ x: player.x, y: player.y - 40, text: "盾がまもった！", big: true, age: 0 });
+      Sound.se("shield");
+      return;
+    }
     player.hp -= BATTLE.damage;
     player.inv = BATTLE.invincibleTime;
     player.hurt = 0.4;
@@ -1676,6 +1731,13 @@ const Battle = (() => {
   // 自機（仮の形: A君が乗る雲）と、横にいるふわり
   function drawPlayer() {
     const { x, y } = player;
+    if (shield > 0) {   // 盾のまく
+      ctx.save();
+      ctx.strokeStyle = `rgba(140,190,230,${0.6 + Math.sin(t * 4) * 0.2})`; ctx.lineWidth = 3;
+      ctx.fillStyle = "rgba(200,230,250,0.18)";
+      ctx.beginPath(); ctx.arc(x, y + 2, 30, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.restore();
+    }
     if (player.inv > 0 && Math.floor(t * 12) % 2 === 0) ctx.globalAlpha = 0.4;
     // 雲
     ctx.fillStyle = "#ffffff";
@@ -1756,6 +1818,7 @@ const Battle = (() => {
     ctx.fillStyle = sortieNo === 1 ? "rgba(236,244,226,0.93)" : "rgba(255,246,220,0.94)";
     ctx.fillRect(0, 0, W, H);
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    if (sortieNo === 2) { drawChoice(); ctx.restore(); return; }
     const cy = H * 0.4;
     ctx.font = font(15); ctx.fillStyle = "#7a8a68";
     ctx.fillText(opts.stageName, W / 2, cy - 110);
@@ -1772,6 +1835,38 @@ const Battle = (() => {
     ctx.font = font(22); ctx.fillStyle = sortieNo === 1 ? "#6f9a4a" : "#c98a1e";
     ctx.fillText("タップで出撃！", W / 2, cy + 150);
     ctx.restore();
+  }
+
+  // 出撃2の画面: 本番に持っていくものを3つから1つ選ぶ
+  function drawChoice() {
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.font = font(14); ctx.fillStyle = "#7a8a68";
+    ctx.fillText(`${opts.stageName}　偵察で見つけたことば ${reacted}語`, W / 2, H * 0.07);
+    ctx.font = font(38); ctx.fillStyle = "#b0801a";
+    ctx.fillText("出撃2", W / 2, H * 0.14);
+    ctx.font = font(26);
+    ctx.fillText("本番（あつめる）", W / 2, H * 0.21);
+    ctx.font = font(17); ctx.fillStyle = "#4b5e3a";
+    ctx.fillText("本番に持っていくものを1つえらぼう", W / 2, H * 0.30);
+    choiceRects().forEach((r, i) => {
+      const l = LOADOUTS[i];
+      ctx.fillStyle = "#fffdf7"; ctx.strokeStyle = "#e0b03a"; ctx.lineWidth = 3;
+      roundRect(r.x, r.y, r.w, r.h, 16); ctx.fill(); ctx.stroke();
+      ctx.textAlign = "left";
+      ctx.font = font(20); ctx.fillStyle = "#8a5a10";
+      ctx.fillText(l.name, r.x + 18, r.y + 22);
+      ctx.font = font(13); ctx.fillStyle = "#5d6b4c";
+      ctx.fillText(l.desc, r.x + 18, r.y + 45);
+      if (i === 0) { ctx.textAlign = "right"; ctx.font = font(11); ctx.fillStyle = "#b0a080"; ctx.fillText("えらばないとこれ", r.x + r.w - 12, r.y + 22); }
+      ctx.textAlign = "center";
+    });
+    // 残り時間
+    const last = choiceRects()[2], by = last.y + last.h + 22, bw = last.w;
+    const k = Math.max(0, choiceT / BATTLE.choiceTime);
+    ctx.fillStyle = "rgba(0,0,0,0.08)"; roundRect(W / 2 - bw / 2, by, bw, 8, 4); ctx.fill();
+    ctx.fillStyle = "#e0b03a"; roundRect(W / 2 - bw / 2, by, bw * k, 8, 4); ctx.fill();
+    ctx.font = font(13); ctx.fillStyle = "#7a8a68";
+    ctx.fillText(`あと ${Math.ceil(choiceT)}秒`, W / 2, by + 24);
   }
 
   // ふわりの一言（吹き出し）。画面からはみ出さない位置に出す
@@ -1840,6 +1935,13 @@ const Battle = (() => {
     const ph = { round1: "偵察", round2: "本番", boss: "大ボス" }[phase] || "";
     ctx.strokeText(`${ph}　${fmtTime(t)}`, W - 14, top + 24);
     ctx.fillText(`${ph}　${fmtTime(t)}`, W - 14, top + 24);
+    if (loadout) {   // 持っていったもの（盾は使うと消える）
+      const l = LOADOUTS.find(x => x.id === loadout);
+      const txt = loadout === "shield" && !shield ? "盾（使った）" : l.name;
+      ctx.textAlign = "left"; ctx.font = font(11);
+      const b = bombButton();
+      ctx.strokeText(`持ちもの: ${txt}`, b.x + b.r + 8, b.y + 4); ctx.fillText(`持ちもの: ${txt}`, b.x + b.r + 8, b.y + 4);
+    }
     drawStrip(top + 42);
   }
 
@@ -1948,5 +2050,5 @@ const Battle = (() => {
     ctx.closePath();
   }
 
-  return { start, stop, resize, pause };   // （自動プレイヤーで確かめるときは、ここで中の状態を外に出している）
+  return { start, stop, resize, pause, choiceRects };   // （自動プレイヤーで確かめるときは、ここで中の状態を外に出している）
 })();
