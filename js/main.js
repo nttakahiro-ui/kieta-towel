@@ -72,6 +72,11 @@ const TUNE_ITEMS = [
   ["perCharHp.boss.min", "大ボスの1文字あたりの耐久の下限", 1, 30, 1],
   ["perCharHp.boss.max", "大ボスの1文字あたりの耐久の上限", 5, 80, 1],
   ["shortScale", "1〜2文字の語句の文字の大きさの倍率", 1, 2, 0.05],
+  ["odai", "お題バトル（1＝オン、0＝オフ）", 0, 1, 1],
+  ["odaiTimeLimit", "お題（中ボス）の制限時間（秒）", 5, 60, 1],
+  ["odaiPenalty", "ダミーに当てたときの減点", 0, 2000, 50],
+  ["odaiBonus", "ひらめきボーナス", 0, 10000, 100],
+  ["odaiIntroTime", "お題の始まりのスロー・問題文を大きく出す秒数", 0.5, 4, 0.1],
   ["bombGain", "記憶の光ゲージのたまる速さ（1語あたり）", 2, 50, 1],
   ["difficulty.fireScale.at1", "難易度1の「敵が撃つ間隔の倍率」", 0.2, 2, 0.05],
   ["difficulty.fireScale.at12", "難易度12の「敵が撃つ間隔の倍率」", 0.2, 2, 0.05],
@@ -90,8 +95,12 @@ const TUNE_DEFAULT = {};
 
 const Tune = (() => {
   const $ = id => document.getElementById(id);
-  const getv = path => path.split(".").reduce((o, k) => o[k], BATTLE);
-  const setv = (path, v) => { const ks = path.split("."); const last = ks.pop(); ks.reduce((o, k) => o[k], BATTLE)[last] = v; };
+  // true/false の項目（スイッチ）は、パネルでは 1/0 として扱う
+  const getv = path => { const v = path.split(".").reduce((o, k) => o[k], BATTLE); return typeof v === "boolean" ? (v ? 1 : 0) : v; };
+  const setv = (path, v) => {
+    const ks = path.split("."); const last = ks.pop(); const o = ks.reduce((q, k) => q[k], BATTLE);
+    o[last] = typeof o[last] === "boolean" ? v === 1 : v;
+  };
   let saved = {};
 
   // 保存した調整値を読み込んで反映する

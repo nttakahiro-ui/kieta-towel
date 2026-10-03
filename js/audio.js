@@ -188,6 +188,13 @@ const Sound = (() => {
     } else if (name === "light") {   // 「記憶の光」
       ["C5", "G5", "C6", "E6", "G6", "C7"].forEach((n, i) => tone(freq(n), t + i * 0.05, 0.8, "sine", 0.18));
       sweep(300, 1600, 0.6, "triangle", 0.12);
+    } else if (name === "odai") {    // お題が出た
+      ["E5", "A5", "C6"].forEach((n, i) => tone(freq(n), t + i * 0.12, 0.4, "triangle", 0.22));
+    } else if (name === "boing") {   // ダミーで弾がはね返る（ぼよん）
+      sweep(260, 520, 0.12, "sine", 0.25);
+      sweep(520, 300, 0.15, "sine", 0.18, 0.1);
+    } else if (name === "hirameki") { // ひらめき
+      ["G6", "C7", "E7"].forEach((n, i) => tone(freq(n), t + i * 0.05, 0.5, "sine", 0.16));
     } else if (name === "bomb") {    // たねを落とす（ひゅっ）
       sweep(1200, 500, 0.18, "sine", 0.08);
     } else if (name === "pop") {     // 花がぽんっと咲く

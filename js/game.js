@@ -7,6 +7,8 @@
 //   2周目 … 同じ語句が同じ順番・同じ出方で出る。倒すと、糸のようにほどけて吸い込まれる（クイズに出る）
 //            取り逃がした語句は、そのバトルでは取れない
 //   大ボス … 2周目のあとに1回。倒して吸い込むとバトル終了
+// お題バトル（BATTLE.odai が true のとき）: 2周目の中ボスと大ボスは、ふわりがお題（クイズの問題）を出し、
+//   3つの語句（本物1つ・同じステージの別の語句2つ）から本物を撃つ。ダミーは弾がはね返る
 // 雑魚（語句ではない敵）は小さく薄く。倒すとぽんっと花になり、ときどき体力が回復する「綿のたね」を落とす
 
 // ===== 調整用の数値（速さ・弾の量・硬さなど）はここにまとめる =====
@@ -64,6 +66,16 @@ const BATTLE = {
   scoreWord: 1000,             // 語句を倒した点（雑魚の10倍）
   comboStep: 0.5,              // 語句を続けて倒すたびに増える倍率（1 → 1.5 → 2 …）
   comboMax: 3,                 // コンボ倍率のいちばん上
+
+  // --- お題バトル（2周目の中ボス2回と大ボス1回） ---
+  odai: true,                  // お題バトルのスイッチ（true＝オン、false＝オフ。オフで今までの中ボス・大ボス戦）
+  odaiIntroTime: 1.5,          // 始まりのスローと、問題文を画面中央に大きく出す秒数（この間は弾が当たらない）
+  odaiTimeLimit: 20,           // 中ボスのお題の制限時間（秒）。時間切れは取り逃がし。大ボスは制限なし
+  odaiPenalty: 300,            // ダミーに当てたときの減点（コンボは切らない）
+  odaiPenaltyCool: 1,          // 同じダミーで続けて減点しない秒数（連射で何度も減らないように）
+  odaiBonus: 2000,             // 最初に当てたのが本物なら「ひらめき」ボーナス
+  odaiRowGap: 58,              // 3つの語句の段の間隔（px）
+  odaiSway: 0.45,              // 3つの語句が左右にゆれる速さ
 
   // --- 「記憶の光」ボム ---
   bombGain: 12,                // 語句を倒したときにたまるゲージ（×コンボ倍率）。100で満タン
@@ -242,6 +254,8 @@ const Battle = (() => {
   let slow = 0;              // ゆっくりの残り時間（秒）
   let gauge = 0;             // 「記憶の光」ボムのゲージ（0〜100）
   let fsay = null;           // ふわりの一言（吹き出し）
+  let odai = null;           // いまのお題バトル（なければ null）
+  let bounces = [];          // ダミーではね返った弾
   let bombsUsed = 0;
   let bombing = false;       // 「記憶の光」で反応させている最中（ゲージをためない）
   let wave = null;           // 吸い込んだときに広がる光
@@ -331,7 +345,7 @@ const Battle = (() => {
     score = 0; combo = 0; maxCombo = 0; floats = [];
     hits = 0; downs = 0;
     paused = false; moved = false; groundHinted = false; banner = null; shake = 0; showWord = null; threads = []; pops = [];
-    slow = 0; wave = null; gauge = 0; bombsUsed = 0; fsay = null;
+    slow = 0; wave = null; gauge = 0; bombsUsed = 0; fsay = null; odai = null; bounces = [];
     state = "intro"; stateTimer = 2;
     running = true;
     lastTs = performance.now();
@@ -397,17 +411,19 @@ const Battle = (() => {
   }
 
   // ===== 語句の敵を出す =====
-  function spawn(word) {
-    const role = word.role;
-    const ground = groundIds.has(word.id) && role !== "boss";
+  // od: お題バトルのときだけ { role, size, slot, real }（3つとも同じ役割・同じ大きさで出す）
+  function spawn(word, od) {
+    const role = od ? od.role : word.role;
+    const ground = !od && groundIds.has(word.id) && role !== "boss";
     let size = BATTLE.fontSize[role] || 26;
-    if (isShortWord(word)) size = Math.round(size * BATTLE.shortScale);   // 短い語句は大きめに
+    if (od) size = od.size;
+    else if (isShortWord(word)) size = Math.round(size * BATTLE.shortScale);   // 短い語句は大きめに
     ctx.font = font(size);
     let w = ctx.measureText(word.word).width;
     // 画面からはみ出す長い語句は、24pxまで小さくする
     while (w > W - 40 && size > 24) { size -= 2; ctx.font = font(size); w = ctx.measureText(word.word).width; }
     // 出方（pattern）と位置（lane）はデータで固定。ランダムには出ない
-    let pattern = role === "boss" ? "boss" : patOf(word).pattern;
+    let pattern = od ? "odai" : (role === "boss" ? "boss" : patOf(word).pattern);
     if (isShortWord(word) && (pattern === "edge" || pattern === "cross")) pattern = "normal";   // 短い語句は端・横切りにしない
     const lane = patOf(word).lane;
     const margin = w / 2 + 20 + (ground ? 0 : BATTLE.sway);
@@ -417,8 +433,10 @@ const Battle = (() => {
     if (pattern === "cross") { x = lane < 0.5 ? -w / 2 - 10 : W + w / 2 + 10; y = H * BATTLE.crossY; }
     // 硬さ: ザコは難易度で決まる硬さ、中ボス・大ボスは文字1つあたりの耐久 × 難易度の倍率
     const hp = BATTLE.hpOverride[role] || (role === "zako" ? Math.max(word.hp, P.zakoHp) : Math.max(1, Math.round(word.hp * P.bossHpScale)));
+    if (od) { x = W / 2; y = -size - od.slot * 40; }
     const e = {
       word, role, size, w, h: size * 1.2, ground, pattern, lane,
+      slot: od ? od.slot : 0, dummy: od ? !od.real : false, odaiReal: od ? od.real : false, penaltyAt: -9,
       last: phase !== "round1",                    // 2周目と大ボスは、倒せば吸い込む
       spd: (phase === "round1" ? BATTLE.round1Speed : 1) * P.speedScale,
       bx: x, x, y, hp, maxHp: hp,
@@ -531,6 +549,9 @@ const Battle = (() => {
     if (showWord) { showWord.t -= realDt; if (showWord.t <= 0) showWord = null; }
     if (wave) { wave.age += realDt; if (wave.age > 0.6) wave = null; }
     if (fsay) { fsay.t -= realDt; if (fsay.t <= 0) fsay = null; }
+    if (odai && odai.intro > 0) odai.intro -= realDt;
+    for (const b of bounces) { b.age += realDt; b.x += b.vx * realDt; b.y += b.vy * realDt; }
+    bounces = bounces.filter(b => b.age < 0.5);
     t += dt;
     shake = Math.max(0, shake - dt);
     player.glow = Math.max(0, player.glow - dt);
@@ -582,20 +603,30 @@ const Battle = (() => {
           Sound.se("power");
         } else {
           startPhase("boss");
-          spawn(bossWord);
+          if (BATTLE.odai) startOdai(bossWord, true); else spawn(bossWord);
           banner = { text: "大ボス あらわる！", t: 1.8 };
           Sound.se("boss");
         }
       }
     } else if (phase !== "boss") {
-      roundT += dt;
-      while (nextIdx < script.length && roundT >= nextAt) {
-        spawn(script[nextIdx]);
-        nextIdx++;
-        nextAt += roundInterval();
+      if (!odai) {   // お題バトルの間は、台本を止める
+        roundT += dt;
+        while (nextIdx < script.length && roundT >= nextAt) {
+          const w = script[nextIdx];
+          nextIdx++;
+          nextAt += roundInterval();
+          if (phase === "round2" && BATTLE.odai && w.role === "mid") { startOdai(w, false); break; }
+          spawn(w);
+        }
       }
       // その周の語句が全部出て、画面からいなくなったら次へ
-      if (nextIdx >= script.length && enemies.every(e => e.role === "boss")) gapT = BATTLE.roundGap;
+      if (nextIdx >= script.length && !odai && enemies.every(e => e.role === "boss")) gapT = BATTLE.roundGap;
+    }
+
+    // お題バトルの制限時間（中ボスだけ）
+    if (odai && odai.intro <= 0) {
+      odai.t += dt;
+      if (!odai.boss && odai.t >= BATTLE.odaiTimeLimit) endOdai(false);
     }
 
     // 雑魚の群れを出す（1周目と大ボスのときは少なめ）
@@ -638,7 +669,13 @@ const Battle = (() => {
       e.age += dt;
       e.flash = Math.max(0, e.flash - dt);
       if (e.parts) for (const p of e.parts) p.flash = Math.max(0, p.flash - dt);
-      if (e.role === "boss") {
+      if (e.pattern === "odai") {
+        // お題の語句: 段ごとにならび、左右にゆっくりゆれる（重なっても、ゆれてずれるので下の段の向こうも狙える）
+        const ty = odaiTop() + 26 + e.slot * BATTLE.odaiRowGap;
+        e.y += (ty - e.y) * Math.min(1, dt * 4);
+        const half = Math.max(0, W / 2 - e.w / 2 - 12);
+        e.x = W / 2 + Math.sin(e.age * BATTLE.odaiSway + e.slot * 2.1) * half;
+      } else if (e.role === "boss") {
         const enter = Math.min(e.age / BATTLE.bossEnterTime, 1);
         e.y = -e.size + (H * BATTLE.bossStopY + e.size) * (1 - Math.pow(1 - enter, 2));
         const range = Math.min(W * BATTLE.bossSway, Math.max(0, W / 2 - e.w / 2 - 12));
@@ -661,8 +698,9 @@ const Battle = (() => {
       }
       // 弾を撃つ（画面の上のほうにいる間だけ）
       e.fire -= dt;
+      if (e.pattern === "odai" && odai && odai.intro > 0) e.fire = Math.max(e.fire, 0.5);
       if (e.fire <= 0 && e.y > 0 && e.y < H * 0.62) {
-        e.fire = BATTLE.enemyFireInterval[e.role] * P.fireScale * (0.8 + Math.random() * 0.4);
+        e.fire = BATTLE.enemyFireInterval[e.role] * P.fireScale * (e.pattern === "odai" ? 3 : 1) * (0.8 + Math.random() * 0.4);
         fireAt(e.x, e.y + (e.ground ? 0 : e.h / 2), BATTLE.shotPattern[e.role] || [0]);
       }
     }
@@ -717,12 +755,14 @@ const Battle = (() => {
         if (Math.hypot(s.x - f.x, s.y - f.y) < f.r + 4) { hit = true; damageFiller(f); break; }
       }
       if (!hit) {
-        for (const e of enemies) {
+        for (const e of enemies.slice().sort((a, b) => b.y - a.y)) {   // 下にいる語句から当たる
           if (e.ground || e.hp <= 0) continue;
-          if (e.role === "boss" && e.age < BATTLE.bossEnterTime) continue;   // 大ボスは降りてくる間は当たらない
+          if (e.pattern === "odai" ? (odai && odai.intro > 0) : (e.role === "boss" && e.age < BATTLE.bossEnterTime)) continue;   // 読む時間・降りてくる間は当たらない
           if (Math.abs(s.x - e.x) < e.w / 2 + 4 && Math.abs(s.y - e.y) < e.h / 2) {
-            if (e.parts && !partAt(e, s.x, 4)) continue;   // 砕けた文字のすきまは通りぬける
-            hit = true; damageWord(e, s.x); break;
+            if (e.parts && !e.dummy && !partAt(e, s.x, 4)) continue;   // 砕けた文字のすきまは通りぬける
+            hit = true;
+            if (e.pattern === "odai") odaiHit(e, s); else damageWord(e, s.x);
+            break;
           }
         }
       }
@@ -733,7 +773,7 @@ const Battle = (() => {
     // 下へ抜けた語句の敵
     for (const e of enemies) {
       const gone = e.y > H + e.size || (e.pattern === "cross" && e.age > 1 && (e.x < -e.w / 2 - 20 || e.x > W + e.w / 2 + 20));
-      if (e.role !== "boss" && gone) {
+      if (e.role !== "boss" && e.pattern !== "odai" && gone) {
         e.hp = 0;
         combo = 0;
         if (e.last) missed.push(e.word);   // 2周目に逃がした語句は、このバトルではもう取れない
@@ -762,7 +802,7 @@ const Battle = (() => {
     const R = ENEMY_BULLET_ART.radius;
     for (const b of ebullets) {
       b.x += b.vx * dt; b.y += b.vy * dt;
-      if (player.inv <= 0 && !showWord && Math.hypot(b.x - player.x, b.y - player.y) < R + 10) {
+      if (player.inv <= 0 && !showWord && !(odai && odai.intro > 0) && Math.hypot(b.x - player.x, b.y - player.y) < R + 10) {
         b.y = H + 999;
         hurt();
       }
@@ -838,6 +878,83 @@ const Battle = (() => {
     Sound.se("crack");
     if (p.kana !== "ー") Sound.speak(p.kana);
   }
+  // ===== お題バトル =====
+  // ダミー2つ: 同じステージのほかの語句（大ボス以外）から、本物と文字数が近いものを2つ（ステージごとに毎回同じ）
+  function odaiDummies(real) {
+    const len = w => baseChars(w).length;
+    return opts.words.filter(w => w !== real && w !== bossWord)
+      .sort((a, b) => Math.abs(len(a) - len(real)) - Math.abs(len(b) - len(real)) || patOf(a).order - patOf(b).order)
+      .slice(0, 2);
+  }
+
+  // 問題文を折り返す
+  function wrapText(text, maxW) {
+    const lines = []; let line = "";
+    for (const ch of Array.from(text)) {
+      if (ctx.measureText(line + ch).width > maxW && line) { lines.push(line); line = ch; } else line += ch;
+    }
+    if (line) lines.push(line);
+    return lines;
+  }
+  // 小さく出したときの問題文の帯の位置（集めたことばの帯の下）
+  function odaiPanel() {
+    const y = 14 + 42 + Math.max(1, BATTLE.stripRows) * 22 + 10;
+    ctx.font = font(13);
+    const lines = odai ? wrapText(odai.q, W - 44) : [""];
+    return { y, lines, h: lines.length * 18 + 14 };
+  }
+  function odaiTop() { const p = odaiPanel(); return p.y + p.h; }
+
+  function startOdai(real, isBoss) {
+    const role = isBoss ? "boss" : "mid";
+    const cands = shuffle([real, ...odaiDummies(real)]);   // ならびは毎回入れかえ
+    // 3つとも同じ大きさ（いちばん長い語句が画面に入る大きさ）
+    let size = BATTLE.fontSize[role];
+    ctx.font = font(size);
+    const widest = () => Math.max(...cands.map(w => ctx.measureText(w.word).width));
+    while (widest() > W - 40 && size > 24) { size -= 2; ctx.font = font(size); }
+    odai = { real, boss: isBoss, t: 0, intro: BATTLE.odaiIntroTime, firstHit: null, q: real.odaiQuestion || real.question };
+    cands.forEach((w, i) => spawn(w, { role, size, slot: i, real: w === real }));
+    slow = BATTLE.odaiIntroTime;   // 吸い込みと同じスロー。読む時間をつくる
+    fsay = { text: "お題だよ！ 答えの語句を撃とう", t: 2.5 };
+    Sound.se("odai");
+  }
+
+  // お題の語句に弾が当たった
+  function odaiHit(e, s) {
+    if (odai.firstHit === null) {
+      odai.firstHit = e.dummy ? "dummy" : "real";
+      if (!e.dummy) {   // 最初から本物: ひらめき
+        score += BATTLE.odaiBonus;
+        floats.push({ x: e.x, y: e.y - e.size - 10, text: `ひらめき！ +${BATTLE.odaiBonus}`, big: true, age: 0 });
+        Sound.se("hirameki");
+      }
+    }
+    if (!e.dummy) { damageWord(e, s.x); return; }
+    // ダミー: 弾がはね返る。少し減点（コンボは切らない）
+    e.flash = 0.12;
+    bounces.push({ x: s.x, y: e.y + e.h / 2, vx: (Math.random() - 0.5) * 120, vy: 320, age: 0 });
+    if (t - e.penaltyAt >= BATTLE.odaiPenaltyCool) {
+      e.penaltyAt = t;
+      score = Math.max(0, score - BATTLE.odaiPenalty);
+      floats.push({ x: e.x, y: e.y - e.size, text: `ちがうよ −${BATTLE.odaiPenalty}`, big: true, wrong: true, age: 0 });
+      Sound.se("boing");
+    }
+  }
+
+  // お題バトルの終わり。ok: 本物を吸い込んだ／false: 時間切れ（取り逃がし）
+  function endOdai(ok) {
+    for (const e of enemies) {
+      if (e.pattern !== "odai" || e.hp <= 0) continue;
+      if (!ok && e.odaiReal) { missed.push(e.word); combo = 0; }
+      vanish.push({ word: e.word, x: e.x, y: e.y, size: e.size, w: e.w, ground: false, age: 0 });
+      if (!e.odaiReal || !ok) e.hp = 0;
+    }
+    enemies = enemies.filter(e => e.hp > 0);
+    if (!ok) fsay = { text: "あっ、行っちゃった…", t: 2 };
+    odai = null;
+  }
+
   // 「記憶の光」: 画面の雑魚と敵の弾を全部消す。1周目は、出ている語句を全部「反応」させる
   // 2周目と大ボスのときは、語句には効かない（雑魚と敵の弾だけ）
   function useBomb() {
@@ -921,6 +1038,7 @@ const Battle = (() => {
   // 2周目・大ボス: 糸がほどけるように散って、自機へ吸い込まれる
   function absorb(e) {
     absorbed.push(e.word);
+    if (e.odaiReal && odai) endOdai(true);
     const lv = POWER_LEVELS[Math.min(Math.floor(absorbed.length / BATTLE.powerEvery), POWER_LEVELS.length - 1)];
     if (lv !== level && absorbed.length < opts.total) {
       level = lv;
@@ -1133,7 +1251,7 @@ const Battle = (() => {
       ctx.font = font(fl.kana ? 22 : (fl.big ? 18 : 12));
       ctx.lineWidth = 4; ctx.strokeStyle = "#ffffff";
       ctx.strokeText(fl.text, fl.x, fl.y - fl.age * 30);
-      ctx.fillStyle = fl.kana ? "#5d6b4c" : (fl.big ? "#c98a1e" : "#8a9a78");   // 砕けた文字の読みは、ふりがなの色
+      ctx.fillStyle = fl.wrong ? "#b05068" : (fl.kana ? "#5d6b4c" : (fl.big ? "#c98a1e" : "#8a9a78"));   // 砕けた文字の読みは、ふりがなの色
       ctx.fillText(fl.text, fl.x, fl.y - fl.age * 30);
     }
     ctx.globalAlpha = 1;
@@ -1152,6 +1270,15 @@ const Battle = (() => {
       ctx.globalAlpha = 1;
     }
     if (banner) drawBanner();
+
+    if (odai) drawOdai();
+    // はね返った弾
+    for (const b of bounces) {
+      ctx.globalAlpha = 1 - b.age / 0.5;
+      ctx.fillStyle = "#c9c2b0";
+      ctx.beginPath(); ctx.ellipse(b.x, b.y, 3, 6, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
 
     // 吸い込んだ語句を画面中央に大きく（読み仮名つき）
     if (showWord) drawBigWord(showWord.word, showWord.t);
@@ -1498,6 +1625,36 @@ const Battle = (() => {
     ctx.fillText(String(opts.fuwariCount), fx, fy + 1);
   }
 
+  // お題の問題文: 始まりは画面中央に大きく、読む時間が終わったら上の帯の下へ小さく移す
+  function drawOdai() {
+    ctx.save();
+    ctx.textAlign = "left"; ctx.textBaseline = "top";
+    if (odai.intro > 0) {
+      ctx.font = font(20);
+      const lines = wrapText(odai.q, W - 64);
+      const h = lines.length * 28 + 50, y = H * 0.36 - h / 2;
+      ctx.fillStyle = "rgba(255,253,245,0.97)"; ctx.strokeStyle = "#e0b03a"; ctx.lineWidth = 3;
+      roundRect(20, y, W - 40, h, 18); ctx.fill(); ctx.stroke();
+      ctx.font = font(14); ctx.fillStyle = "#b0801a";
+      ctx.fillText("ふわりのお題", 34, y + 12);
+      ctx.font = font(20); ctx.fillStyle = "#3e4a34";
+      lines.forEach((l, i) => ctx.fillText(l, 32, y + 36 + i * 28));
+    } else {
+      const pnl = odaiPanel();
+      ctx.fillStyle = "rgba(255,253,245,0.92)"; ctx.strokeStyle = "#e0b03a"; ctx.lineWidth = 2;
+      roundRect(10, pnl.y, W - 20, pnl.h, 12); ctx.fill(); ctx.stroke();
+      ctx.font = font(13); ctx.fillStyle = "#3e4a34";
+      pnl.lines.forEach((l, i) => ctx.fillText(l, 22, pnl.y + 7 + i * 18));
+      // 中ボスは残り時間
+      if (!odai.boss) {
+        const r = Math.max(0, 1 - odai.t / BATTLE.odaiTimeLimit);
+        ctx.fillStyle = "rgba(0,0,0,0.08)"; ctx.fillRect(14, pnl.y + pnl.h - 4, W - 28, 3);
+        ctx.fillStyle = r > 0.3 ? "#e0b03a" : "#d0607f"; ctx.fillRect(14, pnl.y + pnl.h - 4, (W - 28) * r, 3);
+      }
+    }
+    ctx.restore();
+  }
+
   // ふわりの一言（吹き出し）。画面からはみ出さない位置に出す
   function drawFuwariSay(fx, fy) {
     const a = Math.min(1, fsay.t / 0.3, (BATTLE.fuwariSayTime - fsay.t) / 0.2);
@@ -1661,5 +1818,5 @@ const Battle = (() => {
     ctx.closePath();
   }
 
-  return { start, stop, resize, pause };
+  return { start, stop, resize, pause };   // （自動プレイヤーで確かめるときは、ここで中の状態を外に出している）
 })();
