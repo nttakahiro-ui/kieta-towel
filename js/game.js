@@ -2115,6 +2115,15 @@ const Battle = (() => {
       while (ctx.measureText(text).width > cw - 6 && fs > 7) { fs--; ctx.font = font(fs); }   // 長い語句は小さく
       ctx.fillStyle = got ? "#8a5a10" : (seen ? "#a3a396" : "#c2bdab");
       ctx.fillText(text, x + cw / 2, y + rowH / 2 - 1);
+      // 大ボスの枠: 吸い込むまで小さく「大ボス」の印（最後に出るものだとわかるように）
+      if (w === bossWord && !got) {
+        ctx.font = font(8);
+        const tw = ctx.measureText("大ボス").width + 6;
+        ctx.fillStyle = ENEMY_COLOR.boss;
+        roundRect(x + cw - tw - 2, y + 2, tw, 11, 5); ctx.fill();
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText("大ボス", x + cw - tw / 2 - 2, y + 8);
+      }
     });
   }
 
