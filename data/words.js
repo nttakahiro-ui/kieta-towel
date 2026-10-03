@@ -1,21 +1,44 @@
-// 120語のデータ。ここを書き換えれば、敵の語句・クイズ・カードの中身が変わる。
-// 元: 資料/タオルの学校_入門編_v53.html の THEMES（10/3 に変換）
-// 欄: id, stage, word(敵の語句), kana(読み), question, choices(2〜3個), answer(正解の位置),
-//     memo(一言メモ), role("zako"/"mid"/"boss"), hp(何発で倒れるか),
-//     sayCorrect / sayWrong(その語句だけのふわりのセリフ。空なら js/quiz.js の FUWARI_SAY からえらぶ)
-//     order(バトルで出てくる順番 1〜10。大ボスは最後), pattern(出方), lane(出てくる位置 0〜1)
-//     kanaParts(中ボス・大ボスだけ。1文字ずつの読み。例: 繊維長 → ["せん","い","ちょう"]。空なら、その文字をそのまま読む)
-//   中ボス・大ボスは1文字ずつ壊す。硬さは役割で決まる「語句全体の硬さ」を文字数で割る（js/game.js の BATTLE.wordTotalHp）。
-//   そのため中ボス・大ボスの hp 欄は今は使っていない（ザコの hp だけ使う）
-//   kanaParts は「壊す文字」の順。かっこと、かっこの中の別名は壊さない・読まないので入れない
-//     odaiQuestion(お題バトルで出す問題。空なら question を使う。2周目の中ボス・大ボスのお題になる)
-//   pattern の型（語句ごとに固定。ランダムには出ない）
-//     "normal" ふつう        … lane の位置から、まっすぐゆっくり降りてくる（lane: 0=左 〜 1=右）
-//     "edge"   端にかくれる  … 画面の端から半分だけ顔を出して、出たり引っこんだりしながら降りてくる（lane: 0=左の端, 1=右の端）
-//     "cross"  横切る        … 画面の上のほうを横に通りすぎる（lane: 0=左から, 1=右から）
-//     "behind" 雑魚のうしろ  … 前を雑魚が守っていて、先に雑魚をどけないと弾が届かない（lane: 横の位置）
-//     "ground" 地上のかげ    … 地面の木かげにかくれている。照準◎で「たね」を落として倒す（lane: 横の位置）
-// 役割: ステージ1は決定（大ボス 天然の撚り、中ボス ルーメン・繊維長）。ステージ2〜12は仮置き（大ボス＝v53のboss欄、中ボス＝2語を仮に選んだもの）
+// 120語のデータ（1ステージ10語 × 12ステージ）。元: 資料/タオルの学校_入門編_v53.html の THEMES（10/3 に変換）
+//
+// ■ 問題・選択肢・正解・一言メモ・お題の問い・ふわりのセリフは、すべてこのファイルの各語句の行だけに持つ（10/3-13）
+//   js/game.js や js/quiz.js には、問題や選択肢の文章を書かない。
+//   この行を直せば、バトルのお題・バトルのあとのクイズ・カードが、同時に変わる。
+//
+// ■ 直し方
+//   1. 直したい語句の行をさがす（ステージごとに「// ---- ステージN ----」の下に10行ある。word の欄で見つける）
+//   2. その行の "…" の中だけを書き換える。" と , と { } は消さない。文の中に " を入れたいときは「」を使う
+//   3. 保存して、ゲームを開き直す（公開するときは index.html の ?v= の数を1つ上げる）
+//   表計算で見ながら直したいとき: docs/words.csv（120語の一覧）を直して、tools/words_csv.js で、このファイルに戻す（手順は docs/進捗メモ.md）
+//
+// ■ 各欄の意味
+//   id           語句の番号（1〜120。変えない）
+//   stage        ステージの番号（1〜12）
+//   word         語句（画面に出ることば）。かっこの中は別名で、中ボス・大ボスでは壊さない・読まない。例: "毛(ウール)"
+//   kana         読み（ひらがな）。読み上げと、漢字の上のふりがなに使う
+//   question     通常クイズ（バトルのあと）の問題文。答えは語句でなくてもよい（性質・理由・順番などを聞いてよい）
+//   choices      通常クイズの選択肢（2〜3個）。画面ではならびをまぜて出す
+//   answer       choices の中の正解の位置（0 ＝ 1つ目、1 ＝ 2つ目、2 ＝ 3つ目）
+//   memo         一言メモ。クイズの答えのあとと、カードに出る
+//   role         役割。"zako"（ザコの語句）/ "mid"（中ボス。お題バトルになる）/ "boss"（大ボス＝さいごの語句。お題バトルになる）
+//   hp           ザコの語句の硬さ（今は難易度の線で決まるので、ほぼ使っていない）。中ボス・大ボスの hp は使っていない
+//   sayCorrect   その語句のクイズで正解したときの、ふわりのセリフ（空 "" なら js/quiz.js のふつうのセリフからえらぶ）
+//   sayWrong     その語句のクイズでまちがえたときの、ふわりのセリフ（空 "" なら同じく、ふつうのセリフ）
+//   order        バトルで出てくる順番（1〜10。大ボスは最後の10）
+//   pattern      出方（下の「pattern の型」。patterns が "auto" のステージでは使わない）
+//   lane         出てくる横の位置（0 ＝ 左 〜 1 ＝ 右）
+//   kanaParts    中ボス・大ボスだけ。1文字ずつの読み。例: 繊維長 → ["せん","い","ちょう"]。[] なら、その文字をそのまま読む。
+//                かっこと、かっこの中の別名は入れない
+//   odaiQuestion お題バトル（中ボス・大ボス）で出す問い。答えが「その語句自身」になる形で書く（「〜は？」で、答えが語句）。
+//                空 "" なら question を使う。question の答えが語句自身でない（性質や理由・順番を聞く）中ボス・大ボスには、必ず入れる
+//
+// ■ pattern の型（語句ごとに固定。ランダムには出ない）
+//   "normal" ふつう        … lane の位置から、まっすぐゆっくり降りてくる
+//   "edge"   端にかくれる  … 画面の右の端から半分だけ顔を出して、出たり引っこんだりしながら降りてくる
+//   "cross"  横切る        … 画面の上のほうを横に通りすぎる（lane: 0＝左から, 1＝右から）
+//   "behind" 雑魚のうしろ  … 前を雑魚が守っていて、先に雑魚をどけないと光が届かない
+//   "ground" 地上のかげ    … 地面にいる。照準◎で「たね」を落として助ける
+//
+// ■ 役割: ステージ1は決定（大ボス 天然の撚り、中ボス ルーメン・繊維長）。ステージ2〜12は仮置き（大ボス＝v53のboss欄、中ボス＝2語を仮に選んだもの）
 window.WORDS = [
   // ---- ステージ1 ----
   {"id": 1, "stage": 1, "word": "アオイ科", "kana": "あおいか", "question": "綿(めん)は何科の植物?", "choices": ["アオイ科", "ミカン科"], "answer": 0, "memo": "綿はアオイ科の植物。試験にもよく出るよ", "role": "zako", "hp": 1, "sayCorrect": "", "sayWrong": "", "order": 1, "pattern": "normal", "lane": 0.3, "odaiQuestion": ""},
@@ -23,8 +46,8 @@ window.WORDS = [
   {"id": 3, "stage": 1, "word": "ルーメン", "kana": "るーめん", "question": "綿がよく水を吸うのは、繊維(せんい)の中がストローのように空洞(くうどう)だから。この空洞の名前は?", "choices": ["ルーメン", "トンネル"], "answer": 0, "memo": "ルーメンのおかげで吸水・保温・ふっくら復元!", "role": "mid", "hp": 3, "sayCorrect": "", "sayWrong": "", "order": 3, "pattern": "normal", "lane": 0.5, "kanaParts": ["る", "ー", "め", "ん"], "odaiQuestion": ""},
   {"id": 4, "stage": 1, "word": "リント", "kana": "りんと", "question": "綿の繊維(せんい)のうち、糸に紡(つむ)がれる「長い繊維(せんい)」を何と呼ぶ?", "choices": ["リント", "リンター"], "answer": 0, "memo": "短い方のリンターは油や不織布(ふしょくふ)に使われる", "role": "zako", "hp": 1, "sayCorrect": "", "sayWrong": "", "order": 5, "pattern": "cross", "lane": 0, "odaiQuestion": ""},
   {"id": 5, "stage": 1, "word": "リンター", "kana": "りんたー", "question": "種に残った短い繊維(せんい)「リンター」は、どうなる?", "choices": ["油や不織布の原料になる", "捨てられる"], "answer": 0, "memo": "綿はぜんぶ使い切れるエコな植物!", "role": "zako", "hp": 1, "sayCorrect": "", "sayWrong": "", "order": 7, "pattern": "behind", "lane": 0.6, "odaiQuestion": ""},
-  {"id": 6, "stage": 1, "word": "天然の撚り", "kana": "てんねんのより", "question": "綿の繊維(せんい)は自然に◯◯◯いるから、糸にしたとき強くなる。◯◯◯は?", "choices": ["よじれて", "まっすぐで"], "answer": 0, "memo": "天然のよじれ(撚(よ)り)が繊維(せんい)同士をからませる", "role": "boss", "hp": 12, "sayCorrect": "", "sayWrong": "", "order": 10, "pattern": "normal", "lane": 0.5, "kanaParts": ["てん", "ねん", "の", "よ", "り"], "odaiQuestion": ""},
-  {"id": 7, "stage": 1, "word": "繊維長", "kana": "せんいちょう", "question": "綿の品質は、まず繊維(せんい)の何で区別する?", "choices": ["長さ", "色"], "answer": 0, "memo": "長いほど高級。繊維長(せんいちょう)がものさし", "role": "mid", "hp": 3, "sayCorrect": "", "sayWrong": "", "order": 8, "pattern": "normal", "lane": 0.4, "kanaParts": ["せん", "い", "ちょう"], "odaiQuestion": ""},
+  {"id": 6, "stage": 1, "word": "天然の撚り", "kana": "てんねんのより", "question": "綿の繊維(せんい)は自然に◯◯◯いるから、糸にしたとき強くなる。◯◯◯は?", "choices": ["よじれて", "まっすぐで"], "answer": 0, "memo": "天然のよじれ(撚(よ)り)が繊維(せんい)同士をからませる", "role": "boss", "hp": 12, "sayCorrect": "", "sayWrong": "", "order": 10, "pattern": "normal", "lane": 0.5, "kanaParts": ["てん", "ねん", "の", "よ", "り"], "odaiQuestion": "綿の繊維(せんい)に生まれつきあって、繊維どうしをからませ、糸を強くする「よじれ」は？"},
+  {"id": 7, "stage": 1, "word": "繊維長", "kana": "せんいちょう", "question": "綿の品質は、まず繊維(せんい)の何で区別する?", "choices": ["長さ", "色"], "answer": 0, "memo": "長いほど高級。繊維長(せんいちょう)がものさし", "role": "mid", "hp": 3, "sayCorrect": "", "sayWrong": "", "order": 8, "pattern": "normal", "lane": 0.4, "kanaParts": ["せん", "い", "ちょう"], "odaiQuestion": "長いほど高級といわれる、綿の品質を区別するものさしは？"},
   {"id": 8, "stage": 1, "word": "綿の花", "kana": "めんのはな", "question": "綿の花は、さいたあと何色に変わっていく?", "choices": ["乳白色から赤むらさき色へ", "ずっと真っ白のまま"], "answer": 0, "memo": "花の色が変わるのが綿のふしぎ", "role": "zako", "hp": 1, "sayCorrect": "", "sayWrong": "", "order": 6, "pattern": "ground", "lane": 0.3, "odaiQuestion": ""},
   {"id": 9, "stage": 1, "word": "一年生植物", "kana": "いちねんせいしょくぶつ", "question": "綿は春に種をまいて、どのくらいで1mほどに育つ?", "choices": ["3〜4ヶ月", "3〜4年"], "answer": 0, "memo": "綿は一年で育つ「一年生」として育てられる", "role": "zako", "hp": 1, "sayCorrect": "", "sayWrong": "", "order": 2, "pattern": "ground", "lane": 0.65, "odaiQuestion": ""},
   {"id": 10, "stage": 1, "word": "植物繊維", "kana": "しょくぶつせんい", "question": "綿と麻(あさ)は、天然繊維(せんい)のうちどっちの仲間?", "choices": ["植物繊維(せんい)", "動物繊維(せんい)"], "answer": 0, "memo": "動物繊維(せんい)は毛(ウール)や絹(シルク)", "role": "zako", "hp": 1, "sayCorrect": "", "sayWrong": "", "order": 9, "pattern": "cross", "lane": 1, "odaiQuestion": ""},
@@ -46,7 +69,7 @@ window.WORDS = [
   {"id": 24, "stage": 3, "word": "単糸", "kana": "たんし", "question": "1本だけの糸を何と呼ぶ?(20/1と書く)", "choices": ["単糸(たんし)", "毛糸"], "answer": 0, "memo": "「にじゅうばんたんたん」と読むよ", "role": "zako", "hp": 1, "sayCorrect": "", "sayWrong": "", "order": 4, "pattern": "normal", "lane": 0.7, "odaiQuestion": ""},
   {"id": 25, "stage": 3, "word": "双糸", "kana": "そうし", "question": "糸を2本より合わせた、じょうぶで太さのそろった糸は?", "choices": ["双糸(そうし)", "三つ編み糸"], "answer": 0, "memo": "40/2=「よんまるそうし」。細かい柄のタオルに", "role": "zako", "hp": 1, "sayCorrect": "", "sayWrong": "", "order": 5, "pattern": "normal", "lane": 0.35, "odaiQuestion": ""},
   {"id": 26, "stage": 3, "word": "Z撚り", "kana": "ぜっとより", "question": "ふつうの糸の撚(よ)りの向きは、アルファベットでいうと?", "choices": ["Z撚(よ)り", "S撚(よ)り"], "answer": 0, "memo": "特別な糸以外はZ撚(よ)りが基本", "role": "zako", "hp": 1, "sayCorrect": "", "sayWrong": "", "order": 6, "pattern": "normal", "lane": 0.55, "odaiQuestion": ""},
-  {"id": 27, "stage": 3, "word": "甘撚り", "kana": "あまより", "question": "撚(よ)りがゆるい「甘撚(あまよ)り」の糸。手ざわりは?", "choices": ["柔らかく、温かい", "硬く、涼しい"], "answer": 0, "memo": "撚(よ)りが強いと硬く涼しい。試験によく出る!", "role": "mid", "hp": 3, "sayCorrect": "", "sayWrong": "", "order": 7, "pattern": "normal", "lane": 0.25, "kanaParts": [], "odaiQuestion": ""},
+  {"id": 27, "stage": 3, "word": "甘撚り", "kana": "あまより", "question": "撚(よ)りがゆるい「甘撚(あまよ)り」の糸。手ざわりは?", "choices": ["柔らかく、温かい", "硬く、涼しい"], "answer": 0, "memo": "撚(よ)りが強いと硬く涼しい。試験によく出る!", "role": "mid", "hp": 3, "sayCorrect": "", "sayWrong": "", "order": 7, "pattern": "normal", "lane": 0.25, "kanaParts": [], "odaiQuestion": "撚(よ)りがゆるくて、やわらかく温かい糸は？"},
   {"id": 28, "stage": 3, "word": "強撚糸", "kana": "きょうねんし", "question": "撚(よ)りをとても強くかけた、硬くて涼しい糸は?", "choices": ["強撚糸(きょうねんし)", "ゆる撚(よ)り糸"], "answer": 0, "memo": "シャリッとした夏向きの生地になる", "role": "zako", "hp": 1, "sayCorrect": "", "sayWrong": "", "order": 8, "pattern": "normal", "lane": 0.65, "odaiQuestion": ""},
   {"id": 29, "stage": 3, "word": "無撚糸", "kana": "むねんし", "question": "撚(よ)りをかけずに作る、ふわふわの糸は?", "choices": ["無撚糸(むねんし)", "二重糸"], "answer": 0, "memo": "水にとける特別な糸を使って作る", "role": "boss", "hp": 12, "sayCorrect": "", "sayWrong": "", "order": 10, "pattern": "normal", "lane": 0.4, "kanaParts": [], "odaiQuestion": ""},
   {"id": 30, "stage": 3, "word": "スナール", "kana": "すなーる", "question": "撚(よ)りが元にもどろうとして、糸がよじれてしまう現象は?", "choices": ["スナール", "カール"], "answer": 0, "memo": "よじれ防止に蒸気で形を安定させる", "role": "zako", "hp": 1, "sayCorrect": "", "sayWrong": "", "order": 10, "pattern": "normal", "lane": 0.5, "odaiQuestion": ""},
@@ -71,11 +94,11 @@ window.WORDS = [
   {"id": 47, "stage": 5, "word": "検査", "kana": "けんさ", "question": "出荷前に、サイズや汚(よご)れ、針の混入がないかを確かめる工程は?", "choices": ["検査", "宣伝"], "answer": 0, "memo": "検針機(けんしんき)で金属もチェック!", "role": "mid", "hp": 3, "sayCorrect": "", "sayWrong": "", "order": 7, "pattern": "normal", "lane": 0.25, "kanaParts": [], "odaiQuestion": ""},
   {"id": 48, "stage": 5, "word": "先晒し先染め", "kana": "さきざらしさきぞめ", "question": "糸の段階で晒(さら)して染めてから織る、今治(いまばり)産地の技法は?", "choices": ["先晒(さら)し先染め", "後晒(さら)し後染め"], "answer": 0, "memo": "綿本来の柔らかさが引き出せる", "role": "zako", "hp": 1, "sayCorrect": "", "sayWrong": "", "order": 8, "pattern": "normal", "lane": 0.65, "odaiQuestion": ""},
   {"id": 49, "stage": 5, "word": "後晒し後染め", "kana": "あとざらしあとぞめ", "question": "先に織ってから、生地を晒(さら)して染める一般的な技法は?", "choices": ["後晒(さら)し後染め", "先晒(さら)し先染め"], "answer": 0, "memo": "ふつうのタオルはこちらの順番で作られる", "role": "zako", "hp": 1, "sayCorrect": "", "sayWrong": "", "order": 9, "pattern": "normal", "lane": 0.4, "odaiQuestion": ""},
-  {"id": 50, "stage": 5, "word": "製織", "kana": "せいしょく", "question": "綿花からタオルになるまでの6工程。正しい順番はどれ?", "choices": ["綿花→紡績→糊付け→製織→晒し→縫製", "綿花→紡績→糊付け→晒し→製織→縫製", "紡績→綿花→糊付け→製織→晒し→縫製"], "answer": 0, "memo": "この流れが基本。何度もならべて覚えよう", "role": "boss", "hp": 12, "sayCorrect": "", "sayWrong": "", "order": 10, "pattern": "normal", "lane": 0.5, "kanaParts": [], "odaiQuestion": ""},
+  {"id": 50, "stage": 5, "word": "製織", "kana": "せいしょく", "question": "綿花からタオルになるまでの6工程。正しい順番はどれ?", "choices": ["綿花→紡績→糊付け→製織→晒し→縫製", "綿花→紡績→糊付け→晒し→製織→縫製", "紡績→綿花→糊付け→製織→晒し→縫製"], "answer": 0, "memo": "この流れが基本。何度もならべて覚えよう", "role": "boss", "hp": 12, "sayCorrect": "", "sayWrong": "", "order": 10, "pattern": "normal", "lane": 0.5, "kanaParts": [], "odaiQuestion": "糊(のり)付けした糸を織機(しょっき)にかけて、タオルの生地に織り上げる工程は？"},
   // ---- ステージ6 ----
   {"id": 51, "stage": 6, "word": "梳綿", "kana": "そめん", "question": "糸づくりのはじまり。正しい順番はどれ?", "choices": ["混打綿→梳綿", "梳綿→混打綿", "混打綿→精紡"], "answer": 0, "memo": "まずほぐして、それから方向をそろえる", "role": "zako", "hp": 1, "sayCorrect": "", "sayWrong": "", "order": 1, "pattern": "normal", "lane": 0.3, "odaiQuestion": ""},
   {"id": 52, "stage": 6, "word": "練条", "kana": "れんじょう", "question": "スライバーが糸になるまで。正しい順番はどれ?", "choices": ["梳綿→練条→粗紡", "梳綿→粗紡→練条", "練条→梳綿→粗紡"], "answer": 0, "memo": "だんだん細く、だんだんそろっていく", "role": "zako", "hp": 1, "sayCorrect": "", "sayWrong": "", "order": 2, "pattern": "normal", "lane": 0.6, "odaiQuestion": ""},
-  {"id": 53, "stage": 6, "word": "精紡", "kana": "せいぼう", "question": "糸が完成するまで。正しい順番はどれ?", "choices": ["練条→粗紡→精紡", "練条→精紡→粗紡", "粗紡→練条→精紡"], "answer": 0, "memo": "精紡(せいぼう)で決められた太さ(番手(ばんて))の糸が完成", "role": "boss", "hp": 12, "sayCorrect": "", "sayWrong": "", "order": 10, "pattern": "normal", "lane": 0.45, "kanaParts": [], "odaiQuestion": ""},
+  {"id": 53, "stage": 6, "word": "精紡", "kana": "せいぼう", "question": "糸が完成するまで。正しい順番はどれ?", "choices": ["練条→粗紡→精紡", "練条→精紡→粗紡", "粗紡→練条→精紡"], "answer": 0, "memo": "精紡(せいぼう)で決められた太さ(番手(ばんて))の糸が完成", "role": "boss", "hp": 12, "sayCorrect": "", "sayWrong": "", "order": 10, "pattern": "normal", "lane": 0.45, "kanaParts": [], "odaiQuestion": "糸づくりの最後に、決められた太さ（番手(ばんて)）の糸に仕上げる工程は？"},
   {"id": 54, "stage": 6, "word": "混打綿", "kana": "こんだめん", "question": "かたく固まった綿をほぐして、ゴミを落とす最初の工程は?", "choices": ["混打綿(こんだめん)", "精紡(せいぼう)"], "answer": 0, "memo": "ちがう産地の綿をまぜる(ブレンド)のもここ", "role": "mid", "hp": 3, "sayCorrect": "", "sayWrong": "", "order": 4, "pattern": "normal", "lane": 0.7, "kanaParts": [], "odaiQuestion": ""},
   {"id": 55, "stage": 6, "word": "コーマ糸", "kana": "こーまいと", "question": "短い繊維(せんい)を取りのぞいて作る、つやのある上質な糸は?", "choices": ["コーマ糸", "カード糸"], "answer": 0, "memo": "「櫛(くし)を通した糸」という意味", "role": "zako", "hp": 1, "sayCorrect": "", "sayWrong": "", "order": 5, "pattern": "normal", "lane": 0.35, "odaiQuestion": ""},
   {"id": 56, "stage": 6, "word": "粗紡", "kana": "そぼう", "question": "糸になる直前の、太い糸を作る工程は?", "choices": ["粗紡(そぼう)", "漂白(ひょうはく)"], "answer": 0, "memo": "この太い糸は「粗糸(あらいと)」と呼ばれる", "role": "zako", "hp": 1, "sayCorrect": "", "sayWrong": "", "order": 6, "pattern": "normal", "lane": 0.55, "odaiQuestion": ""},
@@ -141,12 +164,12 @@ window.WORDS = [
   // ---- ステージ12 ----
   {"id": 111, "stage": 12, "word": "吸水性", "kana": "きゅうすいせい", "question": "タオルのいちばん大事な力。水を吸う力を何と呼ぶ?", "choices": ["吸水性(きゅうすいせい)", "防水性"], "answer": 0, "memo": "5秒テストで確かめられる", "role": "zako", "hp": 1, "sayCorrect": "", "sayWrong": "", "order": 1, "pattern": "normal", "lane": 0.3, "odaiQuestion": ""},
   {"id": 112, "stage": 12, "word": "肌ざわり", "kana": "はだざわり", "question": "タオルを買うとき、いちばん重視される感覚は?", "choices": ["肌ざわり", "におい"], "answer": 0, "memo": "デザインよりも「さわった感じ」が決め手", "role": "zako", "hp": 1, "sayCorrect": "", "sayWrong": "", "order": 2, "pattern": "normal", "lane": 0.6, "odaiQuestion": ""},
-  {"id": 113, "stage": 12, "word": "柔軟剤の使いすぎ", "kana": "じゅうなんざいのつかいすぎ", "question": "柔軟剤(じゅうなんざい)を使いすぎるとタオルはどうなる?", "choices": ["水をはじくようになる", "もっと水を吸う"], "answer": 0, "memo": "ふんわりするけど吸水性(きゅうすいせい)が落ちる。ほどほどに!", "role": "boss", "hp": 12, "sayCorrect": "", "sayWrong": "", "order": 10, "pattern": "normal", "lane": 0.45, "kanaParts": [], "odaiQuestion": ""},
-  {"id": 114, "stage": 12, "word": "塩素系漂白剤", "kana": "えんそけいひょうはくざい", "question": "塩素系漂白剤(えんそけいひょうはくざい)をタオルに使うと?", "choices": ["色が抜けて生地も傷む", "もっと丈夫になる"], "answer": 0, "memo": "白いタオルと色物は分けて洗おう", "role": "mid", "hp": 3, "sayCorrect": "", "sayWrong": "", "order": 4, "pattern": "normal", "lane": 0.7, "kanaParts": [], "odaiQuestion": ""},
+  {"id": 113, "stage": 12, "word": "柔軟剤の使いすぎ", "kana": "じゅうなんざいのつかいすぎ", "question": "柔軟剤(じゅうなんざい)を使いすぎるとタオルはどうなる?", "choices": ["水をはじくようになる", "もっと水を吸う"], "answer": 0, "memo": "ふんわりするけど吸水性(きゅうすいせい)が落ちる。ほどほどに!", "role": "boss", "hp": 12, "sayCorrect": "", "sayWrong": "", "order": 10, "pattern": "normal", "lane": 0.45, "kanaParts": [], "odaiQuestion": "タオルがふんわりしても、水をはじいて吸わなくなってしまう原因は？"},
+  {"id": 114, "stage": 12, "word": "塩素系漂白剤", "kana": "えんそけいひょうはくざい", "question": "塩素系漂白剤(えんそけいひょうはくざい)をタオルに使うと?", "choices": ["色が抜けて生地も傷む", "もっと丈夫になる"], "answer": 0, "memo": "白いタオルと色物は分けて洗おう", "role": "mid", "hp": 3, "sayCorrect": "", "sayWrong": "", "order": 4, "pattern": "normal", "lane": 0.7, "kanaParts": [], "odaiQuestion": "タオルに使うと、色が抜けて生地も傷んでしまうものは？"},
   {"id": 115, "stage": 12, "word": "パイルの引きつれ", "kana": "ぱいるのひきつれ", "question": "パイルが引っかかって飛び出したら、どうする?", "choices": ["引っぱらずに切る", "思いきり引っぱる"], "answer": 0, "memo": "引っぱると連鎖してもっと抜けてしまう", "role": "zako", "hp": 1, "sayCorrect": "", "sayWrong": "", "order": 5, "pattern": "normal", "lane": 0.35, "odaiQuestion": ""},
   {"id": 116, "stage": 12, "word": "毛羽落ち", "kana": "けばおち", "question": "新品のタオルを使う前にした方がよいことは?", "choices": ["一度洗ってから使う", "そのまま使う"], "answer": 0, "memo": "最初の毛羽を落としてから使うと快適", "role": "zako", "hp": 1, "sayCorrect": "", "sayWrong": "", "order": 6, "pattern": "normal", "lane": 0.55, "odaiQuestion": ""},
   {"id": 117, "stage": 12, "word": "たっぷりの水", "kana": "たっぷりのみず", "question": "タオルを長持ちさせる洗い方は?", "choices": ["たっぷりの水で泳がせるように洗う", "ぎゅうぎゅうに詰めて洗う"], "answer": 0, "memo": "水の量がタオルの寿命を決める", "role": "zako", "hp": 1, "sayCorrect": "", "sayWrong": "", "order": 7, "pattern": "normal", "lane": 0.25, "odaiQuestion": ""},
-  {"id": 118, "stage": 12, "word": "陰干し", "kana": "かげぼし", "question": "タオルの干し方でおすすめなのは?", "choices": ["風通しのよい場所で陰干(かげぼ)し", "真夏の直射日光でカラカラに"], "answer": 0, "memo": "乾かしすぎは硬くなる原因に", "role": "mid", "hp": 3, "sayCorrect": "", "sayWrong": "", "order": 8, "pattern": "normal", "lane": 0.65, "kanaParts": [], "odaiQuestion": ""},
+  {"id": 118, "stage": 12, "word": "陰干し", "kana": "かげぼし", "question": "タオルの干し方でおすすめなのは?", "choices": ["風通しのよい場所で陰干(かげぼ)し", "真夏の直射日光でカラカラに"], "answer": 0, "memo": "乾かしすぎは硬くなる原因に", "role": "mid", "hp": 3, "sayCorrect": "", "sayWrong": "", "order": 8, "pattern": "normal", "lane": 0.65, "kanaParts": [], "odaiQuestion": "タオルを風通しのよい場所で、直射日光(ちょくしゃにっこう)をさけて干す干し方は？"},
   {"id": 119, "stage": 12, "word": "洗濯表示", "kana": "せんたくひょうじ", "question": "洗い方やアイロンのかけ方を教えてくれるマークを何と呼ぶ?", "choices": ["洗濯表示", "天気予報"], "answer": 0, "memo": "ネーム(タグ)についているマークだよ", "role": "zako", "hp": 1, "sayCorrect": "", "sayWrong": "", "order": 9, "pattern": "normal", "lane": 0.4, "odaiQuestion": ""},
   {"id": 120, "stage": 12, "word": "タオルソムリエ", "kana": "たおるそむりえ", "question": "お客様とタオルの架け橋になる、タオル選びの専門アドバイザーは?", "choices": ["タオルソムリエ", "タオルマイスター"], "answer": 0, "memo": "2007年開始。キミも今日からその一歩!", "role": "zako", "hp": 1, "sayCorrect": "", "sayWrong": "", "order": 10, "pattern": "normal", "lane": 0.5, "odaiQuestion": ""},
 ];
