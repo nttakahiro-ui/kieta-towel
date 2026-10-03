@@ -709,6 +709,7 @@ const Battle = (() => {
     floats = floats.filter(fl => fl.age < 0.9);
     vanish = vanish.filter(v => v.age < 0.8);
     player.notice = Math.max(0, (player.notice || 0) - dt);
+    player.healFlash = Math.max(0, (player.healFlash || 0) - realDt);
 
     if (state === "down") {
       stateTimer -= dt;
@@ -954,6 +955,8 @@ const Battle = (() => {
         it.got = true;
         player.hp = Math.min(BATTLE.playerMaxHp, player.hp + BATTLE.healItem);
         player.glow = 0.3;
+        player.healFlash = 1;   // 体力ゲージが光って「+回復」
+        if (!fsay || !fsay.big) fsay = { text: "ありがと！", t: 1.2, small: true };   // ふわりが小さく
         Sound.se("item");
         addPop(it.x, it.y, "#fff8d0", 0.6);
       }
@@ -1480,7 +1483,7 @@ const Battle = (() => {
     // 状態の文字
     if (state === "sortie") drawSortie();
     if (state === "down") centerText("やられた…", `${Math.ceil(stateTimer)}秒後に再開`);
-    if (state === "clear") centerText(`${absorbed.length}語あつまった！`, `${score}点　タイム ${fmtTime(t)}`);
+    if (state === "clear") centerText(`${absorbed.length}語あつまった！`, `${score}点`);
     if (paused) {
       ctx.fillStyle = "rgba(248,243,228,0.85)";
       ctx.fillRect(0, 0, W, H);
@@ -2013,8 +2016,8 @@ const Battle = (() => {
       ctx.restore();
       return;
     }
-    ctx.font = font(15);
-    const tw = ctx.measureText(fsay.text).width, pad = 10, bw = tw + pad * 2, bh = 30;
+    ctx.font = font(fsay.small ? 12 : 15);
+    const tw = ctx.measureText(fsay.text).width, pad = fsay.small ? 7 : 10, bw = tw + pad * 2, bh = fsay.small ? 22 : 30;
     const bx = Math.min(Math.max(fx - bw / 2, 8), W - bw - 8), by = fy - 30 - bh;
     ctx.fillStyle = "rgba(255,253,245,0.96)"; ctx.strokeStyle = "#cfe0b6"; ctx.lineWidth = 2;
     roundRect(bx, by, bw, bh, 12); ctx.fill(); ctx.stroke();
@@ -2033,6 +2036,20 @@ const Battle = (() => {
     const rate = player.hp / BATTLE.playerMaxHp;
     ctx.fillStyle = rate > 0.4 ? "#8cbf5a" : (Math.floor(t * 4) % 2 ? "#e39a8e" : "#f2c4bb");
     roundRect(14, top + 2, 126 * rate, 12, 6); ctx.fill();
+    if (player.healFlash > 0) {   // 綿のたねを取った: ゲージが光って「+回復」
+      const k = player.healFlash;
+      ctx.save();
+      ctx.shadowColor = `rgba(255,240,150,${k})`; ctx.shadowBlur = 14 * k;
+      ctx.strokeStyle = `rgba(255,236,140,${k})`; ctx.lineWidth = 3;
+      roundRect(12, top, 130, 16, 8); ctx.stroke();
+      ctx.restore();
+      ctx.save();
+      ctx.font = font(11); ctx.textAlign = "right"; ctx.textBaseline = "middle";
+      ctx.globalAlpha = Math.min(1, k * 2);
+      ctx.lineWidth = 3; ctx.strokeStyle = "#ffffff"; ctx.strokeText("+回復", 138, top + 8 - (1 - k) * 4);
+      ctx.fillStyle = "#4f8a2c"; ctx.fillText("+回復", 138, top + 8 - (1 - k) * 4);
+      ctx.restore();
+    }
     ctx.font = font(12);
     ctx.textAlign = "left"; ctx.textBaseline = "top";
     ctx.lineWidth = 4; ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.lineJoin = "round";
@@ -2061,8 +2078,8 @@ const Battle = (() => {
     ctx.fillText(`${absorbed.length} / ${opts.total} 語`, W - 14, top);
     ctx.font = font(12);
     const ph = { round1: "偵察", round2: "本番", boss: "大ボス" }[phase] || "";
-    ctx.strokeText(`${ph}　${fmtTime(t)}`, W - 14, top + 24);
-    ctx.fillText(`${ph}　${fmtTime(t)}`, W - 14, top + 24);
+    ctx.strokeText(ph, W - 14, top + 24);   // バトルの時間は出さない（タイムは競わない）
+    ctx.fillText(ph, W - 14, top + 24);
     if (loadout) {   // 持っていったもの（盾は使うと消える）
       const l = LOADOUTS.find(x => x.id === loadout);
       const txt = loadout === "shield" && !shield ? "盾（使った）" : l.name;

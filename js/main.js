@@ -123,7 +123,12 @@ const Tune = (() => {
   function store() { try { window.localStorage.setItem(TUNE_KEY, JSON.stringify(saved)); } catch (e) {} }
   function changed() { return Object.keys(saved).length > 0; }
 
+  // 前回のバトルの時間など（タイムは競わないので、ここでだけ見られる）
+  let info = "前回のバトル: まだ遊んでいません";
+  function setInfo(text) { info = text; }
+
   function render() {
+    $("tune-info").textContent = info;
     const box = $("tune-list");
     box.innerHTML = "";
     TUNE_ITEMS.forEach(([p, name, min, max, step]) => {
@@ -171,7 +176,7 @@ const Tune = (() => {
     });
   }
 
-  return { load, open, bind, changed };
+  return { load, open, bind, changed, setInfo };
 })();
 
 const Main = (() => {
@@ -225,7 +230,12 @@ const Main = (() => {
         stage,
         stageName: stage.name,
         fuwariCount: Save.cardCount(),
-        onEnd: (ids, stats) => { lastStats = stats; lastIds = ids; toQuiz(ids); }
+        onEnd: (ids, stats) => {
+          lastStats = stats; lastIds = ids;
+          const m = Math.floor(stats.time / 60), sec = String(Math.floor(stats.time % 60)).padStart(2, "0");
+          Tune.setInfo(`前回のバトル（${stage.name}）: ${m}分${sec}秒　回収 ${ids.length}語　被弾 ${stats.hits}回　やられた ${stats.downs}回　${stats.score}点`);
+          toQuiz(ids);
+        }
       });
     });
   }

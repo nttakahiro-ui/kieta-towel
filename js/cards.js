@@ -37,8 +37,8 @@ const Cards = (() => {
     const rk = $("cards-rank");
     rk.innerHTML = "";
     if (o.stats) {
-      const st = o.stats, m = Math.floor(st.time / 60), sec = String(Math.floor(st.time % 60)).padStart(2, "0");
-      $("cards-summary").textContent += `\nバトル ${m}:${sec}　被弾 ${st.hits}回${st.downs ? `　やられた ${st.downs}回` : ""}　最大コンボ ${st.maxCombo}`;
+      const st = o.stats;
+      $("cards-summary").textContent += `\n被弾 ${st.hits}回${st.downs ? `　やられた ${st.downs}回` : ""}　最大コンボ ${st.maxCombo}`;   // バトルの時間は出さない（調整パネルの中だけ）
       // 点数とランク
       const r = rankOf(st.score);
       const sc = document.createElement("div"); sc.className = "rank-score"; sc.textContent = `${st.score} 点`;
