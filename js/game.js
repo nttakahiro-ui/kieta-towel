@@ -50,6 +50,7 @@ const BATTLE = {
   fillerScale: 0.8,            // 雑魚の大きさの倍率（語句より目立たないように小さく）
   fillerAlpha: 0.72,           // 雑魚の濃さ（1でふつう。小さいほど薄い）
   fillerAvoid: 90,             // 語句のまわり、この距離（px）には雑魚を出さない
+  fillerDensity: 1.5,          // 本番（あつめる）と大ボスの雑魚の濃さ（10/3-8: 1.5倍・間隔もつめる）。数がふえても弾の量は同じになるよう、1匹が撃つ間隔をこの倍率だけのばす
   fillerFireScale: 1.5,         // 雑魚が撃つ間隔の倍率（大きいほど撃たない）
   dropRate: 0.15,              // 雑魚が「綿のたね」を落とす確率（0〜1）。雑魚が増えたので下げた
   popScale: 1.6,               // 雑魚を倒したときの花の大きさ
@@ -691,10 +692,12 @@ const Battle = (() => {
   }
 
   // ===== 雑魚の群れを出す =====
+  // 本番と大ボスだけ雑魚を濃くする（難しさは雑魚の弾でなく数で作る）
+  const fillerDense = () => phase === "round1" ? 1 : BATTLE.fillerDensity;
   function spawnFiller(type, x, y, extra) {
     const def = FILLER_TYPES[type];
     fillers.push(Object.assign({ type, layer: def.layer, hp: def.hp, r: def.r * BATTLE.fillerScale, x, y, age: 0, flash: 0,
-      fire: def.fire ? rand(0.8, 1.6) * def.fire * BATTLE.fillerFireScale * P.fireScale / fireRamp() : 0 }, extra || {}));
+      fire: def.fire ? rand(0.8, 1.6) * def.fire * BATTLE.fillerFireScale * fillerDense() * P.fireScale / fireRamp() : 0 }, extra || {}));
   }
   // 語句の近くかどうか（雑魚を出す場所をえらぶとき用）
   function nearWord(x, y, layer) {
@@ -848,8 +851,9 @@ const Battle = (() => {
     fillerTimer -= dt;
     if (fillerTimer <= 0) {
       const rp = BATTLE.ramp[phase] || BATTLE.ramp.round2;   // 坂: 今の出撃の濃さ
-      if (fillers.length < BATTLE.fillerMax * rp.filler) spawnWave();
-      fillerTimer = BATTLE.fillerInterval / Math.max(0.1, rp.filler) * rand(0.8, 1.2);
+      const dn = rp.filler * fillerDense();
+      if (fillers.length < BATTLE.fillerMax * dn) spawnWave();
+      fillerTimer = BATTLE.fillerInterval / Math.max(0.1, dn) * rand(0.8, 1.2);
     }
 
     // 自機の弾（自動で連射）
@@ -968,7 +972,7 @@ const Battle = (() => {
       if (def.fire) {
         f.fire -= dt;
         if (f.fire <= 0 && f.y > 0 && f.y < H * 0.68) {
-          f.fire = def.fire * BATTLE.fillerFireScale * P.fireScale / fireRamp() * rand(0.8, 1.2);
+          f.fire = def.fire * BATTLE.fillerFireScale * fillerDense() * P.fireScale / fireRamp() * rand(0.8, 1.2);
           fireAt(f.x, f.y, def.spread || [0]);
         }
       }
