@@ -66,6 +66,8 @@ const TUNE_ITEMS = [
   ["damage", "被弾で減る体力（最大100）", 5, 60, 5],
   ["healOnAbsorb", "吸い込みで回復する体力", 0, 40, 2],
   ["wordShowTime", "吸い込んだ語句の表示（秒）", 0.3, 2, 0.1],
+  ["lives", "残機", 1, 9, 1],
+  ["respawnInv", "復活したあと無敵の秒数", 0, 5, 0.5],
   ["slowTime", "吸い込むときのスローの時間（秒）", 0, 1, 0.05],
   ["slowScale", "スローの速さ（1=ふつう、小さいほどゆっくり）", 0.1, 1, 0.05],
   ["powerEvery", "何語ごとに強くなるか（強化の段階）", 1, 5, 1],
@@ -233,7 +235,7 @@ const Main = (() => {
         onEnd: (ids, stats) => {
           lastStats = stats; lastIds = ids;
           const m = Math.floor(stats.time / 60), sec = String(Math.floor(stats.time % 60)).padStart(2, "0");
-          Tune.setInfo(`前回のバトル（${stage.name}）: ${m}分${sec}秒　回収 ${ids.length}語　被弾 ${stats.hits}回　やられた ${stats.downs}回　${stats.score}点`);
+          Tune.setInfo(`前回のバトル（${stage.name}）: ${m}分${sec}秒　回収 ${ids.length}語　被弾 ${stats.hits}回　失った機体 ${stats.downs}機　本番やり直し ${stats.gameOvers}回　${stats.score}点`);
           toQuiz(ids);
         }
       });

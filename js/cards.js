@@ -38,7 +38,7 @@ const Cards = (() => {
     rk.innerHTML = "";
     if (o.stats) {
       const st = o.stats;
-      $("cards-summary").textContent += `\n被弾 ${st.hits}回${st.downs ? `　やられた ${st.downs}回` : ""}　最大コンボ ${st.maxCombo}`;   // バトルの時間は出さない（調整パネルの中だけ）
+      $("cards-summary").textContent += `\n被弾 ${st.hits}回${st.downs ? `　失った機体 ${st.downs}機` : ""}${st.gameOvers ? `　本番やり直し ${st.gameOvers}回` : ""}　最大コンボ ${st.maxCombo}`;   // バトルの時間は出さない（調整パネルの中だけ）
       // 点数とランク
       const r = rankOf(st.score);
       const sc = document.createElement("div"); sc.className = "rank-score"; sc.textContent = `${st.score} 点`;
@@ -48,7 +48,7 @@ const Cards = (() => {
       if (o.record) {
         if (o.record.newBest) { const nb = document.createElement("div"); nb.className = "best-new"; nb.textContent = "ベスト更新！"; rk.appendChild(nb); }
         const ms = document.createElement("div"); ms.className = "marks-now";
-        [["all", "10語すべて回収"], ["noDown", "やられなかった"], ["noHit", "被弾ゼロ"]].forEach(([k, label]) => {
+        [["all", "10語すべて回収"], ["noDown", "1機も失わなかった"], ["noHit", "被弾ゼロ"]].forEach(([k, label]) => {
           const m = document.createElement("span"); m.className = "mark" + (o.record.now[k] ? " on" : ""); m.textContent = label;
           ms.appendChild(m);
         });

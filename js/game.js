@@ -124,7 +124,9 @@ const BATTLE = {
   damage: 20,                  // 敵の弾に当たったときに減る体力
   healOnAbsorb: 12,            // 語句を吸い込んだときに回復する体力
   invincibleTime: 1.3,         // 当たったあと、しばらく無敵になる秒数
-  reviveDelay: 3,              // 体力ゼロのあと、再開するまでの秒数
+  lives: 3,                    // 残機（1945型）。体力ゼロで1機失い、画面の下から復活。全部失うと本番の最初からやり直し
+  respawnRise: 0.6,            // 復活のとき、画面の下から上がってくる秒数
+  respawnInv: 2,               // 復活したあと、無敵で点滅する秒数
   wordShowTime: 1.5,           // 吸い込んだ語句を画面中央に大きく出す秒数（この間は弾が当たらない）
   fuwariSayTime: 3,            // 周の始まりの、ふわりの一言を出す秒数
   slowTime: 0.3,               // 吸い込む瞬間に画面全体がゆっくりになる秒数
@@ -293,7 +295,12 @@ const Battle = (() => {
   let level = POWER_LEVELS[0];
   let score = 0, combo = 0, maxCombo = 0;
   let floats = [];           // 点数が浮かぶ表示
-  let hits = 0, downs = 0;   // 被弾した回数、やられた回数
+  let hits = 0, downs = 0;   // 被弾した回数、失った機体の数
+  let lives = 3;             // 残機
+  let gameOvers = 0;         // 3機すべて失って、本番をやり直した回数
+  let scoreAtMain = 0;       // 本番が始まったときの点数（やり直しでここに戻す）
+  let retryMain = false;     // 本番のやり直しの画面か
+  let lastPX = 0, lastPY = 0;   // いちばん最近の指の位置
   let lock = false;          // 照準に地上の敵が入っているか
   let slow = 0;              // ゆっくりの残り時間（秒）
   let gauge = 0;             // 「記憶の光」ボムのゲージ（0〜100）
@@ -366,12 +373,15 @@ const Battle = (() => {
       return;
     }
     drag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, px: player.x, py: player.y };
+    lastPX = e.clientX; lastPY = e.clientY;
     try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
   }
   function onMove(e) {
     if (!drag || e.pointerId !== drag.id) return;
     e.preventDefault();
     moved = true;
+    lastPX = e.clientX; lastPY = e.clientY;
+    if (player.rising > 0) return;   // 復活して上がってくる間は動かせない
     player.x = Math.min(Math.max(drag.px + (e.clientX - drag.sx) * 1.15, 24), W - 24);
     player.y = Math.min(Math.max(drag.py + (e.clientY - drag.sy) * 1.15, minPlayerY()), H - 40);
   }
@@ -415,7 +425,7 @@ const Battle = (() => {
     player = { x: W / 2, y: H * 0.8, hp: BATTLE.playerMaxHp, inv: 0, glow: 0, hurt: 0 };
     level = POWER_LEVELS[0];
     score = 0; combo = 0; maxCombo = 0; floats = [];
-    hits = 0; downs = 0;
+    hits = 0; downs = 0; lives = BATTLE.lives; gameOvers = 0; scoreAtMain = 0; retryMain = false;
     paused = false; moved = false; groundHinted = false; banner = null; shake = 0; showWord = null; threads = []; pops = [];
     slow = 0; wave = null; gauge = 0; bombsUsed = 0; fsay = null; odai = null; bounces = [];
     state = "sortie"; sortieNo = 1; reacted = 0;   // 「出撃1 偵察」の画面から始める
@@ -456,6 +466,7 @@ const Battle = (() => {
   // 出撃の画面をタップ: 出撃する
   function startSortie() {
     state = "play";
+    retryMain = false;
     Sound.se("start");
     if (sortieNo === 1) {
       fsay = { text: "ことばを見つけよう（まだあつめられないよ）", t: BATTLE.fuwariSayTime };
@@ -716,15 +727,15 @@ const Battle = (() => {
     vanish = vanish.filter(v => v.age < 0.8);
     player.notice = Math.max(0, (player.notice || 0) - dt);
     player.healFlash = Math.max(0, (player.healFlash || 0) - realDt);
-
-    if (state === "down") {
-      stateTimer -= dt;
-      if (stateTimer <= 0) revive();
-      return;
+    if (player.rising > 0) {   // 画面の下から上がってくる
+      player.rising -= dt;
+      const k = 1 - Math.max(0, player.rising) / BATTLE.respawnRise;
+      player.y = H + 30 + (H * 0.8 - H - 30) * (1 - Math.pow(1 - k, 2));
     }
+
     if (state === "clear") {
       stateTimer -= dt;
-      if (stateTimer <= 0) { stop(); opts.onEnd(absorbed.map(w => w.id), { time: t, hits, downs, score, maxCombo, bombsUsed, missed: missed.map(w => w.id) }); }
+      if (stateTimer <= 0) { stop(); opts.onEnd(absorbed.map(w => w.id), { time: t, hits, downs, gameOvers, score, maxCombo, bombsUsed, missed: missed.map(w => w.id) }); }
       return;
     }
 
@@ -738,6 +749,7 @@ const Battle = (() => {
           fillers.forEach(f => addPop(f.x, f.y, "#fff8d8", 0.8, f.layer === "ground"));
           fillers = []; ebullets = []; bombs = []; items = [];
           state = "sortie"; sortieNo = 2; choiceT = BATTLE.choiceTime;
+          scoreAtMain = score;
           drag = null;
         } else {
           startPhase("boss");
@@ -1309,20 +1321,45 @@ const Battle = (() => {
     combo = 0;
     shake = 0.25;
     Sound.se("damage");
-    if (player.hp <= 0) {
-      player.hp = 0;
-      state = "down";
-      downs++;
-      stateTimer = BATTLE.reviveDelay;
-      ebullets = [];
-    }
+    if (player.hp <= 0) loseLife();
   }
 
-  // やられたあと: 止めていた台本の同じところからつづける（出ていた語句もそのまま）
-  function revive() {
+  // 体力ゼロ: 1機失う。のこっていれば画面の下から復活（吸い込んだ語句と帯はそのまま）
+  function loseLife() {
+    downs++;
+    lives--;
+    addPop(player.x, player.y, "#ffffff", 1.6, false, true);
+    for (let i = 0; i < 16; i++) {
+      const a = Math.random() * Math.PI * 2, sp = 80 + Math.random() * 140;
+      threads.push({ x: player.x, y: player.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, len: 4, curl: 0, rot: 0, color: "#ffffff", age: 0, scatter: 9, sparkle: true });
+    }
+    if (lives > 0) { respawn(); return; }
+    gameOver();
+  }
+  function respawn() {
     player.hp = BATTLE.playerMaxHp;
-    player.inv = BATTLE.invincibleTime;
-    state = "play";
+    player.x = W / 2; player.y = H + 30;
+    player.rising = BATTLE.respawnRise;
+    player.inv = BATTLE.respawnRise + BATTLE.respawnInv;
+    if (drag) { drag.sx = lastPX; drag.sy = lastPY; drag.px = player.x; drag.py = H * 0.8; }   // 指を置いたままでも動かせる
+  }
+  // 3機すべて失った: 本番（出撃2）の最初からやり直す。偵察はとばし、本番で集めた語句は消える
+  function gameOver() {
+    gameOvers++;
+    lives = BATTLE.lives;
+    player.hp = BATTLE.playerMaxHp; player.inv = 0; player.rising = 0;
+    enemies = []; fillers = []; ebullets = []; bombs = []; items = []; obs = []; odai = null;
+    if (phase !== "round1") {
+      absorbed = []; missed = [];
+      score = scoreAtMain;
+    } else {
+      scoreAtMain = score;   // 偵察中に3機失ったら、偵察はそこまで
+    }
+    combo = 0; gauge = 0; level = POWER_LEVELS[0];
+    loadout = null; powerBonus = 0; shield = 0; gaugeMul = 1;
+    retryMain = true;
+    state = "sortie"; sortieNo = 2; choiceT = BATTLE.choiceTime; drag = null;
+    player.x = W / 2; player.y = H * 0.8;
   }
 
   // ===== 描く =====
@@ -1488,7 +1525,6 @@ const Battle = (() => {
 
     // 状態の文字
     if (state === "sortie") drawSortie();
-    if (state === "down") centerText("やられた…", `${Math.ceil(stateTimer)}秒後に再開`);
     if (state === "clear") centerText(`${absorbed.length}語あつまった！`, `${score}点`);
     if (paused) {
       ctx.fillStyle = "rgba(248,243,228,0.85)";
@@ -1978,7 +2014,9 @@ const Battle = (() => {
   // 出撃2の画面: 本番に持っていくものを3つから1つ選ぶ
   function drawChoice() {
     // ふわりのセリフ（偵察の終わり）
-    const say = `${reacted}のことばを見つけたね。でもまだ記憶がぼんやり…。同じ道をもう一回飛べば、吸い込める気がする！`;
+    const say = retryMain
+      ? "3機ともやられちゃった…。でも、見つけたことばはおぼえてるよ。本番の最初から、もう一回！"
+      : `${reacted}のことばを見つけたね。でもまだ記憶がぼんやり…。同じ道をもう一回飛べば、吸い込める気がする！`;
     ctx.font = font(14);
     const lines = wrapText(say, W - 92);
     const bh = lines.length * 20 + 16, by = H * 0.03;
@@ -2068,11 +2106,22 @@ const Battle = (() => {
       ctx.restore();
     }
     ctx.lineWidth = 4; ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.lineJoin = "round";
-    // 点数（まん中）。上に出すのは体力ゲージと点数だけ
-    ctx.textAlign = "center"; ctx.textBaseline = "top";
+    // 残機: 機体（雲）の絵をならべる。失ったぶんはうすく
+    for (let i = 0; i < BATTLE.lives; i++) {
+      const lx = 160 + i * 26, ly = top + 8;
+      ctx.save();
+      ctx.globalAlpha = i < lives ? 1 : 0.22;
+      ctx.fillStyle = "#ffffff"; ctx.strokeStyle = "#9cbf7c"; ctx.lineWidth = 1.5;
+      for (const [dx, dy, r] of [[-6, 2, 5], [0, -1, 7], [6, 2, 5]]) { ctx.beginPath(); ctx.arc(lx + dx, ly + dy, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+      for (const [dx, dy, r] of [[-6, 2, 5], [0, -1, 7], [6, 2, 5]]) { ctx.beginPath(); ctx.arc(lx + dx, ly + dy, r - 1, 0, Math.PI * 2); ctx.fill(); }
+      ctx.fillStyle = "#f3d9b8"; ctx.beginPath(); ctx.arc(lx, ly - 7, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+    // 点数（右）。上に出すのは体力ゲージ、残機、点数だけ
+    ctx.textAlign = "right"; ctx.textBaseline = "top";
     ctx.font = font(16); ctx.fillStyle = "#4b5e3a";
-    ctx.strokeText(String(score), W / 2 + 40, top);
-    ctx.fillText(String(score), W / 2 + 40, top);
+    ctx.strokeText(String(score), W - 14, top);
+    ctx.fillText(String(score), W - 14, top);
     // パワーと持ちものは、左下の記憶の光のボタンの横に小さく
     const b = bombButton();
     ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.font = font(11);
