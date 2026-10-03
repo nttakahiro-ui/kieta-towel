@@ -3,9 +3,9 @@
 //   空中の敵 … 自機の弾（自動で連射）で倒す
 //   地上の敵 … 自機の前にある照準◎に入ると、自動で「たね」を落として倒す
 // 主役は語句の敵。バトルは「1周目 → 2周目 → 大ボス」の台本で進む（出る順番・出方・時刻はデータで固定）
-//   1周目「出撃1 偵察（ちょうさ）」… 大ボス以外の語句が決まった順に出る。倒すと、ふわりが反応して光って消えるだけ（吸い込まない）
+//   1周目「出撃1 探検（たんけん）」… 大ボス以外の語句が決まった順に出る。倒すと、ふわりが反応して光って消えるだけ（吸い込まない）
 //   2周目「出撃2 本番（あつめる）」… 同じ語句が同じ順番・同じ出方で出る。倒すと、糸のようにほどけて吸い込まれる（クイズに出る）
-//   出撃の始まりには「出撃1 偵察」「出撃2 本番」の画面を出し、タップで出撃する。出撃1が終わると一度止まる
+//   出撃の始まりには「出撃1 探検」「出撃2 本番」の画面を出し、タップで出撃する。出撃1が終わると一度止まる
 //            取り逃がした語句は、そのバトルでは取れない
 //   大ボス … 2周目のあとに1回。倒して吸い込むとバトル終了
 // お題バトル（BATTLE.odai が true のとき）: 2周目の中ボスと大ボスは、ふわりがお題（クイズの問題）を出し、
@@ -15,9 +15,9 @@
 // ===== 調整用の数値（速さ・弾の量・硬さなど）はここにまとめる =====
 const BATTLE = {
   // --- 台本（2周＋大ボス） ---
-  roundInterval1: 3.5,         // 偵察（出撃1）で語句が出てくる間隔（秒）
+  roundInterval1: 3.5,         // 探検（出撃1）で語句が出てくる間隔（秒）
   roundInterval2: 4,           // 本番（出撃2）で語句が出てくる間隔（秒）
-  round1Speed: 1.4,            // 偵察の語句の動く速さの倍率（偵察は速く流す）
+  round1Speed: 1.4,            // 探検の語句の動く速さの倍率（探検は速く流す）
   roundGap: 2.5,               // 周と周のあいだの秒数（帯を出す）
   firstSpawnDelay: 2.2,        // 始まってから最初の語句が出るまで（秒）
   fallTime: { zako: 10, mid: 12.5 }, // 空中の語句が画面の上から下まで降りる秒数（大きいほどゆっくり）。10/7に10/6の前とあとの中間にした
@@ -82,10 +82,10 @@ const BATTLE = {
   odaiBonus: 2000,             // 最初に当てたのが本物なら「ひらめき」ボーナス
   odaiColumns: [0.2, 0.5, 0.8], // 3つの語句をならべる列の位置（画面の幅に対する割合）。縦書きで動かさない
 
-  // --- バトルの中の坂（偵察 → 本番 → 大ボスで、だんだん濃くなる） ---
+  // --- バトルの中の坂（探検 → 本番 → 大ボスで、だんだん濃くなる） ---
   // filler: 雑魚の量の倍率（大きいほど多い）、fire: 敵の弾の量の倍率（大きいほど多い）
   ramp: {
-    round1: { filler: 0.5, fire: 0.6 },   // 偵察: 雑魚少なめ・弾少なめ
+    round1: { filler: 0.5, fire: 0.6 },   // 探検: 雑魚少なめ・弾少なめ
     round2: { filler: 1,   fire: 1 },     // 本番
     boss:   { filler: 1.3, fire: 1.2 },   // 大ボス: いちばん濃い
   },
@@ -306,13 +306,13 @@ const Battle = (() => {
   let gauge = 0;             // 「記憶の光」ボムのゲージ（0〜100）
   let fsay = null;           // ふわりの一言（吹き出し）
   let odai = null;           // いまのお題バトル（なければ null）
-  let sortieNo = 1;          // 出撃の画面に出している番号（1＝偵察、2＝本番）
-  let reacted = 0;           // 偵察で見つけた（反応させた）語句の数
+  let sortieNo = 1;          // 出撃の画面に出している番号（1＝探検、2＝本番）
+  let reacted = 0;           // 探検で見つけた（反応させた）語句の数
   let slots = [];            // 帯の10のあき枠に入る語句（順番）
   let obsDef = null;         // このステージの障害物の決まり（data/stages.js の obstacles）
   let obs = [];              // 画面に出ている障害物 { kind, x, y, r }
   let obsNext = 0;           // 次に出す障害物の番号
-  let found = new Set();     // 偵察で見つけた語句の id
+  let found = new Set();     // 探検で見つけた語句の id
   let loadout = null;        // 本番に持っていくもの（LOADOUTS の id）
   let choiceT = 0;           // 選ぶ時間の残り（秒）
   let powerBonus = 0;        // 「つよい弾」で上がる強さの段階
@@ -428,7 +428,7 @@ const Battle = (() => {
     hits = 0; downs = 0; lives = BATTLE.lives; gameOvers = 0; scoreAtMain = 0; retryMain = false;
     paused = false; moved = false; groundHinted = false; banner = null; shake = 0; showWord = null; threads = []; pops = [];
     slow = 0; wave = null; gauge = 0; bombsUsed = 0; fsay = null; odai = null; bounces = [];
-    state = "sortie"; sortieNo = 1; reacted = 0;   // 「出撃1 偵察」の画面から始める
+    state = "sortie"; sortieNo = 1; reacted = 0;   // 「出撃1 探検」の画面から始める
     loadout = null; powerBonus = 0; shield = 0; gaugeMul = 1;
     running = true;
     lastTs = performance.now();
@@ -605,7 +605,7 @@ const Battle = (() => {
       }
     }
     enemies.push(e);
-    // 木のかげ: 本番では、語句のすぐ前（下）に木が来る。偵察では木は出ない
+    // 木のかげ: 本番では、語句のすぐ前（下）に木が来る。探検では木は出ない
     if (pattern === "treeshade") {
       e.holdT = 0;
       if (obsActive()) {
@@ -745,7 +745,7 @@ const Battle = (() => {
       gapT -= dt;
       if (gapT <= 0) {
         if (phase === "round1") {
-          // 偵察が終わった: 画面の雑魚と弾を片づけて、「出撃2 本番」の画面で止まる
+          // 探検が終わった: 画面の雑魚と弾を片づけて、「出撃2 本番」の画面で止まる
           fillers.forEach(f => addPop(f.x, f.y, "#fff8d8", 0.8, f.layer === "ground"));
           fillers = []; ebullets = []; bombs = []; items = [];
           state = "sortie"; sortieNo = 2; choiceT = BATTLE.choiceTime;
@@ -1343,7 +1343,7 @@ const Battle = (() => {
     player.inv = BATTLE.respawnRise + BATTLE.respawnInv;
     if (drag) { drag.sx = lastPX; drag.sy = lastPY; drag.px = player.x; drag.py = H * 0.8; }   // 指を置いたままでも動かせる
   }
-  // 3機すべて失った: 本番（出撃2）の最初からやり直す。偵察はとばし、本番で集めた語句は消える
+  // 3機すべて失った: 本番（出撃2）の最初からやり直す。探検はとばし、本番で集めた語句は消える
   function gameOver() {
     gameOvers++;
     lives = BATTLE.lives;
@@ -1353,7 +1353,7 @@ const Battle = (() => {
       absorbed = []; missed = [];
       score = scoreAtMain;
     } else {
-      scoreAtMain = score;   // 偵察中に3機失ったら、偵察はそこまで
+      scoreAtMain = score;   // 探検中に3機失ったら、探検はそこまで
     }
     combo = 0; gauge = 0; level = POWER_LEVELS[0];
     loadout = null; powerBonus = 0; shield = 0; gaugeMul = 1;
@@ -1787,7 +1787,7 @@ const Battle = (() => {
   function drawWordText(e, x, y, alpha) {
     if (e.vertical) { drawVerticalWord(e, x, y, alpha); return; }
     const word = e.word;
-    if (!e.last) alpha *= 0.55;   // 偵察の語句は半透明
+    if (!e.last) alpha *= 0.55;   // 探検の語句は半透明
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.font = font(e.size);
     ctx.lineJoin = "round";
@@ -1999,11 +1999,11 @@ const Battle = (() => {
     ctx.font = font(44); ctx.fillStyle = sortieNo === 1 ? "#48693a" : "#b0801a";
     ctx.fillText(`出撃${sortieNo}`, W / 2, cy - 60);
     ctx.font = font(30);
-    ctx.fillText(sortieNo === 1 ? "偵察（ちょうさ）" : "本番（あつめる）", W / 2, cy - 12);
+    ctx.fillText(sortieNo === 1 ? "探検（たんけん）" : "本番（あつめる）", W / 2, cy - 12);
     ctx.font = font(16); ctx.fillStyle = "#4b5e3a";
     const lines = sortieNo === 1
-      ? ["ことばを見つけよう。", "どこから来るか、おぼえておこう", "（まだあつめられないよ）"]
-      : [`偵察で見つけたことば ${reacted}語`, "同じ順番で、もう一度来るよ。", "今度はあつめられる！"];
+      ? ["いちど見にいこう。まだ吸い込めないよ", "ことばを見つけて、", "どこから来るか、おぼえておこう"]
+      : [`探検で見つけたことば ${reacted}語`, "同じ順番で、もう一度来るよ。", "今度はあつめられる！"];
     lines.forEach((l, i) => ctx.fillText(l, W / 2, cy + 36 + i * 24));
     ctx.globalAlpha = 0.6 + Math.sin(performance.now() / 250) * 0.4;
     ctx.font = font(22); ctx.fillStyle = sortieNo === 1 ? "#6f9a4a" : "#c98a1e";
@@ -2013,7 +2013,7 @@ const Battle = (() => {
 
   // 出撃2の画面: 本番に持っていくものを3つから1つ選ぶ
   function drawChoice() {
-    // ふわりのセリフ（偵察の終わり）
+    // ふわりのセリフ（探検の終わり）
     const say = retryMain
       ? "3機ともやられちゃった…。でも、見つけたことばはおぼえてるよ。本番の最初から、もう一回！"
       : `${reacted}のことばを見つけたね。でもまだ記憶がぼんやり…。同じ道をもう一回飛べば、吸い込める気がする！`;
@@ -2163,7 +2163,7 @@ const Battle = (() => {
   }
 
   // 帯: 画面の左端に、10のあき枠を上から縦にならべる（出てくる順。いちばん下が大ボス）
-  // はじめは「？」、偵察で見つけると灰色の名前、本番で吸い込むと金色。名前は枠の中に縦書き
+  // はじめは「？」、探検で見つけると灰色の名前、本番で吸い込むと金色。名前は枠の中に縦書き
   function drawStrip() {
     const x = 6, cw = BATTLE.stripWidth, gap = 3;
     const y0 = 40, y1 = bombButton().y - bombButton().r - 22;   // 体力ゲージの下から、記憶の光のボタンの上まで
@@ -2259,7 +2259,7 @@ const Battle = (() => {
 
   // ===== デバッグ用（タイトルを5回続けて押すと使える） =====
   const debug = {
-    // 偵察をとばして、「本番に持っていくもの」を選ぶ画面へ
+    // 探検をとばして、「本番に持っていくもの」を選ぶ画面へ
     skipRecon() {
       if (!running || phase !== "round1") return;
       enemies = []; fillers = []; ebullets = []; bombs = []; items = []; odai = null;
