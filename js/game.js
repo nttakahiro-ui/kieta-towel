@@ -75,8 +75,10 @@ const BATTLE = {
   // --- お題バトル（2周目の中ボス2回と大ボス1回） ---
   odai: true,                  // お題バトルのスイッチ（true＝オン、false＝オフ。オフで今までの中ボス・大ボス戦）
   odaiIntroTime: 2.5,          // 始まりのスローと、問題文を画面中央に大きく出す秒数（この間は弾が当たらない）。10/8に2.5秒に
-  odaiBigFont: 30,             // 問題文を画面中央に出すときの文字の大きさ（px）
-  odaiSmallFont: 16,           // 問題文を上の帯の下に移したあとの文字の大きさ（px）
+  odaiBigFont: 34,             // 問題文を画面中央に出すときの文字の大きさのいちばん上（px）。長い問題は3行に収まるまで小さくする
+  odaiSmallFont: 20,           // 問題文を上の帯の下に移したあとの文字の大きさのいちばん上（px）。同じく3行に収まるまで小さくする
+  odaiMaxLines: 3,             // 問題文の行数の上限
+  odaiMinFont: 12,             // 問題文の文字の大きさのいちばん下（px）
   odaiTimeLimit: 20,           // 中ボスのお題の制限時間（秒）。時間切れは取り逃がし。大ボスは制限なし
   odaiPenalty: 300,            // ダミーに当てたときの減点（コンボは切らない）
   odaiPenaltyCool: 1,          // 同じダミーで続けて減点しない秒数（連射で何度も減らないように）
@@ -1115,11 +1117,21 @@ const Battle = (() => {
     return lines;
   }
   // 小さく出したときの問題文の帯の位置（集めたことばの帯の下）
+  // 問題文の大きさを、長さに合わせて決める: いちばん上の大きさから、行数の上限に収まるまで小さくする
+  function fitOdaiText(text, maxFont, width) {
+    let fs = maxFont, lines;
+    for (;;) {
+      ctx.font = font(fs);
+      lines = wrapText(text, width);
+      if (lines.length <= BATTLE.odaiMaxLines || fs <= BATTLE.odaiMinFont) break;
+      fs--;
+    }
+    return { fs, lines, lh: Math.round(fs * 1.38) };
+  }
   function odaiPanel() {
     const y = 40;   // 上の体力ゲージ・点数の下
-    ctx.font = font(BATTLE.odaiSmallFont);
-    const lines = odai ? wrapText(odai.q, W - stripRight() - 34) : [""];
-    return { y, lines, h: lines.length * Math.round(BATTLE.odaiSmallFont * 1.4) + 14 };
+    const f = fitOdaiText(odai ? odai.q : "", BATTLE.odaiSmallFont, W - stripRight() - 34);
+    return { y, lines: f.lines, fs: f.fs, lh: f.lh, h: f.lines.length * f.lh + 14 };
   }
   function odaiTop() { const p = odaiPanel(); return p.y + p.h; }
 
@@ -2017,9 +2029,7 @@ const Battle = (() => {
     ctx.save();
     ctx.textAlign = "left"; ctx.textBaseline = "top";
     if (odai.intro > 0) {
-      const fs = BATTLE.odaiBigFont, lh = Math.round(fs * 1.38);
-      ctx.font = font(fs);
-      const lines = wrapText(odai.q, W - 64);
+      const { fs, lh, lines } = fitOdaiText(odai.q, BATTLE.odaiBigFont, W - 64);   // 短い問題は大きく、長い問題は小さく
       const h = lines.length * lh + 50, y = H * 0.4 - h / 2;
       ctx.fillStyle = "rgba(255,253,245,0.97)"; ctx.strokeStyle = "#e0b03a"; ctx.lineWidth = 3;
       roundRect(20, y, W - 40, h, 18); ctx.fill(); ctx.stroke();
@@ -2032,8 +2042,8 @@ const Battle = (() => {
       ctx.fillStyle = "rgba(255,253,245,0.92)"; ctx.strokeStyle = "#e0b03a"; ctx.lineWidth = 2;
       const px = stripRight() + 6;
       roundRect(px, pnl.y, W - px - 10, pnl.h, 12); ctx.fill(); ctx.stroke();
-      ctx.font = font(BATTLE.odaiSmallFont); ctx.fillStyle = "#3e4a34";
-      pnl.lines.forEach((l, i) => ctx.fillText(l, px + 12, pnl.y + 7 + i * Math.round(BATTLE.odaiSmallFont * 1.4)));
+      ctx.font = font(pnl.fs); ctx.fillStyle = "#3e4a34";
+      pnl.lines.forEach((l, i) => ctx.fillText(l, px + 12, pnl.y + 7 + i * pnl.lh));
       // 中ボスは残り時間
       if (!odai.boss) {
         const r = Math.max(0, 1 - odai.t / BATTLE.odaiTimeLimit);
