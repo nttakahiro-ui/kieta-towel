@@ -30,9 +30,12 @@ const BATTLE = {
   swaySpeed: 0.9,              // 左右に振れる速さ
   bossSway: 0.28,              // 大ボスの左右の動き（画面の幅に対する割合）
   fontSize: { zako: 26, mid: 30, boss: 36 },   // 敵の文字の大きさ（px）。24以上
+  shortScale: 1.3,             // 1〜2文字の短い語句は、文字をこの倍率で大きく出す
+  wordTotalHp: { mid: 12, boss: 60 },          // 中ボス・大ボスの「語句全体の硬さ」。文字数で割って1文字あたりの耐久にする（難易度の倍率もかかる）
+  perCharHp: { mid: { min: 2, max: 6 }, boss: { min: 6, max: 30 } },   // 1文字あたりの耐久の下限と上限
   enemyFireInterval: { zako: 3.4, mid: 2.4, boss: 1.4 },  // 語句の敵が弾を撃つ間隔（秒）
   enemyBulletSpeed: 140,       // 敵の弾の速さ（px/秒）
-  hpOverride: { zako: 0, mid: 0, boss: 0 },   // 0 のときは data/words.js の hp を使う。0より大きいと役割ごとにこの硬さにする
+  hpOverride: { zako: 0, mid: 0, boss: 0 },   // 0 のときは自動。0より大きいと、ザコはこの硬さ、中ボス・大ボスは1文字あたりこの耐久にする
   shotPattern: { zako: [0], mid: [-0.18, 0.18], boss: [-0.25, 0, 0.25] },   // 語句の敵の弾の向き（自機をねらう向きからのずれ）
 
   // --- 雑魚 ---
@@ -152,6 +155,11 @@ const POWER_LEVELS = [
 
 const FONT_FAMILY = '"Hiragino Maru Gothic ProN","Hiragino Maru Gothic Pro","Zen Maru Gothic","Rounded Mplus 1c",sans-serif';
 
+// 語句の本体の文字（かっこと、かっこの中の別名を除く）。例: 毛(ウール) → 毛
+function baseChars(word) { return Array.from(word.word.replace(/\([^)]*\)/g, "")); }
+// 1〜2文字の短い語句
+function isShortWord(word) { return baseChars(word).length <= 2; }
+
 // ステージの難易度から、そのステージの数値を決める（override 欄があればそちらを使う）
 function stageParams(stage) {
   const d = Math.min(12, Math.max(1, (stage && stage.difficulty) || 1));
@@ -182,6 +190,7 @@ function autoLayout(words, P) {
     let pattern = "normal", lane = lanes[i % lanes.length];
     if (trickyIdx.has(i)) {
       pattern = kinds[kindNo % kinds.length];
+      if (isShortWord(w) && (pattern === "edge" || pattern === "cross")) pattern = "behind";   // 短い語句は端・横切りにしない
       if (pattern === "edge" || pattern === "cross") lane = kindNo % 2 ? 0 : 1;
       kindNo++;
     } else if (w.role === "zako" && groundLeft > 0 && i % 3 === 2) {
@@ -392,12 +401,14 @@ const Battle = (() => {
     const role = word.role;
     const ground = groundIds.has(word.id) && role !== "boss";
     let size = BATTLE.fontSize[role] || 26;
+    if (isShortWord(word)) size = Math.round(size * BATTLE.shortScale);   // 短い語句は大きめに
     ctx.font = font(size);
     let w = ctx.measureText(word.word).width;
     // 画面からはみ出す長い語句は、24pxまで小さくする
     while (w > W - 40 && size > 24) { size -= 2; ctx.font = font(size); w = ctx.measureText(word.word).width; }
     // 出方（pattern）と位置（lane）はデータで固定。ランダムには出ない
-    const pattern = role === "boss" ? "boss" : patOf(word).pattern;
+    let pattern = role === "boss" ? "boss" : patOf(word).pattern;
+    if (isShortWord(word) && (pattern === "edge" || pattern === "cross")) pattern = "normal";   // 短い語句は端・横切りにしない
     const lane = patOf(word).lane;
     const margin = w / 2 + 20 + (ground ? 0 : BATTLE.sway);
     let x = role === "boss" ? W / 2 : margin + lane * Math.max(1, W - margin * 2);
@@ -413,20 +424,28 @@ const Battle = (() => {
       bx: x, x, y, hp, maxHp: hp,
       age: 0, phase: (word.id * 1.7) % 6, fire: 1.2, flash: 0
     };
-    // 中ボス・大ボスは1文字ずつ壊す: 文字がそれぞれ部品。hp は文字1つあたりの耐久
+    // 中ボス・大ボスは1文字ずつ壊す: 文字がそれぞれ部品
+    // 硬さは「語句全体の硬さ」（役割で決まる）を、壊す文字の数で割った1文字あたりの耐久（上限・下限つき）
+    // かっこと、かっこの中の別名は飾り（壊さない・当たらない・読まない）
     if (role === "mid" || role === "boss") {
       ctx.font = font(size);
       const chars = Array.from(word.word);
+      let depth = 0;
+      const deco = chars.map(ch => { if (ch === "(") depth++; const d = depth > 0; if (ch === ")") depth = Math.max(0, depth - 1); return d; });
+      const n = Math.max(1, deco.filter(d => !d).length);
+      const lim = BATTLE.perCharHp[role];
+      const per = BATTLE.hpOverride[role] ||
+        Math.min(lim.max, Math.max(lim.min, Math.round(BATTLE.wordTotalHp[role] * P.bossHpScale / n)));
       const ws = chars.map(ch => ctx.measureText(ch).width);
       const total = ws.reduce((a, b) => a + b, 0);
-      let ox = -total / 2;
+      let ox = -total / 2, k = 0;
       e.parts = chars.map((ch, i) => {
-        const p = { ch, ox: ox + ws[i] / 2, cw: ws[i], hp, maxHp: hp, broken: false, flash: 0,
-          kana: (word.kanaParts && word.kanaParts[i]) || ch };
+        const p = { ch, ox: ox + ws[i] / 2, cw: ws[i], deco: deco[i], hp: deco[i] ? 0 : per, maxHp: deco[i] ? 0 : per, broken: false, flash: 0 };
+        if (!deco[i]) { p.kana = (word.kanaParts && word.kanaParts[k]) || ch; k++; }   // kanaParts は壊す文字の順
         ox += ws[i];
         return p;
       });
-      e.hp = e.maxHp = chars.length;   // 残っている文字の数
+      e.hp = e.maxHp = n;   // 残っている（壊す）文字の数
     }
     enemies.push(e);
     // 雑魚のうしろ: 語句の前（下）に雑魚がならんで守る
@@ -779,7 +798,7 @@ const Battle = (() => {
 
   // x の位置にある、まだ砕けていない文字（near: ゆるめる幅）
   function partAt(e, x, near) {
-    return e.parts.find(p => !p.broken && Math.abs(x - (e.x + p.ox)) < p.cw / 2 + near);
+    return e.parts.find(p => !p.broken && !p.deco && Math.abs(x - (e.x + p.ox)) < p.cw / 2 + near);
   }
 
   function damageWord(e, hitX) {
@@ -788,7 +807,7 @@ const Battle = (() => {
       // 当たった文字（なければ、いちばん近い文字）を削る
       let p = hitX === undefined ? null : partAt(e, hitX, 0);
       if (!p) {
-        const alive = e.parts.filter(q => !q.broken);
+        const alive = e.parts.filter(q => !q.broken && !q.deco);
         const hx = hitX === undefined ? e.x : hitX;
         p = alive.sort((a, b) => Math.abs(hx - (e.x + a.ox)) - Math.abs(hx - (e.x + b.ox)))[0];
       }
