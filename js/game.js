@@ -97,11 +97,21 @@ const BATTLE = {
   },
 
   // --- 本番に持っていくもの（出撃2の前に3つから1つ選ぶ） ---
-  // コクピット（探検だけ。10/3-9）と本番の表紙。見た目はすべて仮
-  cockpitFrame: 6,             // コクピットの枠の太さ（px。画面の幅の3%以内）。枠は背景のすぐ上に描くので、敵・語句・弾・帯は枠の上に出る
-  cockpitScan: 0.04,           // 走査線の濃さ（0〜1）
-  cockpitDim: 0.12,            // 探検のときの背景の暗さ（0〜1。背景だけ。語句・帯・弾の明るさは変えない）
-  radarR: 24,                  // 下の中央のレーダーの大きさ（半径 px）
+  // 1回目の旅（さがす）: 双眼鏡（10/3-11）。見た目はすべて仮
+  exploreTime: 40,             // 1回目の旅の長さ（秒）。時間切れでも何も失わない
+  exploreFirst: 1.2,           // 最初の語句が現れるまで（秒）
+  exploreGap: 3.4,             // 語句が現れる間隔（秒）
+  exploreLife: 11,             // 語句がただよっている時間（秒）。見つけられなければ消える
+  exploreSpeed: 24,            // 語句がただよう速さ（px/秒）
+  binoR: 0.19,                 // 双眼鏡の円の大きさ（半径。画面の幅に対する割合）
+  binoSpread: 0.62,            // 2つの円の中心のはなれぐあい（半径に対する割合。1より小さいと重なる）
+  binoMove: 1.15,              // 指を動かした量に対して、双眼鏡が動く量
+  exploreDark: 0.96,           // 円の外の暗さ（0〜1。1でまっ暗）
+  lookTime: 0.5,               // 円の中で見つめると見つかるまでの時間（秒・合計）
+  hintEvery: 1.5,              // 暗いところで語句がきらっと光る間隔（秒）
+  hintAlpha: 0.75,             // きらっと光る強さ（0＝光らない〜1）
+  bugEvery: 5,                 // 飾りの虫が横切る間隔（秒）
+  // 本番の表紙（10/3-9）
   countStep: 0.45,             // 表紙のあとのカウント「3」「2」「1」のそれぞれの時間（秒）
   countGo: 0.5,                // 「出撃！」の時間（秒）。カウントの合計は2秒以内
   choiceTime: 10,              // 選ぶ時間（秒）。選ばなければ「つよい弾」になる
@@ -364,8 +374,9 @@ const Battle = (() => {
   let choiceT = 0;           // 選ぶ時間の残り（秒）
   let sortieStep = "choice"; // 出撃2の画面の段階: "choice" 持っていくものを選ぶ → "cover" 表紙（タップ待ち）→ "count" 3・2・1・出撃！
   let countT = 0;            // カウントの経過（秒）
-  let cockpitK = 1;          // コクピットの枠の出ぐあい（1＝探検、0＝外れた）
-  let radarDots = [];        // レーダーの点（見つけた語句。x は 0〜1 の横の位置）
+  let explore = null;        // 1回目の旅（双眼鏡）の状態 { t, next, list, bugs, bugT, endT }
+  let bino = null;           // 双眼鏡の中心 { x, y }
+  let maskCv = null;         // 双眼鏡の外を暗くするための裏の画面
   let stripFlash = 0;        // 出撃の瞬間に帯の灰色の名前がいっせいに光る（残り秒）
   let powerBonus = 0;        // 「つよい弾」で上がる強さの段階
   let shield = 0;            // 「盾」の残り（1回だけ防ぐ）
@@ -430,11 +441,12 @@ const Battle = (() => {
     }
     // ふわりマークをタップ: ゲージが満タンなら「ふわりタイフーン」
     const rect = canvas.getBoundingClientRect(), bb = bombButton();
-    if (Math.hypot(e.clientX - rect.left - bb.x, e.clientY - rect.top - bb.y) < bb.r + 10) {
+    if (phase !== "round1" && Math.hypot(e.clientX - rect.left - bb.x, e.clientY - rect.top - bb.y) < bb.r + 10) {   // （1回目の旅にはボタンがない）
       if (gauge >= 100 && state === "play") useBomb();
       return;
     }
-    drag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, px: player.x, py: player.y };
+    const exploring = phase === "round1";   // 1回目の旅は、指で双眼鏡を動かす
+    drag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, px: exploring ? bino.x : player.x, py: exploring ? bino.y : player.y };
     lastPX = e.clientX; lastPY = e.clientY;
     try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
   }
@@ -444,6 +456,11 @@ const Battle = (() => {
     if (state === "sortie") { drag.sx = e.clientX; drag.sy = e.clientY; return; }   // カウントのあいだは動かさない
     moved = true;
     lastPX = e.clientX; lastPY = e.clientY;
+    if (phase === "round1") {   // 1回目の旅: 双眼鏡を動かす（円が少し画面の外に出てもよい）
+      bino.x = Math.min(Math.max(drag.px + (e.clientX - drag.sx) * BATTLE.binoMove, stripRight() + 10), W - 10);
+      bino.y = Math.min(Math.max(drag.py + (e.clientY - drag.sy) * BATTLE.binoMove, 70), H - 90);
+      return;
+    }
     if (player.rising > 0) return;   // 復活して上がってくる間は動かせない
     player.x = Math.min(Math.max(drag.px + (e.clientX - drag.sx) * 1.15, 24), W - 24);
     player.y = Math.min(Math.max(drag.py + (e.clientY - drag.sy) * 1.15, minPlayerY()), H - 40);
@@ -496,7 +513,9 @@ const Battle = (() => {
     hits = 0; downs = 0; lives = BATTLE.lives; gameOvers = 0; scoreAtMain = 0; retryMain = false;
     paused = false; moved = false; groundHinted = false; banner = null; shake = 0; showWord = null; threads = []; pops = [];
     slow = 0; wave = null; gauge = 0; bombsUsed = 0; fsay = null; odai = null; bounces = [];
-    cockpitK = 1; radarDots = []; stripFlash = 0; sortieStep = "choice";
+    stripFlash = 0; sortieStep = "choice";
+    explore = { t: 0, next: 0, list: [], bugs: [], bugT: 2, endT: 0 };
+    bino = { x: W / 2 + 10, y: H * 0.42 };
     state = "sortie"; sortieNo = 1; reacted = 0;   // 「出撃1 探検」の画面から始める
     loadout = null; powerBonus = 0; shield = 0; gaugeMul = 1;
     running = true;
@@ -557,9 +576,12 @@ const Battle = (() => {
     retryMain = false;
     Sound.se("start");
     if (sortieNo === 1) {
+      player.x = W / 2; player.y = H - 70;   // 1回目の旅: ふわりは下のまん中で待つ（動かない・撃たない）
       fsay = { text: "ことばをさがそう！ 円の中で見つめてね", t: BATTLE.fuwariSayTime };
     } else {
       startPhase("round2");
+      player.x = W / 2; player.y = H * 0.8;
+      moved = false;   // 2回目の旅の最初に、もう一度「ゆびでふわりをうごかそう」を出す
       stripFlash = 0.6;   // 帯の灰色の名前がいっせいに光る
       fsay = { text: "ことばを助けよう！", t: BATTLE.fuwariSayTime, big: true };
       Sound.se("power");
@@ -795,7 +817,6 @@ const Battle = (() => {
       return;
     }
     // 本番が始まったら、コクピットの枠が外れていく
-    if (phase !== "round1") cockpitK = Math.max(0, cockpitK - realDt / 0.5);
     stripFlash = Math.max(0, stripFlash - realDt);
     // 吸い込む瞬間は、画面全体がゆっくりになる
     let dt = realDt;
@@ -840,6 +861,7 @@ const Battle = (() => {
       if (stateTimer <= 0) { stop(); opts.onEnd(absorbed.map(w => w.id), { time: t, hits, downs, gameOvers, score, maxCombo, bombsUsed, missed: missed.map(w => w.id) }); }
       return;
     }
+    if (phase === "round1") { updateExplore(dt); return; }   // 1回目の旅（双眼鏡）。雑魚・弾・木・天気は出さない
 
     // ===== 台本: 決まった時刻に、決まった順番で語句を出す（倒したかどうかには関係しない） =====
     if (gapT > 0) {
@@ -1369,6 +1391,88 @@ const Battle = (() => {
     absorb(e);
   }
 
+  // ===== 1回目の旅: 双眼鏡でことばをさがす =====
+  const binoR = () => W * BATTLE.binoR;
+  const binoCenters = () => { const d = binoR() * BATTLE.binoSpread; return [{ x: bino.x - d, y: bino.y }, { x: bino.x + d, y: bino.y }]; };
+  const inBino = (x, y, k = 1) => binoCenters().some(c => Math.hypot(x - c.x, y - c.y) < binoR() * k);
+  function exploreWords() { return script.slice(0, 9); }   // 大ボスをのぞく9語（出てくる順）
+
+  function spawnDrifter(word) {
+    const size = isShortWord(word) ? Math.round(BATTLE.fontSize.zako * BATTLE.shortScale) : BATTLE.fontSize.zako;
+    ctx.font = font(size);
+    const w = ctx.measureText(word.word).width;
+    const minX = stripRight() + w / 2 + 12, maxX = Math.max(minX, W - w / 2 - 12);
+    let x = rand(minX, maxX), y = rand(100, H * 0.7);
+    for (let k = 0; k < 10 && inBino(x, y, 1.5); k++) { x = rand(minX, maxX); y = rand(100, H * 0.7); }   // 双眼鏡のすぐそばには出さない
+    const a = Math.random() * Math.PI * 2, sp = BATTLE.exploreSpeed * rand(0.7, 1.3);
+    explore.list.push({ word, role: "zako", size, w, h: size * 1.2, x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.6,
+      age: 0, look: 0, found: false, foundT: 0, phase: Math.random() * 6, hintT: Math.random() * BATTLE.hintEvery, flash: 0, explore: true, last: false });
+  }
+
+  function updateExplore(dt) {
+    const ex = explore;
+    if (ex.endT > 0) {   // 時間切れ（または全部見つけた）: 一言を出して、2回目の旅の準備へ
+      ex.endT -= dt;
+      if (ex.endT <= 0) {
+        state = "sortie"; sortieNo = 2; choiceT = BATTLE.choiceTime; sortieStep = "choice";
+        scoreAtMain = score; drag = null;
+      }
+      return;
+    }
+    ex.t += dt;
+    const words = exploreWords();
+    while (ex.next < words.length && ex.t >= BATTLE.exploreFirst + ex.next * BATTLE.exploreGap) spawnDrifter(words[ex.next++]);
+    for (const d of ex.list) {
+      d.age += dt;
+      if (d.found) { d.foundT += dt; continue; }
+      d.x += d.vx * dt; d.y += d.vy * dt + Math.sin(d.age * 1.3 + d.phase) * 10 * dt;
+      const minX = stripRight() + d.w / 2 + 8, maxX = W - d.w / 2 - 8;
+      if (d.x < minX) { d.x = minX; d.vx = Math.abs(d.vx); }
+      if (d.x > maxX) { d.x = maxX; d.vx = -Math.abs(d.vx); }
+      if (d.y < 80) { d.y = 80; d.vy = Math.abs(d.vy); }
+      if (d.y > H * 0.78) { d.y = H * 0.78; d.vy = -Math.abs(d.vy); }
+      d.hintT += dt;
+      if (d.age < BATTLE.exploreLife && inBino(d.x, d.y, 0.9)) {
+        d.look += dt;
+        if (d.look >= BATTLE.lookTime) findWord(d);
+      }
+    }
+    ex.list = ex.list.filter(d => d.found ? d.foundT < 0.9 : d.age < BATTLE.exploreLife);
+    // 飾りの虫（円の中を横切る）
+    ex.bugT -= dt;
+    if (ex.bugT <= 0) {
+      ex.bugT = BATTLE.bugEvery * rand(0.7, 1.3);
+      const fromLeft = Math.random() < 0.5;
+      ex.bugs.push({ x: fromLeft ? -10 : W + 10, y: rand(H * 0.2, H * 0.7), vx: (fromLeft ? 1 : -1) * rand(50, 80), ph: Math.random() * 6, kind: Math.random() < 0.5 ? "ladybug" : "moth" });
+    }
+    for (const b of ex.bugs) { b.x += b.vx * dt; b.y += Math.sin(t * 3 + b.ph) * 20 * dt; }
+    ex.bugs = ex.bugs.filter(b => b.x > -20 && b.x < W + 20);
+    // 終わり: 40秒たった、または9語ぜんぶ見つけた
+    const all = reacted >= words.length;
+    if (ex.t >= BATTLE.exploreTime || (all && ex.list.length === 0)) {
+      ex.endT = 2.4;
+      banner = { text: all ? "ぜんぶ見つけた！" : `見つけたのは${reacted}語。のこりは2回目の旅でさがそう`, t: 2.4, color: "rgba(72,105,58,0.92)" };
+      fsay = null;
+    }
+  }
+
+  function findWord(d) {
+    d.found = true;
+    for (let i = 0; i < 14; i++) {
+      const a = Math.random() * Math.PI * 2;
+      threads.push({ x: d.x + (Math.random() - 0.5) * d.w, y: d.y, vx: Math.cos(a) * 90, vy: Math.sin(a) * 90 - 30,
+        len: 3, curl: 0, rot: 0, color: "#ffe9a0", age: 0, scatter: 9, sparkle: true });
+    }
+    player.glow = 0.5;
+    player.notice = 0.8;   // ふわりの「！」
+    reacted++;
+    found.add(d.word.id);
+    score += BATTLE.scoreWord;
+    gauge = Math.min(100, gauge + BATTLE.bombGain * gaugeMul);
+    floats.push({ x: d.x, y: d.y - d.size, text: "みつけた！", big: false, found: true, age: 0 });
+    Sound.se("shine");
+  }
+
   // 1周目: 吸い込まずに、光って消えるだけ。ふわりが反応する
   function firstPass(e) {
     vanish.push({ word: e.word, x: e.x, y: e.y, size: e.size, w: e.w, ground: e.ground, age: 0 });
@@ -1381,7 +1485,6 @@ const Battle = (() => {
     player.notice = 0.8;   // ふわりの「！」
     reacted++;
     found.add(e.word.id);
-    radarDots.push({ x: Math.min(1, Math.max(0, e.x / W)), age: 0 });
     floats.push({ x: e.x, y: e.y - e.size, text: "みつけた！", big: false, found: true, age: 0 });
     Sound.se("shine");
   }
@@ -1517,7 +1620,7 @@ const Battle = (() => {
     if (shake > 0) ctx.translate((Math.random() - 0.5) * 10 * shake / 0.25, (Math.random() - 0.5) * 10 * shake / 0.25);
 
     drawTerrain();
-    if (cockpitK > 0) drawCockpit();   // 背景のすぐ上（敵・語句・弾・自機・帯は、この上に描く）
+    if (phase === "round1") { drawExplore(); ctx.restore(); return; }   // 1回目の旅は双眼鏡の画面だけ
 
     // 地上の花（たねが咲いたあと）
     for (const p of pops) if (p.ground) drawPop(p);
@@ -1657,9 +1760,9 @@ const Battle = (() => {
       ctx.font = font(16);
       ctx.lineWidth = 5; ctx.strokeStyle = "#ffffff"; ctx.lineJoin = "round";
       const hy = Math.min(H - 24, player.y + 54);
-      ctx.strokeText("← ゆびでドラッグしてうごかそう →", W / 2, hy);
+      ctx.strokeText("← ゆびでふわりをうごかそう →", W / 2, hy);
       ctx.fillStyle = "#48693a";
-      ctx.fillText("← ゆびでドラッグしてうごかそう →", W / 2, hy);
+      ctx.fillText("← ゆびでふわりをうごかそう →", W / 2, hy);
       ctx.globalAlpha = 1;
     }
     if (banner) drawBanner();
@@ -1678,7 +1781,7 @@ const Battle = (() => {
 
     // 状態の文字
     if (state === "sortie") drawSortie();
-    if (state === "clear") centerText(`${absorbed.length}語あつまった！`, `${score}点`);
+    if (state === "clear") centerText(`${absorbed.length}語助けた！`, `${score}点`);
     if (paused) {
       ctx.fillStyle = "rgba(248,243,228,0.85)";
       ctx.fillRect(0, 0, W, H);
@@ -2058,7 +2161,7 @@ const Battle = (() => {
   function drawWordText(e, x, y, alpha) {
     if (e.vertical) { drawVerticalWord(e, x, y, alpha); return; }
     const word = e.word;
-    if (!e.last) alpha *= 0.55;   // 探検の語句は半透明
+    if (!e.last && !e.explore) alpha *= 0.55;   // （1回目の旅の双眼鏡の語句は、半透明にしない）
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.font = font(e.size);
     ctx.lineJoin = "round";
@@ -2285,54 +2388,114 @@ const Battle = (() => {
   }
 
   // 出撃2の画面: 本番に持っていくものを3つから1つ選ぶ
-  // コクピット（探検だけ。仮の見た目）: 背景を少し暗く・ごく薄い走査線・細い枠・四隅の計器・下の中央のレーダー
-  // 背景のすぐ上に描くので、敵・語句・弾・自機・帯・体力ゲージはすべてこの上に出る（遊ぶ範囲を覆わない）
-  function drawCockpit() {
-    const k = cockpitK, out = (1 - k) * 24;   // 外れるときは外へすべり出る
-    ctx.save();
-    ctx.globalAlpha = k;
-    ctx.fillStyle = `rgba(20,40,60,${BATTLE.cockpitDim})`; ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = `rgba(0,0,0,${BATTLE.cockpitScan})`;
-    for (let y = 0; y < H; y += 3) ctx.fillRect(0, y, W, 1);
-    const sy = (t * 60) % (H + 120) - 60;   // ゆっくり流れる光の帯
-    const g = ctx.createLinearGradient(0, sy - 40, 0, sy + 40);
-    g.addColorStop(0, "rgba(200,255,240,0)"); g.addColorStop(0.5, "rgba(200,255,240,0.03)"); g.addColorStop(1, "rgba(200,255,240,0)");
-    ctx.fillStyle = g; ctx.fillRect(0, sy - 40, W, 80);
-    // 枠
-    const f = BATTLE.cockpitFrame;
-    ctx.fillStyle = "rgba(60,96,100,0.85)";
-    ctx.fillRect(-out, 0, f, H); ctx.fillRect(W - f + out, 0, f, H);
-    ctx.fillRect(0, -out, W, f); ctx.fillRect(0, H - f + out, W, f);
-    ctx.strokeStyle = "rgba(170,230,215,0.7)"; ctx.lineWidth = 1;
-    ctx.strokeRect(f - out + 0.5, f - out + 0.5, W - f * 2 + out * 2 - 1, H - f * 2 + out * 2 - 1);
-    // 四隅の計器（L字の金具と目盛り）
-    const L = 18;
-    ctx.strokeStyle = "rgba(190,240,225,0.8)"; ctx.lineWidth = 2; ctx.lineCap = "round";
-    [[1, 1], [-1, 1], [1, -1], [-1, -1]].forEach(([sx, sy2]) => {
-      const cx = sx > 0 ? f + 2 - out : W - f - 2 + out, cy = sy2 > 0 ? f + 2 - out : H - f - 2 + out;
-      ctx.beginPath(); ctx.moveTo(cx, cy + sy2 * L); ctx.lineTo(cx, cy); ctx.lineTo(cx + sx * L, cy); ctx.stroke();
-      for (let i = 1; i <= 3; i++) { ctx.beginPath(); ctx.moveTo(cx + sx * i * 5, cy); ctx.lineTo(cx + sx * i * 5, cy + sy2 * (i === 3 ? 5 : 3)); ctx.stroke(); }
-      ctx.fillStyle = Math.floor(t * 1.5 + sx + sy2 * 2) % 2 ? "rgba(140,230,190,0.9)" : "rgba(140,230,190,0.25)";
-      ctx.beginPath(); ctx.arc(cx + sx * 9, cy + sy2 * 9, 2, 0, Math.PI * 2); ctx.fill();
-    });
-    // レーダー（下の中央・半円）。語句を見つけるたびに点がふえる
-    const R = BATTLE.radarR, rx = W / 2, ry = H - f - 4 + out;
-    ctx.globalAlpha = k * 0.5;
-    ctx.fillStyle = "rgba(20,60,60,0.8)";
-    ctx.beginPath(); ctx.moveTo(rx - R, ry); ctx.arc(rx, ry, R, Math.PI, Math.PI * 2); ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = "rgba(150,240,200,0.9)"; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(rx, ry, R, Math.PI, Math.PI * 2); ctx.stroke();
-    ctx.beginPath(); ctx.arc(rx, ry, R * 0.55, Math.PI, Math.PI * 2); ctx.stroke();
-    const sw = Math.PI + (Math.sin(t * 1.6) * 0.5 + 0.5) * Math.PI;   // 左右に行ったり来たりする線
-    ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(rx + Math.cos(sw) * R, ry + Math.sin(sw) * R); ctx.stroke();
-    ctx.globalAlpha = k * 0.9;
-    for (const d of radarDots) {
-      const a = Math.PI + d.x * Math.PI, rr = R * 0.75;
-      const fresh = (d.age = (d.age || 0) + 1 / 60) < 1;
-      ctx.fillStyle = fresh && Math.floor(t * 8) % 2 ? "#ffffff" : "#ffe27a";
-      ctx.beginPath(); ctx.arc(rx + Math.cos(a) * rr, ry + Math.sin(a) * rr, fresh ? 3 : 2.2, 0, Math.PI * 2); ctx.fill();
+  // 1回目の旅の画面: 暗い中に、双眼鏡の2つの円の中だけが見える（仮の見た目）
+  function drawExplore() {
+    const ex = explore, R = binoR(), cs = binoCenters();
+    // 飾りの虫
+    for (const b of ex.bugs) {
+      ctx.save(); ctx.translate(b.x, b.y);
+      if (b.kind === "ladybug") {
+        ctx.fillStyle = "#d8443a"; ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "#222"; ctx.beginPath(); ctx.arc(b.vx > 0 ? 4 : -4, 0, 2.5, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(-1, -2, 1.1, 0, Math.PI * 2); ctx.arc(1, 2, 1.1, 0, Math.PI * 2); ctx.fill();
+      } else {
+        const f = Math.abs(Math.sin(t * 18 + b.ph));
+        ctx.fillStyle = "rgba(240,232,210,0.9)";
+        ctx.beginPath(); ctx.ellipse(-3, 0, 4, 6 * f + 1, -0.4, 0, Math.PI * 2); ctx.ellipse(3, 0, 4, 6 * f + 1, 0.4, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.restore();
     }
+    // ただよう語句（見つけた語句は金色に光って、ふわっと上へ消える）
+    for (const d of ex.list) {
+      const a = d.found ? 1 - d.foundT / 0.9 : Math.min(1, d.age / 0.8, (BATTLE.exploreLife - d.age) / 1.2);
+      if (a <= 0) continue;
+      d.last = d.found;
+      ctx.font = font(d.size);
+      drawWordText(d, d.x, d.y - d.foundT * 24, Math.max(0, a));
+      ctx.globalAlpha = 1;
+      if (!d.found && d.look > 0) {   // 見つめているあいだ、まわりの輪がたまる
+        const rr = d.w / 2 + 12;
+        ctx.save();
+        ctx.lineWidth = 4; ctx.lineCap = "round";
+        ctx.strokeStyle = "rgba(255,255,255,0.6)";
+        ctx.beginPath(); ctx.ellipse(d.x, d.y, rr, d.size * 0.9, 0, 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = "#e0b03a";
+        ctx.beginPath(); ctx.ellipse(d.x, d.y, rr, d.size * 0.9, 0, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, d.look / BATTLE.lookTime)); ctx.stroke();
+        ctx.restore();
+      }
+    }
+    // 光の粒
+    for (const th of threads) {
+      ctx.globalAlpha = Math.max(0, 1 - th.age / 0.7);
+      ctx.fillStyle = th.color; ctx.beginPath(); ctx.arc(th.x, th.y, 2, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    // 双眼鏡の外を暗くする（裏の画面に暗い色をぬって、円の形にくりぬく）
+    if (maskCv === null) { try { maskCv = document.createElement("canvas"); } catch (_) { maskCv = false; } }
+    if (maskCv) {
+      if (maskCv.width !== Math.round(W * dpr) || maskCv.height !== Math.round(H * dpr)) { maskCv.width = Math.round(W * dpr); maskCv.height = Math.round(H * dpr); }
+      const m = maskCv.getContext("2d");
+      m.setTransform(dpr, 0, 0, dpr, 0, 0);
+      m.globalCompositeOperation = "source-over";
+      m.clearRect(0, 0, W, H);
+      m.fillStyle = `rgba(10,16,34,${BATTLE.exploreDark})`; m.fillRect(0, 0, W, H);
+      m.globalCompositeOperation = "destination-out";
+      for (const c of cs) {
+        const g = m.createRadialGradient(c.x, c.y, R * 0.8, c.x, c.y, R);
+        g.addColorStop(0, "rgba(0,0,0,1)"); g.addColorStop(1, "rgba(0,0,0,0)");
+        m.fillStyle = g; m.beginPath(); m.arc(c.x, c.y, R, 0, Math.PI * 2); m.fill();
+      }
+      ctx.drawImage(maskCv, 0, 0, W, H);
+    }
+    // 暗いところで、語句のある場所がきらっと光る（さがす手がかり）
+    for (const d of ex.list) {
+      if (d.found || BATTLE.hintAlpha <= 0) continue;
+      const k = (d.hintT % BATTLE.hintEvery) / 0.4;
+      if (k > 1 || inBino(d.x, d.y, 1)) continue;
+      const a = Math.sin(k * Math.PI) * BATTLE.hintAlpha, r = 3 + Math.sin(k * Math.PI) * 6;
+      ctx.save();
+      ctx.globalAlpha = a; ctx.fillStyle = "#fff6c8"; ctx.shadowColor = "rgba(255,240,170,1)"; ctx.shadowBlur = 10;
+      ctx.translate(d.x, d.y);
+      ctx.beginPath();
+      for (let i = 0; i < 8; i++) { const rr = i % 2 ? r * 0.3 : r, an = i * Math.PI / 4; ctx.lineTo(Math.cos(an) * rr, Math.sin(an) * rr); }
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+    // 双眼鏡のふち
+    ctx.save();
+    ctx.strokeStyle = "rgba(40,44,60,0.9)"; ctx.lineWidth = 5;
+    for (const c of cs) { ctx.beginPath(); ctx.arc(c.x, c.y, R, 0, Math.PI * 2); ctx.stroke(); }
+    ctx.strokeStyle = "rgba(200,215,240,0.35)"; ctx.lineWidth = 1.5;
+    for (const c of cs) { ctx.beginPath(); ctx.arc(c.x, c.y, R - 4, 0, Math.PI * 2); ctx.stroke(); }
     ctx.restore();
+    drawPlayer();
+    // 浮かぶ文字（みつけた！）
+    ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
+    for (const fl of floats) {
+      ctx.globalAlpha = Math.max(0, 1 - fl.age / 0.9);
+      ctx.font = font(fl.big ? 18 : 14);
+      ctx.lineWidth = 4; ctx.strokeStyle = "#ffffff";
+      ctx.strokeText(fl.text, fl.x, fl.y - fl.age * 30);
+      ctx.fillStyle = fl.found ? "#6f9a4a" : "#c98a1e";
+      ctx.fillText(fl.text, fl.x, fl.y - fl.age * 30);
+    }
+    ctx.globalAlpha = 1;
+    drawHud();
+    if (!moved && state === "play") {   // 操作のヒント
+      ctx.globalAlpha = 0.7 + Math.sin(t * 4) * 0.3;
+      ctx.font = font(16); ctx.lineWidth = 5; ctx.strokeStyle = "#ffffff";
+      const hy = Math.min(H - 110, bino.y + R + 26);
+      ctx.strokeText("ゆびで双眼鏡をうごかそう", W / 2, hy);
+      ctx.fillStyle = "#48693a"; ctx.fillText("ゆびで双眼鏡をうごかそう", W / 2, hy);
+      ctx.globalAlpha = 1;
+    }
+    if (banner) drawBanner();
+    if (state === "sortie") drawSortie();
+    if (paused) {
+      ctx.fillStyle = "rgba(248,243,228,0.85)";
+      ctx.fillRect(0, 0, W, H);
+      centerText("ひとやすみ中", "画面をタップするとつづきから");
+    }
   }
 
   // 本番の表紙（仮の見た目）: 大きく「出撃2 本番」、ふわりの一言。タップで 3・2・1・出撃！
@@ -2452,6 +2615,12 @@ const Battle = (() => {
     // 体力
     ctx.fillStyle = "rgba(255,255,255,0.85)";
     roundRect(12, top, 130, 16, 8); ctx.fill();
+    if (phase === "round1") {   // 1回目の旅: 体力のかわりに、のこり時間（元気は減らない）
+      const k = Math.max(0, 1 - explore.t / BATTLE.exploreTime);
+      ctx.fillStyle = "#8fb8d8"; roundRect(14, top + 2, 126 * k, 12, 6); ctx.fill();
+      ctx.save(); ctx.font = font(10); ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillStyle = "#3d5a70";
+      ctx.fillText("のこり時間", 18, top + 8); ctx.restore();
+    } else {
     const rate = player.hp / BATTLE.playerMaxHp;
     ctx.fillStyle = rate > 0.4 ? "#8cbf5a" : (Math.floor(t * 4) % 2 ? "#e39a8e" : "#f2c4bb");
     roundRect(14, top + 2, 126 * rate, 12, 6); ctx.fill();
@@ -2468,6 +2637,7 @@ const Battle = (() => {
       ctx.lineWidth = 3; ctx.strokeStyle = "#ffffff"; ctx.strokeText("+回復", 138, top + 8 - (1 - k) * 4);
       ctx.fillStyle = "#4f8a2c"; ctx.fillText("+回復", 138, top + 8 - (1 - k) * 4);
       ctx.restore();
+    }
     }
     ctx.lineWidth = 4; ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.lineJoin = "round";
     // 残機: 機体（雲）の絵をならべる。失ったぶんはうすく
@@ -2486,18 +2656,8 @@ const Battle = (() => {
     ctx.font = font(16); ctx.fillStyle = "#4b5e3a";
     ctx.strokeText(String(score), W - 14, top);
     ctx.fillText(String(score), W - 14, top);
-    if (cockpitK > 0) {   // 探検のあいだ、右上に「探検中」
-      ctx.save();
-      ctx.globalAlpha = cockpitK;
-      ctx.font = font(12); ctx.textBaseline = "middle";
-      const ty = top + 30;
-      ctx.strokeText("探検中", W - 14, ty); ctx.fillStyle = "#3f6f6a"; ctx.fillText("探検中", W - 14, ty);
-      const dw = ctx.measureText("探検中").width;
-      ctx.fillStyle = Math.floor(t * 2) % 2 ? "#e0605a" : "rgba(224,96,90,0.25)";
-      ctx.beginPath(); ctx.arc(W - 14 - dw - 8, ty, 3.5, 0, Math.PI * 2); ctx.fill();
-      ctx.restore();
-    }
-    // パワーと持ちものは、左下のふわりタイフーンのボタンの横に小さく
+    // パワーと持ちものは、左下のふわりタイフーンのボタンの横に小さく（1回目の旅は光を使わないので出さない）
+    if (phase === "round1") { drawStrip(); return; }
     const b = bombButton();
     ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.font = font(11);
     const lvNo = POWER_LEVELS.indexOf(level) + 1;
@@ -2644,6 +2804,8 @@ const Battle = (() => {
 
   // ===== デバッグ用（タイトルを5回続けて押すと使える） =====
   const debug = {
+    // 1回目の旅のようす（確かめる用）
+    exploreInfo() { return explore && { t: explore.t, found: reacted, bino: Object.assign({}, bino), words: explore.list.map(d => ({ word: d.word.word, x: d.x, y: d.y, found: d.found, look: d.look })) }; },
     // 探検をとばして、「本番に持っていくもの」を選ぶ画面へ
     skipRecon() {
       if (!running || phase !== "round1") return;
