@@ -62,6 +62,10 @@ const BATTLE = {
   comboStep: 0.5,              // 語句を続けて倒すたびに増える倍率（1 → 1.5 → 2 …）
   comboMax: 3,                 // コンボ倍率のいちばん上
 
+  // --- 「記憶の光」ボム ---
+  bombGain: 12,                // 語句を倒したときにたまるゲージ（×コンボ倍率）。100で満タン
+  bombButtonR: 26,             // 画面左下のふわりマーク（ボムのボタン）の大きさ（px）
+
   // --- 自機 ---
   shotInterval: 0.16,          // 自機の弾の間隔（秒）
   shotSpeed: 640,              // 自機の弾の速さ（px/秒）
@@ -162,6 +166,8 @@ const Battle = (() => {
   let hits = 0, downs = 0;   // 被弾した回数、やられた回数
   let lock = false;          // 照準に地上の敵が入っているか
   let slow = 0;              // ゆっくりの残り時間（秒）
+  let gauge = 0;             // 「記憶の光」ボムのゲージ（0〜100）
+  let bombsUsed = 0;
   let wave = null;           // 吸い込んだときに広がる光
 
   function font(size) { return `bold ${size}px ${FONT_FAMILY}`; }
@@ -186,11 +192,20 @@ const Battle = (() => {
   // 照準が画面の中に入るように、自機は上に行きすぎない
   function minPlayerY() { return Math.min(H - 60, BATTLE.bombRange + 60); }
 
+  // 「記憶の光」ボムのボタン（画面左下のふわりマーク）
+  function bombButton() { return { x: 14 + BATTLE.bombButtonR, y: H - 18 - BATTLE.bombButtonR, r: BATTLE.bombButtonR }; }
+
   // ===== 操作: 指一本のドラッグ（指の動いたぶんだけ自機が動く） =====
   function onDown(e) {
     e.preventDefault();
     if (paused) { resume(); return; }
     if (!player) return;
+    // ふわりマークをタップ: ゲージが満タンなら「記憶の光」
+    const rect = canvas.getBoundingClientRect(), bb = bombButton();
+    if (Math.hypot(e.clientX - rect.left - bb.x, e.clientY - rect.top - bb.y) < bb.r + 10) {
+      if (gauge >= 100 && state === "play") useBomb();
+      return;
+    }
     drag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, px: player.x, py: player.y };
     try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
   }
@@ -238,7 +253,7 @@ const Battle = (() => {
     score = 0; combo = 0; maxCombo = 0; floats = [];
     hits = 0; downs = 0;
     paused = false; moved = false; groundHinted = false; banner = null; shake = 0; showWord = null; threads = []; pops = [];
-    slow = 0; wave = null;
+    slow = 0; wave = null; gauge = 0; bombsUsed = 0;
     state = "intro"; stateTimer = 2;
     running = true;
     lastTs = performance.now();
@@ -458,7 +473,7 @@ const Battle = (() => {
     }
     if (state === "clear") {
       stateTimer -= dt;
-      if (stateTimer <= 0) { stop(); opts.onEnd(absorbed.map(w => w.id), { time: t, hits, downs, score, maxCombo, missed: missed.map(w => w.id) }); }
+      if (stateTimer <= 0) { stop(); opts.onEnd(absorbed.map(w => w.id), { time: t, hits, downs, score, maxCombo, bombsUsed, missed: missed.map(w => w.id) }); }
       return;
     }
 
@@ -728,6 +743,32 @@ const Battle = (() => {
     Sound.se("crack");
     if (p.kana !== "ー") Sound.speak(p.kana);
   }
+  // 「記憶の光」: 画面の雑魚と敵の弾を全部消す。1周目は、出ている語句を全部「反応」させる
+  // 2周目と大ボスのときは、語句には効かない（雑魚と敵の弾だけ）
+  function useBomb() {
+    gauge = 0;
+    bombsUsed++;
+    Sound.se("light");
+    wave = { x: player.x, y: player.y, age: 0 };
+    player.glow = 0.35;
+    player.inv = Math.max(player.inv, 1);
+    for (const f of fillers) {
+      score += BATTLE.scoreFiller;
+      addPop(f.x, f.y, "#fff8d8", 1, f.layer === "ground");
+    }
+    fillers = [];
+    ebullets = [];
+    if (phase === "round1") {
+      for (const e of enemies) {
+        if (e.role === "boss" || e.hp <= 0 || e.y < -e.size) continue;
+        e.hp = 0;
+        defeat(e);
+      }
+      enemies = enemies.filter(e => e.hp > 0);
+      gauge = 0;   // 反応させたぶんでは、ゲージはたまらない
+    }
+  }
+
   function comboMul() { return Math.min(1 + BATTLE.comboStep * Math.max(0, combo - 1), BATTLE.comboMax); }
 
   function damageFiller(f) {
@@ -761,6 +802,9 @@ const Battle = (() => {
     const pts = Math.round(BATTLE.scoreWord * mul);
     score += pts;
     floats.push({ x: e.x, y: e.y - e.size, text: `+${pts}` + (mul > 1 ? ` ×${mul}` : ""), big: true, age: 0 });
+    const before = gauge;
+    gauge = Math.min(100, gauge + BATTLE.bombGain * mul);
+    if (before < 100 && gauge >= 100) { floats.push({ x: bombButton().x + 40, y: bombButton().y - 34, text: "記憶の光 OK！", big: true, age: 0 }); Sound.se("item"); }
     if (!e.last) { firstPass(e); return; }
     absorb(e);
   }
@@ -996,6 +1040,7 @@ const Battle = (() => {
     }
     ctx.globalAlpha = 1;
     drawHud();
+    drawBombButton();
     // 操作のヒント（まだ動かしていないとき）
     if (!moved && state !== "clear") {
       ctx.globalAlpha = 0.6 + Math.sin(t * 4) * 0.3;
@@ -1393,6 +1438,32 @@ const Battle = (() => {
     ctx.strokeText(`${ph}　${fmtTime(t)}`, W - 14, top + 24);
     ctx.fillText(`${ph}　${fmtTime(t)}`, W - 14, top + 24);
     drawStrip(top + 42);
+  }
+
+  // 「記憶の光」のボタン: ふわりマークのまわりにゲージ。満タンで光る
+  function drawBombButton() {
+    const b = bombButton(), full = gauge >= 100;
+    ctx.save();
+    if (full) {
+      const g = ctx.createRadialGradient(b.x, b.y, b.r * 0.5, b.x, b.y, b.r * 1.8);
+      g.addColorStop(0, `rgba(255,240,170,${0.5 + Math.sin(t * 6) * 0.3})`); g.addColorStop(1, "rgba(255,240,170,0)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(b.x, b.y, b.r * 1.8, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.fillStyle = "rgba(255,253,245,0.85)";
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "rgba(0,0,0,0.1)"; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r - 3, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = full ? "#e0b03a" : "#8cbf5a"; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r - 3, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * gauge / 100); ctx.stroke();
+    // ふわりマーク（小さなタオル）
+    ctx.fillStyle = full ? "#fff4cf" : "#fffdf7"; ctx.strokeStyle = full ? "#dcb64e" : "#c9d9b4"; ctx.lineWidth = 2;
+    roundRect(b.x - 11, b.y - 9, 22, 18, 5); ctx.fill(); ctx.stroke();
+    ctx.font = font(10); ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.lineWidth = 3; ctx.strokeStyle = "#ffffff";
+    ctx.strokeText(full ? "タップ" : "記憶の光", b.x, b.y - b.r - 7);
+    ctx.fillStyle = full ? "#b0801a" : "#7a8a68";
+    ctx.fillText(full ? "タップ" : "記憶の光", b.x, b.y - b.r - 7);
+    ctx.restore();
   }
 
   // 「集めたことば」の帯: 吸い込んだ語句が順にならんでいく

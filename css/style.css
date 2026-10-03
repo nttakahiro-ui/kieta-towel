@@ -184,6 +184,31 @@ body { position: fixed; inset: 0; }
 .quiz-feedback .memo { margin: 0 0 14px; }
 .quiz-feedback .btn { display: block; margin: 0 auto; }
 
+/* ステージ一覧 */
+.stages-box { max-width: 440px; margin: 0 auto; }
+.stages-title { font-size: 24px; color: var(--green-dark); text-align: center; margin: 8px 0 4px; }
+.stages-note { font-size: 12px; text-align: center; color: #7a8a68; margin: 0 0 8px; line-height: 1.8; }
+.stages-world { font-size: 15px; color: var(--green); margin: 16px 4px 6px; }
+.stage-row {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  background: var(--white); border: 2px solid var(--green-light); border-radius: 16px;
+  padding: 10px 12px; margin-bottom: 8px; font-family: var(--font); color: var(--text);
+  text-align: left; cursor: pointer; touch-action: manipulation;
+  box-shadow: 0 3px 0 var(--cream-dark);
+}
+.stage-row:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--cream-dark); }
+.stage-row.locked { opacity: .45; box-shadow: none; cursor: default; }
+.stage-row .no { width: 30px; height: 30px; border-radius: 50%; background: var(--green-light); display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0; }
+.stage-row .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.stage-row .nm { font-size: 17px; font-weight: bold; }
+.stage-row .sub { font-size: 12px; color: #7a8a68; }
+.stage-row .marks { display: flex; flex-direction: column; gap: 3px; }
+.mark { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 999px; background: #e9e4d4; color: #a8a08a; margin: 0 2px; }
+.mark.on { background: #f3c64e; color: #5e4612; }
+.best-new { font-size: 18px; color: var(--rose); font-weight: bold; margin-top: 6px; }
+.marks-now { margin-top: 8px; }
+.marks-now .mark { font-size: 13px; padding: 3px 10px; }
+
 /* 点数とランク */
 .cards-rank { margin: 4px 0 6px; }
 .rank-score { font-size: 30px; font-weight: bold; color: #c98a1e; }

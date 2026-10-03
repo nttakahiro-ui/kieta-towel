@@ -44,6 +44,16 @@ const Cards = (() => {
       const sc = document.createElement("div"); sc.className = "rank-score"; sc.textContent = `${st.score} 点`;
       const nm = document.createElement("div"); nm.className = "rank-name"; nm.textContent = `ランク：${r.name}`;
       rk.append(sc, nm);
+      // ベスト更新と、今回とれた印
+      if (o.record) {
+        if (o.record.newBest) { const nb = document.createElement("div"); nb.className = "best-new"; nb.textContent = "ベスト更新！"; rk.appendChild(nb); }
+        const ms = document.createElement("div"); ms.className = "marks-now";
+        [["all", "10語すべて回収"], ["noDown", "やられなかった"], ["noHit", "被弾ゼロ"]].forEach(([k, label]) => {
+          const m = document.createElement("span"); m.className = "mark" + (o.record.now[k] ? " on" : ""); m.textContent = label;
+          ms.appendChild(m);
+        });
+        rk.appendChild(ms);
+      }
     }
     const list = $("cards-list");
     list.innerHTML = "";
@@ -90,7 +100,7 @@ const Cards = (() => {
       } else {
         res.innerHTML = `あと ${CARDS.clearCount - ownedCount} 枚でステージクリア<br>（あと ${rest} 枚でレシピ完成）`;
       }
-      btns.append(button("もう一度あそぶ", "btn-main", o.onRetry), button("タイトルへ", "btn-sub", o.onTitle));
+      btns.append(button("もう一度あそぶ", "btn-main", o.onRetry), button("ステージ一覧へ", "btn-sub", o.onTitle));
     }
   }
 
@@ -116,7 +126,7 @@ const Cards = (() => {
     $("recipe-next").innerHTML = "ステージクリア！<br>次のステージはまだありません";
     const btns = $("recipe-buttons");
     btns.innerHTML = "";
-    btns.append(button("もう一度あそぶ", "btn-main", o.onRetry), button("タイトルへ", "btn-sub", o.onTitle));
+    btns.append(button("もう一度あそぶ", "btn-main", o.onRetry), button("ステージ一覧へ", "btn-sub", o.onTitle));
   }
 
   return { showCards, showRecipe };

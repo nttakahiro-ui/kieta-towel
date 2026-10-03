@@ -4,7 +4,8 @@ const SAVE_KEY = "kietaTowel.save.v1";
 const Save = (() => {
   // cards: 集めたカード、cleared: クリアしたステージ、
   // retake: クイズで不正解だった語句（あとで図鑑の受け直しクイズに使う。バトルで取り逃がした語句は入れない）
-  let data = { cards: {}, cleared: {}, retake: {} };
+  // best: ステージごとのベストスコアと3つの印（{ score, all, noDown, noHit }）
+  let data = { cards: {}, cleared: {}, retake: {}, best: {} };
   // localStorage が使えなくても落ちないようにする
   function load() {
     try {
@@ -14,6 +15,7 @@ const Save = (() => {
         data.cards = d.cards || {};
         data.cleared = d.cleared || {};
         data.retake = d.retake || {};
+        data.best = d.best || {};
       }
     } catch (e) { /* 読めないときは空のまま */ }
   }
@@ -138,7 +140,7 @@ const Tune = (() => {
 const Main = (() => {
   const $ = id => document.getElementById(id);
   const STAGE_ID = 1;   // V01 は世界1の最初のステージだけ
-  let stage, world, words, lastStats = null;
+  let stage, world, words, lastStats = null, lastIds = [];
   const tuneMode = /[?&]tune/.test(window.location.search);
 
   // 調整中なら、タイトルに印を出す
@@ -177,7 +179,7 @@ const Main = (() => {
       Battle.start(words, {
         stageName: stage.name,
         fuwariCount: Save.cardCount(),
-        onEnd: (ids, stats) => { lastStats = stats; toQuiz(ids); }
+        onEnd: (ids, stats) => { lastStats = stats; lastIds = ids; toQuiz(ids); }
       });
     });
   }
@@ -205,21 +207,67 @@ const Main = (() => {
     });
     const owned = Save.data.cards;
     if (words.filter(w => owned[w.id]).length >= CARDS.clearCount) Save.data.cleared[STAGE_ID] = true;
+    // ベストスコアと3つの印（一度とった印は消えない。次のステージに進む条件ではない）
+    const st = lastStats || { score: 0, hits: 1, downs: 1 };
+    const now = { all: lastIds.length >= words.length, noDown: st.downs === 0, noHit: st.hits === 0 };
+    const prev = Save.data.best[STAGE_ID] || { score: 0, all: false, noDown: false, noHit: false };
+    const newBest = st.score > prev.score;
+    Save.data.best[STAGE_ID] = {
+      score: Math.max(prev.score, st.score),
+      all: prev.all || now.all, noDown: prev.noDown || now.noDown, noHit: prev.noHit || now.noHit
+    };
     Save.store();
     showScreen("cards");
     $("screen-cards").scrollTop = 0;
     Cards.showCards({
       stage, words, results, owned, newIds, stats: lastStats,
+      record: { newBest, now, best: Save.data.best[STAGE_ID] },
       onRecipe: toRecipe,
       onRetry: toBattle,
-      onTitle: toTitle
+      onTitle: toStages
     });
   }
 
   function toRecipe() {
     showScreen("recipe");
     $("screen-recipe").scrollTop = 0;
-    Cards.showRecipe({ stage, words, onRetry: toBattle, onTitle: toTitle });
+    Cards.showRecipe({ stage, words, onRetry: toBattle, onTitle: toStages });
+  }
+
+  // ステージ一覧: 12ステージ。遊べるのは V01 ではステージ1だけ
+  function toStages() {
+    Battle.stop();
+    Sound.play("title");
+    const box = $("stages-list");
+    box.innerHTML = "";
+    window.WORLDS.forEach(wd => {
+      const h = document.createElement("h3"); h.className = "stages-world"; h.textContent = `世界${wd.id}　${wd.name}`;
+      box.appendChild(h);
+      window.STAGES.filter(s => s.world === wd.id).forEach(s => {
+        const row = document.createElement("button");
+        row.className = "stage-row" + (s.open ? "" : " locked");
+        row.disabled = !s.open;
+        const b = Save.data.best[s.id];
+        const got = window.WORDS.filter(w => w.stage === s.id && Save.data.cards[w.id]).length;
+        const no = document.createElement("span"); no.className = "no"; no.textContent = s.id;
+        const main = document.createElement("span"); main.className = "main";
+        const nm = document.createElement("span"); nm.className = "nm"; nm.textContent = s.name;
+        const sub = document.createElement("span"); sub.className = "sub";
+        sub.textContent = s.open ? `ベスト ${b ? b.score : 0}点　カード ${got}/10` : "まだあそべません";
+        const marks = document.createElement("span"); marks.className = "marks";
+        [["all", "10語"], ["noDown", "無事"], ["noHit", "無傷"]].forEach(([k, label]) => {
+          const m = document.createElement("span"); m.className = "mark" + (b && b[k] ? " on" : ""); m.textContent = label;
+          marks.appendChild(m);
+        });
+        main.append(nm, sub);
+        row.append(no, main);
+        if (s.open) row.appendChild(marks);
+        if (s.open) row.addEventListener("click", () => { Sound.se("start"); toBattle(); });
+        box.appendChild(row);
+      });
+    });
+    showScreen("stages");
+    $("screen-stages").scrollTop = 0;
   }
 
   function init() {
@@ -244,14 +292,17 @@ const Main = (() => {
     $("btn-start").addEventListener("click", () => {
       Sound.unlock();
       Sound.se("start");
-      toBattle();
+      toStages();
     });
+    $("btn-stages-back").addEventListener("click", toTitle);
 
     // 記録を消す（試すとき用）
     $("btn-reset").addEventListener("click", () => {
       if (!window.confirm("集めたカードの記録を消しますか？")) return;
       Save.data.cards = {};
       Save.data.cleared = {};
+      Save.data.retake = {};
+      Save.data.best = {};
       Save.store();
       $("title-cards").textContent = 0;
     });
