@@ -129,7 +129,7 @@ const BATTLE = {
   fuwariSayTime: 3,            // 周の始まりの、ふわりの一言を出す秒数
   slowTime: 0.3,               // 吸い込む瞬間に画面全体がゆっくりになる秒数
   slowScale: 0.25,             // ゆっくりのときの速さ（1でふつう、小さいほどゆっくり）
-  stripRows: 2,                // 「集めたことば」の帯の行数
+  stripWidth: 24,              // 左端の「集めたことば」の縦の帯の幅（px。縦書き1文字分ほど）
 };
 
 // ===== 雑魚の種類 =====
@@ -239,7 +239,8 @@ function autoLayout(words, P, obstacles) {
     if (trickyIdx.has(i)) {
       pattern = kinds[kindNo % kinds.length];
       if (isShortWord(w) && (pattern === "edge" || pattern === "cross")) pattern = "behind";   // 短い語句は端・横切りにしない
-      if (pattern === "edge" || pattern === "cross") lane = kindNo % 2 ? 0 : 1;
+      if (pattern === "cross") lane = kindNo % 2 ? 0 : 1;
+      if (pattern === "edge") lane = 1;   // 端にかくれる語句は右端だけ
       kindNo++;
     } else if (w.role === "zako" && groundLeft > 0 && i % 3 === 2) {
       pattern = "ground"; groundLeft--;
@@ -336,6 +337,9 @@ const Battle = (() => {
   }
   // 照準が画面の中に入るように、自機は上に行きすぎない
   function minPlayerY() { return Math.min(H - 60, BATTLE.bombRange + 60); }
+
+  // 左端の縦の帯の右はし
+  const stripRight = () => 6 + BATTLE.stripWidth;
 
   // 「記憶の光」ボムのボタン（画面左下のふわりマーク）
   function bombButton() { return { x: 14 + BATTLE.bombButtonR, y: H - 18 - BATTLE.bombButtonR, r: BATTLE.bombButtonR }; }
@@ -539,9 +543,11 @@ const Battle = (() => {
     // 出方（pattern）と位置（lane）はデータで固定。ランダムには出ない
     let pattern = od ? "odai" : (role === "boss" ? "boss" : patOf(word).pattern);
     if (isShortWord(word) && (pattern === "edge" || pattern === "cross")) pattern = "normal";   // 短い語句は端・横切りにしない
-    const lane = patOf(word).lane;
+    let lane = patOf(word).lane;
     const margin = w / 2 + 20 + (ground ? 0 : BATTLE.sway);
-    let x = role === "boss" ? W / 2 : margin + lane * Math.max(1, W - margin * 2);
+    const left = stripRight();   // 左端の帯と重ならないように
+    let x = role === "boss" ? W / 2 : left + margin + lane * Math.max(1, W - left - margin * 2);
+    if (pattern === "edge") lane = 1;   // 端にかくれる語句は右端だけ（左端は帯があるため）
     let y = -size;
     if (pattern === "edge") x = lane < 0.5 ? -w / 2 : W + w / 2;
     if (pattern === "cross") { x = lane < 0.5 ? -w / 2 - 10 : W + w / 2 + 10; y = H * BATTLE.crossY; }
@@ -1076,9 +1082,9 @@ const Battle = (() => {
   }
   // 小さく出したときの問題文の帯の位置（集めたことばの帯の下）
   function odaiPanel() {
-    const y = 14 + 42 + Math.max(1, BATTLE.stripRows) * 22 + 10;
+    const y = 40;   // 上の体力ゲージ・点数の下
     ctx.font = font(BATTLE.odaiSmallFont);
-    const lines = odai ? wrapText(odai.q, W - 44) : [""];
+    const lines = odai ? wrapText(odai.q, W - stripRight() - 34) : [""];
     return { y, lines, h: lines.length * Math.round(BATTLE.odaiSmallFont * 1.4) + 14 };
   }
   function odaiTop() { const p = odaiPanel(); return p.y + p.h; }
@@ -1920,14 +1926,15 @@ const Battle = (() => {
     } else {
       const pnl = odaiPanel();
       ctx.fillStyle = "rgba(255,253,245,0.92)"; ctx.strokeStyle = "#e0b03a"; ctx.lineWidth = 2;
-      roundRect(10, pnl.y, W - 20, pnl.h, 12); ctx.fill(); ctx.stroke();
+      const px = stripRight() + 6;
+      roundRect(px, pnl.y, W - px - 10, pnl.h, 12); ctx.fill(); ctx.stroke();
       ctx.font = font(BATTLE.odaiSmallFont); ctx.fillStyle = "#3e4a34";
-      pnl.lines.forEach((l, i) => ctx.fillText(l, 22, pnl.y + 7 + i * Math.round(BATTLE.odaiSmallFont * 1.4)));
+      pnl.lines.forEach((l, i) => ctx.fillText(l, px + 12, pnl.y + 7 + i * Math.round(BATTLE.odaiSmallFont * 1.4)));
       // 中ボスは残り時間
       if (!odai.boss) {
         const r = Math.max(0, 1 - odai.t / BATTLE.odaiTimeLimit);
-        ctx.fillStyle = "rgba(0,0,0,0.08)"; ctx.fillRect(14, pnl.y + pnl.h - 4, W - 28, 3);
-        ctx.fillStyle = r > 0.3 ? "#e0b03a" : "#d0607f"; ctx.fillRect(14, pnl.y + pnl.h - 4, (W - 28) * r, 3);
+        ctx.fillStyle = "rgba(0,0,0,0.08)"; ctx.fillRect(px + 4, pnl.y + pnl.h - 4, W - px - 18, 3);
+        ctx.fillStyle = r > 0.3 ? "#e0b03a" : "#d0607f"; ctx.fillRect(px + 4, pnl.y + pnl.h - 4, (W - px - 18) * r, 3);
       }
     }
     ctx.restore();
@@ -2050,44 +2057,24 @@ const Battle = (() => {
       ctx.fillStyle = "#4f8a2c"; ctx.fillText("+回復", 138, top + 8 - (1 - k) * 4);
       ctx.restore();
     }
-    ctx.font = font(12);
-    ctx.textAlign = "left"; ctx.textBaseline = "top";
     ctx.lineWidth = 4; ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.lineJoin = "round";
+    // 点数（まん中）。上に出すのは体力ゲージと点数だけ
+    ctx.textAlign = "center"; ctx.textBaseline = "top";
+    ctx.font = font(16); ctx.fillStyle = "#4b5e3a";
+    ctx.strokeText(String(score), W / 2 + 40, top);
+    ctx.fillText(String(score), W / 2 + 40, top);
+    // パワーと持ちものは、左下の記憶の光のボタンの横に小さく
+    const b = bombButton();
+    ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.font = font(11);
     const lvNo = POWER_LEVELS.indexOf(level) + 1;
-    const lvText = `たいりょく　パワー${"★".repeat(lvNo)}`;
-    ctx.strokeText(lvText, 14, top + 20);
-    ctx.fillStyle = "#4b5e3a";
-    ctx.fillText(lvText, 14, top + 20);
-    // 点数とコンボ（まん中）
-    ctx.textAlign = "center";
-    ctx.font = font(16);
-    ctx.strokeText(String(score), W / 2, top);
-    ctx.fillText(String(score), W / 2, top);
-    if (combo >= 2) {
-      ctx.font = font(12);
-      ctx.fillStyle = "#c98a1e";
-      const ct = `コンボ ${combo}　×${comboMul()}`;
-      ctx.strokeText(ct, W / 2, top + 20);
-      ctx.fillText(ct, W / 2, top + 20);
-      ctx.fillStyle = "#4b5e3a";
-    }
-    // 集めた語句の数
-    ctx.textAlign = "right";
-    ctx.font = font(18);
-    ctx.strokeText(`${absorbed.length} / ${opts.total} 語`, W - 14, top);
-    ctx.fillText(`${absorbed.length} / ${opts.total} 語`, W - 14, top);
-    ctx.font = font(12);
-    const ph = { round1: "偵察", round2: "本番", boss: "大ボス" }[phase] || "";
-    ctx.strokeText(ph, W - 14, top + 24);   // バトルの時間は出さない（タイムは競わない）
-    ctx.fillText(ph, W - 14, top + 24);
+    const lvText = `パワー${"★".repeat(lvNo)}`;
+    ctx.strokeText(lvText, b.x + b.r + 8, b.y - 8); ctx.fillText(lvText, b.x + b.r + 8, b.y - 8);
     if (loadout) {   // 持っていったもの（盾は使うと消える）
       const l = LOADOUTS.find(x => x.id === loadout);
       const txt = loadout === "shield" && !shield ? "盾（使った）" : l.name;
-      ctx.textAlign = "left"; ctx.font = font(11);
-      const b = bombButton();
-      ctx.strokeText(`持ちもの: ${txt}`, b.x + b.r + 8, b.y + 4); ctx.fillText(`持ちもの: ${txt}`, b.x + b.r + 8, b.y + 4);
+      ctx.strokeText(`持ちもの: ${txt}`, b.x + b.r + 8, b.y + 8); ctx.fillText(`持ちもの: ${txt}`, b.x + b.r + 8, b.y + 8);
     }
-    drawStrip(top + 42);
+    drawStrip();
   }
 
   // 「記憶の光」のボタン: ふわりマークのまわりにゲージ。満タンで光る
@@ -2116,39 +2103,40 @@ const Battle = (() => {
     ctx.restore();
   }
 
-  // 帯: 10のあき枠。はじめは「？」、偵察で見つけると灰色の名前、本番で吸い込むと金色
-  function drawStrip(y0) {
-    const rowH = 22, x0 = 10, cols = 5, gap = 4;
-    const rows = Math.max(1, BATTLE.stripRows);
-    const cw = (W - x0 * 2 - gap * (cols - 1)) / cols;
-    ctx.fillStyle = "rgba(255,253,245,0.6)";
-    roundRect(x0 - 4, y0 - 4, W - x0 * 2 + 8, rows * rowH + 6, 10); ctx.fill();
+  // 帯: 画面の左端に、10のあき枠を上から縦にならべる（出てくる順。いちばん下が大ボス）
+  // はじめは「？」、偵察で見つけると灰色の名前、本番で吸い込むと金色。名前は枠の中に縦書き
+  function drawStrip() {
+    const x = 6, cw = BATTLE.stripWidth, gap = 3;
+    const y0 = 40, y1 = bombButton().y - bombButton().r - 22;   // 体力ゲージの下から、記憶の光のボタンの上まで
+    const n = Math.max(1, slots.length), sh = (y1 - y0 - gap * (n - 1)) / n;
+    ctx.save();
+    ctx.fillStyle = "rgba(255,253,245,0.55)";
+    roundRect(x - 3, y0 - 3, cw + 6, y1 - y0 + 6, 8); ctx.fill();
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     slots.forEach((w, i) => {
-      const r = Math.floor(i / cols), c = i % cols;
-      if (r >= rows) return;
-      const x = x0 + c * (cw + gap), y = y0 + r * rowH;
+      const y = y0 + i * (sh + gap);
       const got = absorbed.includes(w), seen = found.has(w.id);
       const isNew = got && absorbed[absorbed.length - 1] === w && showWord;
-      ctx.fillStyle = got ? (isNew ? "#ffe9a8" : "#fff2c8") : "rgba(255,255,255,0.85)";
+      ctx.fillStyle = got ? (isNew ? "#ffe9a8" : "#fff2c8") : "rgba(255,255,255,0.88)";
       ctx.strokeStyle = got ? "#d8a42c" : "#d6d2c2"; ctx.lineWidth = got ? 2 : 1.2;
-      roundRect(x, y + 1, cw, rowH - 4, 7); ctx.fill(); ctx.stroke();
-      const text = got || seen ? w.word : "？";
-      let fs = 12;
+      roundRect(x, y, cw, sh, 6); ctx.fill(); ctx.stroke();
+      const chars = got || seen ? Array.from(w.word) : ["？"];
+      const fs = Math.max(6, Math.min(13, Math.floor((sh - 4) / chars.length), cw - 6));
       ctx.font = font(fs);
-      while (ctx.measureText(text).width > cw - 6 && fs > 7) { fs--; ctx.font = font(fs); }   // 長い語句は小さく
       ctx.fillStyle = got ? "#8a5a10" : (seen ? "#a3a396" : "#c2bdab");
-      ctx.fillText(text, x + cw / 2, y + rowH / 2 - 1);
-      // 大ボスの枠: 吸い込むまで小さく「大ボス」の印（最後に出るものだとわかるように）
+      const top = y + sh / 2 - (chars.length - 1) * fs / 2;
+      chars.forEach((ch, k) => ctx.fillText(VERTICAL_GLYPH[ch] || ch, x + cw / 2, top + k * fs));
+      // 大ボスの枠: 吸い込むまで小さく「大ボス」の印（帯の右に出す）
       if (w === bossWord && !got) {
         ctx.font = font(8);
         const tw = ctx.measureText("大ボス").width + 6;
         ctx.fillStyle = ENEMY_COLOR.boss;
-        roundRect(x + cw - tw - 2, y + 2, tw, 11, 5); ctx.fill();
+        roundRect(x + cw + 2, y + sh / 2 - 6, tw, 12, 5); ctx.fill();
         ctx.fillStyle = "#ffffff";
-        ctx.fillText("大ボス", x + cw - tw / 2 - 2, y + 8);
+        ctx.fillText("大ボス", x + cw + 2 + tw / 2, y + sh / 2);
       }
     });
+    ctx.restore();
   }
 
   function drawBigWord(word, remain) {
