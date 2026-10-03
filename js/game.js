@@ -106,7 +106,7 @@ const BATTLE = {
   binoR: 0.17,                 // 双眼鏡の円の大きさ（半径。画面の幅に対する割合）
   binoSpread: 0.62,            // 2つの円の中心のはなれぐあい（半径に対する割合。1より小さいと重なる）
   binoMove: 1.15,              // 指を動かした量に対して、双眼鏡が動く量
-  exploreDark: 0.96,           // 円の外の暗さ（0〜1。1でまっ暗）
+  exploreDark: 0.98,           // 円の外の暗さ（0〜1。1でまっ暗）
   lookTime: 0.5,               // 円の中で見つめると見つかるまでの時間（秒・合計）
   hintEvery: 1.5,              // 暗いところで語句がきらっと光る間隔（秒）
   hintAlpha: 0.6,              // きらっと光る強さ（0＝光らない〜1）
@@ -1465,7 +1465,7 @@ const Battle = (() => {
     const all = reacted >= words.length;
     if (ex.t >= BATTLE.exploreTime || (all && ex.list.length === 0)) {
       ex.endT = 2.4;
-      banner = { text: all ? "ぜんぶ見つけた！" : `見つけたのは${reacted}語。のこりは2回目の旅でさがそう`, t: 2.4, color: "rgba(72,105,58,0.92)" };
+      banner = { text: all ? "ぜんぶ見つけた！" : `見つけたのは${reacted}語。\nのこりは2回目の旅でさがそう`, t: 2.4, color: "rgba(72,105,58,0.92)" };
       fsay = null;
     }
   }
@@ -2365,14 +2365,16 @@ const Battle = (() => {
     const a = Math.min(1, banner.t / 0.3, (total - banner.t) / 0.2);
     ctx.globalAlpha = Math.max(0, a);
     const y = H * 0.42;
+    const lines = banner.text.split("\n");   // 「\n」で2行にできる
+    const bh = 60 + (lines.length - 1) * 30;
     ctx.fillStyle = banner.color || "rgba(196,87,122,0.88)";
-    ctx.fillRect(0, y - 30, W, 60);
+    ctx.fillRect(0, y - bh / 2, W, bh);
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     let size = 28;
     ctx.font = font(size);
-    while (ctx.measureText(banner.text).width > W - 24 && size > 18) { size -= 2; ctx.font = font(size); }
+    while (Math.max(...lines.map(l => ctx.measureText(l).width)) > W - 24 && size > 16) { size -= 2; ctx.font = font(size); }
     ctx.fillStyle = "#fffdf7";
-    ctx.fillText(banner.text, W / 2 + (1 - a) * 40, y);
+    lines.forEach((l, i) => ctx.fillText(l, W / 2 + (1 - a) * 40, y + (i - (lines.length - 1) / 2) * (size + 6)));
     ctx.globalAlpha = 1;
   }
 
@@ -2607,6 +2609,7 @@ const Battle = (() => {
     if (!moved && state === "play") {   // 操作のヒント
       ctx.globalAlpha = 0.7 + Math.sin(t * 4) * 0.3;
       ctx.font = font(16); ctx.lineWidth = 5; ctx.strokeStyle = "#ffffff";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
       const hy = Math.min(H - 110, bino.y + R + 26);
       ctx.strokeText("ゆびで双眼鏡をうごかそう", W / 2, hy);
       ctx.fillStyle = "#48693a"; ctx.fillText("ゆびで双眼鏡をうごかそう", W / 2, hy);
