@@ -328,6 +328,21 @@ const Battle = (() => {
       bx: x, x, y, hp, maxHp: hp,
       age: 0, phase: (word.id * 1.7) % 6, fire: 1.2, flash: 0
     };
+    // 中ボス・大ボスは1文字ずつ壊す: 文字がそれぞれ部品。hp は文字1つあたりの耐久
+    if (role === "mid" || role === "boss") {
+      ctx.font = font(size);
+      const chars = Array.from(word.word);
+      const ws = chars.map(ch => ctx.measureText(ch).width);
+      const total = ws.reduce((a, b) => a + b, 0);
+      let ox = -total / 2;
+      e.parts = chars.map((ch, i) => {
+        const p = { ch, ox: ox + ws[i] / 2, cw: ws[i], hp, maxHp: hp, broken: false, flash: 0,
+          kana: (word.kanaParts && word.kanaParts[i]) || ch };
+        ox += ws[i];
+        return p;
+      });
+      e.hp = e.maxHp = chars.length;   // 残っている文字の数
+    }
     enemies.push(e);
     // 雑魚のうしろ: 語句の前（下）に雑魚がならんで守る
     if (pattern === "behind") {
@@ -513,6 +528,7 @@ const Battle = (() => {
     for (const e of enemies) {
       e.age += dt;
       e.flash = Math.max(0, e.flash - dt);
+      if (e.parts) for (const p of e.parts) p.flash = Math.max(0, p.flash - dt);
       if (e.role === "boss") {
         const enter = Math.min(e.age / BATTLE.bossEnterTime, 1);
         e.y = -e.size + (H * BATTLE.bossStopY + e.size) * (1 - Math.pow(1 - enter, 2));
@@ -596,7 +612,8 @@ const Battle = (() => {
           if (e.ground || e.hp <= 0) continue;
           if (e.role === "boss" && e.age < BATTLE.bossEnterTime) continue;   // 大ボスは降りてくる間は当たらない
           if (Math.abs(s.x - e.x) < e.w / 2 + 4 && Math.abs(s.y - e.y) < e.h / 2) {
-            hit = true; damageWord(e); break;
+            if (e.parts && !partAt(e, s.x, 4)) continue;   // 砕けた文字のすきまは通りぬける
+            hit = true; damageWord(e, s.x); break;
           }
         }
       }
@@ -665,15 +682,51 @@ const Battle = (() => {
     Sound.se("pop");
     for (const g of groundTargets()) {
       if (!inReach(g, x, y, BATTLE.bombRadius * 0.6)) continue;
-      if (g.word) damageWord(g); else damageFiller(g);
+      if (g.word) damageWord(g, x); else damageFiller(g);
     }
   }
 
-  function damageWord(e) {
-    e.hp--;
+  // x の位置にある、まだ砕けていない文字（near: ゆるめる幅）
+  function partAt(e, x, near) {
+    return e.parts.find(p => !p.broken && Math.abs(x - (e.x + p.ox)) < p.cw / 2 + near);
+  }
+
+  function damageWord(e, hitX) {
     e.flash = 0.12;
+    if (e.parts) {
+      // 当たった文字（なければ、いちばん近い文字）を削る
+      let p = hitX === undefined ? null : partAt(e, hitX, 0);
+      if (!p) {
+        const alive = e.parts.filter(q => !q.broken);
+        const hx = hitX === undefined ? e.x : hitX;
+        p = alive.sort((a, b) => Math.abs(hx - (e.x + a.ox)) - Math.abs(hx - (e.x + b.ox)))[0];
+      }
+      if (!p) return;
+      p.hp--;
+      p.flash = 0.12;
+      if (p.hp > 0) { Sound.se("hit"); return; }
+      // 文字が砕ける: その文字の読みが鳴る
+      p.broken = true;
+      breakPart(e, p);
+      e.hp--;
+      if (e.hp <= 0) defeat(e);
+      return;
+    }
+    e.hp--;
     Sound.se("hit");
     if (e.hp <= 0) defeat(e);
+  }
+
+  function breakPart(e, p) {
+    const px = e.x + p.ox;
+    for (let i = 0; i < 12; i++) {
+      const a = Math.random() * Math.PI * 2, sp = 50 + Math.random() * 110;
+      threads.push({ x: px, y: e.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, len: 5 + Math.random() * 6,
+        curl: (Math.random() - 0.5) * 2, rot: Math.random() * 6, color: ENEMY_COLOR[e.role], age: 0, scatter: 9, sparkle: true });
+    }
+    floats.push({ x: px, y: e.y - e.size * 0.9, text: p.kana, big: true, kana: true, age: 0 });
+    Sound.se("crack");
+    if (p.kana !== "ー") Sound.speak(p.kana);
   }
   function comboMul() { return Math.min(1 + BATTLE.comboStep * Math.max(0, combo - 1), BATTLE.comboMax); }
 
@@ -935,10 +988,10 @@ const Battle = (() => {
     ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
     for (const fl of floats) {
       ctx.globalAlpha = 1 - fl.age / 0.9;
-      ctx.font = font(fl.big ? 18 : 12);
+      ctx.font = font(fl.kana ? 22 : (fl.big ? 18 : 12));
       ctx.lineWidth = 4; ctx.strokeStyle = "#ffffff";
       ctx.strokeText(fl.text, fl.x, fl.y - fl.age * 30);
-      ctx.fillStyle = fl.big ? "#c98a1e" : "#8a9a78";
+      ctx.fillStyle = fl.kana ? "#5d6b4c" : (fl.big ? "#c98a1e" : "#8a9a78");   // 砕けた文字の読みは、ふりがなの色
       ctx.fillText(fl.text, fl.x, fl.y - fl.age * 30);
     }
     ctx.globalAlpha = 1;
@@ -1157,11 +1210,34 @@ const Battle = (() => {
     ctx.shadowBlur = e.last ? 10 + pulse * 8 : 10;
     ctx.lineWidth = 8;
     ctx.strokeStyle = e.flash > 0 ? "#fff6c8" : (e.last ? "#fff6d8" : "#ffffff");
-    ctx.strokeText(word.word, x, y);
+    if (e.parts) {
+      for (const p of e.parts) if (!p.broken) ctx.strokeText(p.ch, x + p.ox, y);
+    } else {
+      ctx.strokeText(word.word, x, y);
+    }
     ctx.restore();
     ctx.globalAlpha = alpha;
     ctx.fillStyle = ENEMY_COLOR[e.role];
-    ctx.fillText(word.word, x, y);
+    if (e.parts) {
+      for (const p of e.parts) {
+        const px = x + p.ox;
+        if (p.broken) {   // 砕けた文字は、うすい形だけ残す
+          ctx.save(); ctx.globalAlpha = alpha * 0.15; ctx.fillText(p.ch, px, y); ctx.restore();
+          continue;
+        }
+        const wob = p.flash > 0 ? (Math.random() - 0.5) * 3 : 0;
+        ctx.fillText(p.ch, px + wob, y);
+        // 文字ごとの残りの耐久（小さな帯）
+        if (p.hp < p.maxHp) {
+          const bw = p.cw * 0.7;
+          ctx.fillStyle = "rgba(0,0,0,0.12)"; ctx.fillRect(px - bw / 2, y + e.size / 2 + 3, bw, 3);
+          ctx.fillStyle = ENEMY_COLOR[e.role]; ctx.fillRect(px - bw / 2, y + e.size / 2 + 3, bw * p.hp / p.maxHp, 3);
+        }
+        ctx.fillStyle = ENEMY_COLOR[e.role];
+      }
+    } else {
+      ctx.fillText(word.word, x, y);
+    }
     if (hasKanji(word.word)) {
       ctx.font = font(BATTLE.kanaSize);
       ctx.lineWidth = 4; ctx.strokeStyle = "#ffffff";
@@ -1196,7 +1272,7 @@ const Battle = (() => {
 
   // 中ボス・大ボスは硬さを小さな丸で表示
   function drawHpDots(e) {
-    if (e.maxHp <= 1) return;
+    if (e.parts || e.maxHp <= 1) return;   // 1文字ずつ壊す敵は、文字ごとの帯で出す
     const n = e.maxHp, gap = 10, x0 = e.x - (n - 1) * gap / 2;
     const dy = e.y - e.h / 2 - 10 - (hasKanji(e.word.word) ? BATTLE.kanaSize + 4 : 0);   // ふりがなより上に出す
     for (let i = 0; i < n; i++) {
