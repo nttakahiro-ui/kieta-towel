@@ -285,6 +285,8 @@ const Battle = (() => {
   let odai = null;           // いまのお題バトル（なければ null）
   let sortieNo = 1;          // 出撃の画面に出している番号（1＝偵察、2＝本番）
   let reacted = 0;           // 偵察で見つけた（反応させた）語句の数
+  let slots = [];            // 帯の10のあき枠に入る語句（順番）
+  let found = new Set();     // 偵察で見つけた語句の id
   let loadout = null;        // 本番に持っていくもの（LOADOUTS の id）
   let choiceT = 0;           // 選ぶ時間の残り（秒）
   let powerBonus = 0;        // 「つよい弾」で上がる強さの段階
@@ -377,6 +379,8 @@ const Battle = (() => {
     groundIds = new Set(words.filter(w => patOf(w).pattern === "ground" && w !== bossWord).map(w => w.id));
     // 台本: 大ボス以外の語句を、データの順番（order）でならべる
     script = words.filter(w => w !== bossWord).sort((a, b) => patOf(a).order - patOf(b).order);
+    slots = script.concat([bossWord]);   // 帯の10のあき枠（出てくる順。いちばん右が大ボス）
+    found = new Set();
     vanish = [];
     fluff = Array.from({ length: 18 }, () => ({ x: Math.random() * W, y: Math.random() * H, r: 2 + Math.random() * 4, v: 30 + Math.random() * 40, p: Math.random() * 6 }));
     cloudShadows = Array.from({ length: 3 }, (_, i) => ({ x: Math.random() * W, y: (i / 3) * H, rx: rand(70, 120), ry: rand(35, 55) }));
@@ -435,7 +439,7 @@ const Battle = (() => {
   }
   // 出撃2の画面の、3つの選ぶボタンの場所
   function choiceRects() {
-    const bw = Math.min(W - 48, 320), bh = 62, gap = 12, x = W / 2 - bw / 2, y0 = H * 0.36;
+    const bw = Math.min(W - 48, 320), bh = 62, gap = 12, x = W / 2 - bw / 2, y0 = H * 0.42;
     return LOADOUTS.map((l, i) => ({ id: l.id, x, y: y0 + i * (bh + gap), w: bw, h: bh }));
   }
 
@@ -755,6 +759,7 @@ const Battle = (() => {
       e.age += dt;
       e.flash = Math.max(0, e.flash - dt);
       if (e.parts) for (const p of e.parts) p.flash = Math.max(0, p.flash - dt);
+      if (odai && e.pattern !== "odai") continue;   // お題バトルの間は、画面のほかの語句も止める（動かない・撃たない）
       if (e.pattern === "odai") {
         // お題の語句: 縦書きで左・中・右の列にならび、動かない（上から降りてきて止まる）
         const ty = odaiTop() + 30 + e.h / 2;
@@ -1132,6 +1137,8 @@ const Battle = (() => {
     player.glow = 0.35;
     player.notice = 0.8;   // ふわりの「！」
     reacted++;
+    found.add(e.word.id);
+    floats.push({ x: e.x, y: e.y - e.size, text: "みつけた！", big: false, found: true, age: 0 });
     Sound.se("shine");
   }
 
@@ -1359,7 +1366,7 @@ const Battle = (() => {
       ctx.font = font(fl.kana ? 22 : (fl.big ? 18 : 12));
       ctx.lineWidth = 4; ctx.strokeStyle = "#ffffff";
       ctx.strokeText(fl.text, fl.x, fl.y - fl.age * 30);
-      ctx.fillStyle = fl.wrong ? "#b05068" : (fl.kana ? "#5d6b4c" : (fl.big ? "#c98a1e" : "#8a9a78"));   // 砕けた文字の読みは、ふりがなの色
+      ctx.fillStyle = fl.wrong ? "#b05068" : (fl.found ? "#6f9a4a" : (fl.kana ? "#5d6b4c" : (fl.big ? "#c98a1e" : "#8a9a78")));   // 砕けた文字の読みは、ふりがなの色
       ctx.fillText(fl.text, fl.x, fl.y - fl.age * 30);
     }
     ctx.globalAlpha = 1;
@@ -1839,15 +1846,25 @@ const Battle = (() => {
 
   // 出撃2の画面: 本番に持っていくものを3つから1つ選ぶ
   function drawChoice() {
+    // ふわりのセリフ（偵察の終わり）
+    const say = `${reacted}のことばを見つけたね。でもまだ記憶がぼんやり…。同じ道をもう一回飛べば、吸い込める気がする！`;
+    ctx.font = font(14);
+    const lines = wrapText(say, W - 92);
+    const bh = lines.length * 20 + 16, by = H * 0.03;
+    ctx.fillStyle = "rgba(255,253,245,0.97)"; ctx.strokeStyle = "#cfe0b6"; ctx.lineWidth = 2;
+    roundRect(54, by, W - 70, bh, 14); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#fffdf7"; ctx.strokeStyle = "#c9d9b4";   // ふわり（仮の絵）
+    roundRect(16, by + bh / 2 - 12, 28, 24, 7); ctx.fill(); ctx.stroke();
+    ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillStyle = "#4b5e3a";
+    lines.forEach((l, i) => ctx.fillText(l, 66, by + 8 + i * 20));
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.font = font(14); ctx.fillStyle = "#7a8a68";
-    ctx.fillText(`${opts.stageName}　偵察で見つけたことば ${reacted}語`, W / 2, H * 0.07);
-    ctx.font = font(38); ctx.fillStyle = "#b0801a";
-    ctx.fillText("出撃2", W / 2, H * 0.14);
-    ctx.font = font(26);
-    ctx.fillText("本番（あつめる）", W / 2, H * 0.21);
-    ctx.font = font(17); ctx.fillStyle = "#4b5e3a";
-    ctx.fillText("本番に持っていくものを1つえらぼう", W / 2, H * 0.30);
+    const top = by + bh + 8;
+    ctx.font = font(34); ctx.fillStyle = "#b0801a";
+    ctx.fillText("出撃2　本番", W / 2, top + 24);
+    ctx.font = font(16);
+    ctx.fillText("（あつめる）", W / 2, top + 52);
+    ctx.font = font(16); ctx.fillStyle = "#4b5e3a";
+    ctx.fillText("本番に持っていくものを1つえらぼう", W / 2, top + 82);
     choiceRects().forEach((r, i) => {
       const l = LOADOUTS[i];
       ctx.fillStyle = "#fffdf7"; ctx.strokeStyle = "#e0b03a"; ctx.lineWidth = 3;
@@ -1861,12 +1878,12 @@ const Battle = (() => {
       ctx.textAlign = "center";
     });
     // 残り時間
-    const last = choiceRects()[2], by = last.y + last.h + 22, bw = last.w;
+    const last = choiceRects()[2], ty = last.y + last.h + 22, bw = last.w;
     const k = Math.max(0, choiceT / BATTLE.choiceTime);
-    ctx.fillStyle = "rgba(0,0,0,0.08)"; roundRect(W / 2 - bw / 2, by, bw, 8, 4); ctx.fill();
-    ctx.fillStyle = "#e0b03a"; roundRect(W / 2 - bw / 2, by, bw * k, 8, 4); ctx.fill();
+    ctx.fillStyle = "rgba(0,0,0,0.08)"; roundRect(W / 2 - bw / 2, ty, bw, 8, 4); ctx.fill();
+    ctx.fillStyle = "#e0b03a"; roundRect(W / 2 - bw / 2, ty, bw * k, 8, 4); ctx.fill();
     ctx.font = font(13); ctx.fillStyle = "#7a8a68";
-    ctx.fillText(`あと ${Math.ceil(choiceT)}秒`, W / 2, by + 24);
+    ctx.fillText(`あと ${Math.ceil(choiceT)}秒`, W / 2, ty + 24);
   }
 
   // ふわりの一言（吹き出し）。画面からはみ出さない位置に出す
@@ -1971,31 +1988,29 @@ const Battle = (() => {
     ctx.restore();
   }
 
-  // 「集めたことば」の帯: 吸い込んだ語句が順にならんでいく
+  // 帯: 10のあき枠。はじめは「？」、偵察で見つけると灰色の名前、本番で吸い込むと金色
   function drawStrip(y0) {
-    const pad = 8, rowH = 22, x0 = 10, maxX = W - 10;
-    ctx.font = font(12);
-    ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    const rowH = 22, x0 = 10, cols = 5, gap = 4;
     const rows = Math.max(1, BATTLE.stripRows);
+    const cw = (W - x0 * 2 - gap * (cols - 1)) / cols;
     ctx.fillStyle = "rgba(255,253,245,0.6)";
-    roundRect(x0 - 4, y0 - 4, maxX - x0 + 8, rows * rowH + 6, 10); ctx.fill();
-    ctx.fillStyle = "#7a8a68";
-    let x = x0 + 2, row = 0;
-    const label = "集めたことば";
-    ctx.fillText(label, x, y0 + rowH / 2 - 1);
-    x += ctx.measureText(label).width + 8;
-    absorbed.forEach((w, i) => {
-      const tw = ctx.measureText(w.word).width + pad * 2;
-      if (x + tw > maxX) { row++; x = x0 + 2; }
-      if (row >= rows) return;   // 入りきらない分は出さない
-      const y = y0 + row * rowH;
-      const isNew = i === absorbed.length - 1 && showWord;
-      ctx.fillStyle = isNew ? "#fff3c4" : "#ffffff";
-      ctx.strokeStyle = ENEMY_COLOR[w.role]; ctx.lineWidth = 1.5;
-      roundRect(x, y + 1, tw, rowH - 4, 8); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = ENEMY_COLOR[w.role];
-      ctx.fillText(w.word, x + pad, y + rowH / 2 - 1);
-      x += tw + 5;
+    roundRect(x0 - 4, y0 - 4, W - x0 * 2 + 8, rows * rowH + 6, 10); ctx.fill();
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    slots.forEach((w, i) => {
+      const r = Math.floor(i / cols), c = i % cols;
+      if (r >= rows) return;
+      const x = x0 + c * (cw + gap), y = y0 + r * rowH;
+      const got = absorbed.includes(w), seen = found.has(w.id);
+      const isNew = got && absorbed[absorbed.length - 1] === w && showWord;
+      ctx.fillStyle = got ? (isNew ? "#ffe9a8" : "#fff2c8") : "rgba(255,255,255,0.85)";
+      ctx.strokeStyle = got ? "#d8a42c" : "#d6d2c2"; ctx.lineWidth = got ? 2 : 1.2;
+      roundRect(x, y + 1, cw, rowH - 4, 7); ctx.fill(); ctx.stroke();
+      const text = got || seen ? w.word : "？";
+      let fs = 12;
+      ctx.font = font(fs);
+      while (ctx.measureText(text).width > cw - 6 && fs > 7) { fs--; ctx.font = font(fs); }   // 長い語句は小さく
+      ctx.fillStyle = got ? "#8a5a10" : (seen ? "#a3a396" : "#c2bdab");
+      ctx.fillText(text, x + cw / 2, y + rowH / 2 - 1);
     });
   }
 
