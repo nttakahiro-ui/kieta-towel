@@ -41,6 +41,7 @@ const BATTLE = {
   enemyBulletSize: 11,         // 敵の弾の見た目の大きさ（半径 px）。大きく見やすく
   enemyBulletHitR: 6,          // 敵の弾の当たりの大きさ（半径 px）。見た目より小さく、避けやすく
   hpOverride: { zako: 0, mid: 0, boss: 0 },   // 0 のときは自動。0より大きいと、ザコはこの硬さ、中ボス・大ボスは1文字あたりこの耐久にする
+  zakoHpByShots: true,         // 空中のザコの語句の硬さを、今の自機の弾の本数に比例させる（10/3-8。弾1本で5発…太い弾は2本分）
   shotPattern: { zako: [0], mid: [-0.18, 0.18], boss: [-0.25, 0, 0.25] },   // 語句の敵の弾の向き（自機をねらう向きからのずれ）
 
   // --- 雑魚 ---
@@ -121,7 +122,7 @@ const BATTLE = {
   difficulty: {
     fireScale:   { at1: 1,   at12: 0.5 },   // 敵が撃つ間隔の倍率（小さいほど弾が多い）
     speedScale:  { at1: 1,   at12: 1.4 },   // 敵（語句と敵の弾）の速さの倍率
-    zakoHp:      { at1: 5,   at12: 6.5 },   // ザコの語句の硬さ（四捨五入）。10/3-4に5発にした（世界1は5発）
+    zakoHp:      { at1: 5,   at12: 6.5 },   // ザコの語句の硬さ（四捨五入）。10/3-4に5発にした（世界1は5発）。空中のザコは「弾1本あたり」の硬さ（10/3-8: 弾の本数をかける）
     bossHpScale: { at1: 1,   at12: 2 },     // 中ボス・大ボスの1文字あたりの耐久の倍率
     tricky:      { at1: 1,   at12: 6.2 },   // 意地の悪い語句（端にかくれる・雑魚のうしろ・横切る）の数（四捨五入。patterns が "auto" のステージだけ）
   },
@@ -1028,7 +1029,8 @@ const Battle = (() => {
               if (!lp || s.y > e.y + lp.oy + e.charH / 2) continue;
             } else if (e.parts && !e.dummy && !partAt(e, s.x, s.thick ? 10 : 4)) continue;   // 砕けた文字のすきまは通りぬける
             hit = true;
-            if (e.pattern === "odai") odaiHit(e, s); else { damageWord(e, s.x); if (s.thick && e.hp > 0) damageWord(e, s.x); }   // 太い弾は2発分
+            if (e.pattern === "odai") odaiHit(e, s);
+            else { const a = shotDamage(e); damageWord(e, s.x, a); if (s.thick && e.hp > 0) damageWord(e, s.x, a); }   // 太い弾は2発分
             break;
           }
         }
@@ -1122,7 +1124,16 @@ const Battle = (() => {
     return best;
   }
 
-  function damageWord(e, hitX) {
+  // 空中のザコの語句の硬さは、今の自機の弾の本数に比例（10/3-8）: 弾1本で P.zakoHp 発、2本でその2倍…（太い弾は2本分）
+  // 硬さを本数倍にするかわりに、1発で削る量を「1 ÷ 本数」にしている。こうすると、とちゅうで強くなっても弱くなっても
+  // 「何回の連射でこわれるか」が変わらない（強くなっても手ごたえが同じ）。地上の語句（たねで倒す）は今のまま
+  function shotUnits() {
+    if (odai) return 1;   // お題バトルの間は正面1本だけ
+    return (SHOT_SPREAD[level.shots] || [0]).length * (level.thick ? 2 : 1);
+  }
+  const shotDamage = e => (e.role === "zako" && !e.ground && BATTLE.zakoHpByShots) ? 1 / shotUnits() : 1;
+
+  function damageWord(e, hitX, amt = 1) {
     e.flash = 0.12;
     if (e.parts) {
       // 当たった文字（なければ、いちばん近い文字）を削る。縦書きは、いちばん下の文字
@@ -1143,7 +1154,8 @@ const Battle = (() => {
       if (e.hp <= 0) defeat(e);
       return;
     }
-    e.hp--;
+    e.hp -= amt;
+    if (e.hp < 1e-6) e.hp = 0;   // 1/3 などを足したときの、こまかい誤差を消す
     Sound.se("hit");
     if (e.hp <= 0) defeat(e);
   }
@@ -2093,7 +2105,7 @@ const Battle = (() => {
     for (let i = 0; i < n; i++) {
       ctx.beginPath();
       ctx.arc(x0 + i * gap, dy, 3.5, 0, Math.PI * 2);
-      ctx.fillStyle = i < e.hp ? ENEMY_COLOR[e.role] : "rgba(0,0,0,0.12)";
+      ctx.fillStyle = i < e.hp - 1e-6 ? ENEMY_COLOR[e.role] : "rgba(0,0,0,0.12)";
       ctx.fill();
     }
   }
