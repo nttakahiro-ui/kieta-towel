@@ -96,6 +96,13 @@ const BATTLE = {
   },
 
   // --- 本番に持っていくもの（出撃2の前に3つから1つ選ぶ） ---
+  // コクピット（探検だけ。10/3-9）と本番の表紙。見た目はすべて仮
+  cockpitFrame: 6,             // コクピットの枠の太さ（px。画面の幅の3%以内）。枠は背景のすぐ上に描くので、敵・語句・弾・帯は枠の上に出る
+  cockpitScan: 0.04,           // 走査線の濃さ（0〜1）
+  cockpitDim: 0.12,            // 探検のときの背景の暗さ（0〜1。背景だけ。語句・帯・弾の明るさは変えない）
+  radarR: 24,                  // 下の中央のレーダーの大きさ（半径 px）
+  countStep: 0.45,             // 表紙のあとのカウント「3」「2」「1」のそれぞれの時間（秒）
+  countGo: 0.5,                // 「出撃！」の時間（秒）。カウントの合計は2秒以内
   choiceTime: 10,              // 選ぶ時間（秒）。選ばなければ「つよい弾」になる
   bigBombMul: 2,               // 「大きなふわりタイフーン」のときの、ゲージのたまる速さの倍率
 
@@ -354,6 +361,11 @@ const Battle = (() => {
   let found = new Set();     // 探検で見つけた語句の id
   let loadout = null;        // 本番に持っていくもの（LOADOUTS の id）
   let choiceT = 0;           // 選ぶ時間の残り（秒）
+  let sortieStep = "choice"; // 出撃2の画面の段階: "choice" 持っていくものを選ぶ → "cover" 表紙（タップ待ち）→ "count" 3・2・1・出撃！
+  let countT = 0;            // カウントの経過（秒）
+  let cockpitK = 1;          // コクピットの枠の出ぐあい（1＝探検、0＝外れた）
+  let radarDots = [];        // レーダーの点（見つけた語句。x は 0〜1 の横の位置）
+  let stripFlash = 0;        // 出撃の瞬間に帯の灰色の名前がいっせいに光る（残り秒）
   let powerBonus = 0;        // 「つよい弾」で上がる強さの段階
   let shield = 0;            // 「盾」の残り（1回だけ防ぐ）
   let gaugeMul = 1;          // 「大きなふわりタイフーン」のゲージ倍率
@@ -398,11 +410,20 @@ const Battle = (() => {
     if (!player) return;
     if (state === "sortie") {
       if (sortieNo === 2) {
-        const rect = canvas.getBoundingClientRect();
-        const px = e.clientX - rect.left, py = e.clientY - rect.top;
-        const c = choiceRects().find(r => px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h);
-        if (!c) return;   // 選ぶまで出撃しない（10秒で「つよい弾」）
-        chooseLoadout(c.id);
+        if (sortieStep === "choice") {
+          const rect = canvas.getBoundingClientRect();
+          const px = e.clientX - rect.left, py = e.clientY - rect.top;
+          const c = choiceRects().find(r => px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h);
+          if (!c) return;   // 選ぶまで出撃しない（10秒で「つよい弾」）
+          chooseLoadout(c.id);
+          sortieStep = "cover";   // 選んだら表紙へ
+        } else if (sortieStep === "cover") {
+          sortieStep = "count"; countT = 0;   // タップで 3・2・1・出撃！
+          Sound.se("odai");
+          drag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, px: player.x, py: player.y };   // 指をつけたままなら、出撃してすぐ動かせる
+          try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+        }
+        return;
       }
       startSortie();
     }
@@ -419,6 +440,7 @@ const Battle = (() => {
   function onMove(e) {
     if (!drag || e.pointerId !== drag.id) return;
     e.preventDefault();
+    if (state === "sortie") { drag.sx = e.clientX; drag.sy = e.clientY; return; }   // カウントのあいだは動かさない
     moved = true;
     lastPX = e.clientX; lastPY = e.clientY;
     if (player.rising > 0) return;   // 復活して上がってくる間は動かせない
@@ -473,6 +495,7 @@ const Battle = (() => {
     hits = 0; downs = 0; lives = BATTLE.lives; gameOvers = 0; scoreAtMain = 0; retryMain = false;
     paused = false; moved = false; groundHinted = false; banner = null; shake = 0; showWord = null; threads = []; pops = [];
     slow = 0; wave = null; gauge = 0; bombsUsed = 0; fsay = null; odai = null; bounces = [];
+    cockpitK = 1; radarDots = []; stripFlash = 0; sortieStep = "choice";
     state = "sortie"; sortieNo = 1; reacted = 0;   // 「出撃1 探検」の画面から始める
     loadout = null; powerBonus = 0; shield = 0; gaugeMul = 1;
     running = true;
@@ -519,7 +542,10 @@ const Battle = (() => {
     roundT = 0;
     gapT = 0;
     nextAt = p === "round1" ? BATTLE.firstSpawnDelay : 0.8;
+    if (p !== "round1") Sound.fadeTo("battle");   // 本番の曲へ（探検は静かめの曲）
   }
+  // カウントの今の段階（0〜2 ＝「3」「2」「1」、3 ＝「出撃！」）
+  const countStepNo = () => Math.min(3, Math.floor(countT / BATTLE.countStep));
   const roundInterval = () => phase === "round1" ? BATTLE.roundInterval1 : BATTLE.roundInterval2;
   // 坂: 今の出撃の弾の量の倍率（大きいほど撃つ間隔が短い）
   const fireRamp = () => Math.max(0.1, (BATTLE.ramp[phase] || BATTLE.ramp.round2).fire);
@@ -533,6 +559,7 @@ const Battle = (() => {
       fsay = { text: "ことばを見つけよう（まだあつめられないよ）", t: BATTLE.fuwariSayTime };
     } else {
       startPhase("round2");
+      stripFlash = 0.6;   // 帯の灰色の名前がいっせいに光る
       fsay = { text: "思い出した！今度はあつめられる！", t: BATTLE.fuwariSayTime, big: true };
       Sound.se("power");
     }
@@ -754,12 +781,21 @@ const Battle = (() => {
   function update(realDt) {
     if (paused) return;
     if (state === "sortie") {   // 出撃の画面のあいだは止まっている
-      if (sortieNo === 2) {
+      if (sortieNo === 2 && sortieStep === "choice") {
         choiceT -= realDt;
-        if (choiceT <= 0) { chooseLoadout("power"); startSortie(); }   // 選ばなければ「つよい弾」
+        if (choiceT <= 0) { chooseLoadout("power"); sortieStep = "cover"; }   // 選ばなければ「つよい弾」で表紙へ
+      }
+      if (sortieNo === 2 && sortieStep === "count") {
+        const prev = countStepNo();
+        countT += realDt;
+        if (countT >= BATTLE.countStep * 3 + BATTLE.countGo) startSortie();
+        else if (countStepNo() !== prev && countStepNo() < 3) Sound.se("odai");
       }
       return;
     }
+    // 本番が始まったら、コクピットの枠が外れていく
+    if (phase !== "round1") cockpitK = Math.max(0, cockpitK - realDt / 0.5);
+    stripFlash = Math.max(0, stripFlash - realDt);
     // 吸い込む瞬間は、画面全体がゆっくりになる
     let dt = realDt;
     if (slow > 0) { slow -= realDt; dt = realDt * BATTLE.slowScale; }
@@ -813,7 +849,7 @@ const Battle = (() => {
           // 探検が終わった: 画面の雑魚と弾を片づけて、「出撃2 本番」の画面で止まる
           fillers.forEach(f => addPop(f.x, f.y, "#fff8d8", 0.8, f.layer === "ground"));
           fillers = []; ebullets = []; bombs = []; items = [];
-          state = "sortie"; sortieNo = 2; choiceT = BATTLE.choiceTime;
+          state = "sortie"; sortieNo = 2; choiceT = BATTLE.choiceTime; sortieStep = "choice";
           scoreAtMain = score;
           drag = null;
         } else {
@@ -1343,6 +1379,7 @@ const Battle = (() => {
     player.notice = 0.8;   // ふわりの「！」
     reacted++;
     found.add(e.word.id);
+    radarDots.push({ x: Math.min(1, Math.max(0, e.x / W)), age: 0 });
     floats.push({ x: e.x, y: e.y - e.size, text: "みつけた！", big: false, found: true, age: 0 });
     Sound.se("shine");
   }
@@ -1467,7 +1504,7 @@ const Battle = (() => {
     combo = 0; gauge = 0; level = POWER_LEVELS[0];
     loadout = null; powerBonus = 0; shield = 0; gaugeMul = 1;
     retryMain = true;
-    state = "sortie"; sortieNo = 2; choiceT = BATTLE.choiceTime; drag = null;
+    state = "sortie"; sortieNo = 2; choiceT = BATTLE.choiceTime; sortieStep = "choice"; drag = null;
     player.x = W / 2; player.y = H * 0.8;
   }
 
@@ -1478,6 +1515,7 @@ const Battle = (() => {
     if (shake > 0) ctx.translate((Math.random() - 0.5) * 10 * shake / 0.25, (Math.random() - 0.5) * 10 * shake / 0.25);
 
     drawTerrain();
+    if (cockpitK > 0) drawCockpit();   // 背景のすぐ上（敵・語句・弾・自機・帯は、この上に描く）
 
     // 地上の花（たねが咲いたあと）
     for (const p of pops) if (p.ground) drawPop(p);
@@ -2225,7 +2263,7 @@ const Battle = (() => {
     ctx.fillStyle = sortieNo === 1 ? "rgba(236,244,226,0.93)" : "rgba(255,246,220,0.94)";
     ctx.fillRect(0, 0, W, H);
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    if (sortieNo === 2) { drawChoice(); ctx.restore(); return; }
+    if (sortieNo === 2) { if (sortieStep === "choice") drawChoice(); else drawCover(); ctx.restore(); return; }
     const cy = H * 0.4;
     ctx.font = font(15); ctx.fillStyle = "#7a8a68";
     ctx.fillText(opts.stageName, W / 2, cy - 110);
@@ -2245,6 +2283,97 @@ const Battle = (() => {
   }
 
   // 出撃2の画面: 本番に持っていくものを3つから1つ選ぶ
+  // コクピット（探検だけ。仮の見た目）: 背景を少し暗く・ごく薄い走査線・細い枠・四隅の計器・下の中央のレーダー
+  // 背景のすぐ上に描くので、敵・語句・弾・自機・帯・体力ゲージはすべてこの上に出る（遊ぶ範囲を覆わない）
+  function drawCockpit() {
+    const k = cockpitK, out = (1 - k) * 24;   // 外れるときは外へすべり出る
+    ctx.save();
+    ctx.globalAlpha = k;
+    ctx.fillStyle = `rgba(20,40,60,${BATTLE.cockpitDim})`; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = `rgba(0,0,0,${BATTLE.cockpitScan})`;
+    for (let y = 0; y < H; y += 3) ctx.fillRect(0, y, W, 1);
+    const sy = (t * 60) % (H + 120) - 60;   // ゆっくり流れる光の帯
+    const g = ctx.createLinearGradient(0, sy - 40, 0, sy + 40);
+    g.addColorStop(0, "rgba(200,255,240,0)"); g.addColorStop(0.5, "rgba(200,255,240,0.03)"); g.addColorStop(1, "rgba(200,255,240,0)");
+    ctx.fillStyle = g; ctx.fillRect(0, sy - 40, W, 80);
+    // 枠
+    const f = BATTLE.cockpitFrame;
+    ctx.fillStyle = "rgba(60,96,100,0.85)";
+    ctx.fillRect(-out, 0, f, H); ctx.fillRect(W - f + out, 0, f, H);
+    ctx.fillRect(0, -out, W, f); ctx.fillRect(0, H - f + out, W, f);
+    ctx.strokeStyle = "rgba(170,230,215,0.7)"; ctx.lineWidth = 1;
+    ctx.strokeRect(f - out + 0.5, f - out + 0.5, W - f * 2 + out * 2 - 1, H - f * 2 + out * 2 - 1);
+    // 四隅の計器（L字の金具と目盛り）
+    const L = 18;
+    ctx.strokeStyle = "rgba(190,240,225,0.8)"; ctx.lineWidth = 2; ctx.lineCap = "round";
+    [[1, 1], [-1, 1], [1, -1], [-1, -1]].forEach(([sx, sy2]) => {
+      const cx = sx > 0 ? f + 2 - out : W - f - 2 + out, cy = sy2 > 0 ? f + 2 - out : H - f - 2 + out;
+      ctx.beginPath(); ctx.moveTo(cx, cy + sy2 * L); ctx.lineTo(cx, cy); ctx.lineTo(cx + sx * L, cy); ctx.stroke();
+      for (let i = 1; i <= 3; i++) { ctx.beginPath(); ctx.moveTo(cx + sx * i * 5, cy); ctx.lineTo(cx + sx * i * 5, cy + sy2 * (i === 3 ? 5 : 3)); ctx.stroke(); }
+      ctx.fillStyle = Math.floor(t * 1.5 + sx + sy2 * 2) % 2 ? "rgba(140,230,190,0.9)" : "rgba(140,230,190,0.25)";
+      ctx.beginPath(); ctx.arc(cx + sx * 9, cy + sy2 * 9, 2, 0, Math.PI * 2); ctx.fill();
+    });
+    // レーダー（下の中央・半円）。語句を見つけるたびに点がふえる
+    const R = BATTLE.radarR, rx = W / 2, ry = H - f - 4 + out;
+    ctx.globalAlpha = k * 0.5;
+    ctx.fillStyle = "rgba(20,60,60,0.8)";
+    ctx.beginPath(); ctx.moveTo(rx - R, ry); ctx.arc(rx, ry, R, Math.PI, Math.PI * 2); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "rgba(150,240,200,0.9)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(rx, ry, R, Math.PI, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(rx, ry, R * 0.55, Math.PI, Math.PI * 2); ctx.stroke();
+    const sw = Math.PI + (Math.sin(t * 1.6) * 0.5 + 0.5) * Math.PI;   // 左右に行ったり来たりする線
+    ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(rx + Math.cos(sw) * R, ry + Math.sin(sw) * R); ctx.stroke();
+    ctx.globalAlpha = k * 0.9;
+    for (const d of radarDots) {
+      const a = Math.PI + d.x * Math.PI, rr = R * 0.75;
+      const fresh = (d.age = (d.age || 0) + 1 / 60) < 1;
+      ctx.fillStyle = fresh && Math.floor(t * 8) % 2 ? "#ffffff" : "#ffe27a";
+      ctx.beginPath(); ctx.arc(rx + Math.cos(a) * rr, ry + Math.sin(a) * rr, fresh ? 3 : 2.2, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // 本番の表紙（仮の見た目）: 大きく「出撃2 本番」、ふわりの一言。タップで 3・2・1・出撃！
+  function drawCover() {
+    ctx.fillStyle = "rgba(255,240,200,0.6)"; ctx.fillRect(0, 0, W, H);
+    const cy = H * 0.36;
+    if (sortieStep === "cover") {
+      ctx.font = font(15); ctx.fillStyle = "#9a7a40";
+      ctx.fillText(opts.stageName, W / 2, cy - 120);
+      ctx.font = font(56); ctx.fillStyle = "#b0801a";
+      ctx.fillText("出撃2", W / 2, cy - 64);
+      ctx.font = font(44);
+      ctx.fillText("本番", W / 2, cy - 6);
+      // ふわり（仮の絵）と吹き出し
+      const by = cy + 70, text = "ことばを集めに行こう！";
+      ctx.font = font(17);
+      const tw = ctx.measureText(text).width, bw = tw + 28, bx = W / 2 - bw / 2 + 22;
+      ctx.fillStyle = "#fffdf7"; ctx.strokeStyle = "#dcb64e"; ctx.lineWidth = 2;
+      roundRect(bx - 50, by - 14, 34, 28, 8); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "#6b5a3a"; ctx.beginPath(); ctx.arc(bx - 39, by - 2, 1.8, 0, Math.PI * 2); ctx.arc(bx - 27, by - 2, 1.8, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "rgba(255,253,245,0.97)"; ctx.strokeStyle = "#e0b03a";
+      roundRect(bx, by - 20, bw, 40, 14); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "#6b4a10"; ctx.fillText(text, bx + bw / 2, by);
+      ctx.globalAlpha = 0.6 + Math.sin(performance.now() / 250) * 0.4;
+      ctx.font = font(22); ctx.fillStyle = "#c98a1e";
+      ctx.fillText("タップで出撃！", W / 2, cy + 160);
+      ctx.globalAlpha = 1;
+      return;
+    }
+    // カウント
+    const n = countStepNo(), local = n < 3 ? (countT % BATTLE.countStep) / BATTLE.countStep : (countT - BATTLE.countStep * 3) / BATTLE.countGo;
+    const txt = n < 3 ? String(3 - n) : "出撃！";
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, 1 - local * 0.6);
+    ctx.font = font(n < 3 ? 110 : 64);
+    const sc = 1.4 - Math.min(1, local * 3) * 0.4;
+    ctx.translate(W / 2, H * 0.42); ctx.scale(sc, sc);
+    ctx.lineWidth = 10; ctx.strokeStyle = "#ffffff"; ctx.lineJoin = "round";
+    ctx.strokeText(txt, 0, 0);
+    ctx.fillStyle = n < 3 ? "#b0801a" : "#e07a3a"; ctx.fillText(txt, 0, 0);
+    ctx.restore();
+  }
+
   function drawChoice() {
     // ふわりのセリフ（探検の終わり）
     const say = retryMain
@@ -2355,6 +2484,17 @@ const Battle = (() => {
     ctx.font = font(16); ctx.fillStyle = "#4b5e3a";
     ctx.strokeText(String(score), W - 14, top);
     ctx.fillText(String(score), W - 14, top);
+    if (cockpitK > 0) {   // 探検のあいだ、右上に「探検中」
+      ctx.save();
+      ctx.globalAlpha = cockpitK;
+      ctx.font = font(12); ctx.textBaseline = "middle";
+      const ty = top + 30;
+      ctx.strokeText("探検中", W - 14, ty); ctx.fillStyle = "#3f6f6a"; ctx.fillText("探検中", W - 14, ty);
+      const dw = ctx.measureText("探検中").width;
+      ctx.fillStyle = Math.floor(t * 2) % 2 ? "#e0605a" : "rgba(224,96,90,0.25)";
+      ctx.beginPath(); ctx.arc(W - 14 - dw - 8, ty, 3.5, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
     // パワーと持ちものは、左下のふわりタイフーンのボタンの横に小さく
     const b = bombButton();
     ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.font = font(11);
@@ -2418,6 +2558,16 @@ const Battle = (() => {
       ctx.fillStyle = got ? "#8a5a10" : (seen ? "#a3a396" : "#c2bdab");
       const top = y + sh / 2 - (chars.length - 1) * fs / 2;
       chars.forEach((ch, k) => ctx.fillText(VERTICAL_GLYPH[ch] || ch, x + cw / 2, top + k * fs));
+      if (stripFlash > 0 && seen && !got) {   // 出撃の瞬間: 灰色の名前がいっせいに光る
+        const k = stripFlash / 0.6;
+        ctx.save();
+        ctx.globalAlpha = k;
+        ctx.shadowColor = "rgba(255,214,90,1)"; ctx.shadowBlur = 12;
+        ctx.fillStyle = "rgba(255,244,200,0.9)"; roundRect(x, y, cw, sh, 6); ctx.fill();
+        ctx.shadowBlur = 0; ctx.fillStyle = "#c98a1e";
+        chars.forEach((ch, kk) => ctx.fillText(VERTICAL_GLYPH[ch] || ch, x + cw / 2, top + kk * fs));
+        ctx.restore();
+      }
       // 地上に出る語句の枠: 小さく「地」の印（帯の右に出す）
       if (groundIds.has(w.id)) {
         ctx.font = font(9);
@@ -2499,7 +2649,7 @@ const Battle = (() => {
       nextIdx = script.length;
       for (const w of script) found.add(w.id);
       reacted = found.size;
-      state = "sortie"; sortieNo = 2; choiceT = BATTLE.choiceTime; paused = false; drag = null;
+      state = "sortie"; sortieNo = 2; choiceT = BATTLE.choiceTime; sortieStep = "choice"; paused = false; drag = null;
     },
     // 本番をとばして、大ボスへ
     skipToBoss() {

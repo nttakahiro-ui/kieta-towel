@@ -8,6 +8,11 @@ const SONGS = {
     melody: "E5 G5 A5 G5 E5 - D5 - C5 D5 E5 G5 E5 - - - G5 A5 C6 A5 G5 - E5 - D5 E5 D5 C5 D5 - - -",
     bass:   "C3 - - - G3 - - - A2 - - - E3 - - - F2 - - - C3 - - - G2 - - - G2 - - -"
   },
+  recon: {   // 探検（出撃1）の静かめの曲（10/3-9。仮）
+    file: null, bpm: 76, wave: "sine",
+    melody: "E5 - - - G5 - - - D5 - - - - - - - C5 - - - E5 - - - A4 - - - - - - -",
+    bass:   "A2 - - - - - - - F2 - - - - - - - C3 - - - - - - - G2 - - - - - - -"
+  },
   battle: {
     file: null, bpm: 132, wave: "triangle",
     melody: "C5 E5 G5 E5 A5 G5 E5 D5 C5 D5 E5 G5 D5 - - - E5 G5 A5 C6 A5 G5 E5 G5 D5 E5 C5 D5 C5 - - -",
@@ -129,6 +134,27 @@ const Sound = (() => {
     tick();
   }
 
+  // 前の曲を少しずつ小さくしてから、次の曲に替える（探検 → 本番）
+  function fadeTo(name, sec = 0.3) {
+    if (current === name || current === "→" + name) return;
+    if (!ctx || !master) { play(name); return; }
+    const now = ctx.currentTime, v = 0.22;
+    master.gain.cancelScheduledValues(now);
+    master.gain.setValueAtTime(master.gain.value, now);
+    master.gain.linearRampToValueAtTime(0.0001, now + sec);
+    if (fileAudio) { const fa = fileAudio; setTimeout(() => fa.pause(), sec * 1000); }
+    setTimeout(() => {
+      if (current !== "→" + name) { master.gain.cancelScheduledValues(ctx.currentTime); master.gain.setValueAtTime(v, ctx.currentTime); return; }   // そのあいだに別の曲になった
+      play(name);
+      const n2 = ctx.currentTime;
+      master.gain.cancelScheduledValues(n2);
+      master.gain.setValueAtTime(0.0001, n2);
+      master.gain.linearRampToValueAtTime(v, n2 + 0.15);
+    }, sec * 1000);
+    if (timer) { const tm = timer; setTimeout(() => clearInterval(tm), sec * 1000); timer = null; }
+    current = "→" + name;   // 替わるまでのあいだ、同じ曲を二重に呼ばない
+  }
+
   function stop() {
     current = null;
     if (timer) { clearInterval(timer); timer = null; }
@@ -237,5 +263,5 @@ const Sound = (() => {
     if (ctx && current && !fileAudio) nextTime = Math.max(nextTime, ctx.currentTime + 0.05);
   }
 
-  return { unlock, play, stop, setTempo, se, suspend, resume, speak };
+  return { unlock, play, fadeTo, stop, setTempo, se, suspend, resume, speak };
 })();

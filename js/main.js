@@ -231,7 +231,7 @@ const Main = (() => {
 
   function toBattle() {
     showScreen("battle");
-    Sound.play("battle");
+    Sound.play("recon");   // 探検は静かめの曲。本番が始まると "battle" に替わる
     // 画面が表示されてから大きさを測る
     requestAnimationFrame(() => {
       Battle.start(words, {
