@@ -1998,7 +1998,7 @@ const Battle = (() => {
     if (fsay.big) {   // 大きな一言: 画面のまん中に
       ctx.font = font(22);
       const tw = Math.min(ctx.measureText(fsay.text).width, W - 40), bw = tw + 32, bh = 52;
-      const bx = W / 2 - bw / 2, by = H * 0.42 - bh / 2;
+      const bx = W / 2 - bw / 2, by = H * 0.3 - bh / 2;   // 吸い込んだ語句の大きな表示（まん中）と重ならない高さ
       ctx.fillStyle = "rgba(255,250,232,0.97)"; ctx.strokeStyle = "#e0b03a"; ctx.lineWidth = 3;
       roundRect(bx, by, bw, bh, 18); ctx.fill(); ctx.stroke();
       ctx.fillStyle = "#8a5a10"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
