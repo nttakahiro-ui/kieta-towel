@@ -15,15 +15,14 @@
 // ===== 調整用の数値（速さ・弾の量・硬さなど）はここにまとめる =====
 const BATTLE = {
   // --- 台本（2周＋大ボス） ---
-  roundInterval1: 4.5,         // 1周目に語句が出てくる間隔（秒）。目安は1周50秒
-  roundInterval2: 5,           // 2周目に語句が出てくる間隔（秒）
-  round1Speed: 1.6,            // 1周目の語句の動く速さの倍率（1周目は特に速く流す）
-  round1FillerScale: 2,        // 1周目の雑魚の出る間隔の倍率（大きいほど雑魚が少ない）
+  roundInterval1: 4,           // 偵察（出撃1）で語句が出てくる間隔（秒）
+  roundInterval2: 4.5,         // 本番（出撃2）で語句が出てくる間隔（秒）
+  round1Speed: 1.4,            // 偵察の語句の動く速さの倍率（偵察は速く流す）
   roundGap: 2.5,               // 周と周のあいだの秒数（帯を出す）
   firstSpawnDelay: 2.2,        // 始まってから最初の語句が出るまで（秒）
-  fallTime: { zako: 8, mid: 10 },   // 空中の語句が画面の上から下まで降りる秒数（大きいほどゆっくり）。10/6に1.5倍の速さにした
-  edgeFallTime: 11,            // 「端にかくれる」語句が降りる秒数
-  crossTime: 5,                // 「横切る」語句が画面を横切る秒数
+  fallTime: { zako: 10, mid: 12.5 }, // 空中の語句が画面の上から下まで降りる秒数（大きいほどゆっくり）。10/7に10/6の前とあとの中間にした
+  edgeFallTime: 13.5,          // 「端にかくれる」語句が降りる秒数
+  crossTime: 6,                // 「横切る」語句が画面を横切る秒数
   crossY: 0.2,                 // 「横切る」語句が通る高さ（画面の高さに対する割合）
   escortCount: 4,              // 「雑魚のうしろ」の語句を守る雑魚の数
   kanaSize: 13,                // 敵の語句の上に出すふりがなの大きさ（px）
@@ -44,8 +43,9 @@ const BATTLE = {
   shotPattern: { zako: [0], mid: [-0.18, 0.18], boss: [-0.25, 0, 0.25] },   // 語句の敵の弾の向き（自機をねらう向きからのずれ）
 
   // --- 雑魚 ---
-  fillerInterval: 2,           // 雑魚の群れが出てくる間隔（秒）。10/6に2〜3倍に増やした
-  fillerMax: 16,               // 同時に出ている雑魚の最大数
+  fillerInterval: 3,           // 雑魚の群れが出てくる間隔（秒）。10/7に10/6の前とあとの中間にした（本番での値。坂の倍率がかかる）
+  fillerMax: 11,               // 同時に出ている雑魚の最大数（本番での値。坂の倍率がかかる）
+  fillerSpeed: 0.83,           // 雑魚の動く速さの倍率（1＝10/6の速さ）
   fillerScale: 0.8,            // 雑魚の大きさの倍率（語句より目立たないように小さく）
   fillerAlpha: 0.72,           // 雑魚の濃さ（1でふつう。小さいほど薄い）
   fillerAvoid: 90,             // 語句のまわり、この距離（px）には雑魚を出さない
@@ -55,7 +55,7 @@ const BATTLE = {
   healItem: 8,                 // 綿のたねで回復する体力
 
   // --- 地上 ---
-  scrollTime: 9.5,             // 地面が画面の高さぶん流れる秒数（大きいほどゆっくり）
+  scrollTime: 11.5,            // 地面が画面の高さぶん流れる秒数（大きいほどゆっくり）
   bombRange: 170,              // 照準◎の位置（自機からどれだけ前か、px）
   lockRadius: 26,              // 照準◎の大きさ（この中に地上の敵が入ると、たねを落とす）
   bombInterval: 0.3,           // たねを落とす間隔（秒）
@@ -78,8 +78,15 @@ const BATTLE = {
   odaiPenalty: 300,            // ダミーに当てたときの減点（コンボは切らない）
   odaiPenaltyCool: 1,          // 同じダミーで続けて減点しない秒数（連射で何度も減らないように）
   odaiBonus: 2000,             // 最初に当てたのが本物なら「ひらめき」ボーナス
-  odaiRowGap: 58,              // 3つの語句の段の間隔（px）
-  odaiSway: 0.45,              // 3つの語句が左右にゆれる速さ
+  odaiColumns: [0.2, 0.5, 0.8], // 3つの語句をならべる列の位置（画面の幅に対する割合）。縦書きで動かさない
+
+  // --- バトルの中の坂（偵察 → 本番 → 大ボスで、だんだん濃くなる） ---
+  // filler: 雑魚の量の倍率（大きいほど多い）、fire: 敵の弾の量の倍率（大きいほど多い）
+  ramp: {
+    round1: { filler: 0.5, fire: 0.6 },   // 偵察: 雑魚少なめ・弾少なめ
+    round2: { filler: 1,   fire: 1 },     // 本番
+    boss:   { filler: 1.3, fire: 1.2 },   // 大ボス: いちばん濃い
+  },
 
   // --- 「記憶の光」ボム ---
   bombGain: 12,                // 語句を倒したときにたまるゲージ（×コンボ倍率）。100で満タン
@@ -375,6 +382,8 @@ const Battle = (() => {
     nextAt = p === "round1" ? BATTLE.firstSpawnDelay : 0.8;
   }
   const roundInterval = () => phase === "round1" ? BATTLE.roundInterval1 : BATTLE.roundInterval2;
+  // 坂: 今の出撃の弾の量の倍率（大きいほど撃つ間隔が短い）
+  const fireRamp = () => Math.max(0.1, (BATTLE.ramp[phase] || BATTLE.ramp.round2).fire);
 
   // 出撃の画面をタップ: 出撃する
   function startSortie() {
@@ -490,6 +499,14 @@ const Battle = (() => {
         return p;
       });
       e.hp = e.maxHp = n;   // 残っている（壊す）文字の数
+      // お題の語句は縦書き: 文字を上から下へならべる（列の幅は1文字分）
+      if (od) {
+        e.vertical = true;
+        e.charH = size * 1.12;
+        e.parts.forEach((p, i) => { p.ox = 0; p.oy = (i - (chars.length - 1) / 2) * e.charH; });
+        e.w = Math.max(...ws) + 4;
+        e.h = chars.length * e.charH;
+      }
     }
     enemies.push(e);
     // 雑魚のうしろ: 語句の前（下）に雑魚がならんで守る
@@ -513,7 +530,7 @@ const Battle = (() => {
   function spawnFiller(type, x, y, extra) {
     const def = FILLER_TYPES[type];
     fillers.push(Object.assign({ type, layer: def.layer, hp: def.hp, r: def.r * BATTLE.fillerScale, x, y, age: 0, flash: 0,
-      fire: def.fire ? rand(0.8, 1.6) * def.fire * BATTLE.fillerFireScale * P.fireScale : 0 }, extra || {}));
+      fire: def.fire ? rand(0.8, 1.6) * def.fire * BATTLE.fillerFireScale * P.fireScale / fireRamp() : 0 }, extra || {}));
   }
   // 語句の近くかどうか（雑魚を出す場所をえらぶとき用）
   function nearWord(x, y, layer) {
@@ -652,9 +669,9 @@ const Battle = (() => {
     // 雑魚の群れを出す（1周目と大ボスのときは少なめ）
     fillerTimer -= dt;
     if (fillerTimer <= 0) {
-      if (fillers.length < BATTLE.fillerMax) spawnWave();
-      const scale = phase === "round1" ? BATTLE.round1FillerScale : (phase === "boss" ? 1.6 : 1);
-      fillerTimer = BATTLE.fillerInterval * scale * rand(0.8, 1.2);
+      const rp = BATTLE.ramp[phase] || BATTLE.ramp.round2;   // 坂: 今の出撃の濃さ
+      if (fillers.length < BATTLE.fillerMax * rp.filler) spawnWave();
+      fillerTimer = BATTLE.fillerInterval / Math.max(0.1, rp.filler) * rand(0.8, 1.2);
     }
 
     // 自機の弾（自動で連射）
@@ -692,11 +709,10 @@ const Battle = (() => {
       e.flash = Math.max(0, e.flash - dt);
       if (e.parts) for (const p of e.parts) p.flash = Math.max(0, p.flash - dt);
       if (e.pattern === "odai") {
-        // お題の語句: 段ごとにならび、左右にゆっくりゆれる（重なっても、ゆれてずれるので下の段の向こうも狙える）
-        const ty = odaiTop() + 26 + e.slot * BATTLE.odaiRowGap;
+        // お題の語句: 縦書きで左・中・右の列にならび、動かない（上から降りてきて止まる）
+        const ty = odaiTop() + 30 + e.h / 2;
         e.y += (ty - e.y) * Math.min(1, dt * 4);
-        const half = Math.max(0, W / 2 - e.w / 2 - 12);
-        e.x = W / 2 + Math.sin(e.age * BATTLE.odaiSway + e.slot * 2.1) * half;
+        e.x = W * BATTLE.odaiColumns[e.slot % BATTLE.odaiColumns.length];
       } else if (e.role === "boss") {
         const enter = Math.min(e.age / BATTLE.bossEnterTime, 1);
         e.y = -e.size + (H * BATTLE.bossStopY + e.size) * (1 - Math.pow(1 - enter, 2));
@@ -722,7 +738,7 @@ const Battle = (() => {
       e.fire -= dt;
       if (e.pattern === "odai" && odai && odai.intro > 0) e.fire = Math.max(e.fire, 0.5);
       if (e.fire <= 0 && e.y > 0 && e.y < H * 0.62) {
-        e.fire = BATTLE.enemyFireInterval[e.role] * P.fireScale * (e.pattern === "odai" ? 3 : 1) * (0.8 + Math.random() * 0.4);
+        e.fire = BATTLE.enemyFireInterval[e.role] * P.fireScale / fireRamp() * (e.pattern === "odai" ? 3 : 1) * (0.8 + Math.random() * 0.4);
         fireAt(e.x, e.y + (e.ground ? 0 : e.h / 2), BATTLE.shotPattern[e.role] || [0]);
       }
     }
@@ -741,20 +757,20 @@ const Battle = (() => {
           f.escort = null;   // 守る相手がいなくなったら、ふつうの綿毛おばけになる
         }
       } else if (f.type === "ladybug") {
-        f.x += f.dir * 170 * dt;
+        f.x += f.dir * 170 * BATTLE.fillerSpeed * dt;
         f.y = f.y0 + Math.sin(f.x / 60) * 28 + f.age * 6;
         f.ang = Math.atan2(Math.cos(f.x / 60) * 28 / 60 * f.dir, f.dir);
       } else if (f.type === "bee") {
         if (f.tx === null) { f.tx = player.x; f.turn = H * rand(0.38, 0.5); }
         if (!f.back) {
-          f.y += 340 * dt;
+          f.y += 340 * BATTLE.fillerSpeed * dt;
           f.x += (f.tx - f.x) * 2 * dt;
           if (f.y > f.turn) { f.back = true; f.vx = (f.x < W / 2 ? 1 : -1) * 160; }
         } else {
-          f.y -= 135 * dt; f.x += f.vx * dt;
+          f.y -= 135 * BATTLE.fillerSpeed * dt; f.x += f.vx * BATTLE.fillerSpeed * dt;
         }
       } else if (f.type === "ghost") {
-        f.y += H / 11 * dt;
+        f.y += H / 11 * BATTLE.fillerSpeed * dt;
         f.x += Math.sin(f.age * 1.3) * 40 * dt;
       } else {
         f.y += sc * dt;     // 地上の雑魚は地面といっしょに流れる
@@ -762,7 +778,7 @@ const Battle = (() => {
       if (def.fire) {
         f.fire -= dt;
         if (f.fire <= 0 && f.y > 0 && f.y < H * 0.68) {
-          f.fire = def.fire * BATTLE.fillerFireScale * P.fireScale * rand(0.8, 1.2);
+          f.fire = def.fire * BATTLE.fillerFireScale * P.fireScale / fireRamp() * rand(0.8, 1.2);
           fireAt(f.x, f.y, def.spread || [0]);
         }
       }
@@ -781,7 +797,10 @@ const Battle = (() => {
           if (e.ground || e.hp <= 0) continue;
           if (e.pattern === "odai" ? (odai && odai.intro > 0) : (e.role === "boss" && e.age < BATTLE.bossEnterTime)) continue;   // 読む時間・降りてくる間は当たらない
           if (Math.abs(s.x - e.x) < e.w / 2 + (s.thick ? 10 : 4) && Math.abs(s.y - e.y) < e.h / 2) {
-            if (e.parts && !e.dummy && !partAt(e, s.x, s.thick ? 10 : 4)) continue;   // 砕けた文字のすきまは通りぬける
+            if (e.vertical && !e.dummy) {   // 縦書き: 下から順に砕ける。砕けた文字のところは通りぬける
+              const lp = lowestPart(e);
+              if (!lp || s.y > e.y + lp.oy + e.charH / 2) continue;
+            } else if (e.parts && !e.dummy && !partAt(e, s.x, s.thick ? 10 : 4)) continue;   // 砕けた文字のすきまは通りぬける
             hit = true;
             if (e.pattern === "odai") odaiHit(e, s); else { damageWord(e, s.x); if (s.thick && e.hp > 0) damageWord(e, s.x); }   // 太い弾は2発分
             break;
@@ -863,11 +882,18 @@ const Battle = (() => {
     return e.parts.find(p => !p.broken && !p.deco && Math.abs(x - (e.x + p.ox)) < p.cw / 2 + near);
   }
 
+  // 縦書きの語句で、いちばん下に残っている文字
+  function lowestPart(e) {
+    let best = null;
+    for (const p of e.parts) if (!p.broken && !p.deco && (!best || p.oy > best.oy)) best = p;
+    return best;
+  }
+
   function damageWord(e, hitX) {
     e.flash = 0.12;
     if (e.parts) {
-      // 当たった文字（なければ、いちばん近い文字）を削る
-      let p = hitX === undefined ? null : partAt(e, hitX, 0);
+      // 当たった文字（なければ、いちばん近い文字）を削る。縦書きは、いちばん下の文字
+      let p = e.vertical ? lowestPart(e) : (hitX === undefined ? null : partAt(e, hitX, 0));
       if (!p) {
         const alive = e.parts.filter(q => !q.broken && !q.deco);
         const hx = hitX === undefined ? e.x : hitX;
@@ -890,13 +916,13 @@ const Battle = (() => {
   }
 
   function breakPart(e, p) {
-    const px = e.x + p.ox;
+    const px = e.x + p.ox, py = e.y + (p.oy || 0);
     for (let i = 0; i < 12; i++) {
       const a = Math.random() * Math.PI * 2, sp = 50 + Math.random() * 110;
-      threads.push({ x: px, y: e.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, len: 5 + Math.random() * 6,
+      threads.push({ x: px, y: py, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, len: 5 + Math.random() * 6,
         curl: (Math.random() - 0.5) * 2, rot: Math.random() * 6, color: ENEMY_COLOR[e.role], age: 0, scatter: 9, sparkle: true });
     }
-    floats.push({ x: px, y: e.y - e.size * 0.9, text: p.kana, big: true, kana: true, age: 0 });
+    floats.push({ x: e.vertical ? px + e.size : px, y: e.vertical ? py : e.y - e.size * 0.9, text: p.kana, big: true, kana: true, age: 0 });
     Sound.se("crack");
     if (p.kana !== "ー") Sound.speak(p.kana);
   }
@@ -930,11 +956,10 @@ const Battle = (() => {
   function startOdai(real, isBoss) {
     const role = isBoss ? "boss" : "mid";
     const cands = shuffle([real, ...odaiDummies(real)]);   // ならびは毎回入れかえ
-    // 3つとも同じ大きさ（いちばん長い語句が画面に入る大きさ）
-    let size = BATTLE.fontSize[role];
-    ctx.font = font(size);
-    const widest = () => Math.max(...cands.map(w => ctx.measureText(w.word).width));
-    while (widest() > W - 40 && size > 24) { size -= 2; ctx.font = font(size); }
+    // 3つとも同じ大きさ（いちばん長い語句が、縦書きで画面に入る大きさ。24px より小さくしない）
+    const longest = Math.max(...cands.map(w => Array.from(w.word).length));
+    const room = H * 0.62 - (14 + 42 + Math.max(1, BATTLE.stripRows) * 22 + 10 + 60) - 30;
+    const size = Math.max(24, Math.min(BATTLE.fontSize[role], Math.floor(room / (longest * 1.12))));
     odai = { real, boss: isBoss, t: 0, intro: BATTLE.odaiIntroTime, firstHit: null, q: real.odaiQuestion || real.question };
     cands.forEach((w, i) => spawn(w, { role, size, slot: i, real: w === real }));
     slow = BATTLE.odaiIntroTime;   // 吸い込みと同じスロー。読む時間をつくる
@@ -1205,7 +1230,7 @@ const Battle = (() => {
       const wob = e.flash > 0 ? (Math.random() - 0.5) * 4 : 0;
       // 影
       ctx.fillStyle = "rgba(60,80,40,0.16)";
-      ctx.fillText(e.word.word, e.x + 14, e.y + 22);
+      if (!e.vertical) ctx.fillText(e.word.word, e.x + 14, e.y + 22);
       drawWordText(e, e.x + wob, e.y, alpha);
       ctx.globalAlpha = alpha;
       drawHpDots(e);
@@ -1500,7 +1525,43 @@ const Battle = (() => {
   // 地上の語句: 畑にうまった土の盛り上がりの上に文字
   // 語句の文字: 光る縁取りと、漢字の上に小さくふりがな
   // 吸い込める回（最後の回）は金色に光る。それより前は白く光る
+  // 縦書きのときの文字の形（のばす棒・かっこは縦向きに）
+  const VERTICAL_GLYPH = { "ー": "｜", "(": "︵", ")": "︶", "（": "︵", "）": "︶", "〜": "≀" };
+
+  // 縦書きの語句（お題バトル）
+  function drawVerticalWord(e, x, y, alpha) {
+    ctx.save();
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.font = font(e.size); ctx.lineJoin = "round";
+    const fillColor = e.last ? GOLD_COLOR : ENEMY_COLOR[e.role];
+    for (const p of e.parts) {
+      const ch = VERTICAL_GLYPH[p.ch] || p.ch, py = y + p.oy;
+      if (p.broken) { ctx.globalAlpha = alpha * 0.15; ctx.fillStyle = fillColor; ctx.fillText(ch, x, py); continue; }
+      const wob = p.flash > 0 ? (Math.random() - 0.5) * 3 : 0;
+      ctx.globalAlpha = alpha;
+      ctx.shadowColor = "rgba(255,214,90,0.9)"; ctx.shadowBlur = 12;
+      ctx.lineWidth = 8; ctx.strokeStyle = e.flash > 0 ? "#fff6c8" : "#fff6d8";
+      ctx.strokeText(ch, x + wob, py);
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = fillColor; ctx.fillText(ch, x + wob, py);
+      if (p.maxHp && p.hp < p.maxHp) {   // 文字ごとの残りの耐久（右に小さな帯）
+        const bh = e.charH * 0.7;
+        ctx.fillStyle = "rgba(0,0,0,0.12)"; ctx.fillRect(x + e.w / 2 + 2, py - bh / 2, 3, bh);
+        ctx.fillStyle = ENEMY_COLOR[e.role]; ctx.fillRect(x + e.w / 2 + 2, py + bh / 2 - bh * p.hp / p.maxHp, 3, bh * p.hp / p.maxHp);
+      }
+    }
+    // ふりがなは列の上に横書きで
+    if (hasKanji(e.word.word)) {
+      ctx.globalAlpha = alpha;
+      ctx.font = font(BATTLE.kanaSize); ctx.lineWidth = 4; ctx.strokeStyle = "#ffffff";
+      const ky = y - e.h / 2 - BATTLE.kanaSize / 2 - 2;
+      ctx.strokeText(e.word.kana, x, ky); ctx.fillStyle = "#5d6b4c"; ctx.fillText(e.word.kana, x, ky);
+    }
+    ctx.restore();
+  }
+
   function drawWordText(e, x, y, alpha) {
+    if (e.vertical) { drawVerticalWord(e, x, y, alpha); return; }
     const word = e.word;
     if (!e.last) alpha *= 0.55;   // 偵察の語句は半透明
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
