@@ -179,6 +179,19 @@ const ENEMY_BULLET_ART = {
   }
 };
 
+// 時間帯の色（data/stages.js の theme 欄で、ステージごとに上書きする）。ここは「真昼」の色
+// image に背景の絵のパスを入れると、地面の絵のかわりにその絵を縦に流す（本番の背景用）
+const DEFAULT_THEME = {
+  time: "真昼", image: null,
+  ground: "#dcebc4", field: "#e8dcbc", furrow: "#d8c9a2", plant: "#7fa85a", cotton: "#ffffff",
+  creek: "#c4e0e4", creekLight: "rgba(255,255,255,0.7)", path: "#efe4c8", bush: "#cfe3b3",
+  light: null,                                   // 地面の上にうすくかける光の色（明け方・夕暮れ・夜）
+  cloudShadow: "rgba(70,90,50,0.07)", fluff: "rgba(255,255,255,0.8)",
+  tree: ["#4f7a36", "#5e8c3e", "#6a9a45", "#86b45c"],   // 木の色（濃い → うすい）
+  treeShadow: "rgba(50,70,35,0.25)", treeShadowScale: 1, // 木の影の色と長さ
+  fillerFilter: "none",                          // 雑魚の色味（CSS の filter の書き方。使えない端末では変わらない）
+};
+
 // 本番（出撃2）の語句の色（金色）
 const GOLD_COLOR = "#c8901a";
 
@@ -325,6 +338,7 @@ const Battle = (() => {
   let obs = [];              // 画面に出ている障害物 { kind, x, y, r }
   let obsNext = 0;           // 次に出す障害物の番号
   let guide = null;          // 木のよけ方の案内（矢印）
+  let theme = DEFAULT_THEME; // このステージの時間帯の色
   let found = new Set();     // 探検で見つけた語句の id
   let loadout = null;        // 本番に持っていくもの（LOADOUTS の id）
   let choiceT = 0;           // 選ぶ時間の残り（秒）
@@ -423,6 +437,7 @@ const Battle = (() => {
     P = stageParams(opts.stage);
     layout = opts.stage && opts.stage.patterns === "auto" ? autoLayout(words, P, opts.stage.obstacles) : null;
     obsDef = (opts.stage && opts.stage.obstacles) || null;
+    theme = Object.assign({}, DEFAULT_THEME, (opts.stage && opts.stage.theme) || {});
     groundIds = new Set(words.filter(w => patOf(w).pattern === "ground" && w !== bossWord).map(w => w.id));
     // 台本: 大ボス以外の語句を、データの順番（order）でならべる
     script = words.filter(w => w !== bossWord).sort((a, b) => patOf(a).order - patOf(b).order);
@@ -1423,7 +1438,7 @@ const Battle = (() => {
     if (state === "play") drawReticle();
 
     // 雲の影（地面の上を流れる）
-    ctx.fillStyle = "rgba(70,90,50,0.07)";
+    ctx.fillStyle = theme.cloudShadow;
     for (const c of cloudShadows) { ctx.beginPath(); ctx.ellipse(c.x, c.y, c.rx, c.ry, 0, 0, Math.PI * 2); ctx.fill(); }
 
     // 障害物
@@ -1514,7 +1529,7 @@ const Battle = (() => {
     }
 
     // いちばん上を舞う綿毛
-    ctx.fillStyle = "rgba(255,255,255,0.8)";
+    ctx.fillStyle = theme.fluff;
     for (const f of fluff) { ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2); ctx.fill(); }
     ctx.restore();
 
@@ -1578,39 +1593,57 @@ const Battle = (() => {
 
   // 地面: 草地のうえに、畑・花・小川・あぜ道
   function drawTerrain() {
-    ctx.fillStyle = "#dcebc4";
+    // 背景の絵があれば、それを縦に流す（本番の背景用）
+    if (theme.image) {
+      if (!theme._img) { theme._img = new Image(); theme._img.src = theme.image; }
+      const img = theme._img;
+      if (img.complete && img.naturalWidth) {
+        const ih = W * img.naturalHeight / img.naturalWidth, off = (t * scrollSpeed()) % ih;
+        for (let y = off - ih; y < H; y += ih) ctx.drawImage(img, 0, y, W, ih);
+        drawLight();
+        return;
+      }
+    }
+    ctx.fillStyle = theme.ground;
     ctx.fillRect(-10, -10, W + 20, H + 20);
     for (const s of terrain) {
       const y = s.y;
       if (s.kind === "field") {
-        ctx.fillStyle = "#e8dcbc";
+        ctx.fillStyle = theme.field;
         roundRect(s.x0, y + 8, s.x1 - s.x0, SEG_H - 16, 18); ctx.fill();
-        ctx.strokeStyle = "#d8c9a2"; ctx.lineWidth = 6; ctx.lineCap = "round";
+        ctx.strokeStyle = theme.furrow; ctx.lineWidth = 6; ctx.lineCap = "round";
         for (let yy = y + 26; yy < y + SEG_H - 16; yy += 22) { ctx.beginPath(); ctx.moveTo(s.x0 + 14, yy); ctx.lineTo(s.x1 - 14, yy); ctx.stroke(); }
         for (const d of s.deco) {   // 綿の実
-          ctx.fillStyle = "#7fa85a"; ctx.beginPath(); ctx.arc(d.x, y + d.y + 3, d.r * 0.7, 0, Math.PI * 2); ctx.fill();
-          ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(d.x, y + d.y, d.r * 0.6, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = theme.plant; ctx.beginPath(); ctx.arc(d.x, y + d.y + 3, d.r * 0.7, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = theme.cotton; ctx.beginPath(); ctx.arc(d.x, y + d.y, d.r * 0.6, 0, Math.PI * 2); ctx.fill();
         }
       } else if (s.kind === "meadow") {
         for (const d of s.deco) { ctx.fillStyle = d.c; ctx.beginPath(); ctx.arc(d.x, y + d.y, 3, 0, Math.PI * 2); ctx.fill(); }
       } else if (s.kind === "creek") {
-        ctx.strokeStyle = "#c4e0e4"; ctx.lineWidth = 34; ctx.lineCap = "round";
+        ctx.strokeStyle = theme.creek; ctx.lineWidth = 34; ctx.lineCap = "round";
         ctx.beginPath();
         for (let x = -20; x <= W + 20; x += 16) { const yy = y + s.cy + Math.sin(x / 55 + s.ph) * 18; x === -20 ? ctx.moveTo(x, yy) : ctx.lineTo(x, yy); }
         ctx.stroke();
-        ctx.strokeStyle = "rgba(255,255,255,0.7)"; ctx.lineWidth = 3;
+        ctx.strokeStyle = theme.creekLight; ctx.lineWidth = 3;
         ctx.beginPath();
         for (let x = -20; x <= W + 20; x += 16) { const yy = y + s.cy - 4 + Math.sin(x / 55 + s.ph) * 18; x === -20 ? ctx.moveTo(x, yy) : ctx.lineTo(x, yy); }
         ctx.stroke();
       } else {
-        ctx.strokeStyle = "#efe4c8"; ctx.lineWidth = 26; ctx.lineCap = "round";
+        ctx.strokeStyle = theme.path; ctx.lineWidth = 26; ctx.lineCap = "round";
         ctx.beginPath();
         for (let yy = 0; yy <= SEG_H; yy += 20) { const xx = s.px + Math.sin(yy / 60 + s.ph) * 30; yy === 0 ? ctx.moveTo(xx, y + yy) : ctx.lineTo(xx, y + yy); }
         ctx.stroke();
-        ctx.fillStyle = "#cfe3b3";
+        ctx.fillStyle = theme.bush;
         for (const d of s.deco) { ctx.beginPath(); ctx.arc(d.x, y + d.y, d.r, 0, Math.PI * 2); ctx.fill(); }
       }
     }
+    drawLight();
+  }
+  // 時間帯の光: 地面の上にだけうすくかける（語句・雑魚・自機・帯にはかけないので、夜でも文字は読める）
+  function drawLight() {
+    if (!theme.light) return;
+    ctx.fillStyle = theme.light;
+    ctx.fillRect(-10, -10, W + 20, H + 20);
   }
 
   // 木のよけ方の案内の矢印
@@ -1649,21 +1682,22 @@ const Battle = (() => {
     ctx.save();
     ctx.translate(o.x, o.y);
     // 影
-    ctx.fillStyle = "rgba(50,70,35,0.25)";
-    ctx.beginPath(); ctx.ellipse(10, 14, o.r * 1.02, o.r * 0.95, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = theme.treeShadow;   // 影（夜は濃く、夕暮れは長く）
+    const sl = theme.treeShadowScale;
+    ctx.beginPath(); ctx.ellipse(10 * sl, 14 * sl, o.r * (0.98 + 0.06 * sl), o.r * 0.95, 0, 0, Math.PI * 2); ctx.fill();
     if (o.kind === "rock") {
       ctx.fillStyle = "#b9b3a6"; ctx.beginPath(); ctx.arc(0, 0, o.r, 0, Math.PI * 2); ctx.fill();
     } else {
       // 大きな木: 幹のまわりに、重なった葉のかたまり
-      ctx.fillStyle = "#4f7a36";
+      ctx.fillStyle = theme.tree[0];
       ctx.beginPath(); ctx.arc(0, 0, o.r, 0, Math.PI * 2); ctx.fill();
       const blobs = 7;
       for (let i = 0; i < blobs; i++) {
         const a = i / blobs * Math.PI * 2;
-        ctx.fillStyle = i % 2 ? "#6a9a45" : "#5e8c3e";
+        ctx.fillStyle = i % 2 ? theme.tree[2] : theme.tree[1];
         ctx.beginPath(); ctx.arc(Math.cos(a) * o.r * 0.55, Math.sin(a) * o.r * 0.55, o.r * 0.48, 0, Math.PI * 2); ctx.fill();
       }
-      ctx.fillStyle = "#86b45c";
+      ctx.fillStyle = theme.tree[3];
       ctx.beginPath(); ctx.arc(-o.r * 0.2, -o.r * 0.2, o.r * 0.4, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = "#7a5a3a";   // 幹のてっぺん
       ctx.beginPath(); ctx.arc(0, 0, Math.max(6, o.r * 0.14), 0, Math.PI * 2); ctx.fill();
@@ -1748,6 +1782,7 @@ const Battle = (() => {
     const r = FILLER_TYPES[f.type].r;
     ctx.save();
     ctx.globalAlpha = BATTLE.fillerAlpha;
+    if (theme.fillerFilter && theme.fillerFilter !== "none" && "filter" in ctx) ctx.filter = theme.fillerFilter;   // 時間帯の色味
     ctx.translate(x, y);
     ctx.scale(BATTLE.fillerScale, BATTLE.fillerScale);
     if (f.flash > 0) ctx.translate((Math.random() - 0.5) * 3, 0);
