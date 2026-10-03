@@ -74,7 +74,8 @@ const BATTLE = {
   healOnAbsorb: 12,            // 語句を吸い込んだときに回復する体力
   invincibleTime: 1.3,         // 当たったあと、しばらく無敵になる秒数
   reviveDelay: 3,              // 体力ゼロのあと、再開するまでの秒数
-  wordShowTime: 1.0,           // 吸い込んだ語句を画面中央に大きく出す秒数（この間は弾が当たらない）
+  wordShowTime: 1.5,           // 吸い込んだ語句を画面中央に大きく出す秒数（この間は弾が当たらない）
+  fuwariSayTime: 3,            // 周の始まりの、ふわりの一言を出す秒数
   slowTime: 0.3,               // 吸い込む瞬間に画面全体がゆっくりになる秒数
   slowScale: 0.25,             // ゆっくりのときの速さ（1でふつう、小さいほどゆっくり）
   stripRows: 2,                // 「集めたことば」の帯の行数
@@ -119,6 +120,9 @@ const ENEMY_BULLET_ART = {
     ctx.restore();
   }
 };
+
+// 自機の弾の色
+const SHOT_COLOR = "#ff5fa2";
 
 // 敵の文字の色（役割ごと）
 const ENEMY_COLOR = { zako: "#5f8a3c", mid: "#b2733d", boss: "#c4577a" };
@@ -167,6 +171,7 @@ const Battle = (() => {
   let lock = false;          // 照準に地上の敵が入っているか
   let slow = 0;              // ゆっくりの残り時間（秒）
   let gauge = 0;             // 「記憶の光」ボムのゲージ（0〜100）
+  let fsay = null;           // ふわりの一言（吹き出し）
   let bombsUsed = 0;
   let bombing = false;       // 「記憶の光」で反応させている最中（ゲージをためない）
   let wave = null;           // 吸い込んだときに広がる光
@@ -254,7 +259,7 @@ const Battle = (() => {
     score = 0; combo = 0; maxCombo = 0; floats = [];
     hits = 0; downs = 0;
     paused = false; moved = false; groundHinted = false; banner = null; shake = 0; showWord = null; threads = []; pops = [];
-    slow = 0; wave = null; gauge = 0; bombsUsed = 0;
+    slow = 0; wave = null; gauge = 0; bombsUsed = 0; fsay = null;
     state = "intro"; stateTimer = 2;
     running = true;
     lastTs = performance.now();
@@ -442,6 +447,7 @@ const Battle = (() => {
     // 吸い込んだ語句の表示と、広がる光は実際の時間で進める
     if (showWord) { showWord.t -= realDt; if (showWord.t <= 0) showWord = null; }
     if (wave) { wave.age += realDt; if (wave.age > 0.6) wave = null; }
+    if (fsay) { fsay.t -= realDt; if (fsay.t <= 0) fsay = null; }
     t += dt;
     shake = Math.max(0, shake - dt);
     player.glow = Math.max(0, player.glow - dt);
@@ -464,7 +470,10 @@ const Battle = (() => {
 
     if (state === "intro") {
       stateTimer -= dt;
-      if (stateTimer <= 0) state = "play";
+      if (stateTimer <= 0) {
+        state = "play";
+        fsay = { text: "ことばを見つけよう（まだ吸い込めないよ）", t: BATTLE.fuwariSayTime };
+      }
       return;
     }
     if (state === "down") {
@@ -485,7 +494,8 @@ const Battle = (() => {
       if (gapT <= 0) {
         if (phase === "round1") {
           startPhase("round2");
-          banner = { text: "2周目　こんどは吸い込める！", t: 2.2, color: "rgba(220,170,60,0.92)" };
+          banner = { text: "2周目", t: 1.6, color: "rgba(220,170,60,0.92)" };
+          fsay = { text: "思い出した！今度は吸い込める！", t: BATTLE.fuwariSayTime };
           Sound.se("power");
         } else {
           startPhase("boss");
@@ -944,11 +954,13 @@ const Battle = (() => {
     // 綿のたね（体力回復）
     for (const it of items) drawItem(it);
 
-    // 自機の弾（小さな光のつぶ）
-    ctx.fillStyle = "#fff9d6";
-    ctx.strokeStyle = "#e8cf7a";
-    ctx.lineWidth = 1.5;
-    for (const s of shots) { ctx.beginPath(); ctx.ellipse(s.x, s.y, 3.5, 7, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+    // 自機の弾: 地面（緑・生成り・水色）と重ならない明るい桃色に、白と濃い色の縁取り
+    for (const s of shots) {
+      ctx.beginPath(); ctx.ellipse(s.x, s.y, 4, 8, 0, 0, Math.PI * 2);
+      ctx.lineWidth = 4; ctx.strokeStyle = "rgba(120,30,70,0.55)"; ctx.stroke();
+      ctx.lineWidth = 2; ctx.strokeStyle = "#ffffff"; ctx.stroke();
+      ctx.fillStyle = SHOT_COLOR; ctx.fill();
+    }
 
     // 空中の雑魚
     for (const f of fillers) if (f.layer === "air") drawFiller(f);
@@ -1061,7 +1073,7 @@ const Battle = (() => {
     if (showWord) drawBigWord(showWord.word, showWord.t);
 
     // 状態の文字
-    if (state === "intro") centerText(opts.stageName, "1周目　ことばを見つけよう");
+    if (state === "intro") centerText(opts.stageName, "1周目");
     if (state === "down") centerText("やられた…", `${Math.ceil(stateTimer)}秒後に再開`);
     if (state === "clear") centerText(`${absorbed.length}語あつまった！`, `${score}点　タイム ${fmtTime(t)}`);
     if (paused) {
@@ -1389,6 +1401,7 @@ const Battle = (() => {
       ctx.lineWidth = 4; ctx.strokeStyle = "#ffffff"; ctx.strokeText("！", fx + 2, fy - 24);
       ctx.fillStyle = "#e0a93a"; ctx.fillText("！", fx + 2, fy - 24);
     }
+    if (fsay) drawFuwariSay(fx, fy);
     const sc = 1 + player.glow * 0.6;
     ctx.fillStyle = level.body;
     ctx.strokeStyle = level.line;
@@ -1399,6 +1412,23 @@ const Battle = (() => {
     ctx.font = font(11);
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.fillText(String(opts.fuwariCount), fx, fy + 1);
+  }
+
+  // ふわりの一言（吹き出し）。画面からはみ出さない位置に出す
+  function drawFuwariSay(fx, fy) {
+    const a = Math.min(1, fsay.t / 0.3, (BATTLE.fuwariSayTime - fsay.t) / 0.2);
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, a);
+    ctx.font = font(15);
+    const tw = ctx.measureText(fsay.text).width, pad = 10, bw = tw + pad * 2, bh = 30;
+    const bx = Math.min(Math.max(fx - bw / 2, 8), W - bw - 8), by = fy - 30 - bh;
+    ctx.fillStyle = "rgba(255,253,245,0.96)"; ctx.strokeStyle = "#cfe0b6"; ctx.lineWidth = 2;
+    roundRect(bx, by, bw, bh, 12); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(fx - 6, by + bh); ctx.lineTo(fx, by + bh + 8); ctx.lineTo(fx + 6, by + bh); ctx.closePath();
+    ctx.fillStyle = "rgba(255,253,245,0.96)"; ctx.fill();
+    ctx.fillStyle = "#4b5e3a"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    ctx.fillText(fsay.text, bx + pad, by + bh / 2 + 1);
+    ctx.restore();
   }
 
   function drawHud() {
