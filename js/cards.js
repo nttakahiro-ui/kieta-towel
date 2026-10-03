@@ -38,7 +38,7 @@ const Cards = (() => {
     rk.innerHTML = "";
     if (o.stats) {
       const st = o.stats;
-      $("cards-summary").textContent += `\nぶつかった ${st.hits}回${st.downs ? `　元気がなくなった ${st.downs}回` : ""}${st.gameOvers ? `　2回目の旅のやり直し ${st.gameOvers}回` : ""}　いちばん長いれんぞく ${st.maxCombo}`;   // バトルの時間は出さない（調整パネルの中だけ）
+      $("cards-summary").textContent += `\nぶつかった ${st.hits}回${st.downs ? `　元気がなくなった ${st.downs}回` : ""}${st.gameOvers ? `　救出のたびのやり直し ${st.gameOvers}回` : ""}　いちばん長いれんぞく ${st.maxCombo}`;   // バトルの時間は出さない（調整パネルの中だけ）
       // 点数とランク
       const r = rankOf(st.score);
       const sc = document.createElement("div"); sc.className = "rank-score"; sc.textContent = `${st.score} 点`;

@@ -113,6 +113,11 @@ const BATTLE = {
   bugEvery: 5,                 // 飾りの虫が横切る間隔（秒）
   // 2回目の旅: ことばを包む殻（10/3-11。役割で分ける: ザコ＝綿毛のまゆ、中ボス＝いばら、大ボス＝霧）。見た目はすべて仮
   shellVeil: 0.22,             // 殻が語句の上にかかる濃さ（0〜1。読みやすさのため、うすく）
+  // 旅の名前と表紙の文（10/3-12）。画面に出す言葉はここにまとめる
+  TRIPS: {
+    1: { name: "発見のたび", sub: "双眼鏡でさがそう", cover: "まずは偵察機にのって、とらわれたことばたちを発見するたびに出よう！", go: "発見のたびへ、\n出発！" },
+    2: { name: "救出のたび", sub: "光で助けよう",     cover: "こんどはふわりの光で、ことばたちを殻から助け出す。救出のたびに出よう！", go: "救出のたびへ、\n出発！" },
+  },
   // 本番の表紙（10/3-9）
   countStep: 0.45,             // 表紙のあとのカウント「3」「2」「1」のそれぞれの時間（秒）
   countGo: 0.5,                // 「出撃！」の時間（秒）。カウントの合計は2秒以内
@@ -423,9 +428,8 @@ const Battle = (() => {
     e.preventDefault();
     if (paused) { resume(); return; }
     if (!player) return;
-    if (state === "sortie") {
-      if (sortieNo === 2) {
-        if (sortieStep === "choice") {
+    if (state === "sortie") {   // 旅の画面: 選ぶ（救出のたびだけ）→ 表紙をタップ → カウント
+        if (sortieNo === 2 && sortieStep === "choice") {
           const rect = canvas.getBoundingClientRect();
           const px = e.clientX - rect.left, py = e.clientY - rect.top;
           const c = choiceRects().find(r => px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h);
@@ -435,12 +439,11 @@ const Battle = (() => {
         } else if (sortieStep === "cover") {
           sortieStep = "count"; countT = 0;   // タップで 3・2・1・出撃！
           Sound.se("odai");
-          drag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, px: player.x, py: player.y };   // 指をつけたままなら、出撃してすぐ動かせる
+          const ex = sortieNo === 1;   // 発見のたびは双眼鏡、救出のたびは自機
+          drag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, px: ex ? bino.x : player.x, py: ex ? bino.y : player.y };   // 指をつけたままなら、出発してすぐ動かせる
           try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
         }
         return;
-      }
-      startSortie();
     }
     // ふわりマークをタップ: ゲージが満タンなら「ふわりタイフーン」
     const rect = canvas.getBoundingClientRect(), bb = bombButton();
@@ -519,7 +522,7 @@ const Battle = (() => {
     stripFlash = 0; sortieStep = "choice"; freed = [];
     explore = { t: 0, next: 0, list: [], bugs: [], bugT: 2, endT: 0 };
     bino = { x: W / 2 + 10, y: H * 0.42 };
-    state = "sortie"; sortieNo = 1; reacted = 0;   // 「出撃1 探検」の画面から始める
+    state = "sortie"; sortieNo = 1; reacted = 0; sortieStep = "cover";   // 発見のたびの表紙から始める   // 「出撃1 探検」の画面から始める
     loadout = null; powerBonus = 0; shield = 0; gaugeMul = 1;
     running = true;
     lastTs = performance.now();
@@ -811,7 +814,7 @@ const Battle = (() => {
         choiceT -= realDt;
         if (choiceT <= 0) { chooseLoadout("power"); sortieStep = "cover"; }   // 選ばなければ「つよい弾」で表紙へ
       }
-      if (sortieNo === 2 && sortieStep === "count") {
+      if (sortieStep === "count") {
         const prev = countStepNo();
         countT += realDt;
         if (countT >= BATTLE.countStep * 3 + BATTLE.countGo) startSortie();
@@ -1258,7 +1261,8 @@ const Battle = (() => {
   function wrapText(text, maxW) {
     const lines = []; let line = "";
     for (const ch of Array.from(text)) {
-      if (ctx.measureText(line + ch).width > maxW && line) { lines.push(line); line = ch; } else line += ch;
+      const noHead = "、。，．！？!?」』）)ーっゃゅょッャュョ…".includes(ch);   // 行の頭に来ないようにする文字（ぶら下げる）
+      if (ctx.measureText(line + ch).width > maxW && line && !noHead) { lines.push(line); line = ch; } else line += ch;
     }
     if (line) lines.push(line);
     return lines;
@@ -1465,7 +1469,7 @@ const Battle = (() => {
     const all = reacted >= words.length;
     if (ex.t >= BATTLE.exploreTime || (all && ex.list.length === 0)) {
       ex.endT = 2.4;
-      banner = { text: all ? "ぜんぶ見つけた！" : `見つけたのは${reacted}語。\nのこりは2回目の旅でさがそう`, t: 2.4, color: "rgba(72,105,58,0.92)" };
+      banner = { text: all ? "ぜんぶ見つけた！" : `見つけたのは${reacted}語。\nのこりは救出のたびでさがそう`, t: 2.4, color: "rgba(72,105,58,0.92)" };
       fsay = null;
     }
   }
@@ -2493,27 +2497,11 @@ const Battle = (() => {
     ctx.fillStyle = sortieNo === 1 ? "rgba(236,244,226,0.93)" : "rgba(255,246,220,0.94)";
     ctx.fillRect(0, 0, W, H);
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    if (sortieNo === 2) { if (sortieStep === "choice") drawChoice(); else drawCover(); ctx.restore(); return; }
-    const cy = H * 0.4;
-    ctx.font = font(15); ctx.fillStyle = "#7a8a68";
-    ctx.fillText(opts.stageName, W / 2, cy - 110);
-    ctx.font = font(44); ctx.fillStyle = sortieNo === 1 ? "#48693a" : "#b0801a";
-    ctx.fillText(`${sortieNo}回目の旅`, W / 2, cy - 60);
-    ctx.font = font(30);
-    ctx.fillText(sortieNo === 1 ? "ことばをさがす" : "ことばを助ける", W / 2, cy - 12);
-    ctx.font = font(16); ctx.fillStyle = "#4b5e3a";
-    const lines = sortieNo === 1
-      ? ["双眼鏡で、ただよっていることばをさがそう。", "円の中で少し見つめると", "見つかるよ"]
-      : [`1回目の旅で見つけたことば ${reacted}語`, "ことばは殻にとらわれている。", "ふわりの光でほどいて、助けよう！"];
-    lines.forEach((l, i) => ctx.fillText(l, W / 2, cy + 36 + i * 24));
-    ctx.globalAlpha = 0.6 + Math.sin(performance.now() / 250) * 0.4;
-    ctx.font = font(22); ctx.fillStyle = sortieNo === 1 ? "#6f9a4a" : "#c98a1e";
-    ctx.fillText("タップで出発！", W / 2, cy + 150);
+    if (sortieNo === 2 && sortieStep === "choice") drawChoice(); else drawCover();
     ctx.restore();
   }
 
-  // 出撃2の画面: 本番に持っていくものを3つから1つ選ぶ
-  // 1回目の旅の画面: 暗い中に、双眼鏡の2つの円の中だけが見える（仮の見た目）
+  // 発見のたびの画面: 暗い中に、双眼鏡の2つの円の中だけが見える（仮の見た目）
   function drawExplore() {
     const ex = explore, R = binoR(), cs = binoCenters();
     // 飾りの虫
@@ -2624,51 +2612,59 @@ const Battle = (() => {
     }
   }
 
-  // 本番の表紙（仮の見た目）: 大きく「出撃2 本番」、ふわりの一言。タップで 3・2・1・出撃！
+  // 旅の表紙（仮の見た目）: 大きく旅の名前と見出し、ふわりの一言。タップで 3・2・1・「○○のたびへ、出発！」
   function drawCover() {
-    ctx.fillStyle = "rgba(255,240,200,0.6)"; ctx.fillRect(0, 0, W, H);
-    const cy = H * 0.36;
+    const trip = BATTLE.TRIPS[sortieNo], green = sortieNo === 1;
+    const main = green ? "#48693a" : "#b0801a", accent = green ? "#6f9a4a" : "#c98a1e", line = green ? "#9cbf7c" : "#e0b03a";
+    ctx.fillStyle = green ? "rgba(225,238,212,0.6)" : "rgba(255,240,200,0.6)"; ctx.fillRect(0, 0, W, H);
+    const cy = H * 0.34;
     if (sortieStep === "cover") {
-      ctx.font = font(15); ctx.fillStyle = "#9a7a40";
-      ctx.fillText(opts.stageName, W / 2, cy - 120);
-      ctx.font = font(56); ctx.fillStyle = "#b0801a";
-      ctx.fillText("2回目の旅", W / 2, cy - 64);
-      ctx.font = font(44);
-      ctx.fillText("ことばを助ける", W / 2, cy - 6);
-      // ふわり（仮の絵）と吹き出し
-      const by = cy + 70, text = "ことばを助けに行こう！";
-      ctx.font = font(17);
-      const tw = ctx.measureText(text).width, bw = tw + 28, bx = W / 2 - bw / 2 + 22;
-      ctx.fillStyle = "#fffdf7"; ctx.strokeStyle = "#dcb64e"; ctx.lineWidth = 2;
-      roundRect(bx - 50, by - 14, 34, 28, 8); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = "#6b5a3a"; ctx.beginPath(); ctx.arc(bx - 39, by - 2, 1.8, 0, Math.PI * 2); ctx.arc(bx - 27, by - 2, 1.8, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = "rgba(255,253,245,0.97)"; ctx.strokeStyle = "#e0b03a";
-      roundRect(bx, by - 20, bw, 40, 14); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = "#6b4a10"; ctx.fillText(text, bx + bw / 2, by);
+      ctx.font = font(15); ctx.fillStyle = green ? "#7a8a68" : "#9a7a40";
+      ctx.fillText(opts.stageName, W / 2, cy - 110);
+      let fs = 50; ctx.font = font(fs);
+      while (ctx.measureText(trip.name).width > W - 40 && fs > 30) { fs -= 2; ctx.font = font(fs); }
+      ctx.fillStyle = main;
+      ctx.fillText(trip.name, W / 2, cy - 56);
+      ctx.font = font(26);
+      ctx.fillText(trip.sub, W / 2, cy - 6);
+      // ふわり（仮の絵）と吹き出し（表紙の文）
+      ctx.font = font(16);
+      const lines = wrapText(trip.cover, W - 110), bw = W - 92, bh = lines.length * 22 + 20, bx = 70, by = cy + 40;
+      ctx.fillStyle = "#fffdf7"; ctx.strokeStyle = line; ctx.lineWidth = 2;
+      roundRect(24, by + bh / 2 - 14, 34, 28, 8); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "#6b5a3a"; ctx.beginPath(); ctx.arc(35, by + bh / 2 - 2, 1.8, 0, Math.PI * 2); ctx.arc(47, by + bh / 2 - 2, 1.8, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "rgba(255,253,245,0.97)"; ctx.strokeStyle = line;
+      roundRect(bx, by, bw, bh, 14); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = green ? "#3f5a30" : "#6b4a10";
+      lines.forEach((l, i) => ctx.fillText(l, bx + bw / 2, by + 21 + i * 22));
+      if (sortieNo === 2 && reacted < (opts.total - 1)) {   // 発見のたびで見つけられなかったことばがあるとき
+        ctx.font = font(13); ctx.fillStyle = "#7a6a40";
+        ctx.fillText(`発見のたびで見つけたことば ${reacted}語（のこりは「？」のまま出てくるよ）`, W / 2, by + bh + 22);
+      }
       ctx.globalAlpha = 0.6 + Math.sin(performance.now() / 250) * 0.4;
-      ctx.font = font(22); ctx.fillStyle = "#c98a1e";
-      ctx.fillText("タップで出発！", W / 2, cy + 160);
+      ctx.font = font(22); ctx.fillStyle = accent;
+      ctx.fillText("タップで出発！", W / 2, by + bh + 70);
       ctx.globalAlpha = 1;
       return;
     }
     // カウント
     const n = countStepNo(), local = n < 3 ? (countT % BATTLE.countStep) / BATTLE.countStep : (countT - BATTLE.countStep * 3) / BATTLE.countGo;
-    const txt = n < 3 ? String(3 - n) : "出発！";
+    const txt = n < 3 ? String(3 - n) : BATTLE.TRIPS[sortieNo].go;   // 「発見のたびへ、出発！」（2行）
     ctx.save();
     ctx.globalAlpha = Math.max(0, 1 - local * 0.6);
-    ctx.font = font(n < 3 ? 110 : 64);
+    ctx.font = font(n < 3 ? 110 : 40);
     const sc = 1.4 - Math.min(1, local * 3) * 0.4;
-    ctx.translate(W / 2, H * 0.42); ctx.scale(sc, sc);
+    ctx.translate(W / 2, H * 0.42); ctx.scale(n < 3 ? sc : Math.min(sc, 1.15), n < 3 ? sc : Math.min(sc, 1.15));
     ctx.lineWidth = 10; ctx.strokeStyle = "#ffffff"; ctx.lineJoin = "round";
-    ctx.strokeText(txt, 0, 0);
-    ctx.fillStyle = n < 3 ? "#b0801a" : "#e07a3a"; ctx.fillText(txt, 0, 0);
+    ctx.fillStyle = n < 3 ? main : "#e07a3a";
+    txt.split("\n").forEach((l, i, a) => { const yy = (i - (a.length - 1) / 2) * 50; ctx.strokeText(l, 0, yy); ctx.fillText(l, 0, yy); });
     ctx.restore();
   }
 
   function drawChoice() {
     // ふわりのセリフ（探検の終わり）
     const say = retryMain
-      ? "ふわりの元気がなくなっちゃった…。でも、見つけたことばはおぼえてるよ。2回目の旅の最初から、もう一回！"
+      ? "ふわりの元気がなくなっちゃった…。でも、見つけたことばはおぼえてるよ。救出のたびの最初から、もう一回！"
       : `${reacted}のことばを見つけたね。ことばは殻にとらわれているみたい。ふわりの光で殻をほどいて、助けに行こう！`;
     ctx.font = font(14);
     const lines = wrapText(say, W - 92);
@@ -2682,11 +2678,11 @@ const Battle = (() => {
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     const top = by + bh + 8;
     ctx.font = font(34); ctx.fillStyle = "#b0801a";
-    ctx.fillText("2回目の旅", W / 2, top + 24);
+    ctx.fillText(BATTLE.TRIPS[2].name, W / 2, top + 24);
     ctx.font = font(16);
-    ctx.fillText("（ことばを助ける）", W / 2, top + 52);
+    ctx.fillText(`（${BATTLE.TRIPS[2].sub}）`, W / 2, top + 52);
     ctx.font = font(16); ctx.fillStyle = "#4b5e3a";
-    ctx.fillText("2回目の旅に持っていくものを1つえらぼう", W / 2, top + 82);
+    ctx.fillText(`${BATTLE.TRIPS[2].name}に持っていくものを1つえらぼう`, W / 2, top + 82);
     choiceRects().forEach((r, i) => {
       const l = LOADOUTS[i];
       ctx.fillStyle = "#fffdf7"; ctx.strokeStyle = "#e0b03a"; ctx.lineWidth = 3;
