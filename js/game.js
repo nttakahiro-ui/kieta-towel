@@ -94,6 +94,10 @@ const BATTLE = {
   choiceTime: 10,              // 選ぶ時間（秒）。選ばなければ「つよい弾」になる
   bigBombMul: 2,               // 「大きな記憶の光」のときの、ゲージのたまる速さの倍率
 
+  // --- 障害物（data/stages.js の obstacles） ---
+  shadeHoldY: 0.2,             // 「木のかげ」の語句が止まって待つ高さ（画面の高さに対する割合）
+  shadeWait: 2.5,              // 「木のかげ」の語句が、木が去ってから待つ秒数（そのあと降りてくる）
+
   // --- 「記憶の光」ボム ---
   bombGain: 12,                // 語句を倒したときにたまるゲージ（×コンボ倍率）。100で満タン
   bombButtonR: 26,             // 画面左下のふわりマーク（ボムのボタン）の大きさ（px）
@@ -218,7 +222,7 @@ function stageParams(stage) {
 
 // patterns が "auto" のステージ: 語句の出方・順番・位置を、難易度から機械的に決める
 // 意地の悪い語句は、順番の中にちらして置く。難易度が上がるほど「横切る」「端にかくれる」が多くなる
-function autoLayout(words, P) {
+function autoLayout(words, P, obstacles) {
   const lanes = [0.3, 0.65, 0.5, 0.25, 0.7, 0.4, 0.6, 0.35, 0.55];
   const list = words.filter(w => w.role !== "boss").sort((a, b) => (a.order || 0) - (b.order || 0));
   const n = Math.min(P.tricky, list.length - 1);
@@ -240,6 +244,13 @@ function autoLayout(words, P) {
     }
     layout[w.id] = { order: i + 1, pattern, lane };
   });
+  // 「木のかげ」: 意地の悪い語句のうち、長い語句から shade 個を木のかげにする
+  let shadeLeft = (obstacles && obstacles.shade) || 0;
+  for (const i of [...trickyIdx].sort((a, b) => baseChars(list[b]).length - baseChars(list[a]).length)) {
+    if (shadeLeft <= 0) break;
+    const w = list[i];
+    if (w.role === "zako" || w.role === "mid") { layout[w.id].pattern = "treeshade"; shadeLeft--; }
+  }
   // 地上の語句が足りなければ、うしろのほうの「ふつう」のザコから足す
   for (let i = list.length - 1; i >= 0 && groundLeft > 0; i--) {
     const w = list[i];
@@ -288,6 +299,9 @@ const Battle = (() => {
   let sortieNo = 1;          // 出撃の画面に出している番号（1＝偵察、2＝本番）
   let reacted = 0;           // 偵察で見つけた（反応させた）語句の数
   let slots = [];            // 帯の10のあき枠に入る語句（順番）
+  let obsDef = null;         // このステージの障害物の決まり（data/stages.js の obstacles）
+  let obs = [];              // 画面に出ている障害物 { kind, x, y, r }
+  let obsNext = 0;           // 次に出す障害物の番号
   let found = new Set();     // 偵察で見つけた語句の id
   let loadout = null;        // 本番に持っていくもの（LOADOUTS の id）
   let choiceT = 0;           // 選ぶ時間の残り（秒）
@@ -377,7 +391,8 @@ const Battle = (() => {
     bossWord = words.find(w => w.role === "boss") || words[words.length - 1];
     // 地上に出る語句は、データの出方（pattern）が "ground" のもの
     P = stageParams(opts.stage);
-    layout = opts.stage && opts.stage.patterns === "auto" ? autoLayout(words, P) : null;
+    layout = opts.stage && opts.stage.patterns === "auto" ? autoLayout(words, P, opts.stage.obstacles) : null;
+    obsDef = (opts.stage && opts.stage.obstacles) || null;
     groundIds = new Set(words.filter(w => patOf(w).pattern === "ground" && w !== bossWord).map(w => w.id));
     // 台本: 大ボス以外の語句を、データの順番（order）でならべる
     script = words.filter(w => w !== bossWord).sort((a, b) => patOf(a).order - patOf(b).order);
@@ -388,7 +403,7 @@ const Battle = (() => {
     cloudShadows = Array.from({ length: 3 }, (_, i) => ({ x: Math.random() * W, y: (i / 3) * H, rx: rand(70, 120), ry: rand(35, 55) }));
     terrain = [];
     fillTerrain();
-    shots = []; enemies = []; ebullets = []; fillers = []; bombs = []; items = [];
+    shots = []; enemies = []; ebullets = []; fillers = []; bombs = []; items = []; obs = [];
     startPhase("round1");
     fillerTimer = 1.2; shotTimer = 0; bombTimer = 0;
     player = { x: W / 2, y: H * 0.8, hp: BATTLE.playerMaxHp, inv: 0, glow: 0, hurt: 0 };
@@ -406,7 +421,22 @@ const Battle = (() => {
   }
 
   // 周を始める
+  // 障害物を出す（この出撃で出すステージだけ）
+  const obsActive = () => obsDef && phase === (obsDef.sortie === 1 ? "round1" : "round2");
+  function addObstacle(x, r) { const o = { kind: obsDef ? obsDef.kind : "tree", x, y: -r, r }; obs.push(o); return o; }
+  function spawnObstacle(it) {
+    if (it.gate !== undefined) {   // 木と木のあいだを通る場所: すきまの左右に1本ずつ
+      const gx = W * it.gate, half = W * (it.gap || 0.35) / 2;
+      const rl = Math.max(30, (gx - half) / 2), rr = Math.max(30, (W - gx - half) / 2);
+      addObstacle(gx - half - rl, rl + 6);
+      addObstacle(gx + half + rr, rr + 6);
+    } else {
+      addObstacle(W * (it.x || 0.5), it.r || 50);
+    }
+  }
+
   function startPhase(p) {
+    obsNext = 0;
     phase = p;
     nextIdx = 0;
     roundT = 0;
@@ -556,6 +586,15 @@ const Battle = (() => {
       }
     }
     enemies.push(e);
+    // 木のかげ: 本番では、語句のすぐ前（下）に木が来る。偵察では木は出ない
+    if (pattern === "treeshade") {
+      e.holdT = 0;
+      if (obsActive()) {
+        const r = Math.max(50, e.w / 2 + 12);
+        e.tree = addObstacle(e.x, r);
+        e.tree.y = e.y + e.h / 2 + r + 6;
+      }
+    }
     // 雑魚のうしろ: 語句の前（下）に雑魚がならんで守る
     if (pattern === "behind") {
       const n = BATTLE.escortCount;
@@ -701,6 +740,10 @@ const Battle = (() => {
     } else if (phase !== "boss") {
       if (!odai) {   // お題バトルの間は、台本を止める
         roundT += dt;
+        if (obsActive()) {
+          const list = obsDef.items || [];
+          while (obsNext < list.length && roundT >= list[obsNext].at) spawnObstacle(list[obsNext++]);
+        }
         while (nextIdx < script.length && roundT >= nextAt) {
           const w = script[nextIdx];
           nextIdx++;
@@ -779,6 +822,14 @@ const Battle = (() => {
         e.y += (H + e.size * 2) / BATTLE.edgeFallTime * dt * e.spd;
         const show = Math.min(1, 0.45 + 0.65 * Math.sin(e.age * 1.2));   // 見えている割合（ときどき全部出てくる。全部出ている間だけ当たる）
         e.x = e.lane < 0.5 ? -e.w / 2 + e.w * show : W + e.w / 2 - e.w * show;
+      } else if (e.pattern === "treeshade") {
+        // 木のかげ: 地面といっしょに降りてきて、上のほうで止まって待つ。木が去ってしばらくしたら降りてくる
+        const holdY = H * BATTLE.shadeHoldY;
+        const treeGone = !e.tree || e.tree.y - e.tree.r > H;
+        if (e.y < holdY) e.y += sc * dt;
+        else if (!treeGone || e.holdT < BATTLE.shadeWait) { if (treeGone) e.holdT += dt; }
+        else e.y += (H + e.size * 2) / BATTLE.fallTime[e.role] * dt;
+        e.x = e.bx;
       } else if (e.pattern === "cross") {
         // 横切る: 上のほうを横に通りすぎる
         const dir = e.lane < 0.5 ? 1 : -1;
@@ -839,9 +890,24 @@ const Battle = (() => {
     }
 
     // 自機の弾が空中の敵に当たったか（地上の敵には当たらない）
+    // 障害物: 地面といっしょに流れる。自機がふれると被弾して、外へ押し出される
+    for (const o of obs) {
+      o.y += sc * dt;
+      const d = Math.hypot(player.x - o.x, player.y - o.y), min = o.r + 16;
+      if (d < min) {
+        if (player.inv <= 0 && !showWord && !(odai && odai.intro > 0)) hurt();
+        const k = min / Math.max(1, d);
+        player.x = Math.min(Math.max(o.x + (player.x - o.x) * k, 24), W - 24);
+        player.y = Math.min(Math.max(o.y + (player.y - o.y) * k, minPlayerY()), H - 40);
+      }
+    }
+    obs = obs.filter(o => o.y - o.r < H + 20);
+    const inObstacle = (x, y) => obs.some(o => Math.hypot(x - o.x, y - o.y) < o.r);
+
     // 雑魚に先に当たる（「雑魚のうしろ」の語句は、前の雑魚をどけないと弾が届かない）
     for (const s of shots) {
       let hit = false;
+      if (inObstacle(s.x, s.y)) { s.y = -999; continue; }   // 木は弾をさえぎる
       for (const f of fillers) {
         if (f.layer !== "air" || f.hp <= 0 || f.delay > 0) continue;
         if (Math.hypot(s.x - f.x, s.y - f.y) < f.r + (s.thick ? 10 : 4)) { hit = true; damageFiller(f); break; }
@@ -897,6 +963,7 @@ const Battle = (() => {
     const R = BATTLE.enemyBulletHitR;
     for (const b of ebullets) {
       b.x += b.vx * dt; b.y += b.vy * dt;
+      if (inObstacle(b.x, b.y)) { b.y = H + 999; continue; }   // 敵の弾も木にさえぎられる
       if (player.inv <= 0 && !showWord && !(odai && odai.intro > 0) && Math.hypot(b.x - player.x, b.y - player.y) < R + 10) {
         b.y = H + 999;
         hurt();
@@ -1268,6 +1335,9 @@ const Battle = (() => {
     ctx.fillStyle = "rgba(70,90,50,0.07)";
     for (const c of cloudShadows) { ctx.beginPath(); ctx.ellipse(c.x, c.y, c.rx, c.ry, 0, 0, Math.PI * 2); ctx.fill(); }
 
+    // 障害物
+    for (const o of obs) drawObstacle(o);
+
     // 空中のものの影（右下にずらして、浮いているように見せる）
     ctx.fillStyle = "rgba(60,80,40,0.16)";
     for (const f of fillers) if (f.layer === "air" && !(f.delay > 0)) { ctx.beginPath(); ctx.ellipse(f.x + 16, f.y + 26, f.r * 0.9, f.r * 0.5, 0, 0, Math.PI * 2); ctx.fill(); }
@@ -1450,6 +1520,33 @@ const Battle = (() => {
         for (const d of s.deco) { ctx.beginPath(); ctx.arc(d.x, y + d.y, d.r, 0, Math.PI * 2); ctx.fill(); }
       }
     }
+  }
+
+  // 障害物の絵（仮）。kind ごとに描き分ける（今は木。岩・山はあとで足す）
+  function drawObstacle(o) {
+    ctx.save();
+    ctx.translate(o.x, o.y);
+    // 影
+    ctx.fillStyle = "rgba(50,70,35,0.25)";
+    ctx.beginPath(); ctx.ellipse(10, 14, o.r * 1.02, o.r * 0.95, 0, 0, Math.PI * 2); ctx.fill();
+    if (o.kind === "rock") {
+      ctx.fillStyle = "#b9b3a6"; ctx.beginPath(); ctx.arc(0, 0, o.r, 0, Math.PI * 2); ctx.fill();
+    } else {
+      // 大きな木: 幹のまわりに、重なった葉のかたまり
+      ctx.fillStyle = "#4f7a36";
+      ctx.beginPath(); ctx.arc(0, 0, o.r, 0, Math.PI * 2); ctx.fill();
+      const blobs = 7;
+      for (let i = 0; i < blobs; i++) {
+        const a = i / blobs * Math.PI * 2;
+        ctx.fillStyle = i % 2 ? "#6a9a45" : "#5e8c3e";
+        ctx.beginPath(); ctx.arc(Math.cos(a) * o.r * 0.55, Math.sin(a) * o.r * 0.55, o.r * 0.48, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.fillStyle = "#86b45c";
+      ctx.beginPath(); ctx.arc(-o.r * 0.2, -o.r * 0.2, o.r * 0.4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#7a5a3a";   // 幹のてっぺん
+      ctx.beginPath(); ctx.arc(0, 0, Math.max(6, o.r * 0.14), 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
   }
 
   // 照準◎（自機の前の地面）。地上の敵が入ると色が変わる
@@ -2072,5 +2169,5 @@ const Battle = (() => {
     ctx.closePath();
   }
 
-  return { start, stop, resize, pause, choiceRects };   // （自動プレイヤーで確かめるときは、ここで中の状態を外に出している）
+  return { start, stop, resize, pause, choiceRects };   // （自動プレイヤーで確かめるときは、ここで中の状態を外に出している）   // （自動プレイヤーで確かめるときは、ここで中の状態を外に出している）
 })();
