@@ -189,6 +189,11 @@ function autoLayout(words, P) {
     }
     layout[w.id] = { order: i + 1, pattern, lane };
   });
+  // 地上の語句が足りなければ、うしろのほうの「ふつう」のザコから足す
+  for (let i = list.length - 1; i >= 0 && groundLeft > 0; i--) {
+    const w = list[i];
+    if (w.role === "zako" && layout[w.id].pattern === "normal") { layout[w.id].pattern = "ground"; groundLeft--; }
+  }
   return layout;
 }
 
