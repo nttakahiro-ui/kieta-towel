@@ -68,6 +68,17 @@ const TUNE_ITEMS = [
   ["hpOverride.mid", "中ボスの1文字あたりの耐久（0=データどおり）", 0, 12, 1],
   ["hpOverride.boss", "大ボスの1文字あたりの耐久（0=データどおり）", 0, 20, 1],
   ["bombGain", "記憶の光ゲージのたまる速さ（1語あたり）", 2, 50, 1],
+  ["difficulty.fireScale.at1", "難易度1の「敵が撃つ間隔の倍率」", 0.2, 2, 0.05],
+  ["difficulty.fireScale.at12", "難易度12の「敵が撃つ間隔の倍率」", 0.2, 2, 0.05],
+  ["difficulty.speedScale.at1", "難易度1の「敵の速さの倍率」", 0.5, 2.5, 0.05],
+  ["difficulty.speedScale.at12", "難易度12の「敵の速さの倍率」", 0.5, 2.5, 0.05],
+  ["difficulty.zakoHp.at1", "難易度1の「ザコの硬さ」", 1, 6, 0.5],
+  ["difficulty.zakoHp.at12", "難易度12の「ザコの硬さ」", 1, 6, 0.5],
+  ["difficulty.bossHpScale.at1", "難易度1の「中ボス・大ボスの文字耐久の倍率」", 0.25, 4, 0.05],
+  ["difficulty.bossHpScale.at12", "難易度12の「中ボス・大ボスの文字耐久の倍率」", 0.25, 4, 0.05],
+  ["difficulty.tricky.at1", "難易度1の「意地の悪い語句の数」", 0, 9, 0.1],
+  ["difficulty.tricky.at12", "難易度12の「意地の悪い語句の数」", 0, 9, 0.1],
+  ["autoGroundCount", "自動のステージで地上に出る語句の数", 0, 5, 1],
 ];
 const TUNE_KEY = "kietaTowel.tune.v1";
 const TUNE_DEFAULT = {};
@@ -178,6 +189,7 @@ const Main = (() => {
     // 画面が表示されてから大きさを測る
     requestAnimationFrame(() => {
       Battle.start(words, {
+        stage,
         stageName: stage.name,
         fuwariCount: Save.cardCount(),
         onEnd: (ids, stats) => { lastStats = stats; lastIds = ids; toQuiz(ids); }

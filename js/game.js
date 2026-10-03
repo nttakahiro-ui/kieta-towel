@@ -66,6 +66,19 @@ const BATTLE = {
   bombGain: 12,                // 語句を倒したときにたまるゲージ（×コンボ倍率）。100で満タン
   bombButtonR: 26,             // 画面左下のふわりマーク（ボムのボタン）の大きさ（px）
 
+  // --- 難易度 ---
+  // data/stages.js の difficulty（1〜12）から、次の数値が自動で決まる。
+  // at1 が難易度1のときの値、at12 が難易度12のときの値。そのあいだはまっすぐの線でつなぐ
+  // ステージごとの手上書きは data/stages.js の override 欄
+  difficulty: {
+    fireScale:   { at1: 1,   at12: 0.5 },   // 敵が撃つ間隔の倍率（小さいほど弾が多い）
+    speedScale:  { at1: 1,   at12: 1.4 },   // 敵（語句と敵の弾）の速さの倍率
+    zakoHp:      { at1: 1,   at12: 2.5 },   // ザコの語句の硬さ（四捨五入）
+    bossHpScale: { at1: 1,   at12: 2 },     // 中ボス・大ボスの1文字あたりの耐久の倍率
+    tricky:      { at1: 1,   at12: 6.2 },   // 意地の悪い語句（端にかくれる・雑魚のうしろ・横切る）の数（四捨五入。patterns が "auto" のステージだけ）
+  },
+  autoGroundCount: 2,          // patterns が "auto" のステージで、地上（地上のかげ）に出すザコの語句の数
+
   // --- 自機 ---
   shotInterval: 0.16,          // 自機の弾の間隔（秒）
   shotSpeed: 640,              // 自機の弾の速さ（px/秒）
@@ -139,6 +152,46 @@ const POWER_LEVELS = [
 
 const FONT_FAMILY = '"Hiragino Maru Gothic ProN","Hiragino Maru Gothic Pro","Zen Maru Gothic","Rounded Mplus 1c",sans-serif';
 
+// ステージの難易度から、そのステージの数値を決める（override 欄があればそちらを使う）
+function stageParams(stage) {
+  const d = Math.min(12, Math.max(1, (stage && stage.difficulty) || 1));
+  const ov = (stage && stage.override) || {};
+  const P = { difficulty: d };
+  for (const k of Object.keys(BATTLE.difficulty)) {
+    const line = BATTLE.difficulty[k];
+    P[k] = ov[k] !== undefined ? ov[k] : line.at1 + (line.at12 - line.at1) * (d - 1) / 11;
+  }
+  P.zakoHp = Math.max(1, Math.round(P.zakoHp));
+  P.tricky = Math.max(0, Math.round(P.tricky));
+  return P;
+}
+
+// patterns が "auto" のステージ: 語句の出方・順番・位置を、難易度から機械的に決める
+// 意地の悪い語句は、順番の中にちらして置く。難易度が上がるほど「横切る」「端にかくれる」が多くなる
+function autoLayout(words, P) {
+  const lanes = [0.3, 0.65, 0.5, 0.25, 0.7, 0.4, 0.6, 0.35, 0.55];
+  const list = words.filter(w => w.role !== "boss").sort((a, b) => (a.order || 0) - (b.order || 0));
+  const n = Math.min(P.tricky, list.length - 1);
+  const kinds = P.difficulty >= 9 ? ["cross", "edge", "cross", "edge", "behind"]
+    : P.difficulty >= 5 ? ["edge", "behind", "cross"] : ["edge", "behind"];
+  const trickyIdx = new Set();
+  for (let k = 0; k < n; k++) trickyIdx.add(Math.min(list.length - 1, 1 + Math.floor(k * (list.length - 1) / Math.max(1, n))));
+  const layout = {};
+  let kindNo = 0, groundLeft = BATTLE.autoGroundCount;
+  list.forEach((w, i) => {
+    let pattern = "normal", lane = lanes[i % lanes.length];
+    if (trickyIdx.has(i)) {
+      pattern = kinds[kindNo % kinds.length];
+      if (pattern === "edge" || pattern === "cross") lane = kindNo % 2 ? 0 : 1;
+      kindNo++;
+    } else if (w.role === "zako" && groundLeft > 0 && i % 3 === 2) {
+      pattern = "ground"; groundLeft--;
+    }
+    layout[w.id] = { order: i + 1, pattern, lane };
+  });
+  return layout;
+}
+
 const Battle = (() => {
   let canvas, ctx, dpr = 1, W = 0, H = 0;
   let running = false, rafId = 0, lastTs = 0;
@@ -151,6 +204,9 @@ const Battle = (() => {
   let player, shots, enemies, ebullets, threads, fluff;
   let fillers, bombs, pops, items, terrain, cloudShadows;
   let script, absorbed, missed, bossWord, groundIds;
+  let P = null;              // このステージの難易度から決まった数値
+  let layout = null;         // 自動で決めた出方（patterns が "auto" のステージ）
+  const patOf = w => (layout && layout[w.id]) || { order: w.order || 0, pattern: w.pattern || "normal", lane: w.lane === undefined ? 0.5 : w.lane };
   let phase;                 // "round1" / "round2" / "boss"
   let nextIdx, nextAt;       // 台本: 次に出す語句の番号と、出す時刻（その周の中の時間）
   let roundT;                // 今の周の中の経過時間（秒）
@@ -243,9 +299,11 @@ const Battle = (() => {
     absorbed = []; missed = [];
     bossWord = words.find(w => w.role === "boss") || words[words.length - 1];
     // 地上に出る語句は、データの出方（pattern）が "ground" のもの
-    groundIds = new Set(words.filter(w => w.pattern === "ground" && w !== bossWord).map(w => w.id));
+    P = stageParams(opts.stage);
+    layout = opts.stage && opts.stage.patterns === "auto" ? autoLayout(words, P) : null;
+    groundIds = new Set(words.filter(w => patOf(w).pattern === "ground" && w !== bossWord).map(w => w.id));
     // 台本: 大ボス以外の語句を、データの順番（order）でならべる
-    script = words.filter(w => w !== bossWord).sort((a, b) => (a.order || 0) - (b.order || 0));
+    script = words.filter(w => w !== bossWord).sort((a, b) => patOf(a).order - patOf(b).order);
     vanish = [];
     fluff = Array.from({ length: 18 }, () => ({ x: Math.random() * W, y: Math.random() * H, r: 2 + Math.random() * 4, v: 30 + Math.random() * 40, p: Math.random() * 6 }));
     cloudShadows = Array.from({ length: 3 }, (_, i) => ({ x: Math.random() * W, y: (i / 3) * H, rx: rand(70, 120), ry: rand(35, 55) }));
@@ -334,18 +392,19 @@ const Battle = (() => {
     // 画面からはみ出す長い語句は、24pxまで小さくする
     while (w > W - 40 && size > 24) { size -= 2; ctx.font = font(size); w = ctx.measureText(word.word).width; }
     // 出方（pattern）と位置（lane）はデータで固定。ランダムには出ない
-    const pattern = role === "boss" ? "boss" : (word.pattern || "normal");
-    const lane = word.lane === undefined ? 0.5 : word.lane;
+    const pattern = role === "boss" ? "boss" : patOf(word).pattern;
+    const lane = patOf(word).lane;
     const margin = w / 2 + 20 + (ground ? 0 : BATTLE.sway);
     let x = role === "boss" ? W / 2 : margin + lane * Math.max(1, W - margin * 2);
     let y = -size;
     if (pattern === "edge") x = lane < 0.5 ? -w / 2 : W + w / 2;
     if (pattern === "cross") { x = lane < 0.5 ? -w / 2 - 10 : W + w / 2 + 10; y = H * BATTLE.crossY; }
-    const hp = BATTLE.hpOverride[role] || word.hp;
+    // 硬さ: ザコは難易度で決まる硬さ、中ボス・大ボスは文字1つあたりの耐久 × 難易度の倍率
+    const hp = BATTLE.hpOverride[role] || (role === "zako" ? Math.max(word.hp, P.zakoHp) : Math.max(1, Math.round(word.hp * P.bossHpScale)));
     const e = {
       word, role, size, w, h: size * 1.2, ground, pattern, lane,
       last: phase !== "round1",                    // 2周目と大ボスは、倒せば吸い込む
-      spd: phase === "round1" ? BATTLE.round1Speed : 1,
+      spd: (phase === "round1" ? BATTLE.round1Speed : 1) * P.speedScale,
       bx: x, x, y, hp, maxHp: hp,
       age: 0, phase: (word.id * 1.7) % 6, fire: 1.2, flash: 0
     };
@@ -386,7 +445,7 @@ const Battle = (() => {
   function spawnFiller(type, x, y, extra) {
     const def = FILLER_TYPES[type];
     fillers.push(Object.assign({ type, layer: def.layer, hp: def.hp, r: def.r * BATTLE.fillerScale, x, y, age: 0, flash: 0,
-      fire: def.fire ? rand(0.8, 1.6) * def.fire * BATTLE.fillerFireScale : 0 }, extra || {}));
+      fire: def.fire ? rand(0.8, 1.6) * def.fire * BATTLE.fillerFireScale * P.fireScale : 0 }, extra || {}));
   }
   // 語句の近くかどうか（雑魚を出す場所をえらぶとき用）
   function nearWord(x, y, layer) {
@@ -579,7 +638,7 @@ const Battle = (() => {
       // 弾を撃つ（画面の上のほうにいる間だけ）
       e.fire -= dt;
       if (e.fire <= 0 && e.y > 0 && e.y < H * 0.62) {
-        e.fire = BATTLE.enemyFireInterval[e.role] * (0.8 + Math.random() * 0.4);
+        e.fire = BATTLE.enemyFireInterval[e.role] * P.fireScale * (0.8 + Math.random() * 0.4);
         fireAt(e.x, e.y + (e.ground ? 0 : e.h / 2), BATTLE.shotPattern[e.role] || [0]);
       }
     }
@@ -619,7 +678,7 @@ const Battle = (() => {
       if (def.fire) {
         f.fire -= dt;
         if (f.fire <= 0 && f.y > 0 && f.y < H * 0.68) {
-          f.fire = def.fire * BATTLE.fillerFireScale * rand(0.8, 1.2);
+          f.fire = def.fire * BATTLE.fillerFireScale * P.fireScale * rand(0.8, 1.2);
           fireAt(f.x, f.y, def.spread || [0]);
         }
       }
@@ -690,7 +749,8 @@ const Battle = (() => {
   function fireAt(x, y, pattern) {
     const ang = Math.atan2(player.y - y, player.x - x);
     for (const da of pattern) {
-      ebullets.push({ x, y, vx: Math.cos(ang + da) * BATTLE.enemyBulletSpeed, vy: Math.sin(ang + da) * BATTLE.enemyBulletSpeed });
+      const sp = BATTLE.enemyBulletSpeed * P.speedScale;
+      ebullets.push({ x, y, vx: Math.cos(ang + da) * sp, vy: Math.sin(ang + da) * sp });
     }
   }
 
