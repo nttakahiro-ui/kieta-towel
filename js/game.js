@@ -73,7 +73,9 @@ const BATTLE = {
 
   // --- お題バトル（2周目の中ボス2回と大ボス1回） ---
   odai: true,                  // お題バトルのスイッチ（true＝オン、false＝オフ。オフで今までの中ボス・大ボス戦）
-  odaiIntroTime: 1.5,          // 始まりのスローと、問題文を画面中央に大きく出す秒数（この間は弾が当たらない）
+  odaiIntroTime: 2.5,          // 始まりのスローと、問題文を画面中央に大きく出す秒数（この間は弾が当たらない）。10/8に2.5秒に
+  odaiBigFont: 30,             // 問題文を画面中央に出すときの文字の大きさ（px）
+  odaiSmallFont: 16,           // 問題文を上の帯の下に移したあとの文字の大きさ（px）
   odaiTimeLimit: 20,           // 中ボスのお題の制限時間（秒）。時間切れは取り逃がし。大ボスは制限なし
   odaiPenalty: 300,            // ダミーに当てたときの減点（コンボは切らない）
   odaiPenaltyCool: 1,          // 同じダミーで続けて減点しない秒数（連射で何度も減らないように）
@@ -1003,9 +1005,9 @@ const Battle = (() => {
   // 小さく出したときの問題文の帯の位置（集めたことばの帯の下）
   function odaiPanel() {
     const y = 14 + 42 + Math.max(1, BATTLE.stripRows) * 22 + 10;
-    ctx.font = font(13);
+    ctx.font = font(BATTLE.odaiSmallFont);
     const lines = odai ? wrapText(odai.q, W - 44) : [""];
-    return { y, lines, h: lines.length * 18 + 14 };
+    return { y, lines, h: lines.length * Math.round(BATTLE.odaiSmallFont * 1.4) + 14 };
   }
   function odaiTop() { const p = odaiPanel(); return p.y + p.h; }
 
@@ -1013,10 +1015,10 @@ const Battle = (() => {
     const role = isBoss ? "boss" : "mid";
     const cands = shuffle([real, ...odaiDummies(real)]);   // ならびは毎回入れかえ
     // 3つとも同じ大きさ（いちばん長い語句が、縦書きで画面に入る大きさ。24px より小さくしない）
-    const longest = Math.max(...cands.map(w => Array.from(w.word).length));
-    const room = H * 0.62 - (14 + 42 + Math.max(1, BATTLE.stripRows) * 22 + 10 + 60) - 30;
-    const size = Math.max(24, Math.min(BATTLE.fontSize[role], Math.floor(room / (longest * 1.12))));
     odai = { real, boss: isBoss, t: 0, intro: BATTLE.odaiIntroTime, firstHit: null, q: real.odaiQuestion || real.question };
+    const longest = Math.max(...cands.map(w => Array.from(w.word).length));
+    const room = H * 0.66 - odaiTop() - 30;   // 問題文の帯の下から、自機の上まで
+    const size = Math.max(24, Math.min(BATTLE.fontSize[role], Math.floor(room / (longest * 1.12))));
     cands.forEach((w, i) => spawn(w, { role, size, slot: i, real: w === real }));
     slow = BATTLE.odaiIntroTime;   // 吸い込みと同じスロー。読む時間をつくる
     fsay = { text: "お題だよ！ 答えの語句を撃とう", t: 2.5 };
@@ -1798,21 +1800,22 @@ const Battle = (() => {
     ctx.save();
     ctx.textAlign = "left"; ctx.textBaseline = "top";
     if (odai.intro > 0) {
-      ctx.font = font(20);
+      const fs = BATTLE.odaiBigFont, lh = Math.round(fs * 1.38);
+      ctx.font = font(fs);
       const lines = wrapText(odai.q, W - 64);
-      const h = lines.length * 28 + 50, y = H * 0.36 - h / 2;
+      const h = lines.length * lh + 50, y = H * 0.4 - h / 2;
       ctx.fillStyle = "rgba(255,253,245,0.97)"; ctx.strokeStyle = "#e0b03a"; ctx.lineWidth = 3;
       roundRect(20, y, W - 40, h, 18); ctx.fill(); ctx.stroke();
       ctx.font = font(14); ctx.fillStyle = "#b0801a";
       ctx.fillText("ふわりのお題", 34, y + 12);
-      ctx.font = font(20); ctx.fillStyle = "#3e4a34";
-      lines.forEach((l, i) => ctx.fillText(l, 32, y + 36 + i * 28));
+      ctx.font = font(fs); ctx.fillStyle = "#3e4a34";
+      lines.forEach((l, i) => ctx.fillText(l, 32, y + 36 + i * lh));
     } else {
       const pnl = odaiPanel();
       ctx.fillStyle = "rgba(255,253,245,0.92)"; ctx.strokeStyle = "#e0b03a"; ctx.lineWidth = 2;
       roundRect(10, pnl.y, W - 20, pnl.h, 12); ctx.fill(); ctx.stroke();
-      ctx.font = font(13); ctx.fillStyle = "#3e4a34";
-      pnl.lines.forEach((l, i) => ctx.fillText(l, 22, pnl.y + 7 + i * 18));
+      ctx.font = font(BATTLE.odaiSmallFont); ctx.fillStyle = "#3e4a34";
+      pnl.lines.forEach((l, i) => ctx.fillText(l, 22, pnl.y + 7 + i * Math.round(BATTLE.odaiSmallFont * 1.4)));
       // 中ボスは残り時間
       if (!odai.boss) {
         const r = Math.max(0, 1 - odai.t / BATTLE.odaiTimeLimit);
