@@ -1565,9 +1565,16 @@ const Battle = (() => {
   function drawReticle() {
     const x = player.x, y = player.y - BATTLE.bombRange, r = BATTLE.lockRadius;
     ctx.save();
-    ctx.globalAlpha = lock ? 0.95 : 0.55;
-    ctx.strokeStyle = lock ? "#d0607f" : "#6f9a4a";
-    ctx.lineWidth = 2.5;
+    if (lock) {   // 地上の敵に重なったら、照準が光る
+      const pulse = 0.6 + Math.sin(t * 12) * 0.4;
+      const g = ctx.createRadialGradient(x, y, 2, x, y, r * 1.8);
+      g.addColorStop(0, `rgba(255,245,170,${0.75 * pulse})`); g.addColorStop(1, "rgba(255,245,170,0)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r * 1.8, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowColor = "rgba(255,220,90,1)"; ctx.shadowBlur = 12;
+    }
+    ctx.globalAlpha = lock ? 1 : 0.55;
+    ctx.strokeStyle = lock ? "#e09a1e" : "#6f9a4a";
+    ctx.lineWidth = lock ? 3.5 : 2.5;
     ctx.setLineDash([6, 5]);
     ctx.lineDashOffset = -t * 20;
     ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
@@ -1665,7 +1672,7 @@ const Battle = (() => {
       ctx.fillStyle = "#6c7562";
       ctx.beginPath(); ctx.arc(-4, -1, 2, 0, Math.PI * 2); ctx.arc(4, -1, 2, 0, Math.PI * 2); ctx.fill();
     } else if (f.type === "weed") {
-      ctx.fillStyle = "rgba(90,110,60,0.25)";
+      ctx.fillStyle = "rgba(35,50,20,0.45)";   // 濃い影: 地面に貼りついて見える
       ctx.beginPath(); ctx.ellipse(0, 4, r, r * 0.6, 0, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = lit ? "#b8dc8c" : "#5e8a3a"; ctx.lineWidth = 3; ctx.lineCap = "round";
       for (let i = 0; i < 5; i++) {
@@ -1679,7 +1686,7 @@ const Battle = (() => {
       ctx.fillStyle = "#ffffff";
       ctx.beginPath(); ctx.arc(-2, -1, 1.4, 0, Math.PI * 2); ctx.arc(2, -1, 1.4, 0, Math.PI * 2); ctx.fill();
     } else {   // thorn
-      ctx.fillStyle = "rgba(90,110,60,0.25)";
+      ctx.fillStyle = "rgba(35,50,20,0.45)";   // 濃い影: 地面に貼りついて見える
       ctx.beginPath(); ctx.ellipse(0, 5, r * 1.05, r * 0.65, 0, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = lit ? "#a7c88a" : "#557a41";
       ctx.beginPath();
@@ -1797,6 +1804,9 @@ const Battle = (() => {
 
   function drawGroundWord(e) {
     const wob = e.flash > 0 ? (Math.random() - 0.5) * 4 : 0;
+    // 濃い影: 地面に貼りついて見える
+    ctx.fillStyle = "rgba(35,50,20,0.4)";
+    roundRect(e.x - e.w / 2 - 18, e.y - e.h / 2 - 2, e.w + 36, e.h + 16, 18); ctx.fill();
     ctx.fillStyle = "#c9ab7f";
     roundRect(e.x - e.w / 2 - 14, e.y - e.h / 2 - 6, e.w + 28, e.h + 12, 16); ctx.fill();
     ctx.fillStyle = "#dcc297";
@@ -2126,6 +2136,14 @@ const Battle = (() => {
       ctx.fillStyle = got ? "#8a5a10" : (seen ? "#a3a396" : "#c2bdab");
       const top = y + sh / 2 - (chars.length - 1) * fs / 2;
       chars.forEach((ch, k) => ctx.fillText(VERTICAL_GLYPH[ch] || ch, x + cw / 2, top + k * fs));
+      // 地上に出る語句の枠: 小さく「地」の印（帯の右に出す）
+      if (groundIds.has(w.id)) {
+        ctx.font = font(9);
+        ctx.fillStyle = "#9a7650";
+        roundRect(x + cw + 2, y + sh / 2 - 7, 14, 14, 4); ctx.fill();
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText("地", x + cw + 9, y + sh / 2);
+      }
       // 大ボスの枠: 吸い込むまで小さく「大ボス」の印（帯の右に出す）
       if (w === bossWord && !got) {
         ctx.font = font(8);
