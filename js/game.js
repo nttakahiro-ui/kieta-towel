@@ -41,6 +41,7 @@ const BATTLE = {
   enemyBulletSize: 11,         // 敵の弾の見た目の大きさ（半径 px）。大きく見やすく
   enemyBulletHitR: 6,          // 敵の弾の当たりの大きさ（半径 px）。見た目より小さく、避けやすく
   hpOverride: { zako: 0, mid: 0, boss: 0 },   // 0 のときは自動。0より大きいと、ザコはこの硬さ、中ボス・大ボスは1文字あたりこの耐久にする
+  wordHitPad: 28,              // 語句の敵の当たり判定を、文字の幅からさらに左右にこれだけ広げる（px）。10/3-10: 4 → 28。横に広がる弾が短い語句（リントなど）にも当たるように
   zakoHpByShots: true,         // 空中のザコの語句の硬さを、今の自機の弾の本数に比例させる（10/3-8。弾1本で5発…太い弾は2本分）
   shotPattern: { zako: [0], mid: [-0.18, 0.18], boss: [-0.25, 0, 0.25] },   // 語句の敵の弾の向き（自機をねらう向きからのずれ）
 
@@ -1059,11 +1060,12 @@ const Battle = (() => {
         for (const e of enemies.slice().sort((a, b) => b.y - a.y)) {   // 下にいる語句から当たる
           if (e.ground || e.hp <= 0 || !onScreen(e) || e.appearT > 0) continue;   // 画面に全部入るまで・入ってすぐの1秒は当たらない
           if (e.pattern === "odai" ? (odai && odai.intro > 0) : (e.role === "boss" && e.age < BATTLE.bossEnterTime)) continue;   // 読む時間・降りてくる間は当たらない
-          if (Math.abs(s.x - e.x) < e.w / 2 + (s.thick ? 10 : 4) && Math.abs(s.y - e.y) < e.h / 2) {
+          const pad = (s.thick ? 6 : 0) + (e.pattern === "odai" ? 4 : BATTLE.wordHitPad);   // お題の語句は今のまま（となりの列に当たらないように）
+          if (Math.abs(s.x - e.x) < e.w / 2 + pad && Math.abs(s.y - e.y) < e.h / 2) {
             if (e.vertical && !e.dummy) {   // 縦書き: 下から順に砕ける。砕けた文字のところは通りぬける
               const lp = lowestPart(e);
               if (!lp || s.y > e.y + lp.oy + e.charH / 2) continue;
-            } else if (e.parts && !e.dummy && !partAt(e, s.x, s.thick ? 10 : 4)) continue;   // 砕けた文字のすきまは通りぬける
+            } else if (e.parts && !e.dummy && !partAt(e, s.x, s.thick ? 10 : 4)) continue;   // （中ボス・大ボスの文字ごとの当たりは今のまま）   // 砕けた文字のすきまは通りぬける
             hit = true;
             if (e.pattern === "odai") odaiHit(e, s);
             else { const a = shotDamage(e); damageWord(e, s.x, a); if (s.thick && e.hp > 0) damageWord(e, s.x, a); }   // 太い弾は2発分
