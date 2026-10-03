@@ -95,7 +95,7 @@ const BATTLE = {
 
   // --- 本番に持っていくもの（出撃2の前に3つから1つ選ぶ） ---
   choiceTime: 10,              // 選ぶ時間（秒）。選ばなければ「つよい弾」になる
-  bigBombMul: 2,               // 「大きな記憶の光」のときの、ゲージのたまる速さの倍率
+  bigBombMul: 2,               // 「大きなふわりタイフーン」のときの、ゲージのたまる速さの倍率
 
   // --- 障害物（data/stages.js の obstacles） ---
   shadeHoldY: 0.2,             // 「木のかげ」の語句が止まって待つ高さ（画面の高さに対する割合）
@@ -103,7 +103,7 @@ const BATTLE = {
   guideTime: 2.4,              // 木のよけ方の案内（矢印）を出す秒数
   shadeWait: 2.5,              // 「木のかげ」の語句が、木が去ってから待つ秒数（そのあと降りてくる）
 
-  // --- 「記憶の光」ボム ---
+  // --- 「ふわりタイフーン」ボム ---
   bombGain: 12,                // 語句を倒したときにたまるゲージ（×コンボ倍率）。100で満タン
   bombButtonR: 26,             // 画面左下のふわりマーク（ボムのボタン）の大きさ（px）
 
@@ -190,6 +190,7 @@ const DEFAULT_THEME = {
   tree: ["#4f7a36", "#5e8c3e", "#6a9a45", "#86b45c"],   // 木の色（濃い → うすい）
   treeShadow: "rgba(50,70,35,0.25)", treeShadowScale: 1, // 木の影の色と長さ
   fillerFilter: "none",                          // 雑魚の色味（CSS の filter の書き方。使えない端末では変わらない）
+  wordStroke: null,                              // 語句の縁取りの色（null なら白）
 };
 
 // 本番（出撃2）の語句の色（金色）
@@ -215,7 +216,7 @@ const POWER_LEVELS = [
 const LOADOUTS = [
   { id: "power",  name: "つよい弾",       desc: "弾1本分強い状態で始まる" },
   { id: "shield", name: "盾",             desc: "1回だけ弾を防ぐ" },
-  { id: "bomb",   name: "大きな記憶の光", desc: "記憶の光のゲージが速くたまる" },
+  { id: "bomb",   name: "大きなふわりタイフーン", desc: "ふわりタイフーンのゲージが速くたまる" },
 ];
 
 // 弾の本数ごとの、横のならび
@@ -328,7 +329,7 @@ const Battle = (() => {
   let lastPX = 0, lastPY = 0;   // いちばん最近の指の位置
   let lock = false;          // 照準に地上の敵が入っているか
   let slow = 0;              // ゆっくりの残り時間（秒）
-  let gauge = 0;             // 「記憶の光」ボムのゲージ（0〜100）
+  let gauge = 0;             // 「ふわりタイフーン」ボムのゲージ（0〜100）
   let fsay = null;           // ふわりの一言（吹き出し）
   let odai = null;           // いまのお題バトル（なければ null）
   let sortieNo = 1;          // 出撃の画面に出している番号（1＝探検、2＝本番）
@@ -344,10 +345,11 @@ const Battle = (() => {
   let choiceT = 0;           // 選ぶ時間の残り（秒）
   let powerBonus = 0;        // 「つよい弾」で上がる強さの段階
   let shield = 0;            // 「盾」の残り（1回だけ防ぐ）
-  let gaugeMul = 1;          // 「大きな記憶の光」のゲージ倍率
+  let gaugeMul = 1;          // 「大きなふわりタイフーン」のゲージ倍率
   let bounces = [];          // ダミーではね返った弾
   let bombsUsed = 0;
-  let bombing = false;       // 「記憶の光」で反応させている最中（ゲージをためない）
+  let typhoon = null;        // ふわりタイフーンの演出（タオルをくるっと振り回す）
+  let bombing = false;       // 「ふわりタイフーン」で反応させている最中（ゲージをためない）
   let wave = null;           // 吸い込んだときに広がる光
 
   function font(size) { return `bold ${size}px ${FONT_FAMILY}`; }
@@ -375,7 +377,7 @@ const Battle = (() => {
   // 左端の縦の帯の右はし
   const stripRight = () => 6 + BATTLE.stripWidth;
 
-  // 「記憶の光」ボムのボタン（画面左下のふわりマーク）
+  // 「ふわりタイフーン」ボムのボタン（画面左下のふわりマーク）
   function bombButton() { return { x: 14 + BATTLE.bombButtonR, y: H - 18 - BATTLE.bombButtonR, r: BATTLE.bombButtonR }; }
 
   // ===== 操作: 指一本のドラッグ（指の動いたぶんだけ自機が動く） =====
@@ -393,7 +395,7 @@ const Battle = (() => {
       }
       startSortie();
     }
-    // ふわりマークをタップ: ゲージが満タンなら「記憶の光」
+    // ふわりマークをタップ: ゲージが満タンなら「ふわりタイフーン」
     const rect = canvas.getBoundingClientRect(), bb = bombButton();
     if (Math.hypot(e.clientX - rect.left - bb.x, e.clientY - rect.top - bb.y) < bb.r + 10) {
       if (gauge >= 100 && state === "play") useBomb();
@@ -748,6 +750,7 @@ const Battle = (() => {
     if (wave) { wave.age += realDt; if (wave.age > 0.6) wave = null; }
     if (fsay) { fsay.t -= realDt; if (fsay.t <= 0) fsay = null; }
     if (guide) { guide.t -= realDt; if (guide.t <= 0) guide = null; }
+    if (typhoon) { typhoon.age += realDt; if (typhoon.age > 0.9) typhoon = null; }
     if (odai && odai.intro > 0) odai.intro -= realDt;
     for (const b of bounces) { b.age += realDt; b.x += b.vx * realDt; b.y += b.vy * realDt; }
     bounces = bounces.filter(b => b.age < 0.5);
@@ -1207,11 +1210,13 @@ const Battle = (() => {
     odai = null;
   }
 
-  // 「記憶の光」: 画面の雑魚と敵の弾を全部消す。1周目は、出ている語句を全部「反応」させる
+  // 「ふわりタイフーン」: 画面の雑魚と敵の弾を全部消す。1周目は、出ている語句を全部「反応」させる
   // 2周目と大ボスのときは、語句には効かない（雑魚と敵の弾だけ）
   function useBomb() {
     gauge = 0;
     bombsUsed++;
+    typhoon = { age: 0 };
+    fsay = { text: "ふわりタイフーン！", t: 1.5 };
     Sound.se("light");
     wave = { x: player.x, y: player.y, age: 0 };
     player.glow = 0.35;
@@ -1274,7 +1279,7 @@ const Battle = (() => {
     floats.push({ x: e.x, y: e.y - e.size, text: `+${pts}` + (mul > 1 ? ` ×${mul}` : ""), big: true, age: 0 });
     const before = gauge;
     if (!bombing) gauge = Math.min(100, gauge + BATTLE.bombGain * mul * gaugeMul);
-    if (before < 100 && gauge >= 100) { floats.push({ x: bombButton().x + 40, y: bombButton().y - 34, text: "記憶の光 OK！", big: true, age: 0 }); Sound.se("item"); }
+    if (before < 100 && gauge >= 100) { floats.push({ x: bombButton().x + 40, y: bombButton().y - 34, text: "ふわりタイフーン OK！", big: true, age: 0 }); Sound.se("item"); }
     if (!e.last) { firstPass(e); return; }
     absorb(e);
   }
@@ -1516,6 +1521,7 @@ const Battle = (() => {
 
     drawPlayer();
     if (guide) drawGuide();
+    if (typhoon) drawTyphoon();
 
     // 吸い込んだときに広がる光
     if (wave) {
@@ -1644,6 +1650,28 @@ const Battle = (() => {
     if (!theme.light) return;
     ctx.fillStyle = theme.light;
     ctx.fillRect(-10, -10, W + 20, H + 20);
+  }
+
+  // ふわりタイフーン（仮の絵）: 自機のまわりでタオルがくるっと回りながら広がり、白いうずが残る
+  function drawTyphoon() {
+    const k = typhoon.age / 0.9, cx = player.x, cy = player.y;
+    ctx.save();
+    // うず
+    ctx.lineCap = "round";
+    for (let j = 0; j < 3; j++) {
+      const r = (30 + k * Math.max(W, H) * 0.8) * (0.55 + j * 0.2), a0 = k * Math.PI * 5 + j * 2.1;
+      ctx.strokeStyle = `rgba(255,255,255,${(1 - k) * 0.8})`; ctx.lineWidth = 10 * (1 - k) + 2;
+      ctx.beginPath(); ctx.arc(cx, cy, r, a0, a0 + Math.PI * 1.1); ctx.stroke();
+    }
+    // 回るタオル
+    const rr = 26 + k * 110, ang = k * Math.PI * 4;
+    ctx.translate(cx + Math.cos(ang) * rr, cy + Math.sin(ang) * rr);
+    ctx.rotate(ang + Math.PI / 2);
+    ctx.globalAlpha = 1 - k * 0.7;
+    ctx.fillStyle = "#fffdf7"; ctx.strokeStyle = "#c9d9b4"; ctx.lineWidth = 2;
+    roundRect(-22, -14, 44, 28, 6); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#cfe3b3"; ctx.fillRect(-22, 6, 44, 4);
+    ctx.restore();
   }
 
   // 木のよけ方の案内の矢印
@@ -1869,7 +1897,7 @@ const Battle = (() => {
       const wob = p.flash > 0 ? (Math.random() - 0.5) * 3 : 0;
       ctx.globalAlpha = alpha;
       ctx.shadowColor = "rgba(255,214,90,0.9)"; ctx.shadowBlur = 12;
-      ctx.lineWidth = 8; ctx.strokeStyle = e.flash > 0 ? "#fff6c8" : "#fff6d8";
+      ctx.lineWidth = 8; ctx.strokeStyle = e.flash > 0 ? "#fff6c8" : (theme.wordStroke || "#fff6d8");
       ctx.strokeText(ch, x + wob, py);
       ctx.shadowBlur = 0;
       ctx.fillStyle = fillColor; ctx.fillText(ch, x + wob, py);
@@ -1910,7 +1938,7 @@ const Battle = (() => {
       ctx.shadowColor = `rgba(255,255,230,${f})`; ctx.shadowBlur = 26;
     }
     ctx.lineWidth = 8;
-    ctx.strokeStyle = e.flash > 0 ? "#fff6c8" : (e.last ? "#fff6d8" : "#ffffff");
+    ctx.strokeStyle = e.flash > 0 ? "#fff6c8" : (theme.wordStroke || (e.last ? "#fff6d8" : "#ffffff"));   // 縁取りの色は時間帯で変えられる
     if (e.parts) {
       for (const p of e.parts) if (!p.broken) ctx.strokeText(p.ch, x + p.ox, y);
     } else {
@@ -2233,7 +2261,7 @@ const Battle = (() => {
     ctx.font = font(16); ctx.fillStyle = "#4b5e3a";
     ctx.strokeText(String(score), W - 14, top);
     ctx.fillText(String(score), W - 14, top);
-    // パワーと持ちものは、左下の記憶の光のボタンの横に小さく
+    // パワーと持ちものは、左下のふわりタイフーンのボタンの横に小さく
     const b = bombButton();
     ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.font = font(11);
     const lvNo = POWER_LEVELS.indexOf(level) + 1;
@@ -2247,7 +2275,7 @@ const Battle = (() => {
     drawStrip();
   }
 
-  // 「記憶の光」のボタン: ふわりマークのまわりにゲージ。満タンで光る
+  // 「ふわりタイフーン」のボタン: ふわりマークのまわりにゲージ。満タンで光る
   function drawBombButton() {
     const b = bombButton(), full = gauge >= 100;
     ctx.save();
@@ -2265,11 +2293,11 @@ const Battle = (() => {
     // ふわりマーク（小さなタオル）
     ctx.fillStyle = full ? "#fff4cf" : "#fffdf7"; ctx.strokeStyle = full ? "#dcb64e" : "#c9d9b4"; ctx.lineWidth = 2;
     roundRect(b.x - 11, b.y - 9, 22, 18, 5); ctx.fill(); ctx.stroke();
-    ctx.font = font(10); ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.font = font(full ? 10 : 9); ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.lineWidth = 3; ctx.strokeStyle = "#ffffff";
-    ctx.strokeText(full ? "タップ" : "記憶の光", b.x, b.y - b.r - 7);
+    ctx.strokeText(full ? "タップ" : "ふわりタイフーン", b.x, b.y - b.r - 7);
     ctx.fillStyle = full ? "#b0801a" : "#7a8a68";
-    ctx.fillText(full ? "タップ" : "記憶の光", b.x, b.y - b.r - 7);
+    ctx.fillText(full ? "タップ" : "ふわりタイフーン", b.x, b.y - b.r - 7);
     ctx.restore();
   }
 
@@ -2277,7 +2305,7 @@ const Battle = (() => {
   // はじめは「？」、探検で見つけると灰色の名前、本番で吸い込むと金色。名前は枠の中に縦書き
   function drawStrip() {
     const x = 6, cw = BATTLE.stripWidth, gap = 3;
-    const y0 = 40, y1 = bombButton().y - bombButton().r - 22;   // 体力ゲージの下から、記憶の光のボタンの上まで
+    const y0 = 40, y1 = bombButton().y - bombButton().r - 22;   // 体力ゲージの下から、ふわりタイフーンのボタンの上まで
     const n = Math.max(1, slots.length), sh = (y1 - y0 - gap * (n - 1)) / n;
     ctx.save();
     ctx.fillStyle = "rgba(255,253,245,0.55)";

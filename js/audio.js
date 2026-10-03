@@ -185,7 +185,7 @@ const Sound = (() => {
     } else if (name === "crack") {   // 文字が砕ける（ぱりん、でもやわらかく）
       sweep(1800, 900, 0.12, "triangle", 0.16);
       tone(freq("A6"), t + 0.04, 0.2, "sine", 0.1);
-    } else if (name === "light") {   // 「記憶の光」
+    } else if (name === "light") {   // 「ふわりタイフーン」
       ["C5", "G5", "C6", "E6", "G6", "C7"].forEach((n, i) => tone(freq(n), t + i * 0.05, 0.8, "sine", 0.18));
       sweep(300, 1600, 0.6, "triangle", 0.12);
     } else if (name === "odai") {    // お題が出た
