@@ -208,7 +208,14 @@ const LOADOUTS = [
 // 弾の本数ごとの、横のならび
 const SHOT_SPREAD = { 1: [0], 2: [-0.6, 0.6], 3: [-1, 0, 1], 4: [-1.5, -0.5, 0.5, 1.5] };
 
-const FONT_FAMILY = '"Hiragino Maru Gothic ProN","Hiragino Maru Gothic Pro","Zen Maru Gothic","Rounded Mplus 1c",sans-serif';
+// フォント: css/style.css の --font を読む（指定は CSS の1か所だけ）。読めないときの予備
+let FONT_FAMILY = '"Hiragino Maru Gothic ProN","Hiragino Maru Gothic Pro","Zen Maru Gothic",sans-serif';
+function loadFontFamily() {
+  try {
+    const v = getComputedStyle(document.documentElement).getPropertyValue("--font").trim();
+    if (v) FONT_FAMILY = v;
+  } catch (e) { /* 予備のまま */ }
+}
 
 // 語句の本体の文字（かっこと、かっこの中の別名を除く）。例: 毛(ウール) → 毛
 function baseChars(word) { return Array.from(word.word.replace(/\([^)]*\)/g, "")); }
@@ -397,6 +404,7 @@ const Battle = (() => {
   // words: このステージの10語、o: { stageName, fuwariCount, onEnd(吸い込んだ順のid配列, 記録) }
   function start(words, o) {
     opts = Object.assign({}, o, { words, total: words.length });
+    loadFontFamily();
     canvas = document.getElementById("battle-canvas");
     ctx = canvas.getContext("2d");
     resize();

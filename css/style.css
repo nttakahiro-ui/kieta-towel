@@ -9,7 +9,9 @@
   --text: #3e4a34;
   --rose: #d07a8c;
   --white: #fffdf7;
-  --font: "Hiragino Maru Gothic ProN", "Hiragino Maru Gothic Pro", "Zen Maru Gothic", "Rounded Mplus 1c", "Arial Rounded MT Bold", sans-serif;
+  /* ゲーム全体のフォントは、ここ1か所で決める（バトルの画面もここを読む）。本番のフォントに替えるときは、ここを書き換える
+     iPhone は「ヒラギノ丸ゴ」、それ以外は Google Fonts の「Zen Maru Gothic」（index.html で読み込み） */
+  --font: "Hiragino Maru Gothic ProN", "Hiragino Maru Gothic Pro", "Zen Maru Gothic", sans-serif;
 }
 
 * { box-sizing: border-box; }
