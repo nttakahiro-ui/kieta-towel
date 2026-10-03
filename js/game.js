@@ -16,7 +16,7 @@
 const BATTLE = {
   // --- 台本（2周＋大ボス） ---
   roundInterval1: 3.2,         // 探検（出撃1）で語句が出てくる間隔（秒）
-  roundInterval2: 3.6,         // 本番（出撃2）で語句が出てくる間隔（秒）
+  roundInterval2: 4.2,         // 本番（出撃2）で語句が出てくる間隔（秒）
   round1Speed: 1.4,            // 探検の語句の動く速さの倍率（探検は速く流す）
   roundGap: 2.5,               // 周と周のあいだの秒数（帯を出す）
   firstSpawnDelay: 2.2,        // 始まってから最初の語句が出るまで（秒）
@@ -101,16 +101,18 @@ const BATTLE = {
   exploreTime: 40,             // 1回目の旅の長さ（秒）。時間切れでも何も失わない
   exploreFirst: 1.2,           // 最初の語句が現れるまで（秒）
   exploreGap: 3.4,             // 語句が現れる間隔（秒）
-  exploreLife: 11,             // 語句がただよっている時間（秒）。見つけられなければ消える
+  exploreLife: 10,             // 語句がただよっている時間（秒）。見つけられなければ消える
   exploreSpeed: 24,            // 語句がただよう速さ（px/秒）
-  binoR: 0.19,                 // 双眼鏡の円の大きさ（半径。画面の幅に対する割合）
+  binoR: 0.17,                 // 双眼鏡の円の大きさ（半径。画面の幅に対する割合）
   binoSpread: 0.62,            // 2つの円の中心のはなれぐあい（半径に対する割合。1より小さいと重なる）
   binoMove: 1.15,              // 指を動かした量に対して、双眼鏡が動く量
   exploreDark: 0.96,           // 円の外の暗さ（0〜1。1でまっ暗）
   lookTime: 0.5,               // 円の中で見つめると見つかるまでの時間（秒・合計）
   hintEvery: 1.5,              // 暗いところで語句がきらっと光る間隔（秒）
-  hintAlpha: 0.75,             // きらっと光る強さ（0＝光らない〜1）
+  hintAlpha: 0.6,              // きらっと光る強さ（0＝光らない〜1）
   bugEvery: 5,                 // 飾りの虫が横切る間隔（秒）
+  // 2回目の旅: ことばを包む殻（10/3-11。役割で分ける: ザコ＝綿毛のまゆ、中ボス＝いばら、大ボス＝霧）。見た目はすべて仮
+  shellVeil: 0.22,             // 殻が語句の上にかかる濃さ（0〜1。読みやすさのため、うすく）
   // 本番の表紙（10/3-9）
   countStep: 0.45,             // 表紙のあとのカウント「3」「2」「1」のそれぞれの時間（秒）
   countGo: 0.5,                // 「出撃！」の時間（秒）。カウントの合計は2秒以内
@@ -374,6 +376,7 @@ const Battle = (() => {
   let choiceT = 0;           // 選ぶ時間の残り（秒）
   let sortieStep = "choice"; // 出撃2の画面の段階: "choice" 持っていくものを選ぶ → "cover" 表紙（タップ待ち）→ "count" 3・2・1・出撃！
   let countT = 0;            // カウントの経過（秒）
+  let freed = [];            // 殻から助けられて、ふわりのところへ飛んでいく語句
   let explore = null;        // 1回目の旅（双眼鏡）の状態 { t, next, list, bugs, bugT, endT }
   let bino = null;           // 双眼鏡の中心 { x, y }
   let maskCv = null;         // 双眼鏡の外を暗くするための裏の画面
@@ -513,7 +516,7 @@ const Battle = (() => {
     hits = 0; downs = 0; lives = BATTLE.lives; gameOvers = 0; scoreAtMain = 0; retryMain = false;
     paused = false; moved = false; groundHinted = false; banner = null; shake = 0; showWord = null; threads = []; pops = [];
     slow = 0; wave = null; gauge = 0; bombsUsed = 0; fsay = null; odai = null; bounces = [];
-    stripFlash = 0; sortieStep = "choice";
+    stripFlash = 0; sortieStep = "choice"; freed = [];
     explore = { t: 0, next: 0, list: [], bugs: [], bugT: 2, endT: 0 };
     bino = { x: W / 2 + 10, y: H * 0.42 };
     state = "sortie"; sortieNo = 1; reacted = 0;   // 「出撃1 探検」の画面から始める
@@ -844,6 +847,13 @@ const Battle = (() => {
     for (const f of fluff) { f.y += f.v * dt; f.x += Math.sin(t + f.p) * 8 * dt; if (f.y > H + 10) { f.y = -10; f.x = Math.random() * W; } }
     updateThreads(dt);
     updatePops(dt);
+    for (const f of freed) {   // 助けた語句が、ふわりのところへ飛んでいく（0.7秒）
+      f.age += realDt;
+      const k = Math.min(1, f.age / 0.7), tx = player.x + 26, ty = player.y - 6;
+      f.x += (tx - f.x) * Math.min(1, realDt * (2 + k * 10)); f.y += (ty - f.y) * Math.min(1, realDt * (2 + k * 10));
+      if (f.age >= 0.7) { f.done = true; player.glow = 0.4; }
+    }
+    freed = freed.filter(f => !f.done);
     for (const v of vanish) { v.age += dt; if (v.ground) v.y += scrollSpeed() * dt; }
     for (const fl of floats) fl.age += realDt;
     floats = floats.filter(fl => fl.age < 0.9);
@@ -993,7 +1003,7 @@ const Battle = (() => {
       if (e.pattern === "odai" && odai && odai.intro > 0) e.fire = Math.max(e.fire, 0.5);
       if (e.fire <= 0 && e.y > 0 && e.y < H * 0.62) {
         e.fire = BATTLE.enemyFireInterval[e.role] * P.fireScale / fireRamp() * (e.pattern === "odai" ? 3 : 1) * (0.8 + Math.random() * 0.4);
-        fireAt(e.x, e.y + (e.ground ? 0 : e.h / 2), BATTLE.shotPattern[e.role] || [0]);
+        fireAt(e.x, e.y + (e.ground ? 0 : e.h / 2), BATTLE.shotPattern[e.role] || [0], { zako: "seed", mid: "thorn", boss: "mist" }[e.role]);   // 殻から飛ぶ: まゆ＝たね、いばら＝とげ、霧＝もや
       }
     }
 
@@ -1142,11 +1152,11 @@ const Battle = (() => {
     ebullets = ebullets.filter(b => b.y < H + 20 && b.y > -20 && b.x > -20 && b.x < W + 20);
   }
 
-  function fireAt(x, y, pattern) {
+  function fireAt(x, y, pattern, kind) {
     const ang = Math.atan2(player.y - y, player.x - x);
     for (const da of pattern) {
       const sp = BATTLE.enemyBulletSpeed;   // 難しさは弾の速さでは作らない
-      ebullets.push({ x, y, vx: Math.cos(ang + da) * sp, vy: Math.sin(ang + da) * sp });
+      ebullets.push({ x, y, vx: Math.cos(ang + da) * sp, vy: Math.sin(ang + da) * sp, kind });
     }
   }
 
@@ -1216,6 +1226,10 @@ const Battle = (() => {
     }
     e.hp -= amt;
     if (e.hp < 1e-6) e.hp = 0;   // 1/3 などを足したときの、こまかい誤差を消す
+    if (hasShell(e) && Math.random() < 0.6) {   // 光が当たると、まゆの毛羽が少し散る
+      const hx = hitX === undefined ? e.x : Math.min(e.x + e.w / 2, Math.max(e.x - e.w / 2, hitX));
+      threads.push({ x: hx, y: e.y + e.size * 0.4, vx: (Math.random() - 0.5) * 80, vy: 40 + Math.random() * 40, len: 4, curl: 1, rot: Math.random() * 6, color: "#ffffff", age: 0, scatter: 9, sparkle: true });
+    }
     Sound.se("hit");
     if (e.hp <= 0) defeat(e);
   }
@@ -1225,7 +1239,7 @@ const Battle = (() => {
     for (let i = 0; i < 12; i++) {
       const a = Math.random() * Math.PI * 2, sp = 50 + Math.random() * 110;
       threads.push({ x: px, y: py, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, len: 5 + Math.random() * 6,
-        curl: (Math.random() - 0.5) * 2, rot: Math.random() * 6, color: ENEMY_COLOR[e.role], age: 0, scatter: 9, sparkle: true });
+        curl: (Math.random() - 0.5) * 2, rot: Math.random() * 6, color: (SHELL[e.role] || SHELL.zako).bit, age: 0, scatter: 9, sparkle: true });
     }
     floats.push({ x: e.vertical ? px + e.size : px, y: e.vertical ? py : e.y - e.size * 0.9, text: p.kana, big: true, kana: true, age: 0 });
     Sound.se("crack");
@@ -1507,9 +1521,10 @@ const Battle = (() => {
         x: e.x + (Math.random() - 0.5) * e.w, y: e.y + (Math.random() - 0.5) * e.h * 0.6,
         vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 40,
         len: 6 + Math.random() * 12, curl: (Math.random() - 0.5) * 2, rot: Math.random() * 6,
-        color: ENEMY_COLOR[e.role], age: 0, scatter: 0.35 + Math.random() * 0.2
+        color: (SHELL[e.role] || SHELL.zako).bit, age: 0, scatter: 9, sparkle: true   // ほどけるのは殻。殻のかけらは散って消える
       });
     }
+    freed.push({ word: e.word.word, x: e.x, y: e.y, size: e.size, age: 0 });   // ことばは形をたもったまま、ふわりのところへ飛んでくる
     Sound.se("absorb");
     Sound.speak(e.word.kana || e.word.word);   // 語句を読み上げる（仮: 端末の読み上げ機能）
     player.hp = Math.min(BATTLE.playerMaxHp, player.hp + BATTLE.healOnAbsorb);
@@ -1650,6 +1665,8 @@ const Battle = (() => {
 
     // 自機の弾: 地面（緑・生成り・水色）と重ならない明るい桃色に、白と濃い色の縁取り
     for (const s of shots) {
+      ctx.fillStyle = "rgba(255,250,215,0.4)";   // ふわりの光: まわりにやわらかい光の輪
+      ctx.beginPath(); ctx.ellipse(s.x, s.y, s.thick ? 12 : 8, s.thick ? 18 : 12, 0, 0, Math.PI * 2); ctx.fill();
       ctx.beginPath(); ctx.ellipse(s.x, s.y, s.thick ? 7 : 4, s.thick ? 13 : 8, 0, 0, Math.PI * 2);
       ctx.lineWidth = 4; ctx.strokeStyle = "rgba(120,30,70,0.55)"; ctx.stroke();
       ctx.lineWidth = 2; ctx.strokeStyle = "#ffffff"; ctx.stroke();
@@ -1712,6 +1729,17 @@ const Battle = (() => {
     if (fogLevel > 0.01) drawFog();
     drawWeather();
     drawPlayer();
+    for (const f of freed) {   // 助けた語句（金色に光って、小さくなりながらふわりへ）
+      const k = Math.min(1, f.age / 0.7);
+      ctx.save();
+      ctx.globalAlpha = 1 - k * 0.6;
+      ctx.font = font(f.size * (1 - k * 0.6));
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.shadowColor = "rgba(255,214,90,1)"; ctx.shadowBlur = 16;
+      ctx.lineWidth = 6; ctx.strokeStyle = "#fff6d8"; ctx.lineJoin = "round"; ctx.strokeText(f.word, f.x, f.y);
+      ctx.fillStyle = GOLD_COLOR; ctx.fillText(f.word, f.x, f.y);
+      ctx.restore();
+    }
     if (guide) drawGuide();
     if (typhoon) drawTyphoon();
 
@@ -2130,7 +2158,9 @@ const Battle = (() => {
     const fillColor = e.last ? GOLD_COLOR : ENEMY_COLOR[e.role];
     for (const p of e.parts) {
       const ch = VERTICAL_GLYPH[p.ch] || p.ch, py = y + p.oy;
-      if (p.broken) { ctx.globalAlpha = alpha * 0.15; ctx.fillStyle = fillColor; ctx.fillText(ch, x, py); continue; }
+      if (p.broken) {   // 殻から解けた文字: 金色に光る
+        ctx.globalAlpha = alpha; ctx.shadowColor = "rgba(255,214,90,1)"; ctx.shadowBlur = 12; ctx.fillStyle = GOLD_COLOR; ctx.fillText(ch, x, py); ctx.shadowBlur = 0; continue;
+      }
       const wob = p.flash > 0 ? (Math.random() - 0.5) * 3 : 0;
       ctx.globalAlpha = alpha;
       ctx.shadowColor = "rgba(255,214,90,0.9)"; ctx.shadowBlur = 12;
@@ -2138,6 +2168,7 @@ const Battle = (() => {
       ctx.strokeText(ch, x + wob, py);
       ctx.shadowBlur = 0;
       ctx.fillStyle = fillColor; ctx.fillText(ch, x + wob, py);
+      if (hasShell(e) && p.maxHp) drawCharShell(e.role, x + wob, py, e.size, p.hp / p.maxHp);
       if (p.maxHp && p.hp < p.maxHp) {   // 文字ごとの残りの耐久（右に小さな帯）
         const bh = e.charH * 0.7;
         ctx.fillStyle = "rgba(0,0,0,0.12)"; ctx.fillRect(x + e.w / 2 + 2, py - bh / 2, 3, bh);
@@ -2158,9 +2189,82 @@ const Battle = (() => {
     ctx.restore();
   }
 
+  // 殻があるか（2回目の旅の語句。1回目の旅の双眼鏡の語句にはない）
+  const hasShell = e => e.last && !e.explore && !!e.pattern;
+  const SHELL = {
+    zako: { name: "綿毛のまゆ", color: "#ffffff", bit: "#ffffff" },
+    mid:  { name: "いばら",     color: "#5f6f34", bit: "#8a9a50" },
+    boss: { name: "霧",         color: "#b9b6cc", bit: "#d6d3e6" },
+  };
+  // 綿毛のまゆ（語句全体を包む）。k ＝ 殻の残り（1〜0）。うしろ側（front=false）と、語句の上にかかる側（front=true）
+  function drawCocoon(e, x, y, k, front) {
+    if (k <= 0) return;
+    const kanaUp = hasKanji(e.word.word) ? BATTLE.kanaSize * 0.6 : 0;
+    const rx = e.w / 2 + 14, ry = e.size * 0.7 + kanaUp * 0.6, cy = y - kanaUp * 0.5;
+    ctx.save();
+    if (!front) {
+      ctx.globalAlpha = 0.35 + 0.45 * k;
+      ctx.fillStyle = "rgba(255,255,255,0.55)";
+      ctx.beginPath(); ctx.ellipse(x, cy, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
+      // ふちの毛羽（残りが少ないほど減る）
+      const n = Math.round(10 + 14 * k);
+      ctx.fillStyle = "#ffffff";
+      for (let i = 0; i < n; i++) {
+        const a = i / n * Math.PI * 2 + Math.sin(t * 0.8 + i) * 0.05;
+        ctx.beginPath(); ctx.arc(x + Math.cos(a) * rx, cy + Math.sin(a) * ry, 4 + 3 * k + Math.sin(t * 2 + i * 1.7) * 1, 0, Math.PI * 2); ctx.fill();
+      }
+    } else {
+      // 語句の上にかかる、細い糸と、うすいベール
+      ctx.globalAlpha = BATTLE.shellVeil * k;
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath(); ctx.ellipse(x, cy, rx * 0.95, ry * 0.9, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 0.55 * k;
+      ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 1.3;
+      for (let i = 0; i < 3; i++) {
+        const yy = cy + (i - 1) * ry * 0.55, sw = Math.sin(t * 1.5 + i) * 4;
+        ctx.beginPath(); ctx.moveTo(x - rx, yy + sw); ctx.quadraticCurveTo(x, yy - ry * 0.35 - sw, x + rx, yy - sw); ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+  // 1文字ずつの殻（中ボス＝いばら、大ボス＝霧）。k ＝ その文字の殻の残り（1〜0）
+  function drawCharShell(role, cx, cy, sz, k) {
+    if (k <= 0) return;
+    ctx.save();
+    if (role === "boss") {   // 霧のかたまり: 文字のまわりに、うすいもや
+      ctx.globalAlpha = 0.25 + 0.4 * k;
+      ctx.fillStyle = SHELL.boss.bit;
+      for (let i = 0; i < 5; i++) {
+        const a = i / 5 * Math.PI * 2 + t * 0.4;
+        ctx.beginPath(); ctx.arc(cx + Math.cos(a) * sz * 0.5, cy + Math.sin(a) * sz * 0.45, sz * (0.22 + 0.12 * k), 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.globalAlpha = BATTLE.shellVeil * k * 1.2;
+      ctx.fillStyle = SHELL.boss.color;
+      ctx.beginPath(); ctx.ellipse(cx, cy, sz * 0.55, sz * 0.5, 0, 0, Math.PI * 2); ctx.fill();
+    } else {                 // いばら: 文字にからむ、とげのあるつる
+      ctx.globalAlpha = 0.45 + 0.5 * k;
+      ctx.strokeStyle = SHELL.mid.color; ctx.lineWidth = 2; ctx.lineCap = "round";
+      const n = k > 0.5 ? 2 : 1;
+      for (let i = 0; i < n; i++) {
+        const s0 = i ? -1 : 1;
+        ctx.beginPath();
+        ctx.moveTo(cx - sz * 0.6, cy + s0 * sz * 0.3);
+        ctx.bezierCurveTo(cx - sz * 0.2, cy - s0 * sz * 0.6, cx + sz * 0.2, cy + s0 * sz * 0.6, cx + sz * 0.6, cy - s0 * sz * 0.3);
+        ctx.stroke();
+        for (let j = 1; j <= 3; j++) {   // とげ
+          const u = j / 4, px = cx - sz * 0.6 + sz * 1.2 * u, py = cy + s0 * sz * 0.3 * Math.cos(u * Math.PI);
+          ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + 3, py - s0 * 5); ctx.stroke();
+        }
+      }
+    }
+    ctx.restore();
+  }
+
   function drawWordText(e, x, y, alpha) {
     if (e.vertical) { drawVerticalWord(e, x, y, alpha); return; }
     const word = e.word;
+    const cocoon = hasShell(e) && !e.parts && e.maxHp > 0 ? e.hp / e.maxHp : 0;   // ザコの語句: 綿毛のまゆ（残りの硬さで、うすくなる）
+    if (cocoon > 0) { ctx.save(); ctx.globalAlpha = alpha; drawCocoon(e, x, y, cocoon, false); ctx.restore(); }
     if (!e.last && !e.explore) alpha *= 0.55;   // （1回目の旅の双眼鏡の語句は、半透明にしない）
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.font = font(e.size);
@@ -2188,12 +2292,13 @@ const Battle = (() => {
     if (e.parts) {
       for (const p of e.parts) {
         const px = x + p.ox;
-        if (p.broken) {   // 砕けた文字は、うすい形だけ残す
-          ctx.save(); ctx.globalAlpha = alpha * 0.15; ctx.fillText(p.ch, px, y); ctx.restore();
+        if (p.broken) {   // 殻から解けた文字: 金色に光る（1回目の旅のしくみのころは、うすい形だけ残していた）
+          ctx.save(); ctx.globalAlpha = alpha; ctx.shadowColor = "rgba(255,214,90,1)"; ctx.shadowBlur = 12; ctx.fillStyle = GOLD_COLOR; ctx.fillText(p.ch, px, y); ctx.restore();
           continue;
         }
         const wob = p.flash > 0 ? (Math.random() - 0.5) * 3 : 0;
         ctx.fillText(p.ch, px + wob, y);
+        if (hasShell(e) && p.maxHp) { drawCharShell(e.role, px, y, e.size, p.hp / p.maxHp); ctx.fillStyle = fillColor; }
         // 文字ごとの残りの耐久（小さな帯）
         if (p.hp < p.maxHp) {
           const bw = p.cw * 0.7;
@@ -2205,6 +2310,7 @@ const Battle = (() => {
     } else {
       ctx.fillText(word.word, x, y);
     }
+    if (cocoon > 0) { ctx.save(); ctx.globalAlpha = alpha; drawCocoon(e, x, y, cocoon, true); ctx.restore(); ctx.globalAlpha = alpha; }
     if (hasKanji(word.word)) {
       ctx.font = font(BATTLE.kanaSize);
       ctx.lineWidth = 4; ctx.strokeStyle = "#ffffff";
@@ -2242,7 +2348,8 @@ const Battle = (() => {
 
   // 中ボス・大ボスは硬さを小さな丸で表示
   function drawHpDots(e) {
-    if (e.parts || e.maxHp <= 1) return;   // 1文字ずつ壊す敵は、文字ごとの帯で出す
+    if (e.parts || e.maxHp <= 1) return;
+    if (hasShell(e)) return;   // 2回目の旅は、硬さを丸ではなく殻の厚みで見せる   // 1文字ずつ壊す敵は、文字ごとの帯で出す
     const n = e.maxHp, gap = 10, x0 = e.x - (n - 1) * gap / 2;
     const dy = e.y - e.h / 2 - 10 - (hasKanji(e.word.word) ? BATTLE.kanaSize + 4 : 0);   // ふりがなより上に出す
     for (let i = 0; i < n; i++) {
@@ -2270,6 +2377,22 @@ const Battle = (() => {
   }
 
   function drawEnemyBullet(b) {
+    const r = BATTLE.enemyBulletSize;
+    if (b.kind === "thorn") {   // いばらのとげ（進む向きにとがる）
+      ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(Math.atan2(b.vy, b.vx));
+      ctx.beginPath(); ctx.moveTo(r * 1.3, 0); ctx.lineTo(-r * 0.8, r * 0.6); ctx.lineTo(-r * 0.5, 0); ctx.lineTo(-r * 0.8, -r * 0.6); ctx.closePath();
+      ctx.lineWidth = 3; ctx.strokeStyle = "#ffffff"; ctx.lineJoin = "round"; ctx.stroke();
+      ctx.fillStyle = "#6a5a2a"; ctx.fill();
+      ctx.restore(); return;
+    }
+    if (b.kind === "mist") {    // 霧のつぶ
+      ctx.save();
+      ctx.fillStyle = "rgba(150,145,180,0.95)"; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(b.x, b.y, r * 0.75, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "rgba(230,228,245,0.9)";
+      ctx.beginPath(); ctx.arc(b.x - r * 0.25, b.y - r * 0.25, r * 0.3, 0, Math.PI * 2); ctx.fill();
+      ctx.restore(); return;
+    }
     const art = ENEMY_BULLET_ART;
     if (art.image) {
       if (!art._img) { art._img = new Image(); art._img.src = art.image; }
