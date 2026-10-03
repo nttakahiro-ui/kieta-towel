@@ -103,7 +103,7 @@ const BATTLE = {
   difficulty: {
     fireScale:   { at1: 1,   at12: 0.5 },   // 敵が撃つ間隔の倍率（小さいほど弾が多い）
     speedScale:  { at1: 1,   at12: 1.4 },   // 敵（語句と敵の弾）の速さの倍率
-    zakoHp:      { at1: 1,   at12: 2.5 },   // ザコの語句の硬さ（四捨五入）
+    zakoHp:      { at1: 3,   at12: 6 },     // ザコの語句の硬さ（四捨五入）。10/8に3〜4発にした（世界1で3〜4）
     bossHpScale: { at1: 1,   at12: 2 },     // 中ボス・大ボスの1文字あたりの耐久の倍率
     tricky:      { at1: 1,   at12: 6.2 },   // 意地の悪い語句（端にかくれる・雑魚のうしろ・横切る）の数（四捨五入。patterns が "auto" のステージだけ）
   },
@@ -775,7 +775,7 @@ const Battle = (() => {
       } else if (e.pattern === "edge") {
         // 端にかくれる: 半分だけ顔を出して、出たり引っこんだりしながら降りる
         e.y += (H + e.size * 2) / BATTLE.edgeFallTime * dt * e.spd;
-        const show = 0.35 + 0.3 * Math.sin(e.age * 1.2);   // 見えている割合
+        const show = Math.min(1, 0.45 + 0.65 * Math.sin(e.age * 1.2));   // 見えている割合（ときどき全部出てくる。全部出ている間だけ当たる）
         e.x = e.lane < 0.5 ? -e.w / 2 + e.w * show : W + e.w / 2 - e.w * show;
       } else if (e.pattern === "cross") {
         // 横切る: 上のほうを横に通りすぎる
@@ -846,7 +846,7 @@ const Battle = (() => {
       }
       if (!hit) {
         for (const e of enemies.slice().sort((a, b) => b.y - a.y)) {   // 下にいる語句から当たる
-          if (e.ground || e.hp <= 0) continue;
+          if (e.ground || e.hp <= 0 || !onScreen(e)) continue;   // 画面に全部入るまでは当たらない
           if (e.pattern === "odai" ? (odai && odai.intro > 0) : (e.role === "boss" && e.age < BATTLE.bossEnterTime)) continue;   // 読む時間・降りてくる間は当たらない
           if (Math.abs(s.x - e.x) < e.w / 2 + (s.thick ? 10 : 4) && Math.abs(s.y - e.y) < e.h / 2) {
             if (e.vertical && !e.dummy) {   // 縦書き: 下から順に砕ける。砕けた文字のところは通りぬける
@@ -912,8 +912,12 @@ const Battle = (() => {
   }
 
   // 地上の的（地上の語句と、地上の雑魚）
+  // 語句の敵が画面に全部入っているか（入るまでは弾が当たらない）
+  function onScreen(e) {
+    return e.x - e.w / 2 >= 0 && e.x + e.w / 2 <= W && e.y - e.h / 2 >= 0 && e.y + e.h / 2 <= H;
+  }
   function groundTargets() {
-    return enemies.filter(e => e.ground && e.hp > 0 && e.y > 0).concat(fillers.filter(f => f.layer === "ground" && f.hp > 0 && f.y > 0));
+    return enemies.filter(e => e.ground && e.hp > 0 && onScreen(e)).concat(fillers.filter(f => f.layer === "ground" && f.hp > 0 && f.y > 0));
   }
   function inReach(g, x, y, r) {
     if (g.word) return Math.abs(x - g.x) < g.w / 2 + r && Math.abs(y - g.y) < g.h / 2 + r;
@@ -1072,7 +1076,7 @@ const Battle = (() => {
     if (phase === "round1") {
       bombing = true;
       for (const e of enemies) {
-        if (e.role === "boss" || e.hp <= 0 || e.y < -e.size) continue;
+        if (e.role === "boss" || e.hp <= 0 || !onScreen(e)) continue;
         e.hp = 0;
         defeat(e);
       }
