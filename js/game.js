@@ -921,7 +921,7 @@ const Battle = (() => {
     }
 
     // 雑魚の群れを出す（1周目と大ボスのときは少なめ）
-    fillerTimer -= dt;
+    if (!odai) fillerTimer -= dt;   // お題のあいだは雑魚を出さない
     if (fillerTimer <= 0) {
       const rp = BATTLE.ramp[phase] || BATTLE.ramp.round2;   // 坂: 今の出撃の濃さ
       const dn = rp.filler * fillerDense();
@@ -1295,6 +1295,9 @@ const Battle = (() => {
     const room = H * 0.66 - odaiTop() - 30;   // 問題文の帯の下から、自機の上まで
     const size = Math.max(24, Math.min(BATTLE.fontSize[role], Math.floor(room / (longest * 1.12))));
     cands.forEach((w, i) => spawn(w, { role, size, slot: i, real: w === real }));
+    // お題のあいだは、雑魚と雑魚の弾を出さない（10/3-12）。始まる瞬間に画面の雑魚と弾を消す（殻から飛ぶ弾は、読む時間が終わってから）
+    fillers.forEach(f => addPop(f.x, f.y, "#fff8d8", 0.8, f.layer === "ground"));
+    fillers = []; ebullets = [];
     slow = BATTLE.odaiIntroTime;   // 吸い込みと同じスロー。読む時間をつくる
     fsay = { text: "お題だよ！ 答えのことばに光を当てよう", t: 2.5 };
     Sound.se("odai");
