@@ -97,6 +97,12 @@ const BATTLE = {
   choiceTime: 10,              // 選ぶ時間（秒）。選ばなければ「つよい弾」になる
   bigBombMul: 2,               // 「大きなふわりタイフーン」のときの、ゲージのたまる速さの倍率
 
+  // --- 天気（data/stages.js の weather） ---
+  windDir: 1,                  // 風で自機が流される向き（1 ＝ 右へ、-1 ＝ 左へ）
+  windStrength: 26,            // 風で自機が流される速さ（px/秒）
+  fogTop: 0.33,                // 霧: 画面の上からこの割合までは見えない（そこに入ってから見える）
+  fogColor: "rgba(48,58,84,0.97)",   // 霧の色
+
   // --- 障害物（data/stages.js の obstacles） ---
   shadeHoldY: 0.2,             // 「木のかげ」の語句が止まって待つ高さ（画面の高さに対する割合）
   guideSlow: 1,                // 木のよけ方の案内のときに、ゆっくりになる秒数
@@ -340,6 +346,9 @@ const Battle = (() => {
   let obsNext = 0;           // 次に出す障害物の番号
   let guide = null;          // 木のよけ方の案内（矢印）
   let theme = DEFAULT_THEME; // このステージの時間帯の色
+  let weatherDef = null;     // このステージの天気（data/stages.js の weather）
+  let fogLevel = 0;          // 霧の濃さ（0〜1。お題バトルと大ボスのときはうすくなる）
+  let streaks = [];          // 風・雨・雪の見た目
   let found = new Set();     // 探検で見つけた語句の id
   let loadout = null;        // 本番に持っていくもの（LOADOUTS の id）
   let choiceT = 0;           // 選ぶ時間の残り（秒）
@@ -440,6 +449,9 @@ const Battle = (() => {
     layout = opts.stage && opts.stage.patterns === "auto" ? autoLayout(words, P, opts.stage.obstacles) : null;
     obsDef = (opts.stage && opts.stage.obstacles) || null;
     theme = Object.assign({}, DEFAULT_THEME, (opts.stage && opts.stage.theme) || {});
+    weatherDef = (opts.stage && opts.stage.weather) || null;
+    fogLevel = 0;
+    streaks = Array.from({ length: 22 }, () => ({ x: Math.random() * W, y: Math.random() * H, s: 0.6 + Math.random() * 0.8 }));
     groundIds = new Set(words.filter(w => patOf(w).pattern === "ground" && w !== bossWord).map(w => w.id));
     // 台本: 大ボス以外の語句を、データの順番（order）でならべる
     script = words.filter(w => w !== bossWord).sort((a, b) => patOf(a).order - patOf(b).order);
@@ -469,6 +481,8 @@ const Battle = (() => {
 
   // 周を始める
   // 障害物を出す（この出撃で出すステージだけ）
+  // 天気が今の出撃で出ているか
+  const weatherOn = kind => !!weatherDef && weatherDef.kind === kind && (weatherDef.sortie === 1 ? phase === "round1" : phase !== "round1");   // sortie 2 ＝ 本番と大ボス
   const obsActive = () => obsDef && phase === (obsDef.sortie === 1 ? "round1" : "round2");
   function addObstacle(x, r) { const o = { kind: obsDef ? obsDef.kind : "tree", x, y: -r, r }; obs.push(o); return o; }
   function spawnObstacle(it) {
@@ -961,6 +975,23 @@ const Battle = (() => {
     }
 
     // 自機の弾が空中の敵に当たったか（地上の敵には当たらない）
+    // 天気: 風（自機が横に流される。指で動かしていても流される）
+    if (weatherOn("wind") && !(player.rising > 0) && !(odai && odai.intro > 0)) {
+      const dx = BATTLE.windDir * BATTLE.windStrength * dt;
+      const nx = Math.min(Math.max(player.x + dx, 24), W - 24);
+      if (drag) drag.px += nx - player.x;
+      player.x = nx;
+    }
+    // 霧: お題バトルと大ボスのときは晴れる（語句が見えないと選べないため）
+    const fogWant = weatherOn("fog") && !odai && phase !== "boss" ? 1 : 0;
+    fogLevel += (fogWant - fogLevel) * Math.min(1, dt * 2);
+    for (const p of streaks) {   // 風・雨・雪の粒
+      if (weatherOn("wind")) { p.x += BATTLE.windDir * 260 * p.s * dt; p.y += 20 * dt; }
+      else if (weatherOn("rain")) { p.y += 520 * p.s * dt; p.x -= 40 * dt; }
+      else if (weatherOn("snow")) { p.y += 50 * p.s * dt; p.x += Math.sin(t + p.s * 9) * 20 * dt; }
+      if (p.x > W + 40) p.x = -40; if (p.x < -40) p.x = W + 40; if (p.y > H + 20) { p.y = -20; p.x = Math.random() * W; }
+    }
+
     // 障害物: 地面といっしょに流れる。自機がふれると被弾して、外へ押し出される
     for (const o of obs) {
       o.y += sc * dt;
@@ -1519,6 +1550,8 @@ const Battle = (() => {
     }
     ctx.globalAlpha = 1;
 
+    if (fogLevel > 0.01) drawFog();
+    drawWeather();
     drawPlayer();
     if (guide) drawGuide();
     if (typhoon) drawTyphoon();
@@ -1650,6 +1683,38 @@ const Battle = (() => {
     if (!theme.light) return;
     ctx.fillStyle = theme.light;
     ctx.fillRect(-10, -10, W + 20, H + 20);
+  }
+
+  // 霧: 画面の上のほうをかくす（fogTop まではほぼ見えず、その下でうすれていく）
+  function drawFog() {
+    const y1 = H * BATTLE.fogTop, y2 = y1 + 70;
+    ctx.save();
+    ctx.globalAlpha = fogLevel;
+    ctx.fillStyle = BATTLE.fogColor;
+    ctx.fillRect(-10, -10, W + 20, y1 + 10);
+    const g = ctx.createLinearGradient(0, y1, 0, y2);
+    g.addColorStop(0, BATTLE.fogColor); g.addColorStop(1, "rgba(48,58,84,0)");
+    ctx.fillStyle = g; ctx.fillRect(-10, y1, W + 20, y2 - y1);
+    // もやもや
+    ctx.fillStyle = "rgba(200,210,235,0.12)";
+    for (let i = 0; i < 6; i++) { const x = ((i * 97 + t * 14) % (W + 160)) - 80; ctx.beginPath(); ctx.ellipse(x, y1 - 10 + (i % 3) * 14, 90, 22, 0, 0, Math.PI * 2); ctx.fill(); }
+    ctx.restore();
+  }
+  // 風・雨・雪の粒（見た目だけ）
+  function drawWeather() {
+    if (!weatherDef) return;
+    ctx.save();
+    if (weatherOn("wind")) {
+      ctx.strokeStyle = "rgba(255,255,255,0.45)"; ctx.lineWidth = 2; ctx.lineCap = "round";
+      for (const p of streaks) { ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - BATTLE.windDir * 26 * p.s, p.y - 2); ctx.stroke(); }
+    } else if (weatherOn("rain")) {
+      ctx.strokeStyle = "rgba(200,220,255,0.55)"; ctx.lineWidth = 1.5;
+      for (const p of streaks) { ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + 4, p.y - 14 * p.s); ctx.stroke(); }
+    } else if (weatherOn("snow")) {
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      for (const p of streaks) { ctx.beginPath(); ctx.arc(p.x, p.y, 2 + p.s * 1.5, 0, Math.PI * 2); ctx.fill(); }
+    }
+    ctx.restore();
   }
 
   // ふわりタイフーン（仮の絵）: 自機のまわりでタオルがくるっと回りながら広がり、白いうずが残る
