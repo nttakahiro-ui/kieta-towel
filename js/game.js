@@ -15,8 +15,8 @@
 // ===== 調整用の数値（速さ・弾の量・硬さなど）はここにまとめる =====
 const BATTLE = {
   // --- 台本（2周＋大ボス） ---
-  roundInterval1: 3.5,         // 探検（出撃1）で語句が出てくる間隔（秒）
-  roundInterval2: 4,           // 本番（出撃2）で語句が出てくる間隔（秒）
+  roundInterval1: 3.2,         // 探検（出撃1）で語句が出てくる間隔（秒）
+  roundInterval2: 3.6,         // 本番（出撃2）で語句が出てくる間隔（秒）
   round1Speed: 1.4,            // 探検の語句の動く速さの倍率（探検は速く流す）
   roundGap: 2.5,               // 周と周のあいだの秒数（帯を出す）
   firstSpawnDelay: 2.2,        // 始まってから最初の語句が出るまで（秒）
@@ -26,6 +26,7 @@ const BATTLE = {
   crossY: 0.2,                 // 「横切る」語句が通る高さ（画面の高さに対する割合）
   escortCount: 4,              // 「雑魚のうしろ」の語句を守る雑魚の数
   kanaSize: 13,                // 敵の語句の上に出すふりがなの大きさ（px）
+  zakoAppearTime: 1,           // ザコの語句が画面に全部入ってから、止まって光る秒数（この間は撃てない。「来た」とわかる）
   bossStopY: 0.22,             // 大ボスが止まる高さ（画面の高さに対する割合）
   bossEnterTime: 3,            // 大ボスが止まる位置まで降りてくる秒数（この間は弾が当たらない）
   sway: 16,                    // 空中の語句の左右の振れ幅（px）
@@ -58,7 +59,7 @@ const BATTLE = {
   scrollTime: 11.5,            // 地面が画面の高さぶん流れる秒数（大きいほどゆっくり）
   bombRange: 170,              // 照準◎の位置（自機からどれだけ前か、px）
   lockRadius: 26,              // 照準◎の大きさ（この中に地上の敵が入ると、たねを落とす）
-  bombInterval: 0.22,          // たねを落とす間隔（秒）。10/8 にザコが硬くなったので短くした
+  bombInterval: 0.15,          // たねを落とす間隔（秒）。ザコの語句が硬くなるたびに短くしている（0.3 → 0.22 → 0.15）
   bombFlight: 0.4,             // たねが地面に届くまでの秒数
   bombRadius: 36,              // たねが当たる広さ（px）
 
@@ -111,7 +112,7 @@ const BATTLE = {
   difficulty: {
     fireScale:   { at1: 1,   at12: 0.5 },   // 敵が撃つ間隔の倍率（小さいほど弾が多い）
     speedScale:  { at1: 1,   at12: 1.4 },   // 敵（語句と敵の弾）の速さの倍率
-    zakoHp:      { at1: 3,   at12: 6 },     // ザコの語句の硬さ（四捨五入）。10/8に3〜4発にした（世界1で3〜4）
+    zakoHp:      { at1: 5,   at12: 6.5 },   // ザコの語句の硬さ（四捨五入）。10/3-4に5発にした（世界1は5発）
     bossHpScale: { at1: 1,   at12: 2 },     // 中ボス・大ボスの1文字あたりの耐久の倍率
     tricky:      { at1: 1,   at12: 6.2 },   // 意地の悪い語句（端にかくれる・雑魚のうしろ・横切る）の数（四捨五入。patterns が "auto" のステージだけ）
   },
@@ -840,6 +841,9 @@ const Battle = (() => {
 
     // 語句の敵の動き
     for (const e of enemies) {
+      // ザコの語句: 画面に全部入ったら1秒止まって光る（この間は撃てない）
+      if (e.role === "zako" && e.pattern !== "odai" && !e.appeared && onScreen(e)) { e.appeared = true; e.appearT = BATTLE.zakoAppearTime; }
+      if (e.appearT > 0 && !(odai && e.pattern !== "odai")) { e.appearT -= dt; e.flash = Math.max(0, e.flash - dt); continue; }
       e.age += dt;
       e.flash = Math.max(0, e.flash - dt);
       if (e.parts) for (const p of e.parts) p.flash = Math.max(0, p.flash - dt);
@@ -953,7 +957,7 @@ const Battle = (() => {
       }
       if (!hit) {
         for (const e of enemies.slice().sort((a, b) => b.y - a.y)) {   // 下にいる語句から当たる
-          if (e.ground || e.hp <= 0 || !onScreen(e)) continue;   // 画面に全部入るまでは当たらない
+          if (e.ground || e.hp <= 0 || !onScreen(e) || e.appearT > 0) continue;   // 画面に全部入るまで・入ってすぐの1秒は当たらない
           if (e.pattern === "odai" ? (odai && odai.intro > 0) : (e.role === "boss" && e.age < BATTLE.bossEnterTime)) continue;   // 読む時間・降りてくる間は当たらない
           if (Math.abs(s.x - e.x) < e.w / 2 + (s.thick ? 10 : 4) && Math.abs(s.y - e.y) < e.h / 2) {
             if (e.vertical && !e.dummy) {   // 縦書き: 下から順に砕ける。砕けた文字のところは通りぬける
@@ -1027,7 +1031,7 @@ const Battle = (() => {
     return e.x - e.w / 2 >= 0 && e.x + e.w / 2 <= W && e.y - e.h / 2 >= 0 && e.y + e.h / 2 <= H;
   }
   function groundTargets() {
-    return enemies.filter(e => e.ground && e.hp > 0 && onScreen(e)).concat(fillers.filter(f => f.layer === "ground" && f.hp > 0 && f.y > 0));
+    return enemies.filter(e => e.ground && e.hp > 0 && onScreen(e) && !(e.appearT > 0)).concat(fillers.filter(f => f.layer === "ground" && f.hp > 0 && f.y > 0));
   }
   function inReach(g, x, y, r) {
     if (g.word) return Math.abs(x - g.x) < g.w / 2 + r && Math.abs(y - g.y) < g.h / 2 + r;
@@ -1186,7 +1190,7 @@ const Battle = (() => {
     if (phase === "round1") {
       bombing = true;
       for (const e of enemies) {
-        if (e.role === "boss" || e.hp <= 0 || !onScreen(e)) continue;
+        if (e.role === "boss" || e.hp <= 0 || !onScreen(e) || e.appearT > 0) continue;
         e.hp = 0;
         defeat(e);
       }
@@ -1846,6 +1850,10 @@ const Battle = (() => {
     ctx.globalAlpha = alpha;
     ctx.shadowColor = e.last ? `rgba(255,214,90,${0.7 + pulse * 0.3})` : "rgba(255,255,255,0.95)";
     ctx.shadowBlur = e.last ? 10 + pulse * 8 : 10;
+    if (e.appearT > 0) {   // 画面に入ったばかり: 強く光って「来た」とわかる（まだ撃てない）
+      const f = 0.6 + Math.sin(t * 18) * 0.4;
+      ctx.shadowColor = `rgba(255,255,230,${f})`; ctx.shadowBlur = 26;
+    }
     ctx.lineWidth = 8;
     ctx.strokeStyle = e.flash > 0 ? "#fff6c8" : (e.last ? "#fff6d8" : "#ffffff");
     if (e.parts) {
