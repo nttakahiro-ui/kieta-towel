@@ -151,7 +151,12 @@ const Tune = (() => {
 
 const Main = (() => {
   const $ = id => document.getElementById(id);
-  const STAGE_ID = 1;   // V01 は世界1の最初のステージだけ
+  // いま遊んでいるステージ（ステージ一覧でえらぶ）
+  function selectStage(id) {
+    stage = window.STAGES.find(s => s.id === id) || window.STAGES[0];
+    world = window.WORLDS.find(w => w.id === stage.world);
+    words = window.WORDS.filter(w => w.stage === stage.id);
+  }
   let stage, world, words, lastStats = null, lastIds = [];
   const tuneMode = /[?&]tune/.test(window.location.search);
 
@@ -219,13 +224,13 @@ const Main = (() => {
       else if (!Save.data.cards[r.id]) Save.data.retake[r.id] = true;   // クイズで不正解 → あとで受け直せる
     });
     const owned = Save.data.cards;
-    if (words.filter(w => owned[w.id]).length >= CARDS.clearCount) Save.data.cleared[STAGE_ID] = true;
+    if (words.filter(w => owned[w.id]).length >= CARDS.clearCount) Save.data.cleared[stage.id] = true;
     // ベストスコアと3つの印（一度とった印は消えない。次のステージに進む条件ではない）
     const st = lastStats || { score: 0, hits: 1, downs: 1 };
     const now = { all: lastIds.length >= words.length, noDown: st.downs === 0, noHit: st.hits === 0 };
-    const prev = Save.data.best[STAGE_ID] || { score: 0, all: false, noDown: false, noHit: false };
+    const prev = Save.data.best[stage.id] || { score: 0, all: false, noDown: false, noHit: false };
     const newBest = st.score > prev.score;
-    Save.data.best[STAGE_ID] = {
+    Save.data.best[stage.id] = {
       score: Math.max(prev.score, st.score),
       all: prev.all || now.all, noDown: prev.noDown || now.noDown, noHit: prev.noHit || now.noHit
     };
@@ -234,7 +239,7 @@ const Main = (() => {
     $("screen-cards").scrollTop = 0;
     Cards.showCards({
       stage, words, results, owned, newIds, stats: lastStats,
-      record: { newBest, now, best: Save.data.best[STAGE_ID] },
+      record: { newBest, now, best: Save.data.best[stage.id] },
       onRecipe: toRecipe,
       onRetry: toBattle,
       onTitle: toStages
@@ -266,7 +271,7 @@ const Main = (() => {
         const main = document.createElement("span"); main.className = "main";
         const nm = document.createElement("span"); nm.className = "nm"; nm.textContent = s.name;
         const sub = document.createElement("span"); sub.className = "sub";
-        sub.textContent = s.open ? `ベスト ${b ? b.score : 0}点　カード ${got}/10` : "まだあそべません";
+        sub.textContent = s.open ? `難易度 ${s.difficulty || 1}　ベスト ${b ? b.score : 0}点　カード ${got}/10` : "まだあそべません";
         const marks = document.createElement("span"); marks.className = "marks";
         [["all", "10語"], ["noDown", "無事"], ["noHit", "無傷"]].forEach(([k, label]) => {
           const m = document.createElement("span"); m.className = "mark" + (b && b[k] ? " on" : ""); m.textContent = label;
@@ -275,7 +280,7 @@ const Main = (() => {
         main.append(nm, sub);
         row.append(no, main);
         if (s.open) row.appendChild(marks);
-        if (s.open) row.addEventListener("click", () => { Sound.se("start"); toBattle(); });
+        if (s.open) row.addEventListener("click", () => { Sound.se("start"); selectStage(s.id); toBattle(); });
         box.appendChild(row);
       });
     });
@@ -286,9 +291,7 @@ const Main = (() => {
   function init() {
     Save.load();
     Tune.load();
-    stage = window.STAGES.find(s => s.id === STAGE_ID);
-    world = window.WORLDS.find(w => w.id === stage.world);
-    words = window.WORDS.filter(w => w.stage === STAGE_ID);
+    selectStage(1);
 
     fitHeight();
     window.addEventListener("resize", fitHeight);

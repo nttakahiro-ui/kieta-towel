@@ -19,9 +19,9 @@ window.WORLDS = [
 
 window.STAGES = [
   { id: 1,  world: 1, name: "綿花のめざめ畑",       topic: "綿という植物",               recipe: "綿花のひみつ",  open: true, difficulty: 1, patterns: "data", override: {} },
-  { id: 2,  world: 1, name: "世界のコットン街道",     topic: "品種と産地",                 recipe: "超コットン",        open: false, difficulty: 2, patterns: "auto", override: {} },
-  { id: 3,  world: 1, name: "糸づくりの坂道",       topic: "糸・番手・撚り",             recipe: "糸つむぎ",         open: false, difficulty: 3, patterns: "auto", override: {} },
-  { id: 4,  world: 1, name: "特別な繊維の森",       topic: "綿以外の繊維と特別な糸",     recipe: "（仮）",          open: false, difficulty: 4, patterns: "auto", override: {} },
+  { id: 2,  world: 1, name: "世界のコットン街道",     topic: "品種と産地",                 recipe: "超コットン",        open: true, difficulty: 2, patterns: "auto", override: {} },
+  { id: 3,  world: 1, name: "糸づくりの坂道",       topic: "糸・番手・撚り",             recipe: "糸つむぎ",         open: true, difficulty: 3, patterns: "auto", override: {} },
+  { id: 4,  world: 1, name: "特別な繊維の森",       topic: "綿以外の繊維と特別な糸",     recipe: "（仮）",          open: true, difficulty: 4, patterns: "auto", override: {} },
   { id: 5,  world: 2, name: "タオルの道しるべ",      topic: "工程の全体像",               recipe: "（仮）",          open: false, difficulty: 5, patterns: "auto", override: {} },
   { id: 6,  world: 2, name: "糸が生まれる道",       topic: "糸ができるまで",             recipe: "（仮）",          open: false, difficulty: 6, patterns: "auto", override: {} },
   { id: 7,  world: 2, name: "パイル織りの広間",      topic: "タオルを織る",               recipe: "（仮）",          open: false, difficulty: 7, patterns: "auto", override: {} },
