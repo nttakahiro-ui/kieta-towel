@@ -3,8 +3,9 @@
 //   空中の敵 … 自機の弾（自動で連射）で倒す
 //   地上の敵 … 自機の前にある照準◎に入ると、自動で「たね」を落として倒す
 // 主役は語句の敵。バトルは「1周目 → 2周目 → 大ボス」の台本で進む（出る順番・出方・時刻はデータで固定）
-//   1周目 … 大ボス以外の語句が決まった順に出る。倒すと、ふわりが反応して光って消えるだけ（吸い込まない）
-//   2周目 … 同じ語句が同じ順番・同じ出方で出る。倒すと、糸のようにほどけて吸い込まれる（クイズに出る）
+//   1周目「出撃1 偵察（ちょうさ）」… 大ボス以外の語句が決まった順に出る。倒すと、ふわりが反応して光って消えるだけ（吸い込まない）
+//   2周目「出撃2 本番（あつめる）」… 同じ語句が同じ順番・同じ出方で出る。倒すと、糸のようにほどけて吸い込まれる（クイズに出る）
+//   出撃の始まりには「出撃1 偵察」「出撃2 本番」の画面を出し、タップで出撃する。出撃1が終わると一度止まる
 //            取り逃がした語句は、そのバトルでは取れない
 //   大ボス … 2周目のあとに1回。倒して吸い込むとバトル終了
 // お題バトル（BATTLE.odai が true のとき）: 2周目の中ボスと大ボスは、ふわりがお題（クイズの問題）を出し、
@@ -152,6 +153,9 @@ const ENEMY_BULLET_ART = {
   }
 };
 
+// 本番（出撃2）の語句の色（金色）
+const GOLD_COLOR = "#c8901a";
+
 // 自機の弾の色
 const SHOT_COLOR = "#ff5fa2";
 
@@ -231,7 +235,7 @@ const Battle = (() => {
 
   // ゲームの状態
   let t = 0;                 // 経過時間（秒）
-  let state = "play";        // "intro" / "play" / "down" / "clear"
+  let state = "play";        // "sortie"（出撃の画面）/ "play" / "down" / "clear"
   let stateTimer = 0;
   let player, shots, enemies, ebullets, threads, fluff;
   let fillers, bombs, pops, items, terrain, cloudShadows;
@@ -261,6 +265,8 @@ const Battle = (() => {
   let gauge = 0;             // 「記憶の光」ボムのゲージ（0〜100）
   let fsay = null;           // ふわりの一言（吹き出し）
   let odai = null;           // いまのお題バトル（なければ null）
+  let sortieNo = 1;          // 出撃の画面に出している番号（1＝偵察、2＝本番）
+  let reacted = 0;           // 偵察で見つけた（反応させた）語句の数
   let bounces = [];          // ダミーではね返った弾
   let bombsUsed = 0;
   let bombing = false;       // 「記憶の光」で反応させている最中（ゲージをためない）
@@ -296,6 +302,7 @@ const Battle = (() => {
     e.preventDefault();
     if (paused) { resume(); return; }
     if (!player) return;
+    if (state === "sortie") startSortie();
     // ふわりマークをタップ: ゲージが満タンなら「記憶の光」
     const rect = canvas.getBoundingClientRect(), bb = bombButton();
     if (Math.hypot(e.clientX - rect.left - bb.x, e.clientY - rect.top - bb.y) < bb.r + 10) {
@@ -352,7 +359,7 @@ const Battle = (() => {
     hits = 0; downs = 0;
     paused = false; moved = false; groundHinted = false; banner = null; shake = 0; showWord = null; threads = []; pops = [];
     slow = 0; wave = null; gauge = 0; bombsUsed = 0; fsay = null; odai = null; bounces = [];
-    state = "intro"; stateTimer = 2;
+    state = "sortie"; sortieNo = 1; reacted = 0;   // 「出撃1 偵察」の画面から始める
     running = true;
     lastTs = performance.now();
     cancelAnimationFrame(rafId);
@@ -368,6 +375,19 @@ const Battle = (() => {
     nextAt = p === "round1" ? BATTLE.firstSpawnDelay : 0.8;
   }
   const roundInterval = () => phase === "round1" ? BATTLE.roundInterval1 : BATTLE.roundInterval2;
+
+  // 出撃の画面をタップ: 出撃する
+  function startSortie() {
+    state = "play";
+    Sound.se("start");
+    if (sortieNo === 1) {
+      fsay = { text: "ことばを見つけよう（まだあつめられないよ）", t: BATTLE.fuwariSayTime };
+    } else {
+      startPhase("round2");
+      fsay = { text: "思い出した！今度はあつめられる！", t: BATTLE.fuwariSayTime, big: true };
+      Sound.se("power");
+    }
+  }
 
   function stop() {
     running = false;
@@ -548,6 +568,7 @@ const Battle = (() => {
 
   function update(realDt) {
     if (paused) return;
+    if (state === "sortie") return;   // 出撃の画面のあいだは止まっている
     // 吸い込む瞬間は、画面全体がゆっくりになる
     let dt = realDt;
     if (slow > 0) { slow -= realDt; dt = realDt * BATTLE.slowScale; }
@@ -578,14 +599,6 @@ const Battle = (() => {
     vanish = vanish.filter(v => v.age < 0.8);
     player.notice = Math.max(0, (player.notice || 0) - dt);
 
-    if (state === "intro") {
-      stateTimer -= dt;
-      if (stateTimer <= 0) {
-        state = "play";
-        fsay = { text: "ことばを見つけよう（まだ吸い込めないよ）", t: BATTLE.fuwariSayTime };
-      }
-      return;
-    }
     if (state === "down") {
       stateTimer -= dt;
       if (stateTimer <= 0) revive();
@@ -603,10 +616,11 @@ const Battle = (() => {
       gapT -= dt;
       if (gapT <= 0) {
         if (phase === "round1") {
-          startPhase("round2");
-          banner = { text: "2周目", t: 1.6, color: "rgba(220,170,60,0.92)" };
-          fsay = { text: "思い出した！今度は吸い込める！", t: BATTLE.fuwariSayTime };
-          Sound.se("power");
+          // 偵察が終わった: 画面の雑魚と弾を片づけて、「出撃2 本番」の画面で止まる
+          fillers.forEach(f => addPop(f.x, f.y, "#fff8d8", 0.8, f.layer === "ground"));
+          fillers = []; ebullets = []; bombs = []; items = [];
+          state = "sortie"; sortieNo = 2;
+          drag = null;
         } else {
           startPhase("boss");
           if (BATTLE.odai) startOdai(bossWord, true); else spawn(bossWord);
@@ -1045,6 +1059,7 @@ const Battle = (() => {
     }
     player.glow = 0.35;
     player.notice = 0.8;   // ふわりの「！」
+    reacted++;
     Sound.se("shine");
   }
 
@@ -1297,7 +1312,7 @@ const Battle = (() => {
     if (showWord) drawBigWord(showWord.word, showWord.t);
 
     // 状態の文字
-    if (state === "intro") centerText(opts.stageName, "1周目");
+    if (state === "sortie") drawSortie();
     if (state === "down") centerText("やられた…", `${Math.ceil(stateTimer)}秒後に再開`);
     if (state === "clear") centerText(`${absorbed.length}語あつまった！`, `${score}点　タイム ${fmtTime(t)}`);
     if (paused) {
@@ -1487,6 +1502,7 @@ const Battle = (() => {
   // 吸い込める回（最後の回）は金色に光る。それより前は白く光る
   function drawWordText(e, x, y, alpha) {
     const word = e.word;
+    if (!e.last) alpha *= 0.55;   // 偵察の語句は半透明
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.font = font(e.size);
     ctx.lineJoin = "round";
@@ -1504,7 +1520,8 @@ const Battle = (() => {
     }
     ctx.restore();
     ctx.globalAlpha = alpha;
-    ctx.fillStyle = ENEMY_COLOR[e.role];
+    const fillColor = e.last ? GOLD_COLOR : ENEMY_COLOR[e.role];   // 本番の語句は金色
+    ctx.fillStyle = fillColor;
     if (e.parts) {
       for (const p of e.parts) {
         const px = x + p.ox;
@@ -1520,7 +1537,7 @@ const Battle = (() => {
           ctx.fillStyle = "rgba(0,0,0,0.12)"; ctx.fillRect(px - bw / 2, y + e.size / 2 + 3, bw, 3);
           ctx.fillStyle = ENEMY_COLOR[e.role]; ctx.fillRect(px - bw / 2, y + e.size / 2 + 3, bw * p.hp / p.maxHp, 3);
         }
-        ctx.fillStyle = ENEMY_COLOR[e.role];
+        ctx.fillStyle = fillColor;
       }
     } else {
       ctx.fillText(word.word, x, y);
@@ -1672,11 +1689,46 @@ const Battle = (() => {
     ctx.restore();
   }
 
+  // 出撃の画面（1945の面の始まりのように）
+  function drawSortie() {
+    ctx.save();
+    ctx.fillStyle = sortieNo === 1 ? "rgba(236,244,226,0.93)" : "rgba(255,246,220,0.94)";
+    ctx.fillRect(0, 0, W, H);
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    const cy = H * 0.4;
+    ctx.font = font(15); ctx.fillStyle = "#7a8a68";
+    ctx.fillText(opts.stageName, W / 2, cy - 110);
+    ctx.font = font(44); ctx.fillStyle = sortieNo === 1 ? "#48693a" : "#b0801a";
+    ctx.fillText(`出撃${sortieNo}`, W / 2, cy - 60);
+    ctx.font = font(30);
+    ctx.fillText(sortieNo === 1 ? "偵察（ちょうさ）" : "本番（あつめる）", W / 2, cy - 12);
+    ctx.font = font(16); ctx.fillStyle = "#4b5e3a";
+    const lines = sortieNo === 1
+      ? ["ことばを見つけよう。", "どこから来るか、おぼえておこう", "（まだあつめられないよ）"]
+      : [`偵察で見つけたことば ${reacted}語`, "同じ順番で、もう一度来るよ。", "今度はあつめられる！"];
+    lines.forEach((l, i) => ctx.fillText(l, W / 2, cy + 36 + i * 24));
+    ctx.globalAlpha = 0.6 + Math.sin(performance.now() / 250) * 0.4;
+    ctx.font = font(22); ctx.fillStyle = sortieNo === 1 ? "#6f9a4a" : "#c98a1e";
+    ctx.fillText("タップで出撃！", W / 2, cy + 150);
+    ctx.restore();
+  }
+
   // ふわりの一言（吹き出し）。画面からはみ出さない位置に出す
   function drawFuwariSay(fx, fy) {
     const a = Math.min(1, fsay.t / 0.3, (BATTLE.fuwariSayTime - fsay.t) / 0.2);
     ctx.save();
     ctx.globalAlpha = Math.max(0, a);
+    if (fsay.big) {   // 大きな一言: 画面のまん中に
+      ctx.font = font(22);
+      const tw = Math.min(ctx.measureText(fsay.text).width, W - 40), bw = tw + 32, bh = 52;
+      const bx = W / 2 - bw / 2, by = H * 0.42 - bh / 2;
+      ctx.fillStyle = "rgba(255,250,232,0.97)"; ctx.strokeStyle = "#e0b03a"; ctx.lineWidth = 3;
+      roundRect(bx, by, bw, bh, 18); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "#8a5a10"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(fsay.text, W / 2, by + bh / 2 + 1, W - 56);
+      ctx.restore();
+      return;
+    }
     ctx.font = font(15);
     const tw = ctx.measureText(fsay.text).width, pad = 10, bw = tw + pad * 2, bh = 30;
     const bx = Math.min(Math.max(fx - bw / 2, 8), W - bw - 8), by = fy - 30 - bh;
@@ -1724,7 +1776,7 @@ const Battle = (() => {
     ctx.strokeText(`${absorbed.length} / ${opts.total} 語`, W - 14, top);
     ctx.fillText(`${absorbed.length} / ${opts.total} 語`, W - 14, top);
     ctx.font = font(12);
-    const ph = { round1: "1周目", round2: "2周目", boss: "大ボス" }[phase] || "";
+    const ph = { round1: "偵察", round2: "本番", boss: "大ボス" }[phase] || "";
     ctx.strokeText(`${ph}　${fmtTime(t)}`, W - 14, top + 24);
     ctx.fillText(`${ph}　${fmtTime(t)}`, W - 14, top + 24);
     drawStrip(top + 42);
