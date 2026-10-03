@@ -647,8 +647,10 @@ const Battle = (() => {
     shotTimer -= dt;
     if (shotTimer <= 0) {
       // ふわりの段階で弾の数が増える
-      const spread = SHOT_SPREAD[level.shots] || [0];
-      for (const k of spread) shots.push({ x: player.x + k * 9, y: player.y - 22, vx: k * 55, thick: level.thick });
+      // お題バトルの間は正面1本だけ（強化は一時休止。広がる弾がダミーに当たらないように）
+      const spread = odai ? [0] : (SHOT_SPREAD[level.shots] || [0]);
+      const thick = odai ? false : level.thick;
+      for (const k of spread) shots.push({ x: player.x + k * 9, y: player.y - 22, vx: k * 55, thick });
       shotTimer = BATTLE.shotInterval * level.rate;
     }
     for (const s of shots) { s.y -= BATTLE.shotSpeed * dt; s.x += s.vx * dt; }
@@ -940,7 +942,7 @@ const Battle = (() => {
     // ダミー: 弾がはね返る。少し減点（コンボは切らない）
     e.flash = 0.12;
     bounces.push({ x: s.x, y: e.y + e.h / 2, vx: (Math.random() - 0.5) * 120, vy: 320, age: 0 });
-    if (t - e.penaltyAt >= BATTLE.odaiPenaltyCool) {
+    if (t - e.penaltyAt >= BATTLE.odaiPenaltyCool) {   // 間違いなので減点（同じダミーで続けては減らさない）
       e.penaltyAt = t;
       score = Math.max(0, score - BATTLE.odaiPenalty);
       floats.push({ x: e.x, y: e.y - e.size, text: `ちがうよ −${BATTLE.odaiPenalty}`, big: true, wrong: true, age: 0 });
