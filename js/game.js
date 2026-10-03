@@ -96,6 +96,8 @@ const BATTLE = {
 
   // --- 障害物（data/stages.js の obstacles） ---
   shadeHoldY: 0.2,             // 「木のかげ」の語句が止まって待つ高さ（画面の高さに対する割合）
+  guideSlow: 1,                // 木のよけ方の案内のときに、ゆっくりになる秒数
+  guideTime: 2.4,              // 木のよけ方の案内（矢印）を出す秒数
   shadeWait: 2.5,              // 「木のかげ」の語句が、木が去ってから待つ秒数（そのあと降りてくる）
 
   // --- 「記憶の光」ボム ---
@@ -312,6 +314,7 @@ const Battle = (() => {
   let obsDef = null;         // このステージの障害物の決まり（data/stages.js の obstacles）
   let obs = [];              // 画面に出ている障害物 { kind, x, y, r }
   let obsNext = 0;           // 次に出す障害物の番号
+  let guide = null;          // 木のよけ方の案内（矢印）
   let found = new Set();     // 探検で見つけた語句の id
   let loadout = null;        // 本番に持っていくもの（LOADOUTS の id）
   let choiceT = 0;           // 選ぶ時間の残り（秒）
@@ -419,7 +422,7 @@ const Battle = (() => {
     cloudShadows = Array.from({ length: 3 }, (_, i) => ({ x: Math.random() * W, y: (i / 3) * H, rx: rand(70, 120), ry: rand(35, 55) }));
     terrain = [];
     fillTerrain();
-    shots = []; enemies = []; ebullets = []; fillers = []; bombs = []; items = []; obs = [];
+    shots = []; enemies = []; ebullets = []; fillers = []; bombs = []; items = []; obs = []; guide = null;
     startPhase("round1");
     fillerTimer = 1.2; shotTimer = 0; bombTimer = 0;
     player = { x: W / 2, y: H * 0.8, hp: BATTLE.playerMaxHp, inv: 0, glow: 0, hurt: 0 };
@@ -444,11 +447,25 @@ const Battle = (() => {
     if (it.gate !== undefined) {   // 木と木のあいだを通る場所: すきまの左右に1本ずつ
       const gx = W * it.gate, half = W * (it.gap || 0.35) / 2;
       const rl = Math.max(30, (gx - half) / 2), rr = Math.max(30, (W - gx - half) / 2);
-      addObstacle(gx - half - rl, rl + 6);
+      const a = addObstacle(gx - half - rl, rl + 6);
       addObstacle(gx + half + rr, rr + 6);
+      if (it.guide) startGuide({ kind: "gate", gx, tree: a });
     } else {
-      addObstacle(W * (it.x || 0.5), it.r || 50);
+      const o = addObstacle(W * (it.x || 0.5), it.r || 50);
+      if (it.guide) {
+        // よける向き: 木から遠いほう（画面のはしに寄りすぎるなら反対）
+        let dir = o.x >= player.x ? -1 : 1;
+        if (player.x + dir * 90 < 40 || player.x + dir * 90 > W - 40) dir = -dir;
+        startGuide({ kind: "dodge", dir, tree: o });
+      }
     }
+  }
+  // 木のよけ方の案内: 1秒スローにして、ふわりが一言、矢印で示す
+  function startGuide(g) {
+    guide = Object.assign(g, { t: BATTLE.guideTime });
+    slow = Math.max(slow, BATTLE.guideSlow);
+    fsay = { text: g.kind === "gate" ? "あいだを通ろう！" : "木だ！よけて！", t: BATTLE.guideTime };
+    Sound.se("odai");
   }
 
   function startPhase(p) {
@@ -704,6 +721,7 @@ const Battle = (() => {
     if (showWord) { showWord.t -= realDt; if (showWord.t <= 0) showWord = null; }
     if (wave) { wave.age += realDt; if (wave.age > 0.6) wave = null; }
     if (fsay) { fsay.t -= realDt; if (fsay.t <= 0) fsay = null; }
+    if (guide) { guide.t -= realDt; if (guide.t <= 0) guide = null; }
     if (odai && odai.intro > 0) odai.intro -= realDt;
     for (const b of bounces) { b.age += realDt; b.x += b.vx * realDt; b.y += b.vy * realDt; }
     bounces = bounces.filter(b => b.age < 0.5);
@@ -1458,6 +1476,7 @@ const Battle = (() => {
     ctx.globalAlpha = 1;
 
     drawPlayer();
+    if (guide) drawGuide();
 
     // 吸い込んだときに広がる光
     if (wave) {
@@ -1568,6 +1587,37 @@ const Battle = (() => {
         for (const d of s.deco) { ctx.beginPath(); ctx.arc(d.x, y + d.y, d.r, 0, Math.PI * 2); ctx.fill(); }
       }
     }
+  }
+
+  // 木のよけ方の案内の矢印
+  function drawGuide() {
+    const k = Math.min(1, guide.t / 0.3), pulse = 0.6 + Math.sin(t * 10) * 0.4;
+    const y = player.y - 48;
+    const x1 = player.x;
+    let x2;
+    if (guide.kind === "dodge") x2 = player.x + guide.dir * 80;
+    else {
+      x2 = Math.abs(guide.gx - x1) < 24 ? x1 : guide.gx;   // もうすきまの下にいれば横の矢印は出さない
+      // すきまの場所に下向きの印
+      const gy = Math.max(70, Math.min(player.y - 90, guide.tree.y));
+      ctx.save(); ctx.globalAlpha = k;
+      ctx.fillStyle = `rgba(255,214,90,${0.6 + pulse * 0.4})`; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(guide.gx - 16, gy - 10); ctx.lineTo(guide.gx + 16, gy - 10); ctx.lineTo(guide.gx, gy + 12); ctx.closePath();
+      ctx.stroke(); ctx.fill();
+      ctx.restore();
+    }
+    if (x2 === x1) return;
+    const dir = Math.sign(x2 - x1);
+    ctx.save();
+    ctx.globalAlpha = k;
+    ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 12; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(x1, y); ctx.lineTo(x2 - dir * 10, y); ctx.stroke();
+    ctx.strokeStyle = `rgba(230,160,40,${0.7 + pulse * 0.3})`; ctx.lineWidth = 7;
+    ctx.beginPath(); ctx.moveTo(x1, y); ctx.lineTo(x2 - dir * 10, y); ctx.stroke();
+    ctx.fillStyle = `rgba(230,160,40,${0.7 + pulse * 0.3})`; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(x2 + dir * 8, y); ctx.lineTo(x2 - dir * 12, y - 14); ctx.lineTo(x2 - dir * 12, y + 14); ctx.closePath();
+    ctx.stroke(); ctx.fill();
+    ctx.restore();
   }
 
   // 障害物の絵（仮）。kind ごとに描き分ける（今は木。岩・山はあとで足す）
