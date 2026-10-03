@@ -211,6 +211,11 @@ body { position: fixed; inset: 0; }
 .card .m { font-size: 13px; line-height: 1.5; }
 .card.miss { opacity: .45; border-style: dashed; box-shadow: none; }
 .card.miss .m { display: none; }
+.card .why { font-size: 12px; line-height: 1.4; margin-top: 2px; }
+.card.miss.wrong { opacity: .75; border-color: var(--rose); }
+.card.miss.wrong .why { color: #b05068; }
+.card.miss.lost { opacity: .6; }
+.card.miss.lost .why { color: #7a8a68; }
 @keyframes card-in { from { transform: scale(.7); opacity: 0; } to { transform: none; opacity: 1; } }
 .cards-result { margin-top: 20px; font-size: 18px; line-height: 1.6; }
 .cards-result b { font-size: 22px; color: var(--green-dark); }

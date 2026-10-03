@@ -2,7 +2,9 @@
 const SAVE_KEY = "kietaTowel.save.v1";
 
 const Save = (() => {
-  let data = { cards: {}, cleared: {} };
+  // cards: 集めたカード、cleared: クリアしたステージ、
+  // retake: クイズで不正解だった語句（あとで図鑑の受け直しクイズに使う。バトルで取り逃がした語句は入れない）
+  let data = { cards: {}, cleared: {}, retake: {} };
   // localStorage が使えなくても落ちないようにする
   function load() {
     try {
@@ -11,6 +13,7 @@ const Save = (() => {
         const d = JSON.parse(s);
         data.cards = d.cards || {};
         data.cleared = d.cleared || {};
+        data.retake = d.retake || {};
       }
     } catch (e) { /* 読めないときは空のまま */ }
   }
@@ -181,6 +184,8 @@ const Main = (() => {
 
   function toQuiz(ids) {
     const ordered = ids.map(id => words.find(w => w.id === id));
+    // クイズは吸い込めた語句の分だけ。1語もなければクイズを飛ばす
+    if (!ordered.length) { toCards([]); return; }
     // クイズの前に「今日あつめたことば」を3秒見せる
     showScreen("review");
     Sound.play("card");
@@ -194,7 +199,10 @@ const Main = (() => {
     Sound.setTempo(1);
     // 正解した語句がカードになる
     const newIds = results.filter(r => r.correct && !Save.data.cards[r.id]).map(r => r.id);
-    results.forEach(r => { if (r.correct) Save.data.cards[r.id] = true; });
+    results.forEach(r => {
+      if (r.correct) { Save.data.cards[r.id] = true; delete Save.data.retake[r.id]; }
+      else if (!Save.data.cards[r.id]) Save.data.retake[r.id] = true;   // クイズで不正解 → あとで受け直せる
+    });
     const owned = Save.data.cards;
     if (words.filter(w => owned[w.id]).length >= CARDS.clearCount) Save.data.cleared[STAGE_ID] = true;
     Save.store();

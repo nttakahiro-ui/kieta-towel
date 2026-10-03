@@ -47,8 +47,13 @@ const Cards = (() => {
     }
     const list = $("cards-list");
     list.innerHTML = "";
-    // 今回のクイズの順に並べる。カードは語句＋一言メモだけ
-    const order = o.results.map(r => o.words.find(w => w.id === r.id));
+    // 今回のクイズの順に並べ、そのあとにバトルで取り逃がした語句。カードは語句＋一言メモだけ
+    const quizIds = o.results.map(r => r.id);
+    const wrongIds = o.results.filter(r => !r.correct).map(r => r.id);
+    const missedIds = (o.stats && o.stats.missed) || [];
+    const order = quizIds.concat(missedIds.filter(id => !quizIds.includes(id)))
+      .concat(o.words.map(w => w.id).filter(id => !quizIds.includes(id) && !missedIds.includes(id)))
+      .map(id => o.words.find(w => w.id === id));
     order.forEach((w, i) => {
       const c = document.createElement("div");
       const owned = !!o.owned[w.id];
@@ -57,6 +62,14 @@ const Cards = (() => {
       const wd = document.createElement("div"); wd.className = "w"; wd.textContent = w.word;
       const m = document.createElement("div"); m.className = "m"; m.textContent = w.memo;
       c.append(wd, m);
+      // まだカードになっていない語句には、理由を出す
+      if (!owned) {
+        const why = document.createElement("div"); why.className = "why";
+        if (wrongIds.includes(w.id)) { why.textContent = "クイズで不正解。あとで受け直せる"; c.classList.add("wrong"); }
+        else if (missedIds.includes(w.id)) { why.textContent = "バトルで取り逃がし。もう一度あそんで吸い込もう"; c.classList.add("lost"); }
+        else why.textContent = "まだ";
+        c.appendChild(why);
+      }
       if (o.newIds && o.newIds.includes(w.id)) {
         const nb = document.createElement("span"); nb.className = "new"; nb.textContent = "NEW";
         c.appendChild(nb);
