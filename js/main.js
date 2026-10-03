@@ -65,8 +65,9 @@ const TUNE_ITEMS = [
   ["comboStep", "コンボで増える倍率", 0, 1, 0.1],
   ["comboMax", "コンボ倍率のいちばん上", 1, 5, 0.5],
   ["hpOverride.zako", "ザコの硬さ（0=データどおり）", 0, 6, 1],
-  ["hpOverride.mid", "中ボスの硬さ（0=データどおり）", 0, 12, 1],
-  ["hpOverride.boss", "大ボスの硬さ（0=データどおり）", 0, 20, 1],
+  ["hpOverride.mid", "中ボスの1文字あたりの耐久（0=データどおり）", 0, 12, 1],
+  ["hpOverride.boss", "大ボスの1文字あたりの耐久（0=データどおり）", 0, 20, 1],
+  ["bombGain", "記憶の光ゲージのたまる速さ（1語あたり）", 2, 50, 1],
 ];
 const TUNE_KEY = "kietaTowel.tune.v1";
 const TUNE_DEFAULT = {};

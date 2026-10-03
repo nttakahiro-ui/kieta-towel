@@ -168,6 +168,7 @@ const Battle = (() => {
   let slow = 0;              // ゆっくりの残り時間（秒）
   let gauge = 0;             // 「記憶の光」ボムのゲージ（0〜100）
   let bombsUsed = 0;
+  let bombing = false;       // 「記憶の光」で反応させている最中（ゲージをためない）
   let wave = null;           // 吸い込んだときに広がる光
 
   function font(size) { return `bold ${size}px ${FONT_FAMILY}`; }
@@ -759,13 +760,14 @@ const Battle = (() => {
     fillers = [];
     ebullets = [];
     if (phase === "round1") {
+      bombing = true;
       for (const e of enemies) {
         if (e.role === "boss" || e.hp <= 0 || e.y < -e.size) continue;
         e.hp = 0;
         defeat(e);
       }
       enemies = enemies.filter(e => e.hp > 0);
-      gauge = 0;   // 反応させたぶんでは、ゲージはたまらない
+      bombing = false;   // 反応させたぶんでは、ゲージはたまらない
     }
   }
 
@@ -803,7 +805,7 @@ const Battle = (() => {
     score += pts;
     floats.push({ x: e.x, y: e.y - e.size, text: `+${pts}` + (mul > 1 ? ` ×${mul}` : ""), big: true, age: 0 });
     const before = gauge;
-    gauge = Math.min(100, gauge + BATTLE.bombGain * mul);
+    if (!bombing) gauge = Math.min(100, gauge + BATTLE.bombGain * mul);
     if (before < 100 && gauge >= 100) { floats.push({ x: bombButton().x + 40, y: bombButton().y - 34, text: "記憶の光 OK！", big: true, age: 0 }); Sound.se("item"); }
     if (!e.last) { firstPass(e); return; }
     absorb(e);

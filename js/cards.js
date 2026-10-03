@@ -6,9 +6,9 @@ const CARDS = {
 // バトルの点数によるランク（仮）。min 点以上でそのランク
 const RANKS = [
   { min: 0,     name: "タオル見習い" },
-  { min: 25000, name: "タオル職人" },
-  { min: 35000, name: "タオル名人" },
-  { min: 45000, name: "タオル博士" },
+  { min: 20000, name: "タオル職人" },
+  { min: 30000, name: "タオル名人" },
+  { min: 40000, name: "タオル博士" },
 ];
 function rankOf(score) {
   let r = RANKS[0];
