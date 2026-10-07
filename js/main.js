@@ -1,6 +1,15 @@
 // 画面の切り替えとセーブ
 const SAVE_KEY = "kietaTowel.save.v1";
 
+// チュートリアルを「見た」の記録（10/7-1）。版（versions/ のフォルダ）ごとに分けて保存する
+// 置き場所（URL のパス）を名前に入れるので、別の版を開くと、チュートリアルがもう一度出る
+const TUT_KEY = "kietaTowel.tutorial." + window.location.pathname.replace(/index\.html$/, "");
+const TutSave = {
+  load() { try { return JSON.parse(window.localStorage.getItem(TUT_KEY) || "{}") || {}; } catch (e) { return {}; } },
+  mark(id) { const o = TutSave.load(); o[id] = true; try { window.localStorage.setItem(TUT_KEY, JSON.stringify(o)); } catch (e) {} },
+  reset() { try { window.localStorage.removeItem(TUT_KEY); } catch (e) {} },
+};
+
 const Save = (() => {
   // cards: 集めたカード、cleared: クリアしたステージ、
   // retake: クイズで不正解だった語句（あとで図鑑の受け直しクイズに使う。バトルで取り逃がした語句は入れない）
@@ -36,7 +45,12 @@ const TUNE_ITEMS = [
   ["exploreGap", "発見のたび: 語句が現れる間隔（秒）", 1.5, 6, 0.1],
   ["exploreLife", "発見のたび: 語句がただよう時間（秒）", 4, 20, 0.5],
   ["exploreSpeed", "発見のたび: 語句がただよう速さ", 5, 80, 1],
-  ["binoR", "双眼鏡の円の大きさ（画面の幅に対する割合）", 0.1, 0.3, 0.01],
+  ["binoA", "双眼鏡の横の半径（画面の幅に対する割合）", 0.12, 0.45, 0.005],
+  ["binoB", "双眼鏡の縦の半径（画面の幅に対する割合）", 0.08, 0.35, 0.005],
+  ["hintSize", "きらっと光る大きさの倍率", 0.5, 3, 0.1],
+  ["shotDrawScale", "ふわりの光の見た目の大きさ（当たりは変わらない）", 0.5, 3, 0.1],
+  ["fillerDrawScale", "虫の見た目の大きさ（当たりは変わらない）", 0.3, 1.2, 0.05],
+  ["restGap", "案内つきの木の前後の休み（秒）", 0, 6, 0.5],
   ["exploreDark", "双眼鏡の外の暗さ", 0.5, 1, 0.01],
   ["lookTime", "見つめると見つかるまでの時間（秒）", 0.1, 2, 0.05],
   ["hintAlpha", "暗いところで語句がきらっと光る強さ（0で光らない）", 0, 1, 0.05],
@@ -249,6 +263,7 @@ const Main = (() => {
         stage,
         stageName: stage.name,
         fuwariCount: Save.cardCount(),
+        tutorial: stage.id === 1 ? { seen: TutSave.load(), mark: TutSave.mark } : null,   // チュートリアルはステージ1の初回だけ
         onEnd: (ids, stats) => {
           lastStats = stats; lastIds = ids;
           const m = Math.floor(stats.time / 60), sec = String(Math.floor(stats.time % 60)).padStart(2, "0");
@@ -402,6 +417,8 @@ const Main = (() => {
     // バトルの一時停止メニュー
     $("btn-pause").addEventListener("click", openPause);
     $("pm-continue").addEventListener("click", () => closePause(() => Battle.resume()));
+    // 説明をもう一度: その場で説明を紙芝居のように見せ、次にステージ1を遊ぶときも、もう一度チュートリアルを出す
+    $("pm-tutorial").addEventListener("click", () => { TutSave.reset(); closePause(() => Battle.tutorialSlides()); });
     $("pm-retry").addEventListener("click", () => quitBattle(toBattle));
     $("pm-stages").addEventListener("click", () => quitBattle(toStages));
     $("pm-title").addEventListener("click", () => quitBattle(toTitle));
@@ -438,6 +455,7 @@ const Main = (() => {
       Save.data.retake = {};
       Save.data.best = {};
       Save.store();
+      TutSave.reset();   // チュートリアルを見た記録も消す（この版の分）
       $("title-cards").textContent = 0;
     });
 
