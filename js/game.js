@@ -133,6 +133,7 @@ const BATTLE = {
   // --- 障害物（data/stages.js の obstacles） ---
   shadeHoldY: 0.2,             // 「木のかげ」の語句が止まって待つ高さ（画面の高さに対する割合）
   guideSlow: 1,                // 木のよけ方の案内のときに、ゆっくりになる秒数
+  restGap: 3,                  // 休みつきの木（stages.js の afterWord）の前後にあける秒数（10/7-1）
   guideTime: 2.4,              // 木のよけ方の案内（矢印）を出す秒数
   shadeWait: 2.5,              // 「木のかげ」の語句が、木が去ってから待つ秒数（そのあと降りてくる）
 
@@ -364,13 +365,17 @@ const Battle = (() => {
   let slow = 0;              // ゆっくりの残り時間（秒）
   let gauge = 0;             // 「ふわりタイフーン」ボムのゲージ（0〜100）
   let fsay = null;           // ふわりの一言（吹き出し）
+  // 画面の一言・案内・問題文の順番待ち（10/7-1）。同時に出すのは1つだけ。消えてから次を出す
+  let msgQ = [], msgGap = 0, msgWasBusy = false;
   let odai = null;           // いまのお題バトル（なければ null）
   let sortieNo = 1;          // 出撃の画面に出している番号（1＝探検、2＝本番）
   let reacted = 0;           // 探検で見つけた（反応させた）語句の数
   let slots = [];            // 帯の10のあき枠に入る語句（順番）
   let obsDef = null;         // このステージの障害物の決まり（data/stages.js の obstacles）
   let obs = [];              // 画面に出ている障害物 { kind, x, y, r }
-  let obsNext = 0;           // 次に出す障害物の番号
+  let obsNext = 0;           // 次に出す障害物の番号（at で時刻を決めたものの中で）
+  let rest = null;           // 木の前後の休み（10/7-1）{ it, step: "wait"/"pre"/"guide"/"post", t }。休みのあいだは語句・お題・雑魚を出さない
+  let restDone = new Set();  // 休みが終わった障害物
   let guide = null;          // 木のよけ方の案内（矢印）
   let theme = DEFAULT_THEME; // このステージの時間帯の色
   let weatherDef = null;     // このステージの天気（data/stages.js の weather）
@@ -382,6 +387,7 @@ const Battle = (() => {
   let sortieStep = "choice"; // 出撃2の画面の段階: "choice" 持っていくものを選ぶ → "cover" 表紙（タップ待ち）→ "count" 3・2・1・出撃！
   let countT = 0;            // カウントの経過（秒）
   let freed = [];            // 殻から助けられて、ふわりのところへ飛んでいく語句
+  let tut = null;            // 出ているチュートリアルの案内（出ているあいだはゲームが止まる）
   let explore = null;        // 1回目の旅（双眼鏡）の状態 { t, next, list, bugs, bugT, endT }
   let bino = null;           // 双眼鏡の中心 { x, y }
   let maskCv = null;         // 双眼鏡の外を暗くするための裏の画面
@@ -493,6 +499,7 @@ const Battle = (() => {
     absorbed = []; missed = [];
     bossWord = words.find(w => w.role === "boss") || words[words.length - 1];
     // 地上に出る語句は、データの出方（pattern）が "ground" のもの
+    applyStageBattle(opts.stage);   // ステージごとの BATTLE の上書き（stages.js の override.battle。10/7-1）
     P = stageParams(opts.stage);
     layout = opts.stage && opts.stage.patterns === "auto" ? autoLayout(words, P, opts.stage.obstacles) : null;
     obsDef = (opts.stage && opts.stage.obstacles) || null;
@@ -519,6 +526,7 @@ const Battle = (() => {
     hits = 0; downs = 0; lives = BATTLE.lives; gameOvers = 0; scoreAtMain = 0; retryMain = false;
     paused = false; moved = false; groundHinted = false; banner = null; shake = 0; showWord = null; threads = []; pops = [];
     slow = 0; wave = null; gauge = 0; bombsUsed = 0; fsay = null; odai = null; bounces = [];
+    msgQ = []; msgGap = 0; msgWasBusy = false;
     stripFlash = 0; sortieStep = "choice"; freed = [];
     explore = { t: 0, next: 0, list: [], bugs: [], bugT: 2, endT: 0 };
     bino = { x: W / 2 + 10, y: H * 0.42 };
@@ -553,8 +561,70 @@ const Battle = (() => {
       }
     }
   }
+  // ===== メッセージの順番待ち =====
+  // 大事な順: お題 6 ＞ 木の案内 5 ＞ チュートリアル 4 ＞ 助けたことば 3 ＞ 帯の文字 2 ＞ ふわりの一言 1（小さな一言 0）
+  // 大事なものが来たら、出ているほうを消してすぐ出す（重ねない）。同じか下のものは、出ているものが消えてから出す
+  // お題のあいだは、ほかのメッセージは出さない。小さな一言（ありがと！など）は、何か出ていれば出さない
+  const MSG_PRI = { say0: 0, say: 1, banner: 2, word: 3, tutorial: 4, guide: 5, odai: 6 };
+  function msgBusy() {
+    if (odai) return 6;
+    if (tut) return 4;
+    if (guide) return 5;
+    if (showWord) return 3;
+    if (banner) return 2;
+    if (fsay) return fsay.small ? 0 : 1;
+    return -1;
+  }
+  function clearMsgs(below) {   // below より下のものを消す
+    if (below > 1 && fsay) fsay = null;
+    if (below > 2) banner = null;
+    if (below > 3) showWord = null;
+    if (below > 5) guide = null;
+  }
+  function post(kind, apply) {
+    const pri = MSG_PRI[kind];
+    if (odai && kind !== "odai") return;
+    const cur = msgBusy();
+    if (cur < 0 && msgGap <= 0 && !msgQ.length) { apply(); return; }
+    if (pri > cur && cur >= 0) { clearMsgs(pri); apply(); return; }
+    if (kind === "say0") return;
+    msgQ.push({ kind, pri, apply, at: performance.now() });
+  }
+  function updateMsgs(realDt) {
+    const busy = msgBusy() >= 0;
+    if (msgWasBusy && !busy) msgGap = 0.2;   // 消えてから次まで、少しあける
+    msgWasBusy = busy;
+    if (busy) return;
+    msgGap -= realDt;
+    if (msgGap > 0 || !msgQ.length) return;
+    const now = performance.now();
+    msgQ = msgQ.filter(m => !(m.kind === "say" && now - m.at > 2000));   // 待ちすぎた一言は捨てる
+    if (!msgQ.length) return;
+    let bi = 0;
+    msgQ.forEach((m, i) => { if (m.pri > msgQ[bi].pri) bi = i; });
+    const m = msgQ.splice(bi, 1)[0];
+    m.apply();
+    msgWasBusy = msgBusy() >= 0;
+  }
+
+  function updateRest(dt) {
+    const r = rest;
+    if (r.step === "wait") {   // 画面の語句がみんな助けられるか、出ていくのを待つ
+      if (!enemies.some(e => e.role !== "boss") && !showWord && !freed.length) { r.step = "pre"; r.t = BATTLE.restGap; }
+    } else if (r.step === "pre") {
+      r.t -= dt;
+      if (r.t <= 0) { spawnObstacle(r.it); r.step = "guide"; }
+    } else if (r.step === "guide") {
+      if (!guide) { r.step = "post"; r.t = BATTLE.restGap; }
+    } else if (r.step === "post") {
+      r.t -= dt;
+      if (r.t <= 0) { restDone.add(r.it); rest = null; nextAt = Math.max(nextAt, roundT); }
+    }
+  }
+
   // 木のよけ方の案内: 1秒スローにして、ふわりが一言、矢印で示す
   function startGuide(g) {
+    clearMsgs(5);
     guide = Object.assign(g, { t: BATTLE.guideTime });
     slow = Math.max(slow, BATTLE.guideSlow);
     fsay = { text: g.kind === "gate" ? "あいだを通ろう！" : "木だ！よけて！", t: BATTLE.guideTime };
@@ -562,7 +632,7 @@ const Battle = (() => {
   }
 
   function startPhase(p) {
-    obsNext = 0;
+    obsNext = 0; rest = null; restDone = new Set();
     phase = p;
     nextIdx = 0;
     roundT = 0;
@@ -583,13 +653,13 @@ const Battle = (() => {
     Sound.se("start");
     if (sortieNo === 1) {
       player.x = W / 2; player.y = H - 70;   // 1回目の旅: ふわりは下のまん中で待つ（動かない・撃たない）
-      fsay = { text: "ことばをさがそう！ 円の中で見つめてね", t: BATTLE.fuwariSayTime };
+      post("say", () => { fsay = { text: "ことばをさがそう！ 円の中で見つめてね", t: BATTLE.fuwariSayTime }; });
     } else {
       startPhase("round2");
       player.x = W / 2; player.y = H * 0.8;
       moved = false;   // 2回目の旅の最初に、もう一度「ゆびでふわりをうごかそう」を出す
       stripFlash = 0.6;   // 帯の灰色の名前がいっせいに光る
-      fsay = { text: "ことばを助けよう！", t: BATTLE.fuwariSayTime, big: true };
+      post("say", () => { fsay = { text: "ことばを助けよう！", t: BATTLE.fuwariSayTime, big: true }; });
       Sound.se("power");
     }
   }
@@ -609,7 +679,23 @@ const Battle = (() => {
     return LOADOUTS.map((l, i) => ({ id: l.id, x, y: y0 + i * (bh + gap), w: bw, h: bh }));
   }
 
+  // stages.js の override.battle に書いた BATTLE の数値を、そのステージのあいだだけ上書きする（終わったらもとにもどす）
+  let battleBackup = null;
+  function restoreStageBattle() {
+    if (!battleBackup) return;
+    for (const [k, v] of Object.entries(battleBackup)) BATTLE[k] = v;
+    battleBackup = null;
+  }
+  function applyStageBattle(stage) {
+    restoreStageBattle();
+    const b = stage && stage.override && stage.override.battle;
+    if (!b) return;
+    battleBackup = {};
+    for (const [k, v] of Object.entries(b)) { battleBackup[k] = BATTLE[k]; BATTLE[k] = v; }
+  }
+
   function stop() {
+    restoreStageBattle();
     running = false;
     cancelAnimationFrame(rafId);
     drag = null;
@@ -745,7 +831,7 @@ const Battle = (() => {
   function groundHint() {
     if (groundHinted) return;
     groundHinted = true;
-    banner = { text: "じめんのことばは ◎ をあわせよう", t: 2.4, color: "rgba(111,154,74,0.9)" };
+    post("banner", () => { banner = { text: "じめんのことばは ◎ をあわせよう", t: 2.4, color: "rgba(111,154,74,0.9)" }; });
   }
 
   // ===== 雑魚の群れを出す =====
@@ -831,6 +917,7 @@ const Battle = (() => {
     if (showWord) { showWord.t -= realDt; if (showWord.t <= 0) showWord = null; }
     if (wave) { wave.age += realDt; if (wave.age > 0.6) wave = null; }
     if (fsay) { fsay.t -= realDt; if (fsay.t <= 0) fsay = null; }
+    updateMsgs(realDt);
     if (guide) { guide.t -= realDt; if (guide.t <= 0) guide = null; }
     if (typhoon) { typhoon.age += realDt; if (typhoon.age > 0.9) typhoon = null; }
     if (odai && odai.intro > 0) odai.intro -= realDt;
@@ -891,7 +978,7 @@ const Battle = (() => {
         } else {
           startPhase("boss");
           if (BATTLE.odai) startOdai(bossWord, true); else spawn(bossWord);
-          banner = { text: "大きな殻があらわれた！", t: 1.8 };
+          // （「大きな殻があらわれた！」の帯は、お題の問題文と重なるので出さない。10/7-1）
           Sound.se("boss");
         }
       }
@@ -899,10 +986,14 @@ const Battle = (() => {
       if (!odai) {   // お題バトルの間は、台本を止める
         roundT += dt;
         if (obsActive()) {
-          const list = obsDef.items || [];
+          const list = (obsDef.items || []).filter(it => it.at !== undefined);   // 時刻で出す木
           while (obsNext < list.length && roundT >= list[obsNext].at) spawnObstacle(list[obsNext++]);
+          // 休みつきの木（afterWord: その数の語句を出したあと）: 画面の語句がいなくなる → 3秒 → 木と案内 → 案内のあと3秒 → 次の語句
+          const rl = (obsDef.items || []).find(it => it.afterWord !== undefined && !restDone.has(it) && nextIdx >= it.afterWord);
+          if (rl && !rest) rest = { it: rl, step: "wait", t: 0 };
         }
-        while (nextIdx < script.length && roundT >= nextAt) {
+        if (rest) updateRest(dt);
+        while (!rest && nextIdx < script.length && roundT >= nextAt) {
           const w = script[nextIdx];
           nextIdx++;
           nextAt += roundInterval();
@@ -921,7 +1012,7 @@ const Battle = (() => {
     }
 
     // 雑魚の群れを出す（1周目と大ボスのときは少なめ）
-    if (!odai) fillerTimer -= dt;   // お題のあいだは雑魚を出さない
+    if (!odai && !rest) fillerTimer -= dt;   // お題のあいだと、木の前後の休みのあいだは、雑魚を出さない
     if (fillerTimer <= 0) {
       const rp = BATTLE.ramp[phase] || BATTLE.ramp.round2;   // 坂: 今の出撃の濃さ
       const dn = rp.filler * fillerDense();
@@ -1134,7 +1225,7 @@ const Battle = (() => {
         player.hp = Math.min(BATTLE.playerMaxHp, player.hp + BATTLE.healItem);
         player.glow = 0.3;
         player.healFlash = 1;   // 体力ゲージが光って「+回復」
-        if (!fsay || !fsay.big) fsay = { text: "ありがと！", t: 1.2, small: true };   // ふわりが小さく
+        post("say0", () => { fsay = { text: "ありがと！", t: 1.2, small: true }; });   // ふわりが小さく（何か出ていれば出さない）
         Sound.se("item");
         addPop(it.x, it.y, "#fff8d0", 0.6);
       }
@@ -1290,6 +1381,7 @@ const Battle = (() => {
     const role = isBoss ? "boss" : "mid";
     const cands = shuffle([real, ...odaiDummies(real)]);   // ならびは毎回入れかえ
     // 3つとも同じ大きさ（いちばん長い語句が、縦書きで画面に入る大きさ。24px より小さくしない）
+    clearMsgs(9); msgQ = [];   // お題が始まるときは、出ているメッセージと待っているものを、すべて消してから問題文を出す
     odai = { real, boss: isBoss, t: 0, intro: BATTLE.odaiIntroTime, firstHit: null, q: real.odaiQuestion || real.question };
     const longest = Math.max(...cands.map(w => Array.from(w.word).length));
     const room = H * 0.66 - odaiTop() - 30;   // 問題文の帯の下から、自機の上まで
@@ -1299,7 +1391,7 @@ const Battle = (() => {
     fillers.forEach(f => addPop(f.x, f.y, "#fff8d8", 0.8, f.layer === "ground"));
     fillers = []; ebullets = [];
     slow = BATTLE.odaiIntroTime;   // 吸い込みと同じスロー。読む時間をつくる
-    fsay = { text: "お題だよ！ 答えのことばに光を当てよう", t: 2.5 };
+    // （「お題だよ！」の一言は、問題文と重なるので出さない。説明はチュートリアルで。10/7-1）
     Sound.se("odai");
   }
 
@@ -1334,8 +1426,8 @@ const Battle = (() => {
       if (!e.odaiReal || !ok) e.hp = 0;
     }
     enemies = enemies.filter(e => e.hp > 0);
-    if (!ok) fsay = { text: "あっ、行っちゃった…", t: 2 };
     odai = null;
+    if (!ok) post("say", () => { fsay = { text: "あっ、行っちゃった…", t: 2 }; });
   }
 
   // 「ふわりタイフーン」: 画面の雑魚と敵の弾を全部消す。1周目は、出ている語句を全部「反応」させる
@@ -1344,7 +1436,7 @@ const Battle = (() => {
     gauge = 0;
     bombsUsed++;
     typhoon = { age: 0 };
-    fsay = { text: "ふわりタイフーン！", t: 1.5 };
+    post("say", () => { fsay = { text: "ふわりタイフーン！", t: 1.5 }; });
     Sound.se("light");
     wave = { x: player.x, y: player.y, age: 0 };
     player.glow = 0.35;
@@ -1472,8 +1564,8 @@ const Battle = (() => {
     const all = reacted >= words.length;
     if (ex.t >= BATTLE.exploreTime || (all && ex.list.length === 0)) {
       ex.endT = 2.4;
-      banner = { text: all ? "ぜんぶ見つけた！" : `見つけたのは${reacted}語。\nのこりは救出のたびで助けよう`, t: 2.4, color: "rgba(72,105,58,0.92)" };
-      fsay = null;
+      const text = all ? "ぜんぶ見つけた！" : `見つけたのは${reacted}語。\nのこりは救出のたびで助けよう`;
+      post("banner", () => { banner = { text, t: 2.4, color: "rgba(72,105,58,0.92)" }; });
     }
   }
 
@@ -1517,7 +1609,7 @@ const Battle = (() => {
     const lv = POWER_LEVELS[Math.min(Math.floor(absorbed.length / BATTLE.powerEvery) + powerBonus, POWER_LEVELS.length - 1)];
     if (lv !== level && absorbed.length < opts.total) {
       level = lv;
-      banner = { text: "光が強くなった！", t: 1.2, color: "rgba(220,170,60,0.9)" };
+      post("banner", () => { banner = { text: "光が強くなった！", t: 1.2, color: "rgba(220,170,60,0.9)" }; });
       setTimeout(() => Sound.se("power"), 350);
     }
     const n = Math.min(60, 14 + e.word.word.length * 5);
@@ -1535,7 +1627,7 @@ const Battle = (() => {
     Sound.se("absorb");
     Sound.speak(e.word.kana || e.word.word);   // 語句を読み上げる（仮: 端末の読み上げ機能）
     player.hp = Math.min(BATTLE.playerMaxHp, player.hp + BATTLE.healOnAbsorb);
-    showWord = { word: e.word, t: BATTLE.wordShowTime };
+    post("word", () => { showWord = { word: e.word, t: BATTLE.wordShowTime }; });
     slow = BATTLE.slowTime;
     // 光が広がって、画面上の雑魚と敵の弾が全部消える
     wave = { x: e.x, y: e.y, age: 0 };
