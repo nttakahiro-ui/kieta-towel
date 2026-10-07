@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <!-- テスト版なので検索エンジンに載せない -->
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#eaf3dc">
+  <title>消えたタオルと白い記憶（テスト版）</title>
+  <!-- 丸みのあるフォント: iPhone はヒラギノ丸ゴ、それ以外は Zen Maru Gothic（Google Fonts）。どれを使うかは css/style.css の --font で決める -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap">
+  <link rel="stylesheet" href="css/style.css?v=31">
+</head>
+<body>
+  <div id="app">
+    <!-- タイトル -->
+    <section id="screen-title" class="screen">
+      <div class="title-box">
+        <p class="title-sub">テスト版</p>
+        <h1 class="title-main">消えたタオルと<br>白い記憶</h1>
+        <p class="title-catch">〜消えたレシピを探す旅〜</p>
+        <div class="stage-plate">
+          <div id="title-world" class="stage-world"></div>
+          <div id="title-stage" class="stage-name"></div>
+        </div>
+        <div class="fuwari-line"><span class="fuwari-icon"></span>ふわりのカード <b id="title-cards">0</b> 枚</div>
+        <button id="btn-start" class="btn btn-main">はじめる</button>
+        <p class="title-note">音が出ます</p>
+        <button id="btn-reset" class="link-btn">記録を消す</button>
+        <button id="btn-tune" class="link-btn hidden">調整パネル</button>
+      </div>
+    </section>
+
+    <!-- ステージ一覧（ベストスコアと3つの印） -->
+    <section id="screen-stages" class="screen scroll">
+      <div class="stages-box">
+        <h2 class="stages-title">ステージをえらぶ</h2>
+        <p class="stages-note">印: <span class="mark on">10語</span> 10語すべて助けた　<span class="mark on">元気</span> 元気をなくさなかった　<span class="mark on">ぶつからず</span> 一度もぶつからなかった</p>
+        <div id="stages-list"></div>
+        <div class="btn-row"><button id="btn-stages-back" class="btn btn-sub">タイトルへ</button></div>
+      </div>
+    </section>
+
+    <!-- バトル -->
+    <section id="screen-battle" class="screen">
+      <canvas id="battle-canvas"></canvas>
+      <button id="btn-pause" class="pause-btn" aria-label="ひとやすみ">Ⅱ</button>
+    </section>
+
+    <!-- クイズの前に、今日あつめたことばを見せる -->
+    <section id="screen-review" class="screen">
+      <div class="review-box">
+        <h2 class="review-title">今日助けたことば</h2>
+        <ol id="review-list" class="review-list"></ol>
+        <div class="review-bar"><i id="review-bar"></i></div>
+        <p class="review-note">このあと クイズ！</p>
+      </div>
+    </section>
+
+    <!-- クイズ -->
+    <section id="screen-quiz" class="screen scroll">
+      <div class="quiz-box">
+        <div class="quiz-head"><span id="quiz-count"></span><span id="quiz-dots" class="quiz-dots"></span></div>
+        <div class="fuwari-talk"><span class="fuwari-icon"></span><p id="quiz-say" class="say">助けたことばを思い出そう！</p></div>
+        <p id="quiz-question" class="quiz-question"></p>
+        <div id="quiz-choices" class="quiz-choices"></div>
+        <div id="quiz-feedback" class="quiz-feedback hidden"></div>
+        <div id="quiz-get" class="quiz-get hidden"></div>
+        <div class="btn-row"><button id="btn-quiz-quit" class="link-btn">とちゅうでやめる</button></div>
+      </div>
+    </section>
+
+    <!-- カード -->
+    <section id="screen-cards" class="screen scroll">
+      <div class="cards-box">
+        <div id="cards-rank" class="cards-rank"></div>
+        <h2 class="cards-title">カードになった語句</h2>
+        <p id="cards-summary" class="cards-summary"></p>
+        <div id="cards-list" class="cards-list"></div>
+        <div id="cards-result" class="cards-result"></div>
+        <div id="cards-buttons" class="btn-row"></div>
+      </div>
+    </section>
+
+    <!-- レシピ完成 -->
+    <section id="screen-recipe" class="screen scroll">
+      <div class="recipe-box">
+        <p class="recipe-label">レシピ完成</p>
+        <h2 id="recipe-name" class="recipe-name"></h2>
+        <div id="recipe-fluff" class="recipe-fluff"></div>
+        <div class="recipe-art"><div class="recipe-towel"></div></div>
+        <ol id="recipe-words" class="recipe-words"></ol>
+        <p id="recipe-next" class="recipe-next"></p>
+        <div id="recipe-buttons" class="btn-row"></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- バトルの一時停止メニュー -->
+  <div id="pause-menu" class="overlay hidden">
+    <div class="overlay-box">
+      <h2>ひとやすみ</h2>
+      <div class="btn-row">
+        <button id="pm-continue" class="btn btn-main">つづける</button>
+        <button id="pm-retry" class="btn btn-sub">はじめからやりなおす</button>
+        <button id="pm-stages" class="btn btn-sub">ステージ一覧へ</button>
+        <button id="pm-title" class="btn btn-sub">タイトルへ</button>
+      </div>
+      <div id="pm-debug" class="debug-box hidden">
+        <p class="debug-label">デバッグ</p>
+        <button id="dbg-skip-recon" class="btn btn-debug">探検をとばす</button>
+        <button id="dbg-skip-boss" class="btn btn-debug">大ボスへとぶ</button>
+        <button id="dbg-clear" class="btn btn-debug">すぐクリア（10語ぜんぶ）</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- デバッグメニュー（タイトルの文字を5回続けて押すと出る） -->
+  <div id="debug-menu" class="overlay hidden">
+    <div class="overlay-box">
+      <h2>デバッグ</h2>
+      <p class="tune-note">試すとき用。バトル中は、右下の「Ⅱ」の一時停止メニューに、とばす操作が出ます。</p>
+      <div class="btn-row">
+        <button id="dbg-tune" class="btn btn-debug">調整パネルを開く</button>
+        <button id="dbg-open-all" class="btn btn-debug">すべてのステージを開く: オフ</button>
+        <button id="dbg-invincible" class="btn btn-debug">無敵: オフ</button>
+        <button id="dbg-odai" class="btn btn-debug">お題バトル: オン</button>
+        <button id="dbg-reset" class="btn btn-debug">記録を消す</button>
+        <button id="dbg-off" class="btn btn-sub">デバッグをやめる</button>
+        <button id="dbg-close" class="btn btn-main">とじる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 調整パネル（URLの最後に ?tune をつけると出る。試すとき用） -->
+  <div id="tune" class="tune hidden">
+    <div class="tune-box">
+      <h2>バトルの調整</h2>
+      <p class="tune-note">動かすとすぐ反映されます。この端末にだけ保存されます。</p>
+      <p id="tune-info" class="tune-note"></p>
+      <div id="tune-list"></div>
+      <textarea id="tune-text" class="hidden" readonly></textarea>
+      <div class="btn-row">
+        <button id="tune-copy" class="btn">数値をコピー</button>
+        <button id="tune-reset" class="btn btn-sub">もとにもどす</button>
+        <button id="tune-close" class="btn btn-sub">とじる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 横向きのとき -->
+  <div id="rotate"><div><div class="rotate-icon"></div><p>縦にしてね</p></div></div>
+
+  <script src="data/words.js?v=31"></script>
+  <script src="data/stages.js?v=31"></script>
+  <script src="js/audio.js?v=31"></script>
+  <script src="js/game.js?v=31"></script>
+  <script src="js/quiz.js?v=31"></script>
+  <script src="js/cards.js?v=31"></script>
+  <script src="js/main.js?v=31"></script>
+</body>
+</html>
