@@ -37,7 +37,7 @@ const BATTLE = {
   wordTotalHp: { mid: 12, boss: 60 },          // 中ボス・大ボスの「語句全体の硬さ」。文字数で割って1文字あたりの耐久にする（難易度の倍率もかかる）
   perCharHp: { mid: { min: 2, max: 6 }, boss: { min: 6, max: 30 } },   // 1文字あたりの耐久の下限と上限
   enemyFireInterval: { zako: 3.4, mid: 2.4, boss: 1.4 },  // 語句の敵が弾を撃つ間隔（秒）
-  enemyBulletSpeed: 95,        // 敵の弾の速さ（px/秒）。難易度では変えない（難しさは意地の悪い語句で作る）
+  enemyBulletSpeed: 95,        // 敵の弾の速さ（px/秒）。難易度の線 bulletSpeed をかける（ステージ1はゆっくり）
   enemyBulletSize: 11,         // 敵の弾の見た目の大きさ（半径 px）。大きく見やすく
   enemyBulletHitR: 6,          // 敵の弾の当たりの大きさ（半径 px）。見た目より小さく、避けやすく
   hpOverride: { zako: 0, mid: 0, boss: 0 },   // 0 のときは自動。0より大きいと、ザコはこの硬さ、中ボス・大ボスは1文字あたりこの耐久にする
@@ -51,11 +51,11 @@ const BATTLE = {
   fillerSpeed: 0.83,           // 雑魚の動く速さの倍率（1＝10/6の速さ）
   fillerScale: 0.8,            // 雑魚の当たりの大きさの倍率
   fillerDrawScale: 0.65,       // 雑魚（殻を守る虫）の見た目の大きさの倍率（10/7-1: 小さく暗い色に。当たりは fillerScale のまま）
-  fillerDark: "brightness(0.55) saturate(0.6)",   // 虫を暗い色にする（CSS の filter。使えない端末では、上に暗い色を重ねる）
-  shotDrawScale: 1.5,          // ふわりの光（自機の弾）の見た目の倍率（10/7-1。当たりは今のまま）
+  fillerDark: "brightness(0.55) saturate(0.6)",
+  fillerOutline: "rgba(15,10,20,0.95)",   // 虫のまわりの濃い輪郭の色   // 虫を暗い色にする（CSS の filter。使えない端末では、上に暗い色を重ねる）
+  shotDrawScale: 1.2,          // ふわりの光（自機の弾）の見た目の倍率（10/7-1 に1.5、10/21-1 に1.2。語句や敵が隠れないように。当たりは今のまま）
   fillerAlpha: 0.72,           // 雑魚の濃さ（1でふつう。小さいほど薄い）
   fillerAvoid: 90,             // 語句のまわり、この距離（px）には雑魚を出さない
-  fillerDensity: 1.5,          // 本番（あつめる）と大ボスの雑魚の濃さ（10/3-8: 1.5倍・間隔もつめる）。数がふえても弾の量は同じになるよう、1匹が撃つ間隔をこの倍率だけのばす
   fillerFireScale: 1.5,         // 雑魚が撃つ間隔の倍率（大きいほど撃たない）
   dropRate: 0.15,              // 雑魚が「綿のたね」を落とす確率（0〜1）。雑魚が増えたので下げた
   popScale: 1.6,               // 雑魚を倒したときの花の大きさ
@@ -123,14 +123,10 @@ const BATTLE = {
     explore: { title: "発見のたび", lines: ["指で双眼鏡をうごかして、", "ことばを円の中に入れよう"], pic: "hand" },
     found:   { title: "みつけた！", lines: ["0.5秒見つめると見つかるよ"] },
     rescue:  { title: "救出のたび", lines: ["ふわりの光は自動で出るよ。", "指で動かすだけ"], pic: "three",
-               items: [["ことばの殻", "光でほどいて", "助ける"], ["殻を守る虫", "倒すと綿の", "たねが落ちる"], ["綿のたね", "とると元気が", "戻る"]] },
+               items: [["ことばの殻", "光でほどいて", "助ける"], ["殻を守る虫", "倒すと森の", "たねが落ちる"], ["森のたね", "とると元気が", "戻る"]] },
     odai:    { title: "お題", lines: ["問いを読んで、答えのことばに", "光を当てよう。", "ちがうとはね返るよ"] },
   },
-  // 旅の名前と表紙の文（10/3-12）。画面に出す言葉はここにまとめる
-  TRIPS: {
-    1: { name: "発見のたび", sub: "双眼鏡でさがそう", cover: "まずは双眼鏡をもって、とらわれたことばたちを発見するたびに出よう！", go: "発見のたびへ、\n出発！" },
-    2: { name: "救出のたび", sub: "光で助けよう",     cover: "こんどはふわりの光で、ことばたちを殻から助け出す。救出のたびに出よう！", go: "救出のたびへ、\n出発！" },
-  },
+  // 旅の名前と表紙の文は data/texts.js の trips（10/21-1 に移した）
   // 本番の表紙（10/3-9）
   countStep: 0.45,             // 表紙のあとのカウント「3」「2」「1」のそれぞれの時間（秒）
   countGo: 0.5,                // 「出撃！」の時間（秒）。カウントの合計は2秒以内
@@ -158,19 +154,23 @@ const BATTLE = {
   // data/stages.js の difficulty（1〜12）から、次の数値が自動で決まる。
   // at1 が難易度1のときの値、at12 が難易度12のときの値。そのあいだはまっすぐの線でつなぐ
   // ステージごとの手上書きは data/stages.js の override 欄
+  // 難易度の線（10/21-1）: [難易度, 値] の点を結ぶ。点のあいだはまっすぐつなぐ。世界1は ステージ1＝0.5、2＝1、3＝2、4＝3
   difficulty: {
-    fireScale:   { at1: 1,   at12: 0.5 },   // 敵が撃つ間隔の倍率（小さいほど弾が多い）
-    speedScale:  { at1: 1,   at12: 1.4 },   // 敵（語句と敵の弾）の速さの倍率
-    zakoHp:      { at1: 5,   at12: 6.5 },   // ザコの語句の硬さ（四捨五入）。10/3-4に5発にした（世界1は5発）。空中のザコは「弾1本あたり」の硬さ（10/3-8: 弾の本数をかける）
-    bossHpScale: { at1: 1,   at12: 2 },     // 中ボス・大ボスの1文字あたりの耐久の倍率
-    tricky:      { at1: 1,   at12: 6.2 },   // 意地の悪い語句（端にかくれる・雑魚のうしろ・横切る）の数（四捨五入。patterns が "auto" のステージだけ）
+    fireScale:     [[0.5, 3.2], [1, 1.6], [2, 1.25], [3, 1.15], [12, 0.5]],      // 敵が撃つ間隔の倍率（大きいほど弾が少ない）
+    bulletSpeed:   [[0.5, 0.6], [1, 0.8], [2, 0.9], [3, 1.0], [12, 1.0]],     // 敵の弾の速さの倍率（ステージ1はゆっくり）
+    speedScale:    [[0.5, 0.85], [1, 0.9], [2, 1.0], [3, 1.05], [12, 1.4]],    // 語句の速さの倍率
+    fillerDensity: [[0.5, 0.6], [1, 1.0], [2, 1.3], [3, 1.5], [12, 1.5]],      // 救出のたびの雑魚（虫）の濃さ（数と間隔。弾の量は変えない）
+    zakoHp:        [[0.5, 4], [1, 5], [3, 5], [12, 6.5]],                      // ザコの語句の硬さ（弾1本あたり。四捨五入）
+    bossHpScale:   [[0.5, 1.1], [1, 1], [2, 1.05], [3, 1.1], [12, 2]],       // 中ボス・大ボスの1文字あたりの耐久の倍率
+    tricky:        [[0.5, 0], [1, 1], [2, 2], [3, 3], [12, 6.2]],              // 意地の悪い語句の数（四捨五入。patterns が "auto" のステージだけ）
   },
+
   autoGroundCount: 2,          // patterns が "auto" のステージで、地上（地上のかげ）に出すザコの語句の数
 
   debugInvincible: false,      // デバッグ: 自機が弾に当たらない
 
   // --- 自機 ---
-  shotInterval: 0.11,          // 自機の弾の間隔（秒）
+  shotInterval: 0.14,          // 自機の弾の間隔（秒）。10/21-1 に 0.11 → 0.14（光で語句や敵が隠れないように）
   shotSpeed: 640,              // 自機の弾の速さ（px/秒）
   playerMaxHp: 100,            // 体力
   damage: 20,                  // 敵の弾に当たったときに減る体力
@@ -259,12 +259,15 @@ const POWER_LEVELS = [
   { shots: 4, rate: 1, thick: false, body: "#fff4cf", line: "#dcb64e" },
   { shots: 4, rate: 1, thick: true,  body: "#fde6ee", line: "#e08aa6" },
 ];
-// 本番に持っていくもの（仮の3つ）。選ばなければ最初の「つよい弾」になる
-const LOADOUTS = [
-  { id: "power",  name: "つよい光",       desc: "光が1本ふえた状態で始まる" },
-  { id: "shield", name: "まもりの綿",     desc: "1回だけまもってくれる" },
-  { id: "bomb",   name: "大きなふわりタイフーン", desc: "ふわりタイフーンのゲージが速くたまる" },
-];
+// 画面の言葉は data/texts.js（window.TEXTS）から読む。tx("rescue.start") や tx("explore.endSome", { n: 3 }) のように使う
+function tx(path, vars) {
+  let v = path.split(".").reduce((o, k) => (o == null ? o : o[k]), window.TEXTS);
+  if (typeof v !== "string") return v === undefined ? path : v;
+  if (vars) v = v.replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined ? vars[k] : m));
+  return v;
+}
+// 本番に持っていくもの（仮の3つ）。選ばなければ最初の「つよい光」になる。名前と説明は texts.js の choice.items
+const LOADOUTS = ["power", "shield", "bomb"].map(id => ({ id, get name() { return tx(`choice.items.${id}.name`); }, get desc() { return tx(`choice.items.${id}.desc`); } }));
 
 // 弾の本数ごとの、横のならび
 const SHOT_SPREAD = { 1: [0], 2: [-0.6, 0.6], 3: [-1, 0, 1], 4: [-1.5, -0.5, 0.5, 1.5] };
@@ -283,15 +286,19 @@ function baseChars(word) { return Array.from(word.word.replace(/\([^)]*\)/g, "")
 // 1〜2文字の短い語句
 function isShortWord(word) { return baseChars(word).length <= 2; }
 
+// 難易度の線の、難易度 d のところの値（点と点のあいだはまっすぐつなぐ）
+function lineAt(pts, d) {
+  const p = pts.slice().sort((a, b) => a[0] - b[0]);
+  if (d <= p[0][0]) return p[0][1];
+  for (let i = 1; i < p.length; i++) if (d <= p[i][0]) { const [x0, y0] = p[i - 1], [x1, y1] = p[i]; return y0 + (y1 - y0) * (d - x0) / (x1 - x0); }
+  return p[p.length - 1][1];
+}
 // ステージの難易度から、そのステージの数値を決める（override 欄があればそちらを使う）
 function stageParams(stage) {
-  const d = Math.min(12, Math.max(1, (stage && stage.difficulty) || 1));
+  const d = Math.min(12, Math.max(0.5, (stage && stage.difficulty) || 1));
   const ov = (stage && stage.override) || {};
   const P = { difficulty: d };
-  for (const k of Object.keys(BATTLE.difficulty)) {
-    const line = BATTLE.difficulty[k];
-    P[k] = ov[k] !== undefined ? ov[k] : line.at1 + (line.at12 - line.at1) * (d - 1) / 11;
-  }
+  for (const k of Object.keys(BATTLE.difficulty)) P[k] = ov[k] !== undefined ? ov[k] : lineAt(BATTLE.difficulty[k], d);
   P.zakoHp = Math.max(1, Math.round(P.zakoHp));
   P.tricky = Math.max(0, Math.round(P.tricky));
   return P;
@@ -299,7 +306,7 @@ function stageParams(stage) {
 
 // patterns が "auto" のステージ: 語句の出方・順番・位置を、難易度から機械的に決める
 // 意地の悪い語句は、順番の中にちらして置く。難易度が上がるほど「横切る」「端にかくれる」が多くなる
-function autoLayout(words, P, obstacles) {
+function autoLayout(words, P, obstacles, groundOn) {
   const lanes = [0.3, 0.65, 0.5, 0.25, 0.7, 0.4, 0.6, 0.35, 0.55];
   const list = words.filter(w => w.role !== "boss").sort((a, b) => (a.order || 0) - (b.order || 0));
   const n = Math.min(P.tricky, list.length - 1);
@@ -308,7 +315,7 @@ function autoLayout(words, P, obstacles) {
   const trickyIdx = new Set();
   for (let k = 0; k < n; k++) trickyIdx.add(Math.min(list.length - 1, 1 + Math.floor(k * (list.length - 1) / Math.max(1, n))));
   const layout = {};
-  let kindNo = 0, groundLeft = BATTLE.autoGroundCount;
+  let kindNo = 0, groundLeft = groundOn === false ? 0 : BATTLE.autoGroundCount;   // 地上のない世界では0
   list.forEach((w, i) => {
     let pattern = "normal", lane = lanes[i % lanes.length];
     if (trickyIdx.has(i)) {
@@ -350,6 +357,7 @@ const Battle = (() => {
   let fillers, bombs, pops, items, terrain, cloudShadows;
   let script, absorbed, missed, bossWord, groundIds;
   let P = null;              // このステージの難易度から決まった数値
+  let worldDef = {}, groundOn = true;   // 今の世界（stages.js の WORLDS）。groundOn: 地上の仕組みがあるか
   let layout = null;         // 自動で決めた出方（patterns が "auto" のステージ）
   const patOf = w => (layout && layout[w.id]) || { order: w.order || 0, pattern: w.pattern || "normal", lane: w.lane === undefined ? 0.5 : w.lane };
   let phase;                 // "round1" / "round2" / "boss"
@@ -397,6 +405,7 @@ const Battle = (() => {
   let found = new Set();     // 探検で見つけた語句の id
   let loadout = null;        // 本番に持っていくもの（LOADOUTS の id）
   let choiceT = 0;           // 選ぶ時間の残り（秒）
+  let choiceFree = false;    // 持ち物選択に時間制限がないか（初めて選ぶとき。main.js の opts.firstChoice）
   let sortieStep = "choice"; // 出撃2の画面の段階: "choice" 持っていくものを選ぶ → "cover" 表紙（タップ待ち）→ "count" 3・2・1・出撃！
   let countT = 0;            // カウントの経過（秒）
   let freed = [];            // 殻から助けられて、ふわりのところへ飛んでいく語句
@@ -516,13 +525,15 @@ const Battle = (() => {
     // 地上に出る語句は、データの出方（pattern）が "ground" のもの
     applyStageBattle(opts.stage);   // ステージごとの BATTLE の上書き（stages.js の override.battle。10/7-1）
     P = stageParams(opts.stage);
-    layout = opts.stage && opts.stage.patterns === "auto" ? autoLayout(words, P, opts.stage.obstacles) : null;
+    worldDef = ((window.WORLDS || []).find(w => opts.stage && w.id === opts.stage.world)) || {};
+    groundOn = worldDef.ground !== false;   // 地上の敵・地上の語句・照準◎（世界2から。10/21-1）
+    layout = opts.stage && opts.stage.patterns === "auto" ? autoLayout(words, P, opts.stage.obstacles, groundOn) : null;
     obsDef = (opts.stage && opts.stage.obstacles) || null;
     theme = Object.assign({}, DEFAULT_THEME, (opts.stage && opts.stage.theme) || {});
     weatherDef = (opts.stage && opts.stage.weather) || null;
     fogLevel = 0;
     streaks = Array.from({ length: 22 }, () => ({ x: Math.random() * W, y: Math.random() * H, s: 0.6 + Math.random() * 0.8 }));
-    groundIds = new Set(words.filter(w => patOf(w).pattern === "ground" && w !== bossWord).map(w => w.id));
+    groundIds = new Set(groundOn ? words.filter(w => patOf(w).pattern === "ground" && w !== bossWord).map(w => w.id) : []);
     // 台本: 大ボス以外の語句を、データの順番（order）でならべる
     script = words.filter(w => w !== bossWord).sort((a, b) => patOf(a).order - patOf(b).order);
     slots = script.concat([bossWord]);   // 帯の10のあき枠（出てくる順。いちばん右が大ボス）
@@ -542,6 +553,7 @@ const Battle = (() => {
     paused = false; moved = false; groundHinted = false; banner = null; shake = 0; showWord = null; threads = []; pops = [];
     slow = 0; wave = null; gauge = 0; bombsUsed = 0; fsay = null; odai = null; bounces = [];
     msgQ = []; msgGap = 0; msgWasBusy = false;
+    choiceFree = !!opts.firstChoice;
     tut = null; tutOpts = opts.tutorial || null; tutFlags = Object.assign({}, tutOpts && tutOpts.seen);
     stripFlash = 0; sortieStep = "choice"; freed = [];
     explore = { t: 0, next: 0, list: [], bugs: [], bugT: 2, endT: 0 };
@@ -666,7 +678,7 @@ const Battle = (() => {
     clearMsgs(5);
     guide = Object.assign(g, { t: BATTLE.guideTime });
     slow = Math.max(slow, BATTLE.guideSlow);
-    fsay = { text: g.kind === "gate" ? "あいだを通ろう！" : "木だ！よけて！", t: BATTLE.guideTime };
+    fsay = { text: tx(g.kind === "gate" ? "rescue.treeGate" : "rescue.treeDodge"), t: BATTLE.guideTime };
     Sound.se("odai");
   }
 
@@ -697,20 +709,22 @@ const Battle = (() => {
         explore.tutWait = true;
         bino.y = H * 0.66;
       }
-      post("say", () => { fsay = { text: "ことばをさがそう！ 円の中で見つめてね", t: BATTLE.fuwariSayTime }; });
+      post("say", () => { fsay = { text: tx("explore.start"), t: BATTLE.fuwariSayTime }; });
     } else {
       startPhase("round2");
       player.x = W / 2; player.y = H * 0.8;
       moved = false;   // 2回目の旅の最初に、もう一度「ゆびでふわりをうごかそう」を出す
       stripFlash = 0.6;   // 帯の灰色の名前がいっせいに光る
       if (wantTut("rescue")) showTut("rescue");   // チュートリアル③
-      post("say", () => { fsay = { text: "ことばを助けよう！", t: BATTLE.fuwariSayTime, big: true }; });
+      post("say", () => { fsay = { text: tx("rescue.start"), t: BATTLE.fuwariSayTime, big: true }; });
       Sound.se("power");
     }
   }
 
   // 持っていくものを決める
   function chooseLoadout(id) {
+    if (choiceFree && opts.onFirstChoice) opts.onFirstChoice();   // 初めて選んだ（次からは10秒の時間制限）
+    choiceFree = false;
     loadout = id;
     if (id === "power") powerBonus = 1;
     if (id === "shield") shield = 1;
@@ -802,6 +816,7 @@ const Battle = (() => {
     // 出方（pattern）と位置（lane）はデータで固定。ランダムには出ない
     let pattern = od ? "odai" : (role === "boss" ? "boss" : patOf(word).pattern);
     if (isShortWord(word) && (pattern === "edge" || pattern === "cross")) pattern = "normal";   // 短い語句は端・横切りにしない
+    if (pattern === "ground" && !ground) pattern = "normal";   // 地上のない世界では、地上の語句もふつうの出方に
     let lane = patOf(word).lane;
     const margin = w / 2 + 20 + (ground ? 0 : BATTLE.sway);
     const left = stripRight();   // 左端の帯と重ならないように
@@ -876,12 +891,12 @@ const Battle = (() => {
   function groundHint() {
     if (groundHinted) return;
     groundHinted = true;
-    post("banner", () => { banner = { text: "じめんのことばは ◎ をあわせよう", t: 2.4, color: "rgba(111,154,74,0.9)" }; });
+    post("banner", () => { banner = { text: tx("rescue.groundAim"), t: 2.4, color: "rgba(111,154,74,0.9)" }; });
   }
 
   // ===== 雑魚の群れを出す =====
   // 本番と大ボスだけ雑魚を濃くする（難しさは雑魚の弾でなく数で作る）
-  const fillerDense = () => phase === "round1" ? 1 : BATTLE.fillerDensity;
+  const fillerDense = () => phase === "round1" ? 1 : P.fillerDensity;   // 難易度の線（fillerDensity）
   function spawnFiller(type, x, y, extra) {
     const def = FILLER_TYPES[type];
     fillers.push(Object.assign({ type, layer: def.layer, hp: def.hp, r: def.r * BATTLE.fillerScale, x, y, age: 0, flash: 0,
@@ -908,7 +923,7 @@ const Battle = (() => {
   }
 
   function spawnWave() {
-    const names = Object.keys(FILLER_WAVES);
+    const names = Object.keys(FILLER_WAVES).filter(n => groundOn || !["weeds", "thorn"].includes(n));   // 地上のない世界では、地上の雑魚を出さない
     let sum = names.reduce((a, n) => a + FILLER_WAVES[n], 0), r = Math.random() * sum, name = names[0];
     for (const n of names) { r -= FILLER_WAVES[n]; if (r <= 0) { name = n; break; } }
     // 語句の近くには出さない。場所が見つからなければ、その回は出さない
@@ -942,7 +957,7 @@ const Battle = (() => {
     if (paused) return;
     if (tut) { tut.t += realDt; return; }   // チュートリアルの案内のあいだは止まる
     if (state === "sortie") {   // 出撃の画面のあいだは止まっている
-      if (sortieNo === 2 && sortieStep === "choice") {
+      if (sortieNo === 2 && sortieStep === "choice" && !choiceFree) {   // 初めては時間制限なし（10/21-1）
         choiceT -= realDt;
         if (choiceT <= 0) { chooseLoadout("power"); sortieStep = "cover"; }   // 選ばなければ「つよい弾」で表紙へ
       }
@@ -1271,7 +1286,7 @@ const Battle = (() => {
         player.hp = Math.min(BATTLE.playerMaxHp, player.hp + BATTLE.healItem);
         player.glow = 0.3;
         player.healFlash = 1;   // 体力ゲージが光って「+回復」
-        post("say0", () => { fsay = { text: "ありがと！", t: 1.2, small: true }; });   // ふわりが小さく（何か出ていれば出さない）
+        post("say0", () => { fsay = { text: tx("rescue.thanks"), t: 1.2, small: true }; });   // ふわりが小さく（何か出ていれば出さない）
         Sound.se("item");
         addPop(it.x, it.y, "#fff8d0", 0.6);
       }
@@ -1295,7 +1310,7 @@ const Battle = (() => {
   function fireAt(x, y, pattern, kind) {
     const ang = Math.atan2(player.y - y, player.x - x);
     for (const da of pattern) {
-      const sp = BATTLE.enemyBulletSpeed;   // 難しさは弾の速さでは作らない
+      const sp = BATTLE.enemyBulletSpeed * P.bulletSpeed;   // 難易度の線（bulletSpeed）。世界1のはじめはゆっくり
       ebullets.push({ x, y, vx: Math.cos(ang + da) * sp, vy: Math.sin(ang + da) * sp, kind });
     }
   }
@@ -1474,7 +1489,7 @@ const Battle = (() => {
     }
     enemies = enemies.filter(e => e.hp > 0);
     odai = null;
-    if (!ok) post("say", () => { fsay = { text: "あっ、行っちゃった…", t: 2 }; });
+    if (!ok) post("say", () => { fsay = { text: tx("rescue.odaiLost"), t: 2 }; });
   }
 
   // 「ふわりタイフーン」: 画面の雑魚と敵の弾を全部消す。1周目は、出ている語句を全部「反応」させる
@@ -1483,7 +1498,7 @@ const Battle = (() => {
     gauge = 0;
     bombsUsed++;
     typhoon = { age: 0 };
-    post("say", () => { fsay = { text: "ふわりタイフーン！", t: 1.5 }; });
+    post("say", () => { fsay = { text: tx("rescue.typhoon"), t: 1.5 }; });
     Sound.se("light");
     wave = { x: player.x, y: player.y, age: 0 };
     player.glow = 0.35;
@@ -1546,7 +1561,7 @@ const Battle = (() => {
     floats.push({ x: e.x, y: e.y - e.size, text: `+${pts}` + (mul > 1 ? ` ×${mul}` : ""), big: true, age: 0 });
     const before = gauge;
     if (!bombing) gauge = Math.min(100, gauge + BATTLE.bombGain * mul * gaugeMul);
-    if (before < 100 && gauge >= 100) { floats.push({ x: bombButton().x + 40, y: bombButton().y - 34, text: "ふわりタイフーン OK！", big: true, age: 0 }); Sound.se("item"); }
+    if (before < 100 && gauge >= 100) { floats.push({ x: bombButton().x + 40, y: bombButton().y - 34, text: tx("rescue.typhoonReady"), big: true, age: 0 }); Sound.se("item"); }
     if (!e.last) { firstPass(e); return; }
     absorb(e);
   }
@@ -1612,7 +1627,7 @@ const Battle = (() => {
     const all = reacted >= words.length;
     if (ex.t >= BATTLE.exploreTime || (all && ex.list.length === 0)) {
       ex.endT = 2.4;
-      const text = all ? "ぜんぶ見つけた！" : `見つけたのは${reacted}語。\nのこりは救出のたびで助けよう`;
+      const text = tx(all ? "explore.endAll" : "explore.endSome", { n: reacted });
       post("banner", () => { banner = { text, t: 2.4, color: "rgba(72,105,58,0.92)" }; });
     }
   }
@@ -1632,7 +1647,7 @@ const Battle = (() => {
     found.add(d.word.id);
     score += BATTLE.scoreWord;
     gauge = Math.min(100, gauge + BATTLE.bombGain * gaugeMul);
-    floats.push({ x: d.x, y: d.y - d.size, text: "みつけた！", big: false, found: true, age: 0 });
+    floats.push({ x: d.x, y: d.y - d.size, text: tx("explore.found"), big: false, found: true, age: 0 });
     Sound.se("shine");
   }
 
@@ -1648,7 +1663,7 @@ const Battle = (() => {
     player.notice = 0.8;   // ふわりの「！」
     reacted++;
     found.add(e.word.id);
-    floats.push({ x: e.x, y: e.y - e.size, text: "みつけた！", big: false, found: true, age: 0 });
+    floats.push({ x: e.x, y: e.y - e.size, text: tx("explore.found"), big: false, found: true, age: 0 });
     Sound.se("shine");
   }
 
@@ -1659,7 +1674,7 @@ const Battle = (() => {
     const lv = POWER_LEVELS[Math.min(Math.floor(absorbed.length / BATTLE.powerEvery) + powerBonus, POWER_LEVELS.length - 1)];
     if (lv !== level && absorbed.length < opts.total) {
       level = lv;
-      post("banner", () => { banner = { text: "光が強くなった！", t: 1.2, color: "rgba(220,170,60,0.9)" }; });
+      post("banner", () => { banner = { text: tx("rescue.powerUp"), t: 1.2, color: "rgba(220,170,60,0.9)" }; });
       setTimeout(() => Sound.se("power"), 350);
     }
     const n = Math.min(60, 14 + e.word.word.length * 5);
@@ -1725,7 +1740,7 @@ const Battle = (() => {
       shield = 0;
       player.inv = 1;
       player.glow = 0.35;
-      floats.push({ x: player.x, y: player.y - 40, text: "まもりの綿がまもった！", big: true, age: 0 });
+      floats.push({ x: player.x, y: player.y - 40, text: tx("rescue.shieldSaved"), big: true, age: 0 });
       Sound.se("shield");
       return;
     }
@@ -1794,7 +1809,7 @@ const Battle = (() => {
     // 落ちていくたね
     for (const b of bombs) drawBomb(b);
     // 照準
-    if (state === "play") drawReticle();
+    if (state === "play" && groundOn) drawReticle();   // 照準◎は地上のある世界だけ
 
     // 雲の影（地面の上を流れる）
     ctx.fillStyle = theme.cloudShadow;
@@ -1938,9 +1953,9 @@ const Battle = (() => {
       ctx.font = font(16);
       ctx.lineWidth = 5; ctx.strokeStyle = "#ffffff"; ctx.lineJoin = "round";
       const hy = Math.min(H - 24, player.y + 54);
-      ctx.strokeText("← ゆびでふわりをうごかそう →", W / 2, hy);
+      ctx.strokeText(tx("rescue.moveHint"), W / 2, hy);
       ctx.fillStyle = "#48693a";
-      ctx.fillText("← ゆびでふわりをうごかそう →", W / 2, hy);
+      ctx.fillText(tx("rescue.moveHint"), W / 2, hy);
       ctx.globalAlpha = 1;
     }
     if (banner) drawBanner();
@@ -2236,6 +2251,7 @@ const Battle = (() => {
     ctx.globalAlpha = BATTLE.fillerAlpha;
     const hasFilter = "filter" in ctx;
     if (hasFilter) ctx.filter = [theme.fillerFilter !== "none" ? theme.fillerFilter : "", BATTLE.fillerDark].join(" ").trim() || "none";   // 時間帯の色味＋暗い色
+    ctx.shadowColor = BATTLE.fillerOutline; ctx.shadowBlur = 3;   // 濃い輪郭（背景の飾りと見分けやすく。10/21-1）
     ctx.translate(x, y);
     ctx.scale(BATTLE.fillerDrawScale, BATTLE.fillerDrawScale);
     if (!hasFilter) f._darkFallback = true;
@@ -2618,10 +2634,9 @@ const Battle = (() => {
     ctx.lineWidth = 2;
     roundRect(fx - 12 * sc, fy - 10 * sc, 24 * sc, 20 * sc, 6);
     ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "#6f9a4a";
-    ctx.font = font(11);
-    ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText(String(opts.fuwariCount), fx, fy + 1);
+    // ふわりの顔（前は、これまでに集めたカードの枚数を出していた。遊ぶのに使わないので消した。10/21-1）
+    ctx.fillStyle = "#6b5a3a";
+    ctx.beginPath(); ctx.arc(fx - 4 * sc, fy - 1, 1.6 * sc, 0, Math.PI * 2); ctx.arc(fx + 4 * sc, fy - 1, 1.6 * sc, 0, Math.PI * 2); ctx.fill();
   }
 
   // お題の問題文: 始まりは画面中央に大きく、読む時間が終わったら上の帯の下へ小さく移す
@@ -2634,7 +2649,7 @@ const Battle = (() => {
       ctx.fillStyle = "rgba(255,253,245,0.97)"; ctx.strokeStyle = "#e0b03a"; ctx.lineWidth = 3;
       roundRect(20, y, W - 40, h, 18); ctx.fill(); ctx.stroke();
       ctx.font = font(14); ctx.fillStyle = "#b0801a";
-      ctx.fillText("ふわりのお題", 34, y + 12);
+      ctx.fillText(tx("rescue.odaiPanel"), 34, y + 12);
       ctx.font = font(fs); ctx.fillStyle = "#3e4a34";
       lines.forEach((l, i) => ctx.fillText(l, 32, y + 36 + i * lh));
     } else {
@@ -2763,8 +2778,8 @@ const Battle = (() => {
       ctx.font = font(16); ctx.lineWidth = 5; ctx.strokeStyle = "#ffffff";
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
       const hy = Math.min(H - 110, bino.y + B + 26);
-      ctx.strokeText("ゆびで双眼鏡をうごかそう", W / 2, hy);
-      ctx.fillStyle = "#48693a"; ctx.fillText("ゆびで双眼鏡をうごかそう", W / 2, hy);
+      ctx.strokeText(tx("explore.moveHint"), W / 2, hy);
+      ctx.fillStyle = "#48693a"; ctx.fillText(tx("explore.moveHint"), W / 2, hy);
       ctx.globalAlpha = 1;
     }
     if (banner) drawBanner();
@@ -2844,7 +2859,7 @@ const Battle = (() => {
 
   // 旅の表紙（仮の見た目）: 大きく旅の名前と見出し、ふわりの一言。タップで 3・2・1・「○○のたびへ、出発！」
   function drawCover() {
-    const trip = BATTLE.TRIPS[sortieNo], green = sortieNo === 1;
+    const trip = window.TEXTS.trips[sortieNo], green = sortieNo === 1;
     const main = green ? "#48693a" : "#b0801a", accent = green ? "#6f9a4a" : "#c98a1e", line = green ? "#9cbf7c" : "#e0b03a";
     ctx.fillStyle = green ? "rgba(225,238,212,0.6)" : "rgba(255,240,200,0.6)"; ctx.fillRect(0, 0, W, H);
     const cy = H * 0.34;
@@ -2869,17 +2884,17 @@ const Battle = (() => {
       lines.forEach((l, i) => ctx.fillText(l, bx + bw / 2, by + 21 + i * 22));
       if (sortieNo === 2 && reacted < (opts.total - 1)) {   // 発見のたびで見つけられなかったことばがあるとき
         ctx.font = font(13); ctx.fillStyle = "#7a6a40";
-        ctx.fillText(`発見のたびで見つけたことば ${reacted}語（のこりは「？」のまま出てくるよ）`, W / 2, by + bh + 22);
+        ctx.fillText(tx("coverFoundNote", { n: reacted }), W / 2, by + bh + 22);
       }
       ctx.globalAlpha = 0.6 + Math.sin(performance.now() / 250) * 0.4;
       ctx.font = font(22); ctx.fillStyle = accent;
-      ctx.fillText("タップで出発！", W / 2, by + bh + 70);
+      ctx.fillText(tx("tapToGo"), W / 2, by + bh + 70);
       ctx.globalAlpha = 1;
       return;
     }
     // カウント
     const n = countStepNo(), local = n < 3 ? (countT % BATTLE.countStep) / BATTLE.countStep : (countT - BATTLE.countStep * 3) / BATTLE.countGo;
-    const txt = n < 3 ? String(3 - n) : BATTLE.TRIPS[sortieNo].go;   // 「発見のたびへ、出発！」（2行）
+    const txt = n < 3 ? String(3 - n) : window.TEXTS.trips[sortieNo].go;   // 「発見のたびへ、出発！」（2行）
     ctx.save();
     ctx.globalAlpha = Math.max(0, 1 - local * 0.6);
     ctx.font = font(n < 3 ? 110 : 40);
@@ -2894,8 +2909,8 @@ const Battle = (() => {
   function drawChoice() {
     // ふわりのセリフ（探検の終わり）
     const say = retryMain
-      ? "ふわりの元気がなくなっちゃった…。でも、見つけたことばはおぼえてるよ。救出のたびの最初から、もう一回！"
-      : `${reacted}のことばを見つけたね。ことばは殻にとらわれているみたい。ふわりの光で殻をほどいて、助けに行こう！`;
+      ? tx("choice.retry")
+      : tx("choice.found", { n: reacted });
     ctx.font = font(14);
     const lines = wrapText(say, W - 92);
     const bh = lines.length * 20 + 16, by = H * 0.03;
@@ -2908,11 +2923,11 @@ const Battle = (() => {
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     const top = by + bh + 8;
     ctx.font = font(34); ctx.fillStyle = "#b0801a";
-    ctx.fillText(BATTLE.TRIPS[2].name, W / 2, top + 24);
+    ctx.fillText(window.TEXTS.trips[2].name, W / 2, top + 24);
     ctx.font = font(16);
-    ctx.fillText(`（${BATTLE.TRIPS[2].sub}）`, W / 2, top + 52);
+    ctx.fillText(`（${window.TEXTS.trips[2].sub}）`, W / 2, top + 52);
     ctx.font = font(16); ctx.fillStyle = "#4b5e3a";
-    ctx.fillText(`${BATTLE.TRIPS[2].name}に持っていくものを1つえらぼう`, W / 2, top + 82);
+    ctx.fillText(tx("choice.title", { trip: window.TEXTS.trips[2].name }), W / 2, top + 82);
     choiceRects().forEach((r, i) => {
       const l = LOADOUTS[i];
       ctx.fillStyle = "#fffdf7"; ctx.strokeStyle = "#e0b03a"; ctx.lineWidth = 3;
@@ -2922,16 +2937,22 @@ const Battle = (() => {
       ctx.fillText(l.name, r.x + 18, r.y + 22);
       ctx.font = font(13); ctx.fillStyle = "#5d6b4c";
       ctx.fillText(l.desc, r.x + 18, r.y + 45);
-      if (i === 0) { ctx.textAlign = "right"; ctx.font = font(11); ctx.fillStyle = "#b0a080"; ctx.fillText("えらばないとこれ", r.x + r.w - 12, r.y + 22); }
+      if (i === 0) { ctx.textAlign = "right"; ctx.font = font(11); ctx.fillStyle = "#b0a080"; ctx.fillText(tx("choice.defaultMark"), r.x + r.w - 12, r.y + 22); }
       ctx.textAlign = "center";
     });
-    // 残り時間
-    const last = choiceRects()[2], ty = last.y + last.h + 22, bw = last.w;
+    // ふわりタイフーンの説明（1行。長ければ2行）
+    const last = choiceRects()[2], bw = last.w;
+    ctx.font = font(12); ctx.fillStyle = "#6b5a3a";
+    const tl = wrapText(tx("choice.typhoonNote"), bw);
+    tl.forEach((l, i) => ctx.fillText(l, W / 2, last.y + last.h + 18 + i * 17));
+    // 残り時間（初めて選ぶときは時間制限なし）
+    if (choiceFree) return;
+    const ty = last.y + last.h + 22 + tl.length * 17;
     const k = Math.max(0, choiceT / BATTLE.choiceTime);
     ctx.fillStyle = "rgba(0,0,0,0.08)"; roundRect(W / 2 - bw / 2, ty, bw, 8, 4); ctx.fill();
     ctx.fillStyle = "#e0b03a"; roundRect(W / 2 - bw / 2, ty, bw * k, 8, 4); ctx.fill();
     ctx.font = font(13); ctx.fillStyle = "#7a8a68";
-    ctx.fillText(`あと ${Math.ceil(choiceT)}秒`, W / 2, ty + 24);
+    ctx.fillText(tx("choice.timeLeft", { n: Math.ceil(choiceT) }), W / 2, ty + 24);
   }
 
   // ふわりの一言（吹き出し）。画面からはみ出さない位置に出す
@@ -2971,7 +2992,7 @@ const Battle = (() => {
       const k = Math.max(0, 1 - explore.t / BATTLE.exploreTime);
       ctx.fillStyle = "#8fb8d8"; roundRect(14, top + 2, 126 * k, 12, 6); ctx.fill();
       ctx.save(); ctx.font = font(10); ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillStyle = "#3d5a70";
-      ctx.fillText("のこり時間", 18, top + 8); ctx.restore();
+      ctx.fillText(tx("explore.timeLabel"), 18, top + 8); ctx.restore();
     } else {
     const rate = player.hp / BATTLE.playerMaxHp;
     ctx.fillStyle = rate > 0.4 ? "#8cbf5a" : (Math.floor(t * 4) % 2 ? "#e39a8e" : "#f2c4bb");
@@ -2986,8 +3007,8 @@ const Battle = (() => {
       ctx.save();
       ctx.font = font(11); ctx.textAlign = "right"; ctx.textBaseline = "middle";
       ctx.globalAlpha = Math.min(1, k * 2);
-      ctx.lineWidth = 3; ctx.strokeStyle = "#ffffff"; ctx.strokeText("+回復", 138, top + 8 - (1 - k) * 4);
-      ctx.fillStyle = "#4f8a2c"; ctx.fillText("+回復", 138, top + 8 - (1 - k) * 4);
+      ctx.lineWidth = 3; ctx.strokeStyle = "#ffffff"; ctx.strokeText(tx("rescue.heal"), 138, top + 8 - (1 - k) * 4);
+      ctx.fillStyle = "#4f8a2c"; ctx.fillText(tx("rescue.heal"), 138, top + 8 - (1 - k) * 4);
       ctx.restore();
     }
     }
@@ -3013,12 +3034,12 @@ const Battle = (() => {
     const b = bombButton();
     ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.font = font(11);
     const lvNo = POWER_LEVELS.indexOf(level) + 1;
-    const lvText = `ひかり${"★".repeat(lvNo)}`;
+    const lvText = `${tx("rescue.lightLabel")} ${"★".repeat(lvNo)}`;
     ctx.strokeText(lvText, b.x + b.r + 8, b.y - 8); ctx.fillText(lvText, b.x + b.r + 8, b.y - 8);
     if (loadout) {   // 持っていったもの（盾は使うと消える）
       const l = LOADOUTS.find(x => x.id === loadout);
-      const txt = loadout === "shield" && !shield ? "まもりの綿（使った）" : l.name;
-      ctx.strokeText(`持ちもの: ${txt}`, b.x + b.r + 8, b.y + 8); ctx.fillText(`持ちもの: ${txt}`, b.x + b.r + 8, b.y + 8);
+      const txt = loadout === "shield" && !shield ? l.name + tx("rescue.itemUsed") : l.name;
+      const it = `${tx("rescue.itemLabel")}: ${txt}`; ctx.strokeText(it, b.x + b.r + 8, b.y + 8); ctx.fillText(it, b.x + b.r + 8, b.y + 8);
     }
     drawStrip();
   }
@@ -3043,9 +3064,9 @@ const Battle = (() => {
     roundRect(b.x - 11, b.y - 9, 22, 18, 5); ctx.fill(); ctx.stroke();
     ctx.font = font(full ? 10 : 9); ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.lineWidth = 3; ctx.strokeStyle = "#ffffff";
-    ctx.strokeText(full ? "タップ" : "ふわりタイフーン", b.x, b.y - b.r - 7);
+    ctx.strokeText(tx(full ? "rescue.typhoonTap" : "rescue.typhoonLabel"), b.x, b.y - b.r - 7);
     ctx.fillStyle = full ? "#b0801a" : "#7a8a68";
-    ctx.fillText(full ? "タップ" : "ふわりタイフーン", b.x, b.y - b.r - 7);
+    ctx.fillText(tx(full ? "rescue.typhoonTap" : "rescue.typhoonLabel"), b.x, b.y - b.r - 7);
     ctx.restore();
   }
 
@@ -3088,16 +3109,16 @@ const Battle = (() => {
         ctx.fillStyle = "#9a7650";
         roundRect(x + cw + 2, y + sh / 2 - 7, 14, 14, 4); ctx.fill();
         ctx.fillStyle = "#ffffff";
-        ctx.fillText("地", x + cw + 9, y + sh / 2);
+        ctx.fillText(tx("rescue.groundMark"), x + cw + 9, y + sh / 2);
       }
-      // 大ボスの枠: 助けるまで小さく「さいご」の印（帯の右に出す）
+      // 大ボスの枠: 助けるまで小さく「さいごに出る」の印（帯の右に出す。文は texts.js）
       if (w === bossWord && !got) {
         ctx.font = font(8);
-        const tw = ctx.measureText("さいご").width + 6;
+        const tw = ctx.measureText(tx("rescue.lastMark")).width + 6;
         ctx.fillStyle = ENEMY_COLOR.boss;
         roundRect(x + cw + 2, y + sh / 2 - 6, tw, 12, 5); ctx.fill();
         ctx.fillStyle = "#ffffff";
-        ctx.fillText("さいご", x + cw + 2 + tw / 2, y + sh / 2);
+        ctx.fillText(tx("rescue.lastMark"), x + cw + 2 + tw / 2, y + sh / 2);
       }
     });
     ctx.restore();

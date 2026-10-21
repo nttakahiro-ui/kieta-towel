@@ -47,6 +47,16 @@ const Sound = (() => {
   let nextTime = 0;
   let tempo = 1;         // テンポの倍率（クイズで上げる）
   let fileAudio = null;  // ファイルの曲を流しているとき
+  // 音のオン・オフ（10/21-1）。オフのときは曲・効果音・読み上げを鳴らさない。設定は main.js がブラウザに保存する
+  const VOLUME = 0.22;
+  let muted = false;
+  const vol = () => (muted ? 0.0001 : VOLUME);
+  function setMuted(m) {
+    muted = !!m;
+    if (ctx && master) { master.gain.cancelScheduledValues(ctx.currentTime); master.gain.setValueAtTime(vol(), ctx.currentTime); }
+    if (fileAudio) fileAudio.volume = muted ? 0 : 0.6;
+    if (muted && window.speechSynthesis) { try { window.speechSynthesis.cancel(); } catch (e) {} }
+  }
 
   const NOTE = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
   // "A4" → 周波数
@@ -66,7 +76,7 @@ const Sound = (() => {
         if (!AC) return;
         ctx = new AC();
         master = ctx.createGain();
-        master.gain.value = 0.22;
+        master.gain.value = vol();
         master.connect(ctx.destination);
       }
       if (ctx.state === "suspended") ctx.resume();
@@ -122,7 +132,7 @@ const Sound = (() => {
       try {
         fileAudio = new Audio(song.file);
         fileAudio.loop = true;
-        fileAudio.volume = 0.6;
+        fileAudio.volume = muted ? 0 : 0.6;
         fileAudio.play().catch(() => {});
       } catch (e) { fileAudio = null; }
       return;
@@ -138,7 +148,7 @@ const Sound = (() => {
   function fadeTo(name, sec = 0.3) {
     if (current === name || current === "→" + name) return;
     if (!ctx || !master) { play(name); return; }
-    const now = ctx.currentTime, v = 0.22;
+    const now = ctx.currentTime, v = vol();
     master.gain.cancelScheduledValues(now);
     master.gain.setValueAtTime(master.gain.value, now);
     master.gain.linearRampToValueAtTime(0.0001, now + sec);
@@ -241,7 +251,7 @@ const Sound = (() => {
   // 読み上げ。iOS は最初のタップの中で一度話しておく必要があるので、unlock でも呼ぶ
   function speak(text, silent) {
     try {
-      if (!SPEECH.enabled || !window.speechSynthesis) return;
+      if (!SPEECH.enabled || !window.speechSynthesis || (muted && !silent)) return;
       const u = new SpeechSynthesisUtterance(text);
       u.lang = SPEECH.lang; u.rate = SPEECH.rate; u.pitch = SPEECH.pitch;
       u.volume = silent ? 0 : SPEECH.volume;
@@ -263,5 +273,5 @@ const Sound = (() => {
     if (ctx && current && !fileAudio) nextTime = Math.max(nextTime, ctx.currentTime + 0.05);
   }
 
-  return { unlock, play, fadeTo, stop, setTempo, se, suspend, resume, speak };
+  return { unlock, play, fadeTo, stop, setTempo, setMuted, get muted() { return muted; }, se, suspend, resume, speak };
 })();

@@ -10,6 +10,13 @@ const TutSave = {
   reset() { try { window.localStorage.removeItem(TUT_KEY); } catch (e) {} },
 };
 
+// 音のオン・オフ（10/21-1）。ブラウザに保存する（版に関係なく共通）
+const SOUND_KEY = "kietaTowel.sound";
+const SoundPref = {
+  muted() { try { return window.localStorage.getItem(SOUND_KEY) === "off"; } catch (e) { return false; } },
+  set(m) { try { window.localStorage.setItem(SOUND_KEY, m ? "off" : "on"); } catch (e) {} },
+};
+
 const Save = (() => {
   // cards: 集めたカード、cleared: クリアしたステージ、
   // retake: クイズで不正解だった語句（あとで図鑑の受け直しクイズに使う。バトルで取り逃がした語句は入れない）
@@ -48,6 +55,28 @@ const TUNE_ITEMS = [
   ["binoA", "双眼鏡の横の半径（画面の幅に対する割合）", 0.12, 0.45, 0.005],
   ["binoB", "双眼鏡の縦の半径（画面の幅に対する割合）", 0.08, 0.35, 0.005],
   ["hintSize", "きらっと光る大きさの倍率", 0.5, 3, 0.1],
+  ["difficulty.fireScale.0.1", "難易度0.5の「敵が撃つ間隔の倍率（大きいほど弾が少ない）」", 0.2, 4, 0.05],
+  ["difficulty.fireScale.1.1", "難易度1の「敵が撃つ間隔の倍率（大きいほど弾が少ない）」", 0.2, 4, 0.05],
+  ["difficulty.fireScale.2.1", "難易度2の「敵が撃つ間隔の倍率（大きいほど弾が少ない）」", 0.2, 4, 0.05],
+  ["difficulty.fireScale.3.1", "難易度3の「敵が撃つ間隔の倍率（大きいほど弾が少ない）」", 0.2, 4, 0.05],
+  ["difficulty.bulletSpeed.0.1", "難易度0.5の「敵の弾の速さの倍率」", 0.3, 2, 0.05],
+  ["difficulty.bulletSpeed.1.1", "難易度1の「敵の弾の速さの倍率」", 0.3, 2, 0.05],
+  ["difficulty.bulletSpeed.2.1", "難易度2の「敵の弾の速さの倍率」", 0.3, 2, 0.05],
+  ["difficulty.bulletSpeed.3.1", "難易度3の「敵の弾の速さの倍率」", 0.3, 2, 0.05],
+  ["difficulty.speedScale.0.1", "難易度0.5の「語句の速さの倍率」", 0.5, 2.5, 0.05],
+  ["difficulty.speedScale.1.1", "難易度1の「語句の速さの倍率」", 0.5, 2.5, 0.05],
+  ["difficulty.speedScale.2.1", "難易度2の「語句の速さの倍率」", 0.5, 2.5, 0.05],
+  ["difficulty.speedScale.3.1", "難易度3の「語句の速さの倍率」", 0.5, 2.5, 0.05],
+  ["difficulty.fillerDensity.0.1", "難易度0.5の「虫の濃さ」", 0.2, 3, 0.05],
+  ["difficulty.fillerDensity.1.1", "難易度1の「虫の濃さ」", 0.2, 3, 0.05],
+  ["difficulty.fillerDensity.2.1", "難易度2の「虫の濃さ」", 0.2, 3, 0.05],
+  ["difficulty.fillerDensity.3.1", "難易度3の「虫の濃さ」", 0.2, 3, 0.05],
+  ["difficulty.zakoHp.0.1", "難易度0.5の「ザコの語句の硬さ（弾1本あたり）」", 1, 10, 0.5],
+  ["difficulty.zakoHp.1.1", "難易度1の「ザコの語句の硬さ（弾1本あたり）」", 1, 10, 0.5],
+  ["difficulty.bossHpScale.0.1", "難易度0.5の「中ボス・大ボスの文字耐久の倍率」", 0.25, 4, 0.05],
+  ["difficulty.bossHpScale.1.1", "難易度1の「中ボス・大ボスの文字耐久の倍率」", 0.25, 4, 0.05],
+  ["difficulty.bossHpScale.2.1", "難易度2の「中ボス・大ボスの文字耐久の倍率」", 0.25, 4, 0.05],
+  ["difficulty.bossHpScale.3.1", "難易度3の「中ボス・大ボスの文字耐久の倍率」", 0.25, 4, 0.05],
   ["shotDrawScale", "ふわりの光の見た目の大きさ（当たりは変わらない）", 0.5, 3, 0.1],
   ["fillerDrawScale", "虫の見た目の大きさ（当たりは変わらない）", 0.3, 1.2, 0.05],
   ["restGap", "案内つきの木の前後の休み（秒）", 0, 6, 0.5],
@@ -79,7 +108,6 @@ const TUNE_ITEMS = [
   ["shotInterval", "自機の弾の間隔（秒）", 0.06, 0.4, 0.02],
   ["fillerInterval", "雑魚の群れが出る間隔（秒）", 0.5, 10, 0.1],
   ["fillerMax", "雑魚の最大数", 0, 24, 1],
-  ["fillerDensity", "本番と大ボスの雑魚の濃さ（数と間隔。弾の量は変えない）", 1, 3, 0.1],
   ["wordHitPad", "語句の敵の当たり判定の広さ（文字の左右に足すpx）", 0, 40, 1],
   ["fillerFireScale", "雑魚が撃つ間隔の倍率（大きいほど撃たない）", 0.5, 4, 0.1],
   ["dropRate", "雑魚が回復のたねを落とす確率", 0, 1, 0.05],
@@ -122,16 +150,6 @@ const TUNE_ITEMS = [
   ["odaiSmallFont", "お題の問題文（上の帯の下）の文字のいちばん大きいとき", 11, 30, 1],
   ["odaiMaxLines", "お題の問題文の行数の上限", 1, 5, 1],
   ["bombGain", "ふわりタイフーンゲージのたまる速さ（1語あたり）", 2, 50, 1],
-  ["difficulty.fireScale.at1", "難易度1の「敵が撃つ間隔の倍率」", 0.2, 2, 0.05],
-  ["difficulty.fireScale.at12", "難易度12の「敵が撃つ間隔の倍率」", 0.2, 2, 0.05],
-  ["difficulty.speedScale.at1", "難易度1の「敵の速さの倍率」", 0.5, 2.5, 0.05],
-  ["difficulty.speedScale.at12", "難易度12の「敵の速さの倍率」", 0.5, 2.5, 0.05],
-  ["difficulty.zakoHp.at1", "難易度1の「ザコの硬さ」", 1, 10, 0.5],
-  ["difficulty.zakoHp.at12", "難易度12の「ザコの硬さ」", 1, 12, 0.5],
-  ["difficulty.bossHpScale.at1", "難易度1の「中ボス・大ボスの文字耐久の倍率」", 0.25, 4, 0.05],
-  ["difficulty.bossHpScale.at12", "難易度12の「中ボス・大ボスの文字耐久の倍率」", 0.25, 4, 0.05],
-  ["difficulty.tricky.at1", "難易度1の「意地の悪い語句の数」", 0, 9, 0.1],
-  ["difficulty.tricky.at12", "難易度12の「意地の悪い語句の数」", 0, 9, 0.1],
   ["autoGroundCount", "自動のステージで地上に出る語句の数", 0, 5, 1],
 ];
 const TUNE_KEY = "kietaTowel.tune.v1";
@@ -264,6 +282,8 @@ const Main = (() => {
         stageName: stage.name,
         fuwariCount: Save.cardCount(),
         tutorial: stage.id === 1 ? { seen: TutSave.load(), mark: TutSave.mark } : null,   // チュートリアルはステージ1の初回だけ
+        firstChoice: !TutSave.load().choice,          // 持ち物選択: 初めては時間制限なし（記録は版ごと）
+        onFirstChoice: () => TutSave.mark("choice"),
         onEnd: (ids, stats) => {
           lastStats = stats; lastIds = ids;
           const m = Math.floor(stats.time / 60), sec = String(Math.floor(stats.time % 60)).padStart(2, "0");
@@ -417,6 +437,16 @@ const Main = (() => {
     // バトルの一時停止メニュー
     $("btn-pause").addEventListener("click", openPause);
     $("pm-continue").addEventListener("click", () => closePause(() => Battle.resume()));
+    // 音のオン・オフ（タイトルと一時停止メニュー）
+    const refreshSound = () => document.querySelectorAll(".sound-btn").forEach(b => {
+      b.textContent = window.TEXTS.sound[Sound.muted ? "off" : "on"];
+      b.classList.toggle("muted", Sound.muted);
+    });
+    const toggleSound = () => { Sound.setMuted(!Sound.muted); SoundPref.set(Sound.muted); refreshSound(); };
+    $("btn-sound").addEventListener("click", toggleSound);
+    $("pm-sound").addEventListener("click", toggleSound);
+    Sound.setMuted(SoundPref.muted());
+    refreshSound();
     // 説明をもう一度: その場で説明を紙芝居のように見せ、次にステージ1を遊ぶときも、もう一度チュートリアルを出す
     $("pm-tutorial").addEventListener("click", () => { TutSave.reset(); closePause(() => Battle.tutorialSlides()); });
     $("pm-retry").addEventListener("click", () => quitBattle(toBattle));

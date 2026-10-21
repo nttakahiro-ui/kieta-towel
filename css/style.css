@@ -375,3 +375,6 @@ body { position: fixed; inset: 0; }
 @media (orientation: landscape) and (max-height: 500px) {
   #rotate { display: flex; }
 }
+
+/* 音のオン・オフ（10/21-1）。オフのときは少しうすく */
+.sound-btn.muted { opacity: 0.6; }
