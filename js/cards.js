@@ -18,6 +18,26 @@ function rankOf(score) {
 
 const Cards = (() => {
   const $ = id => document.getElementById(id);
+  const tx = (path, vars) => { let v = path.split(".").reduce((o, k) => (o == null ? o : o[k]), window.TEXTS); if (typeof v !== "string") return path; return vars ? v.replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined ? vars[k] : m)) : v; };
+
+  // カードの一言メモの改行（10/22-1）: 日本語の区切り（Intl.Segmenter）でかたまりに分け、かたまりの途中や助詞の前では折り返さない
+  // （かたまりのあいだにだけ <wbr> を入れ、CSS の word-break: keep-all と組み合わせる）
+  const seg = (typeof Intl !== "undefined" && Intl.Segmenter) ? new Intl.Segmenter("ja", { granularity: "word" }) : null;
+  const GLUE = new Set(["を", "は", "が", "に", "の", "と", "で", "へ", "も", "や", "よ", "ね", "て", "た", "か", "な", "、", "。", "!", "！", "?", "？", ")", "）"]);
+  const esc = t => t.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  function phraseHTML(text) {
+    if (!seg) return esc(text);
+    const parts = [];
+    for (const { segment } of seg.segment(text)) {
+      if (parts.length && (GLUE.has(segment) || GLUE.has(segment[0]))) parts[parts.length - 1] += segment; else parts.push(segment);
+    }
+    return parts.map(esc).join("<wbr>");
+  }
+  // 名前をならべる（3つまで。4つ以上は「〇〇、〇〇ほか○語」）
+  function names(ws) {
+    const n = ws.map(w => `「${w.word}」`);
+    return n.length <= 3 ? n.join("") : tx("results.others", { names: n.slice(0, 2).join(""), n: n.length - 2 });
+  }
 
   function button(text, cls, fn) {
     const b = document.createElement("button");
@@ -38,12 +58,35 @@ const Cards = (() => {
     showHint("cards-hint", o.hint); showHero("cards-hero", o.heroSrc);
     const got = o.results.filter(r => r.correct).map(r => r.id);
     const ownedCount = o.words.filter(w => o.owned[w.id]).length;
-    $("cards-summary").textContent = `今回 ${got.length} 枚 ／ このステージ ${ownedCount} / ${o.words.length} 枚`;
+    // 結果の3段（10/22-1）: 今回助けたことば／正解してカードになった／このステージのカード
+    const tiers = $("cards-tiers");
+    tiers.innerHTML = "";
+    const tier = (label, value, cls) => { const d = document.createElement("div"); d.className = "tier " + (cls || ""); d.innerHTML = `<span class="lb">${label}</span><span class="vl">${value}</span>`; tiers.appendChild(d); };
+    if (o.retake) tier(tx("results.retakeLine", { n: o.results.length, ok: got.length }), "", "retake");
+    else tier(tx("results.helped"), `${o.helpedCount} <small>${tx("results.unitWord")}</small>`);
+    tier(tx("results.carded"), `${got.length} <small>${tx("results.unitCard")}</small>`);
+    tier(tx("results.stageCards"), `${ownedCount} <small>/ ${o.words.length} ${tx("results.unitCard")}</small>`, "total");
+    // 次は〇〇（足りないカードの名前）。クイズでまちがえたことば（受け直せる）と、まだ助けていないことばに分ける
+    const missing = o.words.filter(w => !o.owned[w.id]);
+    const wrong = missing.filter(w => o.retakeIds && o.retakeIds[w.id]);
+    const notHelped = missing.filter(w => !wrong.includes(w));
+    const nx = $("cards-next");
+    nx.innerHTML = "";
+    const line = t => { const p = document.createElement("p"); p.innerHTML = phraseHTML(t); nx.appendChild(p); };
+    if (notHelped.length) { line(tx("results.nextHelp", { names: names(notHelped) })); if (wrong.length) line(tx("results.nextQuizAlso", { names: names(wrong) })); }
+    else if (wrong.length) line(tx("results.nextQuiz", { names: names(wrong) }));
+    $("cards-rule").textContent = tx("results.rule");
+    // 間違えた問題にもう一度（このステージで、クイズでまちがえたことばがあるとき）
+    const rb = $("cards-retake");
+    rb.textContent = tx("results.retakeButton");
+    rb.classList.toggle("hidden", !wrong.length || !o.onRetake);
+    rb.onclick = () => o.onRetake && o.onRetake(wrong);
+    $("cards-summary").textContent = "";
     const rk = $("cards-rank");
     rk.innerHTML = "";
     if (o.stats) {
       const st = o.stats;
-      $("cards-summary").textContent += `\nぶつかった ${st.hits}回${st.downs ? `　元気がなくなった ${st.downs}回` : ""}${st.gameOvers ? `　救出のたびのやり直し ${st.gameOvers}回` : ""}　いちばん長いれんぞく ${st.maxCombo}`;   // バトルの時間は出さない（調整パネルの中だけ）
+      $("cards-summary").textContent = `ぶつかった ${st.hits}回${st.downs ? `　元気がなくなった ${st.downs}回` : ""}${st.gameOvers ? `　救出のたびのやり直し ${st.gameOvers}回` : ""}　いちばん長いれんぞく ${st.maxCombo}`;   // バトルの時間は出さない（調整パネルの中だけ）
       // 点数とランク
       const r = rankOf(st.score);
       const sc = document.createElement("div"); sc.className = "rank-score"; sc.textContent = `${st.score} 点`;
@@ -75,7 +118,7 @@ const Cards = (() => {
       c.className = "card" + (owned ? "" : " miss");
       c.style.animationDelay = `${i * 0.08}s`;
       const wd = document.createElement("div"); wd.className = "w"; wd.textContent = w.word;
-      const m = document.createElement("div"); m.className = "m"; m.textContent = w.memo;
+      const m = document.createElement("div"); m.className = "m"; m.innerHTML = phraseHTML(w.memo);
       c.append(wd, m);
       // まだカードになっていない語句には、理由を出す
       if (!owned) {
@@ -135,5 +178,5 @@ const Cards = (() => {
     btns.append(button("もう一度あそぶ", "btn-main", o.onRetry), button("ステージ一覧へ", "btn-sub", o.onTitle));
   }
 
-  return { showCards, showRecipe };
+  return { showCards, showRecipe, phraseHTML, names };
 })();

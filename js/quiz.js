@@ -1,6 +1,7 @@
 // クイズ。バトルで吸い込んだ順に出題する
 const QUIZ = {
-  reviewTime: 3,                     // クイズの前に「今日あつめたことば」を見せる秒数
+  reviewTime: 3,
+  previewTime: 3,                    // 受け直しクイズで、出題の前にカード（語句＋一言メモ）を見せる秒数                     // クイズの前に「今日あつめたことば」を見せる秒数
   tempoUpAt: { 2: 1.15, 7: 1.3 },   // 何問目（0から数える）で音楽のテンポを上げるか。3問目と8問目
   nextDelay: 1.1,                    // 正解のあと、次の問題へ進むまでの秒数
 };
@@ -16,12 +17,14 @@ const FUWARI_SAY = {
 const pick = a => a[Math.floor(Math.random() * a.length)];
 
 const Quiz = (() => {
-  let list = [], idx = 0, results = [], onEnd = null, locked = false, streak = 0;
+  let list = [], idx = 0, results = [], onEnd = null, locked = false, streak = 0, preview = false, previewTimer = 0;
   const $ = id => document.getElementById(id);
 
   // words: 吸い込んだ順の語句、end(results): 終わったときに呼ぶ。results は [{ id, correct }]
-  function start(words, end) {
-    list = words; idx = 0; results = []; onEnd = end; streak = 0;
+  // o.preview: 受け直しクイズ（出題の前に、その語句のカードを3秒見せる）
+  function start(words, end, o) {
+    list = words; idx = 0; results = []; onEnd = end; streak = 0; preview = !!(o && o.preview);
+    clearTimeout(previewTimer);
     Sound.play("quiz");
     Sound.setTempo(1);
     say(pick(FUWARI_SAY.start));
@@ -54,10 +57,26 @@ const Quiz = (() => {
     locked = false;
     $("quiz-count").textContent = `クイズ ${idx + 1} / ${list.length}`;
     dots();
-    $("quiz-question").textContent = w.question;
     $("quiz-feedback").classList.add("hidden");
     const box = $("quiz-choices");
     box.innerHTML = "";
+    if (preview) {   // 受け直し: まずカードを見せる
+      locked = true;
+      const q = $("quiz-question");
+      q.innerHTML = "";
+      const card = document.createElement("div"); card.className = "card preview";
+      const wd = document.createElement("div"); wd.className = "w"; wd.textContent = w.word;
+      const m = document.createElement("div"); m.className = "m"; m.innerHTML = Cards.phraseHTML(w.memo);
+      card.append(wd, m); q.appendChild(card);
+      previewTimer = setTimeout(() => showQuestion(w, box), QUIZ.previewTime * 1000);
+      $("screen-quiz").scrollTop = 0;
+      return;
+    }
+    showQuestion(w, box);
+  }
+  function showQuestion(w, box) {
+    locked = false;
+    $("quiz-question").textContent = w.question;
     // 選択肢の順番は毎回入れ替える
     shuffle(w.choices.map((c, i) => i)).forEach(i => {
       const b = document.createElement("button");

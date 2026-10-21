@@ -103,6 +103,32 @@ window.TEXTS = {
   // 一時停止メニュー
   pause: { review: "ステージ1でおさらい", slides: "案内を紙芝居で見る（デバッグ）" },
 
+  // 結果画面（10/22-1）
+  results: {
+    helped: "今回助けたことば",
+    carded: "正解してカードになった",
+    stageCards: "このステージのカード",
+    unitWord: "語", unitCard: "枚",
+    retakeLine: "もう一度のクイズ: {n}問中 {ok}問 正解",
+    nextHelp: "次は{names}を助けるとレシピ完成！",
+    nextQuiz: "{names}のクイズに正解するとレシピ完成！",
+    nextQuizAlso: "{names}は、クイズに正解するとカードになるよ",
+    others: "{names}ほか{n}語",
+    rule: "ことばを助けて、クイズに正解するとカードになるよ",
+    retakeButton: "間違えた問題にもう一度",
+  },
+  // カード図鑑（10/22-1）
+  zukan: { button: "カード図鑑", title: "カード図鑑", recipe: "レシピ: {name}", recipeYet: "レシピ: ？", back: "ステージ一覧へ", empty: "？" },
+  // 世界のページとワープ（10/22-1）
+  worlds: {
+    title: "世界{id}　{name}",
+    warp: "世界{id}へワープ",
+    back: "◀ 世界{id}",
+    warping: "世界{id}へ！",
+    notReady: "じゅんびちゅう",
+    locked: "まだあそべません",
+  },
+
   // 音のオン・オフ（タイトルと一時停止メニュー）
   sound: { on: "おと: オン", off: "おと: オフ" },
 };

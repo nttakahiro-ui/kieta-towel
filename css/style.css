@@ -403,3 +403,54 @@ body { position: fixed; inset: 0; }
 /* ふわりの案内（結果画面とレシピ完成） */
 .fuwari-hint { margin: 10px auto; max-width: 320px; background: #fffdf5; border: 2px solid #9cbf7c; border-radius: 14px; padding: 8px 12px; font-size: 15px; color: #3f4a35; }
 .fuwari-hint.hidden { display: none; }
+
+/* カードの一言メモの改行（10/22-1）: ことばのかたまりの途中では折り返さない（かたまりのあいだに <wbr>） */
+.card .m { font-size: 13px; line-height: 1.55; word-break: keep-all; overflow-wrap: break-word; }
+.cards-box .card { padding: 10px 10px; }
+
+/* 結果画面の3段（10/22-1） */
+.cards-tiers { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 10px; }
+.tier { display: flex; justify-content: space-between; align-items: baseline; background: var(--white); border: 2px solid var(--green-light); border-radius: 12px; padding: 8px 14px; }
+.tier .lb { font-size: 15px; color: #4b5e3a; }
+.tier .vl { font-size: 24px; font-weight: bold; color: var(--green-dark); }
+.tier .vl small { font-size: 14px; font-weight: normal; }
+.tier.total { border-color: #e0b03a; background: #fff8e2; }
+.tier.total .vl { color: #b0801a; }
+.tier.retake .lb { font-size: 15px; color: #b05068; }
+.cards-next p { margin: 6px 0; font-size: 16px; font-weight: bold; color: #b0801a; word-break: keep-all; overflow-wrap: break-word; }
+.cards-rule { font-size: 13px; color: #6b7a5a; margin: 4px 0 8px; }
+#cards-retake.hidden { display: none; }
+.cards-summary { font-size: 13px; color: #6b7a5a; }
+
+/* 受け直しクイズ: 出題の前に見せるカード */
+.card.preview { max-width: 300px; margin: 6px auto; text-align: left; }
+.card.preview .w { font-size: 22px; }
+.card.preview .m { font-size: 15px; }
+
+/* カード図鑑（10/22-1） */
+.zukan-box { max-width: 440px; margin: 0 auto; }
+.zukan-title { font-size: 22px; color: var(--green-dark); text-align: center; margin: 6px 0 10px; }
+.zukan-stage { margin: 14px 0 6px; }
+.zukan-stage h3 { font-size: 16px; color: var(--green-dark); margin: 0 4px 2px; }
+.zukan-stage .rc { font-size: 13px; color: #b0801a; margin: 0 4px 6px; }
+.zukan-stage .cards-list .card { animation: none; }
+.zukan-stage .card.empty { opacity: .45; border-style: dashed; box-shadow: none; text-align: center; color: #a3a396; }
+
+/* 世界ごとのステージ一覧とワープ（10/22-1） */
+#screen-stages { background-size: cover; background-position: center; }
+#screen-stages::before { content: ""; position: fixed; inset: 0; background: rgba(250,246,234,0.82); pointer-events: none; }
+.stages-box { position: relative; }
+.stages-nav { display: flex; justify-content: space-between; align-items: center; margin: 0 2px 6px; min-height: 22px; }
+.stages-nav .link-btn { font-size: 13px; }
+.warp-btn { display: block; width: 100%; margin: 16px 0 4px; font-size: 18px; animation: warpGlow 1.4s ease-in-out infinite; }
+@keyframes warpGlow { 50% { box-shadow: 0 0 18px 4px rgba(255,226,140,0.9); } }
+#warp { position: fixed; inset: 0; z-index: 50; pointer-events: none; opacity: 0; background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; }
+#warp.on { animation: warpFx 1.6s ease-in-out forwards; }
+#warp .flash { position: absolute; inset: 0; background: #fff; }
+#warp.on .flash { animation: warpFlash 1.6s ease-in-out forwards; }
+#warp p { position: relative; font-size: 28px; font-weight: bold; color: #48693a; text-shadow: 0 0 8px #fff, 0 0 16px #fff; }
+@keyframes warpFx { 0% { opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes warpFlash { 0% { opacity: 0; } 30% { opacity: 1; } 60% { opacity: 0.2; } 100% { opacity: 0; } }
+.stage-row.notready .sub { color: #a3a396; }
+#btn-zukan { margin-left: auto; font-size: 15px; font-weight: bold; }
+.zukan-title small { font-size: 15px; color: #6f9a4a; }

@@ -22,7 +22,8 @@ const Save = (() => {
   // retake: クイズで不正解だった語句（あとで図鑑の受け直しクイズに使う。バトルで取り逃がした語句は入れない）
   // best: ステージごとのベストスコアと3つの印（{ score, all, noDown, noHit }）
   // hero: 選んだ主人公（"boy"／"girl"）、introSeen: 目的の画面を見たか（10/21-2）
-  let data = { cards: {}, cleared: {}, retake: {}, best: {}, hero: null, introSeen: false };
+  // world: ステージ一覧で今いる世界（10/22-1。ワープで進む）
+  let data = { cards: {}, cleared: {}, retake: {}, best: {}, hero: null, introSeen: false, world: 1 };
   // localStorage が使えなくても落ちないようにする
   function load() {
     try {
@@ -35,6 +36,7 @@ const Save = (() => {
         data.best = d.best || {};
         data.hero = d.hero || null;
         data.introSeen = !!d.introSeen;
+        data.world = d.world || 1;
       }
     } catch (e) { /* 読めないときは空のまま */ }
   }
@@ -316,7 +318,17 @@ const Main = (() => {
     });
   }
 
-  function toCards(results) {
+  // 画面の言葉（data/texts.js）
+  const tx = (path, vars) => { let v = path.split(".").reduce((o, k) => (o == null ? o : o[k]), window.TEXTS); if (typeof v !== "string") return path; return vars ? v.replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined ? vars[k] : m)) : v; };
+
+  // 間違えた問題にもう一度（受け直しクイズ）: カードを3秒見せてから出題する
+  function startRetake(list) {
+    showScreen("quiz");
+    $("quiz-hero").src = heroSrc("think");
+    Quiz.start(list, results => toCards(results, true), { preview: true });
+  }
+
+  function toCards(results, retake) {
     Sound.setTempo(1);
     // 正解した語句がカードになる
     const newIds = results.filter(r => r.correct && !Save.data.cards[r.id]).map(r => r.id);
@@ -326,12 +338,12 @@ const Main = (() => {
     });
     const owned = Save.data.cards;
     if (words.filter(w => owned[w.id]).length >= CARDS.clearCount) Save.data.cleared[stage.id] = true;
-    // ベストスコアと3つの印（一度とった印は消えない。次のステージに進む条件ではない）
-    const st = lastStats || { score: 0, hits: 1, downs: 1 };
+    // ベストスコアと3つの印（一度とった印は消えない。次のステージに進む条件ではない）。受け直しのときはバトルの記録はさわらない
+    const st = (!retake && lastStats) || { score: 0, hits: 1, downs: 1 };
     const now = { all: lastIds.length >= words.length, noDown: st.downs === 0, noHit: st.hits === 0 };
     const prev = Save.data.best[stage.id] || { score: 0, all: false, noDown: false, noHit: false };
-    const newBest = st.score > prev.score;
-    Save.data.best[stage.id] = {
+    const newBest = !retake && st.score > prev.score;
+    if (!retake) Save.data.best[stage.id] = {
       score: Math.max(prev.score, st.score),
       all: prev.all || now.all, noDown: prev.noDown || now.noDown, noHit: prev.noHit || now.noHit
     };
@@ -339,8 +351,10 @@ const Main = (() => {
     showScreen("cards");
     $("screen-cards").scrollTop = 0;
     Cards.showCards({
-      stage, words, results, owned, newIds, stats: lastStats,
-      record: { newBest, now, best: Save.data.best[stage.id] },
+      stage, words, results, owned, newIds, stats: retake ? null : lastStats,
+      record: retake ? null : { newBest, now, best: Save.data.best[stage.id] },
+      retake, helpedCount: lastIds.length, retakeIds: Save.data.retake,
+      onRetake: startRetake,
       onRecipe: toRecipe,
       onRetry: toBattle,
       onTitle: toStages,
@@ -356,40 +370,95 @@ const Main = (() => {
   }
 
   // ステージ一覧: 12ステージ。遊べるのは V01 ではステージ1だけ
+  // ステージ一覧（10/22-1）: 世界ごとのページ。今いる世界だけ出す。世界のカード（40枚）がそろうとワープのボタン
+  const worldStages = id => window.STAGES.filter(s => s.world === id);
+  const worldDone = id => worldStages(id).every(s => window.WORDS.filter(w => w.stage === s.id).every(w => Save.data.cards[w.id]));
   function toStages() {
     Battle.stop();
     Sound.play("title");
+    const wid = Math.min(window.WORLDS.length, Math.max(1, Save.data.world || 1));
+    const wd = window.WORLDS.find(w => w.id === wid);
+    $("stages-world-title").textContent = tx("worlds.title", { id: wd.id, name: wd.name });
+    $("screen-stages").style.backgroundImage = `url(assets/bg_world${wd.id}.jpg)`;
+    const back = $("btn-world-back");
+    back.classList.toggle("hidden", wid <= 1);
+    back.textContent = tx("worlds.back", { id: wid - 1 });
+    back.onclick = () => { Save.data.world = wid - 1; Save.store(); toStages(); };
+    $("btn-zukan").textContent = tx("zukan.button");
     const box = $("stages-list");
     box.innerHTML = "";
-    window.WORLDS.forEach(wd => {
-      const h = document.createElement("h3"); h.className = "stages-world"; h.textContent = `世界${wd.id}　${wd.name}`;
-      box.appendChild(h);
-      window.STAGES.filter(s => s.world === wd.id).forEach(s => {
-        const row = document.createElement("button");
-        const open = s.open || openAll;   // デバッグ: すべてのステージを開く
-        row.className = "stage-row" + (open ? "" : " locked");
-        row.disabled = !open;
-        const b = Save.data.best[s.id];
-        const got = window.WORDS.filter(w => w.stage === s.id && Save.data.cards[w.id]).length;
-        const no = document.createElement("span"); no.className = "no"; no.textContent = s.id;
-        const main = document.createElement("span"); main.className = "main";
-        const nm = document.createElement("span"); nm.className = "nm"; nm.textContent = s.name;
-        const sub = document.createElement("span"); sub.className = "sub";
-        sub.textContent = open ? `難易度 ${s.difficulty || 1}　ベスト ${b ? b.score : 0}点　カード ${got}/10` : "まだあそべません";
-        const marks = document.createElement("span"); marks.className = "marks";
-        [["all", "10語"], ["noDown", "元気"], ["noHit", "ぶつからず"]].forEach(([k, label]) => {
-          const m = document.createElement("span"); m.className = "mark" + (b && b[k] ? " on" : ""); m.textContent = label;
-          marks.appendChild(m);
-        });
-        main.append(nm, sub);
-        row.append(no, main);
-        if (open) row.appendChild(marks);
-        if (open) row.addEventListener("click", () => { Sound.se("start"); selectStage(s.id); toBattle(); });
-        box.appendChild(row);
+    worldStages(wid).forEach(s => {
+      const row = document.createElement("button");
+      const open = s.open || openAll;   // デバッグ: すべてのステージを開く
+      row.className = "stage-row" + (open ? "" : " locked notready");
+      row.disabled = !open;
+      const b = Save.data.best[s.id];
+      const got = window.WORDS.filter(w => w.stage === s.id && Save.data.cards[w.id]).length;
+      const no = document.createElement("span"); no.className = "no"; no.textContent = s.id;
+      const main = document.createElement("span"); main.className = "main";
+      const nm = document.createElement("span"); nm.className = "nm"; nm.textContent = s.name;
+      const sub = document.createElement("span"); sub.className = "sub";
+      sub.textContent = open ? `難易度 ${s.difficulty || 1}　ベスト ${b ? b.score : 0}点　カード ${got}/10` : tx("worlds.notReady");
+      const marks = document.createElement("span"); marks.className = "marks";
+      [["all", "10語"], ["noDown", "元気"], ["noHit", "ぶつからず"]].forEach(([k, label]) => {
+        const m = document.createElement("span"); m.className = "mark" + (b && b[k] ? " on" : ""); m.textContent = label;
+        marks.appendChild(m);
       });
+      main.append(nm, sub);
+      row.append(no, main);
+      if (open) row.appendChild(marks);
+      if (open) row.addEventListener("click", () => { Sound.se("start"); selectStage(s.id); toBattle(); });
+      box.appendChild(row);
     });
+    // ワープ: この世界のカードがそろったら、次の世界へのボタン（ボタンが出る＝進める）
+    const warp = $("btn-warp");
+    const canWarp = wid < window.WORLDS.length && (worldDone(wid) || openAll);
+    warp.classList.toggle("hidden", !canWarp);
+    warp.textContent = tx("worlds.warp", { id: wid + 1 });
+    warp.onclick = () => warpTo(wid + 1);
     showScreen("stages");
     $("screen-stages").scrollTop = 0;
+  }
+  // ワープの演出: 白く光って、次の世界の背景に切りかわる（約1.6秒）
+  function warpTo(id) {
+    const fx = $("warp");
+    fx.style.backgroundImage = `url(assets/bg_world${id}.jpg)`;
+    $("warp-text").textContent = tx("worlds.warping", { id });
+    fx.classList.remove("on"); void fx.offsetWidth; fx.classList.add("on");
+    Sound.se("power");
+    setTimeout(() => { Save.data.world = id; Save.store(); toStages(); }, 700);
+    setTimeout(() => fx.classList.remove("on"), 1700);
+  }
+
+  // カード図鑑（10/22-1）: 今いる世界の、ステージごとの10枚。持っているカードは語句と一言メモ、ないものは「？」
+  function toZukan() {
+    const wid = Save.data.world || 1;
+    $("zukan-title").innerHTML = `${tx("zukan.title")}<br><small>${tx("worlds.title", { id: wid, name: window.WORLDS.find(w => w.id === wid).name })}</small>`;
+    const box = $("zukan-list");
+    box.innerHTML = "";
+    worldStages(wid).forEach(s => {
+      const ws = window.WORDS.filter(w => w.stage === s.id).sort((a, b) => (a.order || 0) - (b.order || 0));
+      const sec = document.createElement("div"); sec.className = "zukan-stage";
+      const h = document.createElement("h3"); h.textContent = `${s.id}　${s.name}`;
+      const done = ws.every(w => Save.data.cards[w.id]);
+      const rc = document.createElement("p"); rc.className = "rc"; rc.textContent = done ? tx("zukan.recipe", { name: s.recipe }) : tx("zukan.recipeYet");
+      const list = document.createElement("div"); list.className = "cards-list";
+      ws.forEach(w => {
+        const c = document.createElement("div");
+        if (Save.data.cards[w.id]) {
+          c.className = "card";
+          const wd = document.createElement("div"); wd.className = "w"; wd.textContent = w.word;
+          const m = document.createElement("div"); m.className = "m"; m.innerHTML = Cards.phraseHTML(w.memo);
+          c.append(wd, m);
+        } else { c.className = "card empty"; c.textContent = tx("zukan.empty"); }
+        list.appendChild(c);
+      });
+      sec.append(h, rc, list);
+      box.appendChild(sec);
+    });
+    $("btn-zukan-back").textContent = tx("zukan.back");
+    showScreen("zukan");
+    $("screen-zukan").scrollTop = 0;
   }
 
   // ===== バトルの一時停止メニュー =====
@@ -474,6 +543,8 @@ const Main = (() => {
       $(`hero-${h}-name`).textContent = window.TEXTS.intro[h];
       $(`hero-${h}`).addEventListener("click", () => { Save.data.hero = h; Save.data.introSeen = true; Save.store(); toTitle(); });
     });
+    $("btn-zukan").addEventListener("click", toZukan);
+    $("btn-zukan-back").addEventListener("click", toStages);
     $("btn-hero").textContent = window.TEXTS.intro.rechoose;
     $("btn-hero").addEventListener("click", () => showScreen("hero"));
     $("pm-retry").addEventListener("click", () => quitBattle(toBattle));
