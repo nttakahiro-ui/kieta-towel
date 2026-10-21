@@ -154,16 +154,17 @@ const BATTLE = {
   // data/stages.js の difficulty（1〜12）から、次の数値が自動で決まる。
   // at1 が難易度1のときの値、at12 が難易度12のときの値。そのあいだはまっすぐの線でつなぐ
   // ステージごとの手上書きは data/stages.js の override 欄
-  // 難易度の線（10/21-1）: [難易度, 値] の点を結ぶ。点のあいだはまっすぐつなぐ。世界1は ステージ1＝0.5、2＝1、3＝2、4＝3
+  // 難易度の線（10/21-2）: 難易度＝ステージ番号（1〜12）。[難易度, 値] の2点（1と12）を結ぶ一直線。ステージ1の手ごたえは10/21-1のまま
   difficulty: {
-    fireScale:     [[0.5, 3.2], [1, 1.6], [2, 1.25], [3, 1.15], [12, 0.5]],      // 敵が撃つ間隔の倍率（大きいほど弾が少ない）
-    bulletSpeed:   [[0.5, 0.6], [1, 0.8], [2, 0.9], [3, 1.0], [12, 1.0]],     // 敵の弾の速さの倍率（ステージ1はゆっくり）
-    speedScale:    [[0.5, 0.85], [1, 0.9], [2, 1.0], [3, 1.05], [12, 1.4]],    // 語句の速さの倍率
-    fillerDensity: [[0.5, 0.6], [1, 1.0], [2, 1.3], [3, 1.5], [12, 1.5]],      // 救出のたびの雑魚（虫）の濃さ（数と間隔。弾の量は変えない）
-    zakoHp:        [[0.5, 4], [1, 5], [3, 5], [12, 6.5]],                      // ザコの語句の硬さ（弾1本あたり。四捨五入）
-    bossHpScale:   [[0.5, 1.1], [1, 1], [2, 1.05], [3, 1.1], [12, 2]],       // 中ボス・大ボスの1文字あたりの耐久の倍率
-    tricky:        [[0.5, 0], [1, 1], [2, 2], [3, 3], [12, 6.2]],              // 意地の悪い語句の数（四捨五入。patterns が "auto" のステージだけ）
+    fireRate:      [[1, 0.31], [12, 1.5]],    // 弾の多さ（敵が撃つ間隔の逆数。大きいほど弾が多い。1 ＝ 10/3の基準）
+    bulletSpeed:   [[1, 0.6], [12, 1.1]],     // 敵の弾の速さの倍率（ステージ1はゆっくり）
+    speedScale:    [[1, 0.85], [12, 1.25]],    // 語句の速さの倍率
+    fillerDensity: [[1, 0.6], [12, 1.6]],     // 救出のたびの虫の濃さ（数と間隔。虫1匹の弾の量は変えない）
+    zakoHp:        [[1, 4], [12, 6.5]],       // ザコの語句の硬さ（弾1本あたり。四捨五入）
+    bossHpScale:   [[1, 1.1], [12, 2]],       // 中ボス・大ボスの1文字あたりの耐久の倍率
+    tricky:        [[1, 0], [12, 6.2]],       // 意地の悪い語句の数（四捨五入。patterns が "auto" のステージだけ）
   },
+
 
   autoGroundCount: 2,          // patterns が "auto" のステージで、地上（地上のかげ）に出すザコの語句の数
 
@@ -295,7 +296,7 @@ function lineAt(pts, d) {
 }
 // ステージの難易度から、そのステージの数値を決める（override 欄があればそちらを使う）
 function stageParams(stage) {
-  const d = Math.min(12, Math.max(0.5, (stage && stage.difficulty) || 1));
+  const d = Math.min(12, Math.max(1, (stage && stage.difficulty) || 1));   // 難易度＝ステージ番号（1〜12）
   const ov = (stage && stage.override) || {};
   const P = { difficulty: d };
   for (const k of Object.keys(BATTLE.difficulty)) P[k] = ov[k] !== undefined ? ov[k] : lineAt(BATTLE.difficulty[k], d);
@@ -900,7 +901,7 @@ const Battle = (() => {
   function spawnFiller(type, x, y, extra) {
     const def = FILLER_TYPES[type];
     fillers.push(Object.assign({ type, layer: def.layer, hp: def.hp, r: def.r * BATTLE.fillerScale, x, y, age: 0, flash: 0,
-      fire: def.fire ? rand(0.8, 1.6) * def.fire * BATTLE.fillerFireScale * fillerDense() * P.fireScale / fireRamp() : 0 }, extra || {}));
+      fire: def.fire ? rand(0.8, 1.6) * def.fire * BATTLE.fillerFireScale * fillerDense() / P.fireRate / fireRamp() : 0 }, extra || {}));
   }
   // 語句の近くかどうか（雑魚を出す場所をえらぶとき用）
   function nearWord(x, y, layer) {
@@ -1157,7 +1158,7 @@ const Battle = (() => {
       e.fire -= dt;
       if (e.pattern === "odai" && odai && odai.intro > 0) e.fire = Math.max(e.fire, 0.5);
       if (e.fire <= 0 && e.y > 0 && e.y < H * 0.62) {
-        e.fire = BATTLE.enemyFireInterval[e.role] * P.fireScale / fireRamp() * (e.pattern === "odai" ? 3 : 1) * (0.8 + Math.random() * 0.4);
+        e.fire = BATTLE.enemyFireInterval[e.role] / P.fireRate / fireRamp() * (e.pattern === "odai" ? 3 : 1) * (0.8 + Math.random() * 0.4);
         fireAt(e.x, e.y + (e.ground ? 0 : e.h / 2), BATTLE.shotPattern[e.role] || [0], { zako: "seed", mid: "thorn", boss: "mist" }[e.role]);   // 殻から飛ぶ: まゆ＝たね、いばら＝とげ、霧＝もや
       }
     }
@@ -1197,7 +1198,7 @@ const Battle = (() => {
       if (def.fire) {
         f.fire -= dt;
         if (f.fire <= 0 && f.y > 0 && f.y < H * 0.68) {
-          f.fire = def.fire * BATTLE.fillerFireScale * fillerDense() * P.fireScale / fireRamp() * rand(0.8, 1.2);
+          f.fire = def.fire * BATTLE.fillerFireScale * fillerDense() / P.fireRate / fireRamp() * rand(0.8, 1.2);
           fireAt(f.x, f.y, def.spread || [0]);
         }
       }
