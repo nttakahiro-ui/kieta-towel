@@ -12,10 +12,30 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap">
-  <link rel="stylesheet" href="css/style.css?v=33">
+  <link rel="stylesheet" href="css/style.css?v=34">
 </head>
 <body>
   <div id="app">
+    <!-- 目的の画面（ゲームを初めて開いたときだけ。10/21-2） -->
+    <section id="screen-intro" class="screen">
+      <div class="intro-box">
+        <div class="intro-heroes"><img class="hero-img" src="assets/hero_boy_point.jpg" alt=""><img class="hero-img" src="assets/hero_girl_point.jpg" alt=""></div>
+        <div id="intro-lines" class="intro-lines"></div>
+        <p id="intro-tap" class="intro-tap"></p>
+      </div>
+    </section>
+
+    <!-- 主人公を選ぶ画面（10/21-2） -->
+    <section id="screen-hero" class="screen">
+      <div class="hero-box">
+        <h2 id="hero-title" class="hero-title"></h2>
+        <div class="hero-choices">
+          <button id="hero-boy" class="hero-choice"><img class="hero-img" src="assets/hero_boy_joy.jpg" alt=""><span id="hero-boy-name"></span></button>
+          <button id="hero-girl" class="hero-choice"><img class="hero-img" src="assets/hero_girl_joy.jpg" alt=""><span id="hero-girl-name"></span></button>
+        </div>
+      </div>
+    </section>
+
     <!-- タイトル -->
     <section id="screen-title" class="screen">
       <div class="title-box">
@@ -30,6 +50,7 @@
         <button id="btn-start" class="btn btn-main">はじめる</button>
         <p class="title-note">音が出ます</p>
         <button id="btn-sound" class="link-btn sound-btn"></button>
+        <button id="btn-hero" class="link-btn"></button>
         <button id="btn-reset" class="link-btn">記録を消す</button>
         <button id="btn-tune" class="link-btn hidden">調整パネル</button>
       </div>
@@ -65,7 +86,7 @@
     <section id="screen-quiz" class="screen scroll">
       <div class="quiz-box">
         <div class="quiz-head"><span id="quiz-count"></span><span id="quiz-dots" class="quiz-dots"></span></div>
-        <div class="fuwari-talk"><span class="fuwari-icon"></span><p id="quiz-say" class="say">助けたことばを思い出そう！</p></div>
+        <div class="fuwari-talk"><img id="quiz-hero" class="hero-img hero-small" alt=""><span class="fuwari-icon"></span><p id="quiz-say" class="say">助けたことばを思い出そう！</p></div>
         <p id="quiz-question" class="quiz-question"></p>
         <div id="quiz-choices" class="quiz-choices"></div>
         <div id="quiz-feedback" class="quiz-feedback hidden"></div>
@@ -77,7 +98,9 @@
     <!-- カード -->
     <section id="screen-cards" class="screen scroll">
       <div class="cards-box">
+        <img id="cards-hero" class="hero-img hero-mid" alt="">
         <div id="cards-rank" class="cards-rank"></div>
+        <p id="cards-hint" class="fuwari-hint hidden"></p>
         <h2 class="cards-title">カードになった語句</h2>
         <p id="cards-summary" class="cards-summary"></p>
         <div id="cards-list" class="cards-list"></div>
@@ -89,7 +112,9 @@
     <!-- レシピ完成 -->
     <section id="screen-recipe" class="screen scroll">
       <div class="recipe-box">
+        <img id="recipe-hero" class="hero-img hero-mid" alt="">
         <p class="recipe-label">レシピ完成</p>
+        <p id="recipe-hint" class="fuwari-hint hidden"></p>
         <h2 id="recipe-name" class="recipe-name"></h2>
         <div id="recipe-fluff" class="recipe-fluff"></div>
         <div class="recipe-art"><div class="recipe-towel"></div></div>
@@ -117,6 +142,7 @@
         <button id="dbg-skip-recon" class="btn btn-debug">探検をとばす</button>
         <button id="dbg-skip-boss" class="btn btn-debug">大ボスへとぶ</button>
         <button id="dbg-clear" class="btn btn-debug">すぐクリア（10語ぜんぶ）</button>
+        <button id="dbg-slides" class="btn btn-debug"></button>
       </div>
     </div>
   </div>
@@ -157,13 +183,13 @@
   <!-- 横向きのとき -->
   <div id="rotate"><div><div class="rotate-icon"></div><p>縦にしてね</p></div></div>
 
-  <script src="data/words.js?v=33"></script>
-  <script src="data/stages.js?v=33"></script>
-  <script src="data/texts.js?v=33"></script>
-  <script src="js/audio.js?v=33"></script>
-  <script src="js/game.js?v=33"></script>
-  <script src="js/quiz.js?v=33"></script>
-  <script src="js/cards.js?v=33"></script>
-  <script src="js/main.js?v=33"></script>
+  <script src="data/words.js?v=34"></script>
+  <script src="data/stages.js?v=34"></script>
+  <script src="data/texts.js?v=34"></script>
+  <script src="js/audio.js?v=34"></script>
+  <script src="js/game.js?v=34"></script>
+  <script src="js/quiz.js?v=34"></script>
+  <script src="js/cards.js?v=34"></script>
+  <script src="js/main.js?v=34"></script>
 </body>
 </html>

@@ -29,8 +29,13 @@ const Cards = (() => {
 
   // カード表示
   // o: { stage, words(このステージの10語), results(今回のクイズ結果), owned(id→true 集めたカード), newIds(今回はじめて集めたid), onRecipe, onRetry, onTitle }
+  // ふわりの案内（ステージ1の初めてのとき。main.js が文を渡す）と、主人公の「喜ぶ」の絵
+  function showHint(id, text) { const el = $(id); el.textContent = text || ""; el.classList.toggle("hidden", !text); }
+  function showHero(id, src) { const el = $(id); if (src) el.src = src; el.classList.toggle("hidden", !src); }
+
   function showCards(o) {
     Sound.play("card");
+    showHint("cards-hint", o.hint); showHero("cards-hero", o.heroSrc);
     const got = o.results.filter(r => r.correct).map(r => r.id);
     const ownedCount = o.words.filter(w => o.owned[w.id]).length;
     $("cards-summary").textContent = `今回 ${got.length} 枚 ／ このステージ ${ownedCount} / ${o.words.length} 枚`;
@@ -107,6 +112,7 @@ const Cards = (() => {
   // レシピ完成表示（絵や演出は仮）
   function showRecipe(o) {
     Sound.play("recipe");
+    showHint("recipe-hint", o.hint); showHero("recipe-hero", o.heroSrc);
     $("recipe-name").textContent = o.stage.recipe;
     // 綿毛がふわふわ舞う（仮の演出）
     const fl = $("recipe-fluff");

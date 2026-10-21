@@ -21,7 +21,8 @@ const Save = (() => {
   // cards: 集めたカード、cleared: クリアしたステージ、
   // retake: クイズで不正解だった語句（あとで図鑑の受け直しクイズに使う。バトルで取り逃がした語句は入れない）
   // best: ステージごとのベストスコアと3つの印（{ score, all, noDown, noHit }）
-  let data = { cards: {}, cleared: {}, retake: {}, best: {} };
+  // hero: 選んだ主人公（"boy"／"girl"）、introSeen: 目的の画面を見たか（10/21-2）
+  let data = { cards: {}, cleared: {}, retake: {}, best: {}, hero: null, introSeen: false };
   // localStorage が使えなくても落ちないようにする
   function load() {
     try {
@@ -32,6 +33,8 @@ const Save = (() => {
         data.cleared = d.cleared || {};
         data.retake = d.retake || {};
         data.best = d.best || {};
+        data.hero = d.hero || null;
+        data.introSeen = !!d.introSeen;
       }
     } catch (e) { /* 読めないときは空のまま */ }
   }
@@ -264,7 +267,18 @@ const Main = (() => {
     showScreen("title");
   }
 
+  let reviewNext = false;    // 「ステージ1でおさらい」: 次のステージ1は、見た記録に関係なく案内を全部出す
+  const heroSrc = pose => `assets/hero_${Save.data.hero || "boy"}_${pose}.jpg`;   // 主人公の絵（point 指さす／think 考える／joy 喜ぶ）
+  // 案内（ステージ1）を結果画面とレシピ完成で出すか。出すなら見た記録をつける
+  function screenHint(id) {
+    if (stage.id !== 1 || (!reviewing && TutSave.load()[id])) return "";
+    TutSave.mark(id);
+    return window.TEXTS.hints[id];
+  }
+  let reviewing = false;     // 今のステージ1がおさらいか
+
   function toBattle() {
+    reviewing = reviewNext && stage.id === 1;
     showScreen("battle");
     Sound.play("recon");   // 探検は静かめの曲。本番が始まると "battle" に替わる
     // 画面が表示されてから大きさを測る
@@ -273,13 +287,15 @@ const Main = (() => {
         stage,
         stageName: stage.name,
         fuwariCount: Save.cardCount(),
-        tutorial: stage.id === 1 ? { seen: TutSave.load(), mark: TutSave.mark } : null,   // チュートリアルはステージ1の初回だけ
+        hints: stage.id === 1 ? { seen: TutSave.load(), mark: TutSave.mark, all: reviewNext } : null,   // 案内はステージ1だけ（初めての瞬間に。おさらいのときは全部）
+        hero: Save.data.hero || "boy",
         firstChoice: !TutSave.load().choice,          // 持ち物選択: 初めては時間制限なし（記録は版ごと）
         onFirstChoice: () => TutSave.mark("choice"),
         onEnd: (ids, stats) => {
           lastStats = stats; lastIds = ids;
           const m = Math.floor(stats.time / 60), sec = String(Math.floor(stats.time % 60)).padStart(2, "0");
           Tune.setInfo(`前回のバトル（${stage.name}）: ${m}分${sec}秒　回収 ${ids.length}語　被弾 ${stats.hits}回　失った機体 ${stats.downs}機　本番やり直し ${stats.gameOvers}回　${stats.score}点`);
+          reviewNext = false;
           toQuiz(ids);
         }
       });
@@ -295,6 +311,7 @@ const Main = (() => {
     Sound.play("card");
     Quiz.review(ordered, () => {
       showScreen("quiz");
+      $("quiz-hero").src = heroSrc("think");   // クイズは「考える」の絵
       Quiz.start(ordered, results => toCards(results));
     });
   }
@@ -326,14 +343,16 @@ const Main = (() => {
       record: { newBest, now, best: Save.data.best[stage.id] },
       onRecipe: toRecipe,
       onRetry: toBattle,
-      onTitle: toStages
+      onTitle: toStages,
+      hint: newIds.length ? screenHint("card") : "",   // 案内: 初めてカードになったとき
+      heroSrc: heroSrc("joy"),
     });
   }
 
   function toRecipe() {
     showScreen("recipe");
     $("screen-recipe").scrollTop = 0;
-    Cards.showRecipe({ stage, words, onRetry: toBattle, onTitle: toStages });
+    Cards.showRecipe({ stage, words, onRetry: toBattle, onTitle: toStages, hint: screenHint("recipe"), heroSrc: heroSrc("joy") });
   }
 
   // ステージ一覧: 12ステージ。遊べるのは V01 ではステージ1だけ
@@ -440,7 +459,23 @@ const Main = (() => {
     Sound.setMuted(SoundPref.muted());
     refreshSound();
     // 説明をもう一度: その場で説明を紙芝居のように見せ、次にステージ1を遊ぶときも、もう一度チュートリアルを出す
-    $("pm-tutorial").addEventListener("click", () => { TutSave.reset(); closePause(() => Battle.tutorialSlides()); });
+    // ステージ1でおさらい: 今のバトルをやめて、ステージ1を案内つきで始める（見た記録に関係なく全部出す）
+    $("pm-tutorial").textContent = window.TEXTS.pause.review;
+    $("pm-tutorial").addEventListener("click", () => quitBattle(() => { selectStage(1); reviewNext = true; toBattle(); }));
+    // デバッグ: 案内の文を紙芝居で見る
+    $("dbg-slides").textContent = window.TEXTS.pause.slides;
+    $("dbg-slides").addEventListener("click", () => closePause(() => Battle.tutorialSlides()));
+    // 目的の画面（初めて開いたときだけ）と、主人公を選ぶ画面
+    $("intro-lines").innerHTML = window.TEXTS.intro.lines.map(l => `<p>${l.replace(/\n/g, "<br>")}</p>`).join("");
+    $("intro-tap").textContent = window.TEXTS.intro.tap;
+    $("screen-intro").addEventListener("click", () => showScreen("hero"));
+    $("hero-title").textContent = window.TEXTS.intro.heroTitle;
+    ["boy", "girl"].forEach(h => {
+      $(`hero-${h}-name`).textContent = window.TEXTS.intro[h];
+      $(`hero-${h}`).addEventListener("click", () => { Save.data.hero = h; Save.data.introSeen = true; Save.store(); toTitle(); });
+    });
+    $("btn-hero").textContent = window.TEXTS.intro.rechoose;
+    $("btn-hero").addEventListener("click", () => showScreen("hero"));
     $("pm-retry").addEventListener("click", () => quitBattle(toBattle));
     $("pm-stages").addEventListener("click", () => quitBattle(toStages));
     $("pm-title").addEventListener("click", () => quitBattle(toTitle));
@@ -502,7 +537,7 @@ const Main = (() => {
     $("title-stage").textContent = stage.name;
     $("title-cards").textContent = Save.cardCount();
     showTuneTag();
-    showScreen("title");
+    showScreen(Save.data.introSeen ? "title" : "intro");   // 初めて開いたときは、目的の画面から
   }
 
   return { init };

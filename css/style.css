@@ -378,3 +378,28 @@ body { position: fixed; inset: 0; }
 
 /* 音のオン・オフ（10/21-1）。オフのときは少しうすく */
 .sound-btn.muted { opacity: 0.6; }
+
+/* 主人公の絵（10/21-2）。絵の地は紙の色（#fff7ea）なので、「暗いほうを残す」重ね方で画面の色に溶けこませる（切り抜きは本番の絵で） */
+.hero-img { mix-blend-mode: darken; display: block; object-fit: contain; }
+.hero-img.hidden { display: none; }
+.hero-small { width: 54px; height: 96px; flex: none; }
+.hero-mid { width: 110px; height: 196px; margin: 0 auto -8px; }
+
+/* 目的の画面と、主人公を選ぶ画面 */
+#screen-intro, #screen-hero { background: #f6efe0; }
+.intro-box, .hero-box { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 20px; box-sizing: border-box; text-align: center; }
+.intro-heroes { display: flex; gap: 6px; justify-content: center; }
+.intro-heroes .hero-img { width: 132px; height: 235px; }
+.intro-lines { margin: 18px 0 10px; }
+.intro-lines p { margin: 10px 0; font-size: 17px; line-height: 1.5; color: #3f4a35; }
+.intro-tap { margin-top: 18px; font-size: 16px; color: #6f9a4a; animation: introBlink 1.6s ease-in-out infinite; }
+@keyframes introBlink { 50% { opacity: 0.35; } }
+.hero-title { font-size: 20px; color: #48693a; margin: 0 0 18px; }
+.hero-choices { display: flex; gap: 14px; justify-content: center; }
+.hero-choice { background: #fffdf5; border: 3px solid #cfe0b6; border-radius: 18px; padding: 10px 10px 12px; display: flex; flex-direction: column; align-items: center; gap: 6px; font: inherit; font-size: 17px; color: #3f4a35; }
+.hero-choice:active { border-color: #9cbf7c; transform: scale(0.97); }
+.hero-choice .hero-img { width: 128px; height: 228px; }
+
+/* ふわりの案内（結果画面とレシピ完成） */
+.fuwari-hint { margin: 10px auto; max-width: 320px; background: #fffdf5; border: 2px solid #9cbf7c; border-radius: 14px; padding: 8px 12px; font-size: 15px; color: #3f4a35; }
+.fuwari-hint.hidden { display: none; }
