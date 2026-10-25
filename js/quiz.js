@@ -3,7 +3,7 @@ const QUIZ = {
   reviewTime: 3,
   previewTime: 3,                    // 受け直しクイズで、出題の前にカード（語句＋一言メモ）を見せる秒数                     // クイズの前に「今日あつめたことば」を見せる秒数
   tempoUpAt: { 2: 1.15, 7: 1.3 },   // 何問目（0から数える）で音楽のテンポを上げるか。3問目と8問目
-  nextDelay: 1.1,                    // 正解のあと、次の問題へ進むまでの秒数
+  nextDelay: 1.6,                    // 正解のあと、次の問題へ進むまでの秒数（10/25-1: カードゲットの演出を見せるため 1.1 → 1.6）
 };
 
 // ふわりのセリフ（仮）。data/words.js の sayCorrect / sayWrong が空のときは、この中からえらぶ
@@ -108,7 +108,12 @@ const Quiz = (() => {
       say(w.sayCorrect || (streak >= 3 ? pick(FUWARI_SAY.streak).replace("{n}", streak) : pick(FUWARI_SAY.correct)));
       // 正解した語句がカードになる
       const get = $("quiz-get");
-      get.textContent = `カードゲット！「${w.word}」`;
+      // カードゲット（10/25-1）: 「カードゲット！」と、そのことばのカードが光る（毎回）
+      get.innerHTML = "";
+      const lb = document.createElement("div"); lb.className = "get-label"; lb.textContent = window.TEXTS.quiz.cardGet;
+      const cd = document.createElement("div"); cd.className = "card get-card";
+      const cw = document.createElement("div"); cw.className = "w"; cw.textContent = w.word;
+      cd.appendChild(cw); get.append(lb, cd);
       get.classList.remove("hidden");
       get.style.animation = "none"; void get.offsetWidth; get.style.animation = "";
       setTimeout(() => get.classList.add("hidden"), QUIZ.nextDelay * 1000);

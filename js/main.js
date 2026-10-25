@@ -295,6 +295,8 @@ const Main = (() => {
         hints: stage.id === 1 ? { seen: TutSave.load(), mark: TutSave.mark, all: reviewNext } : null,   // 案内はステージ1だけ（初めての瞬間に。おさらいのときは全部）
         hero: Save.data.hero || "boy",
         firstChoice: !TutSave.load().choice,          // 持ち物選択: 初めては時間制限なし（記録は版ごと）
+        bombHintSeen: !!TutSave.load().bombReady,     // ぜんぶ消しの案内（初めての1回だけ。記録は版ごと）
+        onBombHint: () => TutSave.mark("bombReady"),
         onFirstChoice: () => TutSave.mark("choice"),
         onEnd: (ids, stats) => {
           lastStats = stats; lastIds = ids;
@@ -315,10 +317,22 @@ const Main = (() => {
     showScreen("review");
     Sound.play("card");
     Quiz.review(ordered, () => {
+      // クイズの1問目の前に、大きく1画面（ステージ1の初回だけ。おさらいのときも出す）
+      if (stage.id === 1 && (reviewing || !TutSave.load().quizIntro)) {
+        TutSave.mark("quizIntro");
+        $("quizintro-text").innerHTML = tx("quiz.intro").replace(/\n/g, "<br>");
+        $("quizintro-tap").textContent = tx("quiz.introTap");
+        showScreen("quizintro");
+        $("screen-quizintro").onclick = () => { $("screen-quizintro").onclick = null; startQuiz(); };
+        return;
+      }
+      startQuiz();
+    });
+    function startQuiz() {
       showScreen("quiz");
       $("quiz-hero").src = heroSrc("think");   // クイズは「考える」の絵
       Quiz.start(ordered, results => toCards(results));
-    });
+    }
   }
 
   // 画面の言葉（data/texts.js）
@@ -361,7 +375,11 @@ const Main = (() => {
       onRecipe: toRecipe,
       onRetry: toBattle,
       onTitle: toStages,
-      hint: newIds.length ? screenHint("card") : "",   // 案内: 初めてカードになったとき
+      hint: "",   // （「クイズに正解したことばが、カードになるよ」は、10/25-1 からクイズの前の画面で出す）
+      onNext: () => {   // つぎへ: 同じ世界の次のステージ（なければステージ一覧）
+        const nx = window.STAGES.find(s => s.id === stage.id + 1 && s.world === stage.world && (s.open || openAll));
+        if (nx) { selectStage(nx.id); toBattle(); } else toStages();
+      },
       heroSrc: heroSrc("joy"),
     });
   }

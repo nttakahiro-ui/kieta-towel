@@ -62,9 +62,7 @@ const Cards = (() => {
     const tiers = $("cards-tiers");
     tiers.innerHTML = "";
     const tier = (label, value, cls) => { const d = document.createElement("div"); d.className = "tier " + (cls || ""); d.innerHTML = `<span class="lb">${label}</span><span class="vl">${value}</span>`; tiers.appendChild(d); };
-    if (o.retake) tier(tx("results.retakeLine", { n: o.results.length, ok: got.length }), "", "retake");
-    else tier(tx("results.helped"), `${o.helpedCount} <small>${tx("results.unitWord")}</small>`);
-    tier(tx("results.carded"), `${got.length} <small>${tx("results.unitCard")}</small>`);
+    // 10/25-1: 「このステージのカード ○/10枚」だけを大きく出す（今回助けたことば・正解してカードになった の段は出さない）
     tier(tx("results.stageCards"), `${ownedCount} <small>/ ${o.words.length} ${tx("results.unitCard")}</small>`, "total");
     // 次は〇〇（足りないカードの名前）。クイズでまちがえたことば（受け直せる）と、まだ助けていないことばに分ける
     const missing = o.words.filter(w => !o.owned[w.id]);
@@ -75,12 +73,16 @@ const Cards = (() => {
     const line = t => { const p = document.createElement("p"); p.innerHTML = phraseHTML(t); nx.appendChild(p); };
     if (notHelped.length) { line(tx("results.nextHelp", { names: names(notHelped) })); if (wrong.length) line(tx("results.nextQuizAlso", { names: names(wrong) })); }
     else if (wrong.length) line(tx("results.nextQuiz", { names: names(wrong) }));
-    $("cards-rule").textContent = tx("results.rule");
-    // 間違えた問題にもう一度（このステージで、クイズでまちがえたことばがあるとき）
+    $("cards-rule").textContent = "";   // （条件の一言は、クイズの前の画面と発見のたびの表紙にあるので、ここには書かない。10/25-1）
+    // 中心の大きなボタン（10/25-1）: 間違えた問題があれば「クイズをもう一度」、なければ「つぎへ」（10枚そろったらレシピ完成へ）
+    const done = ownedCount >= o.words.length;
     const rb = $("cards-retake");
-    rb.textContent = tx("results.retakeButton");
-    rb.classList.toggle("hidden", !wrong.length || !o.onRetake);
-    rb.onclick = () => o.onRetake && o.onRetake(wrong);
+    rb.classList.remove("hidden");
+    if (wrong.length && o.onRetake) { rb.textContent = tx("results.retakeButton"); rb.onclick = () => o.onRetake(wrong); }
+    else { rb.textContent = tx("results.nextButton"); rb.onclick = () => (done ? o.onRecipe() : o.onNext()); }
+    const qb = $("cards-quit");
+    qb.textContent = tx("results.quitButton");
+    qb.onclick = () => o.onTitle();
     $("cards-summary").textContent = "";
     const rk = $("cards-rank");
     rk.innerHTML = "";
@@ -135,21 +137,10 @@ const Cards = (() => {
       list.appendChild(c);
     });
 
-    const res = $("cards-result");
-    const btns = $("cards-buttons");
-    btns.innerHTML = "";
-    if (ownedCount >= o.words.length) {
-      res.innerHTML = "<b>10枚そろった！</b>";
-      btns.append(button("レシピを見る", "btn-main", o.onRecipe));
-    } else {
-      const rest = o.words.length - ownedCount;
-      if (ownedCount >= CARDS.clearCount) {
-        res.innerHTML = `<b>ステージクリア！</b><br>あと ${rest} 枚でレシピ完成<br>次のステージはまだありません`;
-      } else {
-        res.innerHTML = `あと ${CARDS.clearCount - ownedCount} 枚でステージクリア<br>（あと ${rest} 枚でレシピ完成）`;
-      }
-      btns.append(button("もう一度あそぶ", "btn-main", o.onRetry), button("ステージ一覧へ", "btn-sub", o.onTitle));
-    }
+    // （下の「10枚そろった！」「ステージクリア！あと○枚」の文と、「もう一度あそぶ／ステージ一覧へ」のボタンは、
+    //   10/25-1 に上の「次は〇〇」と中心のボタンにまとめた。1画面に1つの要点）
+    $("cards-result").innerHTML = "";
+    $("cards-buttons").innerHTML = "";
   }
 
   // レシピ完成表示（絵や演出は仮）

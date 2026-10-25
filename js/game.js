@@ -427,6 +427,7 @@ const Battle = (() => {
   let tut = null;            // 出ているチュートリアルの案内（出ているあいだはゲームが止まる）{ id, t, rest(紙芝居のつづき) }
   let hintOpts = null, hintShown = {};   // 案内: main.js から { seen, mark, all }（ステージ1だけ。all ＝ おさらいで全部出す）と、このバトルで出したもの
   let hintCard = null;       // 出している案内 { text, t }
+  let bombHinted = false, bombFlash = 0;   // ぜんぶ消しの案内を出したか、ゲージがたまったときに左下を光らせる残り秒
   let explore = null;        // 1回目の旅（双眼鏡）の状態 { t, next, list, bugs, bugT, endT }
   let bino = null;           // 双眼鏡の中心 { x, y }
   let maskCv = null;         // 双眼鏡の外を暗くするための裏の画面
@@ -571,7 +572,7 @@ const Battle = (() => {
     slow = 0; wave = null; gauge = 0; bombsUsed = 0; fsay = null; odai = null; bounces = [];
     msgQ = []; msgGap = 0; msgWasBusy = false;
     choiceFree = !!opts.firstChoice;
-    tut = null; hintOpts = opts.hints || null; hintShown = {}; hintCard = null;
+    tut = null; hintOpts = opts.hints || null; hintShown = {}; hintCard = null; bombHinted = false; bombFlash = 0;
     stripFlash = 0; sortieStep = "choice"; freed = [];
     explore = { t: 0, next: 0, list: [], bugs: [], bugT: 2, endT: 0 };
     bino = { x: W / 2 + 10, y: H * 0.42 };
@@ -614,6 +615,16 @@ const Battle = (() => {
     hintShown[id] = true;
     if (hintOpts.mark) hintOpts.mark(id);
     const text = tx("hints." + id, Object.assign({ seed: seedName() }, vars || {}));
+    post("tutorial", () => { hintCard = { text, t: BATTLE.hintTime }; slow = Math.max(slow, BATTLE.hintSlow); });
+  }
+  // ぜんぶ消しのゲージがたまった（10/25-1）: 初めての1回だけ、1秒ゆっくりにして案内。以後はたまるたびに左下が光って音が鳴る
+  function bombReady() {
+    bombFlash = 1.2;
+    Sound.se("item");
+    if (opts.bombHintSeen || bombHinted) return;
+    bombHinted = true;
+    if (opts.onBombHint) opts.onBombHint();
+    const text = tx("bombReady");
     post("tutorial", () => { hintCard = { text, t: BATTLE.hintTime }; slow = Math.max(slow, BATTLE.hintSlow); });
   }
   const seedName = () => tx(`byWorld.${worldDef.id || 1}.seed`);
@@ -739,6 +750,7 @@ const Battle = (() => {
       moved = false;   // 2回目の旅の最初に、もう一度「ゆびでふわりをうごかそう」を出す
       stripFlash = 0.6;   // 帯の灰色の名前がいっせいに光る
       hint("rescueStart");   // 案内: 救出のたびが始まった
+      if (gauge >= 100) bombReady();   // ひっさつ（最初からゲージ満タン）や、発見のたびでたまっていたとき
       // （「ことばを助けよう！」の一言は、表紙の「ことばを助けに行こう！」と同じなので出さない。10/25-1）
       Sound.se("power");
     }
@@ -1019,6 +1031,7 @@ const Battle = (() => {
     if (wave) { wave.age += realDt; if (wave.age > 0.6) wave = null; }
     if (fsay) { fsay.t -= realDt; if (fsay.t <= 0) fsay = null; }
     if (hintCard) { hintCard.t -= realDt; if (hintCard.t <= 0) hintCard = null; }
+    bombFlash = Math.max(0, bombFlash - realDt);
     updateMsgs(realDt);
     if (guide) { guide.t -= realDt; if (guide.t <= 0) guide = null; }
     if (typhoon) { typhoon.age += realDt; if (typhoon.age > 0.9) typhoon = null; }
@@ -1621,7 +1634,7 @@ const Battle = (() => {
     floats.push({ x: e.x, y: e.y - e.size, text: `+${pts}` + (mul > 1 ? ` ×${mul}` : ""), big: true, age: 0 });
     const before = gauge;
     if (!bombing) gauge = Math.min(100, gauge + BATTLE.bombGain * mul * gaugeMul);
-    if (before < 100 && gauge >= 100) { floats.push({ x: bombButton().x + 40, y: bombButton().y - 34, text: tx("rescue.typhoonReady"), big: true, age: 0 }); Sound.se("item"); }
+    if (before < 100 && gauge >= 100) bombReady();
     if (!e.last) { firstPass(e); return; }
     absorb(e);
   }
@@ -3159,6 +3172,12 @@ const Battle = (() => {
   function drawBombButton() {
     const b = bombButton(), full = gauge >= 100;
     ctx.save();
+    if (bombFlash > 0) {   // たまった瞬間: 大きく光る
+      const k = bombFlash / 1.2;
+      const g2 = ctx.createRadialGradient(b.x, b.y, b.r * 0.5, b.x, b.y, b.r * (1.8 + 1.4 * k));
+      g2.addColorStop(0, `rgba(255,236,140,${0.9 * k})`); g2.addColorStop(1, "rgba(255,236,140,0)");
+      ctx.fillStyle = g2; ctx.beginPath(); ctx.arc(b.x, b.y, b.r * (1.8 + 1.4 * k), 0, Math.PI * 2); ctx.fill();
+    }
     if (full) {
       const g = ctx.createRadialGradient(b.x, b.y, b.r * 0.5, b.x, b.y, b.r * 1.8);
       g.addColorStop(0, `rgba(255,240,170,${0.5 + Math.sin(t * 6) * 0.3})`); g.addColorStop(1, "rgba(255,240,170,0)");

@@ -454,3 +454,22 @@ body { position: fixed; inset: 0; }
 .stage-row.notready .sub { color: #a3a396; }
 #btn-zukan { margin-left: auto; font-size: 15px; font-weight: bold; }
 .zukan-title small { font-size: 15px; color: #6f9a4a; }
+
+/* クイズの前の1画面（10/25-1） */
+#screen-quizintro { background: #fff8e2; }
+.quizintro-box { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; text-align: center; }
+.quizintro-text { font-size: 24px; line-height: 1.6; font-weight: bold; color: #8a5a10; margin: 0 0 24px; }
+
+/* カードゲット（10/25-1）: ラベルと、光るカード */
+.quiz-get { white-space: normal; text-align: center; padding: 12px 18px 16px; }
+.quiz-get .get-label { font-size: 22px; font-weight: bold; color: #b0801a; margin-bottom: 8px; }
+.quiz-get .get-card { display: inline-block; min-width: 140px; padding: 10px 18px; animation: cardShine 1.2s ease-out both; }
+.quiz-get .get-card .w { margin: 0; font-size: 22px; }
+@keyframes cardShine {
+  0% { transform: scale(0.6) rotate(-6deg); box-shadow: 0 0 0 rgba(255,220,110,0); }
+  40% { transform: scale(1.12) rotate(2deg); box-shadow: 0 0 34px 10px rgba(255,220,110,0.95); }
+  100% { transform: scale(1); box-shadow: 0 0 16px 4px rgba(255,220,110,0.6); }
+}
+.cards-main { font-size: 22px; padding: 16px 36px; min-width: 240px; }
+.quiz-get { min-width: 210px; }
+.quiz-get .get-label { white-space: nowrap; }
