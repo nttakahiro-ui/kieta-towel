@@ -206,6 +206,8 @@ body { position: fixed; inset: 0; }
 .tut-tag { display: inline-block; font-size: 11px; font-weight: normal; background: #6f9a4a; color: #fff; border-radius: 999px; padding: 1px 7px; margin-left: 6px; vertical-align: 2px; }   /* ステージ一覧の「チュートリアル」の印（10/25-10） */
 .stage-row .sub { font-size: 12px; color: #7a8a68; }
 .stage-row .marks { display: flex; flex-direction: column; gap: 3px; }
+.stage-row .marks .mark { font-size: 9.5px; padding: 1px 5px; margin: 0; text-align: center; white-space: nowrap; }   /* 印の文字が長くなったので小さめに（10/25-13） */
+.stage-row .sub { white-space: nowrap; }
 .mark { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 999px; background: #e9e4d4; color: #a8a08a; margin: 0 2px; }
 .mark.on { background: #f3c64e; color: #5e4612; }
 .best-new { font-size: 18px; color: var(--rose); font-weight: bold; margin-top: 6px; }

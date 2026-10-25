@@ -450,8 +450,8 @@ const Main = (() => {
       const sub = document.createElement("span"); sub.className = "sub";
       sub.textContent = open ? `難易度 ${s.difficulty || 1}　ベスト ${b ? b.score : 0}点　カード ${got}/10` : tx("worlds.notReady");
       const marks = document.createElement("span"); marks.className = "marks";
-      [["all", "10語"], ["noDown", "元気"]].forEach(([k, label]) => {
-        const m = document.createElement("span"); m.className = "mark" + (b && b[k] ? " on" : ""); m.textContent = label;
+      ["all", "noDown"].forEach(k => {   // 印は texts.js の marks（10/25-13）
+        const m = document.createElement("span"); m.className = "mark" + (b && b[k] ? " on" : ""); m.textContent = tx(`marks.${k}.short`);
         marks.appendChild(m);
       });
       if (s.tutorial) { const tg = document.createElement("span"); tg.className = "tut-tag"; tg.textContent = tx("tutorial.mark"); nm.appendChild(tg); }   // ステージ1は「チュートリアル」（10/25-10）

@@ -33,7 +33,7 @@ const Cards = (() => {
     }
     return parts.map(esc).join("<wbr>");
   }
-  // 名前をならべる（3つまで。4つ以上は「〇〇、〇〇ほか○語」）
+  // 名前をならべる（3つまで。4つ以上は「〇〇、〇〇ほか○つのことば」）
   function names(ws) {
     const n = ws.map(w => `「${w.word}」`);
     return n.length <= 3 ? n.join("") : tx("results.others", { names: n.slice(0, 2).join(""), n: n.length - 2 });
@@ -108,7 +108,7 @@ const Cards = (() => {
     rk.innerHTML = "";
     if (o.stats) {
       const st = o.stats;
-      $("cards-summary").textContent = `ぶつかった ${st.hits}回${st.downs ? `　元気がなくなった ${st.downs}回` : ""}${st.gameOvers ? `　救出の旅のやり直し ${st.gameOvers}回` : ""}　いちばん長いれんぞく ${st.maxCombo}`;   // バトルの時間は出さない（調整パネルの中だけ）
+      $("cards-summary").textContent = [tx("results.summary", { hits: st.hits }), st.downs ? tx("results.summaryDown", { n: st.downs }) : "", st.gameOvers ? tx("results.summaryRetry", { n: st.gameOvers }) : "", tx("results.summaryCombo", { n: st.maxCombo })].filter(Boolean).join("　");   // バトルの時間は出さない（調整パネルの中だけ）
       // 点数とランク
       const r = rankOf(st.score);
       const sc = document.createElement("div"); sc.className = "rank-score"; sc.textContent = `${st.score} 点`;
@@ -118,8 +118,8 @@ const Cards = (() => {
       if (o.record) {
         if (o.record.newBest) { const nb = document.createElement("div"); nb.className = "best-new"; nb.textContent = "ベスト更新！"; rk.appendChild(nb); }
         const ms = document.createElement("div"); ms.className = "marks-now";
-        [["all", "10語すべて助けた"], ["noDown", "元気をなくさなかった"]].forEach(([k, label]) => {
-          const m = document.createElement("span"); m.className = "mark" + (o.record.now[k] ? " on" : ""); m.textContent = label;
+        ["all", "noDown"].forEach(k => {   // 印は texts.js の marks（10/25-13）
+          const m = document.createElement("span"); m.className = "mark" + (o.record.now[k] ? " on" : ""); m.textContent = tx(`marks.${k}.mark`);
           ms.appendChild(m);
         });
         rk.appendChild(ms);
