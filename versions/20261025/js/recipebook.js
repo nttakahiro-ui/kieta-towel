@@ -18,6 +18,18 @@ const GEM_ART = (color, lit, size, stageId) => {
          `<polygon points="${-s * 0.55},${-s * 0.55} ${-s * 0.25},${-s * 0.62} ${-s * 0.45},${-s * 0.2}" fill="rgba(255,255,255,0.8)"/>`;
 };
 
+// ===== レシピ完成の演出の秒数（10/25-15。初めてそろったときだけ。合計5秒以内、タップで最後に飛ぶ） =====
+const RECIPE_FX = {
+  cardGap: 0.12,    // ① カードが1枚ずつ飛んでくる間隔（秒）
+  cardFly: 0.45,    //    1枚が飛んでくる時間
+  gather: 1.5,      //    ①が終わる時刻（ここで②へ）
+  turn: 0.5,        // ② 光の玉になって宝石の色に変わる時間
+  fly: 0.35,        // ③ 光の玉が台座の場所へ飛ぶ時間
+  remainAt: 3.2,    // ④「あと○個で…」を出す時刻
+  total: 4.5,       //    「次へ」のボタンを出す時刻
+  confetti: 40,     //    紙吹雪の数
+};
+
 const RecipeBook = (() => {
   const VB = 360, C = VB / 2, R = 122;   // 台座の大きさ（SVG の中の単位）、宝石のならぶ円の半径
   const stages = () => (window.STAGES || []).slice().sort((a, b) => a.id - b.id).slice(0, 12);
@@ -43,7 +55,8 @@ const RecipeBook = (() => {
     return fills + lines;
   }
 
-  // el に台座を描く。o: { lit: Set（光っている stage id）, drop: 宝石がはまる演出をする stage id, onTap(stageId), small: 小さい台座（目的の画面） }
+  // el に台座を描く。o: { lit: Set（光っている stage id）, drop: 宝石がはまる演出をする stage id, dropClass: その演出の CSS（なければ上から降りる rb-drop）,
+  //   next: 次の目標として点滅させる stage id, onTap(stageId), small: 小さい台座（目的の画面） }
   function render(el, o) {
     const lit = o.lit || new Set(), k = lit.size / 12;
     const list = stages();
@@ -53,7 +66,8 @@ const RecipeBook = (() => {
       const halo = on ? `<circle r="26" fill="url(#rbHalo${i})"/>` : "";
       const art = GEM_ART(s.gem || "#cccccc", on, 19, s.id);
       gems += `<defs><radialGradient id="rbHalo${i}"><stop offset="0" stop-color="${s.gem}" stop-opacity="0.75"/><stop offset="1" stop-color="${s.gem}" stop-opacity="0"/></radialGradient></defs>`;
-      gems += `<g class="rb-gem" data-stage="${s.id}" transform="translate(${x.toFixed(1)},${y.toFixed(1)})"><g class="${o.drop === s.id ? "rb-drop" : ""}">${halo}${art}</g></g>`;
+      const next = o.next === s.id ? `<circle r="25" class="rb-next"/>` : "";   // 次の目標の宝石: 小さく点滅する輪（10/25-15）
+      gems += `<g class="rb-gem" data-stage="${s.id}" transform="translate(${x.toFixed(1)},${y.toFixed(1)})">${next}<g class="${o.drop === s.id ? (o.dropClass || "rb-drop") : ""}">${halo}${art}</g></g>`;
     });
     // 世界ごとのかたまりの名前（外側に小さく）
     let labels = "";
@@ -80,5 +94,12 @@ const RecipeBook = (() => {
     if (o.onTap) el.querySelectorAll(".rb-gem").forEach(g => g.addEventListener("click", () => o.onTap(Number(g.dataset.stage))));
   }
 
-  return { render, litIds };
+  // 次の目標の宝石（10/25-15）: その宝石から時計回りに見て、次のまだ光っていない宝石の stage id（全部光っていれば null）
+  function nextId(fromId, lit) {
+    const list = stages(), i0 = list.findIndex(s => s.id === fromId);
+    for (let k = 1; k <= list.length; k++) { const s = list[(i0 + k) % list.length]; if (!lit.has(s.id)) return s.id; }
+    return null;
+  }
+
+  return { render, litIds, nextId };
 })();

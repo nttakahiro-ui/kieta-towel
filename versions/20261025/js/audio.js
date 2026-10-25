@@ -216,6 +216,13 @@ const Sound = (() => {
     } else if (name === "shine") {   // 1回目の語句が光って消える（きらん）
       tone(freq("B6"), t, 0.25, "sine", 0.18);
       tone(freq("E7"), t + 0.08, 0.35, "sine", 0.12);
+    } else if (name === "stack") {   // レシピの演出①: カードが1枚重なる（ごく小さく。10/25-15）
+      tone(freq("G6"), t, 0.12, "sine", 0.08);
+    } else if (name === "rise") {    // レシピの演出②: 光の玉が宝石の色に変わる（音が高まる）
+      sweep(400, 1700, 0.5, "triangle", 0.12);
+      tone(freq("C6"), t + 0.25, 0.3, "sine", 0.1);
+    } else if (name === "gem") {     // レシピの演出③: 宝石が台座にはまる
+      ["C5", "E5", "G5", "C6", "E6", "G6", "C7"].forEach((n, i) => tone(freq(n), t + i * 0.05, 0.9, "sine", 0.16));
     } else if (name === "power") {   // パワーアップ
       ["C6", "E6", "G6", "C7"].forEach((n, i) => tone(freq(n), t + i * 0.06, 0.25, "triangle", 0.2));
     } else if (name === "crack") {   // 文字が砕ける（ぱりん、でもやわらかく）

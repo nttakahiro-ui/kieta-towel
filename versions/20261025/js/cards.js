@@ -167,20 +167,92 @@ const Cards = (() => {
     $("cards-buttons").innerHTML = "";
   }
 
-  // レシピ完成の画面（10/25-4）: 台座が出て、そのステージの宝石が光ってはまる（初めてそろったときだけ。2回目からは光った状態）。
-  // o: { stage, lit（光っている stage id の Set）, isNew（初めてそろった）, onNext, hint, heroSrc }
+  // レシピ完成の画面（10/25-4）: 台座が出て、そのステージの宝石が光ってはまる
+  // 10/25-15: 初めてそろったときは3段の演出（① 10枚のカードが集まって重なる ② 光の玉が宝石の色に ③ 宝石がはまり、台座が光り、紙吹雪）。
+  //   そのあと「あと○個で…」と、次の宝石が小さく点滅。秒数は js/recipebook.js の RECIPE_FX。画面のどこをタップしても最後に飛ぶ
+  // o: { stage, words（このステージの10のことば）, lit（光っている stage id の Set）, isNew（初めてそろった）, onNext, hint, heroSrc }
+  let fxTimers = [];
   function showRecipe(o) {
     Sound.play("recipe");
+    fxTimers.forEach(clearTimeout); fxTimers = [];
     showHint("recipe-hint", o.hint); showHero("recipe-hero", o.heroSrc);
     $("recipe-label").textContent = tx("recipe.label");
     $("recipe-name").textContent = tx("recipe.revived", { name: o.stage.recipe });
-    const lit = new Set(o.lit);
-    if (o.isNew) lit.delete(o.stage.id);   // はまる演出をする宝石は、まだ光っていない状態から
-    RecipeBook.render($("recipe-book"), { lit, drop: o.isNew ? o.stage.id : null });
-    if (o.isNew) setTimeout(() => Sound.se("shine"), 900);
+    const all = new Set(o.lit); all.add(o.stage.id);
+    const remain = 12 - all.size, nextId = o.isNew ? RecipeBook.nextId(o.stage.id, all) : null;
+    $("recipe-remain").textContent = o.isNew ? (remain > 0 ? tx("recipe.remain", { n: remain }) : tx("recipe.allDone")) : "";
     const btns = $("recipe-buttons");
     btns.innerHTML = "";
     btns.append(button(tx("recipe.next"), "btn-main", o.onNext));
+    const fx = $("recipe-fx"), book = $("recipe-book"), screen = $("screen-recipe");
+    fx.innerHTML = "";
+    const late = ["recipe-name", "recipe-hero", "recipe-fuwari", "recipe-remain", "recipe-buttons"].map($);
+    const show = (el, on) => { el.classList.toggle("fx-hide", !on); el.classList.toggle("fx-show", on); };
+    $("recipe-fuwari").classList.toggle("hidden", !o.isNew);
+    const finalBook = pop => {
+      RecipeBook.render(book, { lit: all, drop: pop ? o.stage.id : null, dropClass: "rb-pop", next: nextId });
+      if (pop) { book.classList.remove("flash"); void book.offsetWidth; book.classList.add("flash"); }
+    };
+    if (!o.isNew) {   // 2回目からは、光った台座が出るだけ（今まで通り）
+      RecipeBook.render(book, { lit: all });
+      late.forEach(el => show(el, true));
+      screen.onclick = null;
+      return;
+    }
+    // ここから、初めてそろったときの演出
+    const lit = new Set(o.lit); lit.delete(o.stage.id);
+    RecipeBook.render(book, { lit });
+    late.forEach(el => show(el, false));
+    const F = RECIPE_FX, at = (sec, fn) => fxTimers.push(setTimeout(fn, sec * 1000));
+    const box = screen.getBoundingClientRect(), br = book.getBoundingClientRect();
+    const cx = br.left + br.width / 2 - box.left, cy = br.top + br.height / 2 - box.top;
+    const place = (el, x, y, sc) => { el.style.transform = `translate(${x}px, ${y}px) scale(${sc === undefined ? 1 : sc})`; };
+    // ① ためる: 10枚のカードが画面の端から飛んできて、1枚ずつ光りながら重なる
+    const cards = (o.words || []).slice(0, 10).map((w, i) => {
+      const c = document.createElement("div"); c.className = "fx-card"; c.textContent = w.word;
+      const side = i % 4, r = Math.random();
+      const sx = side === 0 ? -40 : side === 1 ? box.width + 40 : r * box.width, sy = side < 2 ? r * box.height : side === 2 ? -50 : box.height + 50;
+      place(c, sx, sy, 0.9); fx.appendChild(c);
+      at(0.02 + i * F.cardGap, () => { c.style.transition = `transform ${F.cardFly}s cubic-bezier(.2,.7,.3,1)`; place(c, cx + (i - 4.5) * 1.5, cy - i * 1.5, 1); });
+      at(i * F.cardGap + F.cardFly, () => { c.classList.add("lit"); Sound.se("stack"); });
+      return c;
+    });
+    // ② 変わる: 重なったカードが光の玉になり、宝石の色に変わる
+    const ball = document.createElement("div"); ball.className = "fx-ball";
+    at(F.gather, () => {
+      cards.forEach(c => { c.style.transition = "transform .3s, opacity .3s"; place(c, cx, cy, 0.2); c.style.opacity = "0"; });
+      place(ball, cx, cy, 0.2); ball.style.opacity = "0"; fx.appendChild(ball);
+      requestAnimationFrame(() => { ball.style.transition = `transform ${F.turn * 0.6}s, opacity .2s, background ${F.turn * 0.6}s`; place(ball, cx, cy, 1.3); ball.style.opacity = "1"; });
+      Sound.se("rise");
+    });
+    at(F.gather + F.turn * 0.4, () => { ball.style.background = `radial-gradient(circle, #fff 0%, ${o.stage.gem} 45%, rgba(255,255,255,0) 72%)`; });
+    // ③ はまる: 光の玉が台座の宝石の場所へ飛んで、宝石がはまる。台座が光り、名前・主人公・ふわり・紙吹雪
+    at(F.gather + F.turn, () => {
+      const g = book.querySelector(`.rb-gem[data-stage="${o.stage.id}"]`), gr = g ? g.getBoundingClientRect() : br;
+      ball.style.transition = `transform ${F.fly}s ease-in`; place(ball, gr.left + gr.width / 2 - box.left, gr.top + gr.height / 2 - box.top, 0.5);
+    });
+    at(F.gather + F.turn + F.fly, () => {
+      ball.remove(); fx.querySelectorAll(".fx-card").forEach(c => c.remove());
+      finalBook(true); Sound.se("gem");
+      ["recipe-name", "recipe-hero", "recipe-fuwari"].forEach(id => show($(id), true));
+      const colors = (window.STAGES || []).map(s => s.gem).filter(Boolean);
+      for (let i = 0; i < F.confetti; i++) {
+        const p = document.createElement("span"); p.className = "fx-confetti";
+        p.style.left = `${Math.random() * 100}%`; p.style.background = colors[i % colors.length];
+        p.style.animationDelay = `${Math.random() * 0.6}s`; p.style.animationDuration = `${1.8 + Math.random() * 1.2}s`;
+        fx.appendChild(p);
+      }
+    });
+    at(F.remainAt, () => show($("recipe-remain"), true));
+    at(F.total, () => { show($("recipe-buttons"), true); screen.onclick = null; });
+    // タップで最後の状態に飛ぶ
+    screen.onclick = e => {
+      if (e.target.closest("button")) return;
+      fxTimers.forEach(clearTimeout); fxTimers = [];
+      fx.innerHTML = ""; finalBook(false);
+      late.forEach(el => show(el, true));
+      screen.onclick = null;
+    };
   }
 
   return { showCards, showRecipe, phraseHTML, names };
