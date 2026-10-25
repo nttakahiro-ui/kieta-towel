@@ -285,10 +285,12 @@ const Main = (() => {
   }
   let reviewing = false;     // 今のステージ1がおさらいか
 
-  function toBattle() {
+  // rescueAgain: 結果画面の「救出の旅をもう一度」（10/25-14）。発見の旅をとばして持ち物選択から（前の発見の記録を使う）
+  const lastFound = {};   // ステージごとの、発見の旅で見つけたことばの id
+  function toBattle(rescueAgain) {
     reviewing = reviewNext && stage.id === 1;
     showScreen("battle");
-    Sound.play("recon");   // 探検は静かめの曲。本番が始まると "battle" に替わる
+    Sound.play(rescueAgain ? "battle" : "recon");   // 探検は静かめの曲。本番が始まると "battle" に替わる
     // 画面が表示されてから大きさを測る
     requestAnimationFrame(() => {
       Battle.start(words, {
@@ -301,8 +303,9 @@ const Main = (() => {
         bombHintSeen: !!TutSave.load().bombReady,     // ぜんぶ消しの案内（初めての1回だけ。記録は版ごと）
         onBombHint: () => TutSave.mark("bombReady"),
         onFirstChoice: () => TutSave.mark("choice"),
+        foundIds: rescueAgain === true ? (lastFound[stage.id] || []) : null,
         onEnd: (ids, stats) => {
-          lastStats = stats; lastIds = ids;
+          lastStats = stats; lastIds = ids; lastFound[stage.id] = stats.found;
           const m = Math.floor(stats.time / 60), sec = String(Math.floor(stats.time % 60)).padStart(2, "0");
           Tune.setInfo(`前回のバトル（${stage.name}）: ${m}分${sec}秒　回収 ${ids.length}語　被弾 ${stats.hits}回　失った機体 ${stats.downs}機　本番やり直し ${stats.gameOvers}回　${stats.score}点`);
           reviewNext = false;
@@ -375,6 +378,7 @@ const Main = (() => {
       record: retake ? null : { newBest, now, best: Save.data.best[stage.id] },
       retake, helpedCount: lastIds.length, retakeIds: Save.data.retake,
       onRetake: startRetake,
+      onRescue: lastFound[stage.id] ? () => toBattle(true) : null,   // 救出の旅をもう一度（10/25-14。この遊びの中で発見の旅をしたステージだけ）
       onRecipe: toRecipe,
       onRetry: toBattle,
       onTitle: toStages,

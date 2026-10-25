@@ -23,7 +23,7 @@ const Cards = (() => {
   // カードの一言メモの改行（10/22-1）: 日本語の区切り（Intl.Segmenter）でかたまりに分け、かたまりの途中や助詞の前では折り返さない
   // （かたまりのあいだにだけ <wbr> を入れ、CSS の word-break: keep-all と組み合わせる）
   const seg = (typeof Intl !== "undefined" && Intl.Segmenter) ? new Intl.Segmenter("ja", { granularity: "word" }) : null;
-  const GLUE = new Set(["を", "は", "が", "に", "の", "と", "で", "へ", "も", "や", "よ", "ね", "て", "た", "か", "な", "、", "。", "!", "！", "?", "？", ")", "）"]);
+  const GLUE = new Set(["を", "は", "が", "に", "の", "と", "で", "へ", "も", "や", "よ", "ね", "て", "た", "か", "な", "、", "。", "!", "！", "?", "？", ")", "）", "」"]);   // 「」の閉じかっこも前につける（10/25-14）
   const esc = t => t.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   function phraseHTML(text) {
     if (!seg) return esc(text);
@@ -100,6 +100,10 @@ const Cards = (() => {
     rb.classList.remove("hidden");
     if (wrong.length && o.onRetake) { rb.textContent = tx("results.retakeButton"); rb.onclick = () => o.onRetake(wrong); }
     else { rb.textContent = tx("results.nextButton"); rb.onclick = () => (done ? o.onRecipe() : o.onNext()); }
+    // 救出の旅をもう一度（10/25-14）: 助けられなかったことばがあるとき。「クイズをもう一度」（または「次へ」）の下に
+    const rs = $("cards-rescue");
+    rs.classList.toggle("hidden", !(notHelped.length && o.onRescue));
+    rs.textContent = tx("results.rescueButton"); rs.onclick = () => o.onRescue && o.onRescue();
     const qb = $("cards-quit");
     qb.textContent = tx("results.quitButton");
     qb.onclick = () => o.onTitle();
