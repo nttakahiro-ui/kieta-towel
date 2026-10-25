@@ -52,7 +52,7 @@ const BATTLE = {
   fillerSpeed: 0.83,           // 雑魚の動く速さの倍率（1＝10/6の速さ）
   fillerScale: 0.8,            // 雑魚の当たりの大きさの倍率
   shotPower: 0.35,             // ふわりの光の1発あたりの強さ（ザコの語句の殻を削る量。10/25-1 に0.8、10/25-8 に0.35。中ボス・大ボスの文字には使わない）
-                               //   10/25-8 の目安: 光を当て続けて、ことばが画面の中央あたり（高さの35〜65%）に来るころに殻がほどける
+                               //   目安: 光を当て続けて、ことばが中央より少し手前（高さの30〜50%。10/25-11。前は35〜65%）に来るころに殻がほどける
   firstHoldY: 0.42,            // ステージ1の救出の旅の1語目が止まって待つ高さ（画面の高さに対する割合。stages.js の firstHold）
   firstHold: false,            // 救出の旅の1語目を止めて、助けるまで弾も虫も出さない（stages.js の override.battle でステージ1だけ true）
   odaiShellFire: true,         // お題バトルで殻（中ボス・大ボス）から弾を撃つか（ステージ1は override.battle で false）
@@ -166,7 +166,7 @@ const BATTLE = {
     bulletSpeed:   [[1, 0.6], [12, 1.15]],     // 敵の弾の速さの倍率（ステージ1はゆっくり）
     speedScale:    [[1, 0.85], [12, 1.25]],    // 語句の速さの倍率
     fillerDensity: [[1, 0.6], [12, 1.6]],     // 救出の旅の虫の濃さ（数と間隔。虫1匹の弾の量は変えない）
-    zakoHp:        [[1, 10], [12, 11]],       // ザコの語句の硬さ（弾1本あたり。四捨五入）。10/25-1: 4〜5、10/25-8: 10〜11（殻が画面の中央あたりでほどけるように）
+    zakoHp:        [[1, 9], [12, 8]],         // ザコの語句の硬さ（弾1本あたり。0.1きざみ）。10/25-1: 4〜5、10/25-8: 10〜11（中央あたり）、10/25-11: 9〜8（中央より少し手前、高さ30〜50%でほどけるように。ステージ1〜4で1〜2割下げ。速いステージほど少しやわらかく）
     fillerHp:      [[1, 1], [12, 3]],         // 虫の硬さの倍率（四捨五入）。10/25-1: 耐久は主に虫で上げる
     bossHpScale:   [[1, 1.1], [12, 2]],       // 中ボス・大ボスの1文字あたりの耐久の倍率
     tricky:        [[1, 0], [12, 6.2]],       // 意地の悪い語句の数（四捨五入。patterns が "auto" のステージだけ）
@@ -213,7 +213,7 @@ const FILLER_TYPES = {
 // hover 近くまで降りてとどまる。stay ＝ とどまる秒数）、keep ＝ ことばを助けたときの光で消えない、speed ＝ 速さの倍率、wind ＝ 風に流される、glow ＝ 光る（霧の中の目印）。どの虫を出すかは stages.js の theme.bugs
 Object.assign(FILLER_TYPES, {
   butterfly:   { layer: "air", hp: 1, r: 14, fire: 1.8, move: "ghost" },                 // ちょうちょ（明け方）: ゆっくり降りながら、ときどき撃つ
-  kanabun:     { layer: "air", hp: 6, r: 14, fire: 0.5, move: "hover", stay: 6, keep: true },      // コガネムシ（明け方。10/25-2）: 自機の近くまでゆっくり降りてきて、しばらくとどまってゆっくり撃ち、上へ帰る（ステージ1の「弾が少し来る」はおもにこれ）
+  kanabun:     { layer: "air", hp: 6, r: 14, fire: 0.9, move: "hover", stay: 6, keep: true },      // コガネムシ（明け方。10/25-2）: 自機の近くまでゆっくり降りてきて、しばらくとどまってゆっくり撃ち、上へ帰る（ステージ1の「弾が少し来る」はおもにこれ。10/25-11 に撃つ間隔を 0.5 → 0.9 に広げた）
   grasshopper: { layer: "air", hp: 1, r: 13, fire: 2.4, move: "bee" },                   // バッタ（真昼）: ぴょんと飛びこんでくる
   dragonfly:   { layer: "air", hp: 1, r: 14, fire: 2.6, move: "ladybug", wind: true },   // トンボ（夕暮れ）: 列で横切る。風に流される
   moth:        { layer: "air", hp: 1, r: 14, fire: 3.0, move: "ghost", wind: true },     // ガ（夕暮れ）: ゆらゆら。風に流される
@@ -248,9 +248,9 @@ const BULLET_COLORS = {
   rimWidth: 2,           // 縁取りの太さ（px）
   pulse: 0.12,           // 脈打つ大きさ（半径の何割ふくらむか）
   pulseSpeed: 7,         // 脈打つ速さ
-  shot: "#ffe6f2",       // 味方の光（ふわりの光）: 白寄りの明るい桃色
-  shotRim: "#f283bb",    // 味方の光の縁取り（明るい背景でも見えるように、少し濃い桃色）
-  shotHalo: "rgba(255,240,248,0.5)",   // 味方の光のまわりの、やわらかい光の輪
+  shot: "#3f8cf0",       // 味方の光（ふわりの光）: 青（10/25-11。前は白寄りの桃色）。敵の弾の赤紫・発見の「きらっ」や助けた瞬間の金色とは別の色
+  shotRim: "#ffffff",    // 味方の光の縁取り: 白
+  shotHalo: "rgba(170,210,255,0.45)",   // 味方の光のまわりの、やわらかい光の輪（うすい青）
 };
 
 // 時間帯の色（data/stages.js の theme 欄で、ステージごとに上書きする）。ここは「真昼」の色
@@ -2258,12 +2258,13 @@ const Battle = (() => {
     ctx.restore();
   }
 
-  // 「パワーアップ！」（10/25-9）: 画面の中ほどに大きく、ぽんと出て、少し上がりながら消える
+  // 「パワーアップ！」（10/25-9）: 大きく、ぽんと出て、少し上がりながら消える
+  //   10/25-11: 助けたことばの大きな表示（画面の中ほど）と重ならないよう、自機の上に出す（パワーアップは、ことばを助けた瞬間に起きるので）
   function drawPowerFx() {
     const k = powerFx.age / BATTLE.powerFxTime, pop = k < 0.15 ? 0.6 + k / 0.15 * 0.55 : 1.15 - Math.min(1, (k - 0.15) / 0.2) * 0.15;
     ctx.save();
     ctx.globalAlpha = Math.min(1, (1 - k) * 3);
-    ctx.translate(W / 2, H * 0.42 - k * 30); ctx.scale(pop, pop);
+    ctx.translate(W / 2, Math.min(player.y, H - 80) - 110 - k * 30); ctx.scale(pop, pop);
     ctx.font = font(44); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
     ctx.lineWidth = 10; ctx.strokeStyle = "#ffffff"; ctx.strokeText(tx("rescue.powerUp"), 0, 0);
     ctx.fillStyle = "#d39a12"; ctx.fillText(tx("rescue.powerUp"), 0, 0);
