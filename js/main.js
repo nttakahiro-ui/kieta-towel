@@ -20,7 +20,7 @@ const SoundPref = {
 const Save = (() => {
   // cards: 集めたカード、cleared: クリアしたステージ、
   // retake: クイズで不正解だった語句（あとで図鑑の受け直しクイズに使う。バトルで取り逃がした語句は入れない）
-  // best: ステージごとのベストスコアと3つの印（{ score, all, noDown, noHit }）
+  // best: ステージごとのベストスコアと2つの印（{ score, all, noDown }。10/25-9 に「一度もぶつからなかった」noHit をやめた）
   // hero: 選んだ主人公（"boy"／"girl"）、introSeen: 目的の画面を見たか（10/21-2）
   // world: ステージ一覧で今いる世界（10/22-1。ワープで進む）
   // gemsSeen: レシピブックの宝石がはまる演出を見たステージ（10/25-4。初めてそろったときだけ演出する）
@@ -35,6 +35,7 @@ const Save = (() => {
         data.cleared = d.cleared || {};
         data.retake = d.retake || {};
         data.best = d.best || {};
+        for (const b of Object.values(data.best)) if (b) delete b.noHit;   // 前の版の「一度もぶつからなかった」の記録は消す（10/25-9）
         data.hero = d.hero || null;
         data.introSeen = !!d.introSeen;
         data.world = d.world || 1;
@@ -357,14 +358,14 @@ const Main = (() => {
     });
     const owned = Save.data.cards;
     if (words.filter(w => owned[w.id]).length >= CARDS.clearCount) Save.data.cleared[stage.id] = true;
-    // ベストスコアと3つの印（一度とった印は消えない。次のステージに進む条件ではない）。受け直しのときはバトルの記録はさわらない
+    // ベストスコアと2つの印（一度とった印は消えない。次のステージに進む条件ではない）。受け直しのときはバトルの記録はさわらない
     const st = (!retake && lastStats) || { score: 0, hits: 1, downs: 1 };
-    const now = { all: lastIds.length >= words.length, noDown: st.downs === 0, noHit: st.hits === 0 };
-    const prev = Save.data.best[stage.id] || { score: 0, all: false, noDown: false, noHit: false };
+    const now = { all: lastIds.length >= words.length, noDown: st.downs === 0 };
+    const prev = Save.data.best[stage.id] || { score: 0, all: false, noDown: false };
     const newBest = !retake && st.score > prev.score;
     if (!retake) Save.data.best[stage.id] = {
       score: Math.max(prev.score, st.score),
-      all: prev.all || now.all, noDown: prev.noDown || now.noDown, noHit: prev.noHit || now.noHit
+      all: prev.all || now.all, noDown: prev.noDown || now.noDown
     };
     Save.store();
     showScreen("cards");
@@ -449,7 +450,7 @@ const Main = (() => {
       const sub = document.createElement("span"); sub.className = "sub";
       sub.textContent = open ? `難易度 ${s.difficulty || 1}　ベスト ${b ? b.score : 0}点　カード ${got}/10` : tx("worlds.notReady");
       const marks = document.createElement("span"); marks.className = "marks";
-      [["all", "10語"], ["noDown", "元気"], ["noHit", "ぶつからず"]].forEach(([k, label]) => {
+      [["all", "10語"], ["noDown", "元気"]].forEach(([k, label]) => {
         const m = document.createElement("span"); m.className = "mark" + (b && b[k] ? " on" : ""); m.textContent = label;
         marks.appendChild(m);
       });
