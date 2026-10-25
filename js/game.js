@@ -201,9 +201,10 @@ const FILLER_TYPES = {
   thorn:   { layer: "ground", hp: 1, r: 20, fire: 3.4, spread: [-0.3, 0, 0.3] }, // いばらの株: 3方向に撃つ（雑魚はみな1発で崩れる）
 };
 // 時間帯の虫（10/25-1。絵は仮の図形）。move ＝ 動き方（ladybug 横の列／bee 急降下して引き返す／ghost ゆらゆら降りる）、
-// speed ＝ 速さの倍率、wind ＝ 風に流される、glow ＝ 光る（霧の中の目印）。どの虫を出すかは stages.js の theme.bugs
+// hover 近くまで降りてとどまる。stay ＝ とどまる秒数）、keep ＝ ことばを助けたときの光で消えない、speed ＝ 速さの倍率、wind ＝ 風に流される、glow ＝ 光る（霧の中の目印）。どの虫を出すかは stages.js の theme.bugs
 Object.assign(FILLER_TYPES, {
-  butterfly:   { layer: "air", hp: 1, r: 14, fire: 0.5, move: "ghost" },                 // ちょうちょ（明け方）: ゆっくり降りながらよく撃つ（ステージ1の「弾が少し来る」はおもにこれ。ステージ1はお題で殻が撃たないため）
+  butterfly:   { layer: "air", hp: 1, r: 14, fire: 1.8, move: "ghost" },                 // ちょうちょ（明け方）: ゆっくり降りながら、ときどき撃つ
+  kanabun:     { layer: "air", hp: 6, r: 14, fire: 0.5, move: "hover", stay: 6, keep: true },      // コガネムシ（明け方。10/25-2）: 自機の近くまでゆっくり降りてきて、しばらくとどまってゆっくり撃ち、上へ帰る（ステージ1の「弾が少し来る」はおもにこれ）
   grasshopper: { layer: "air", hp: 1, r: 13, fire: 2.4, move: "bee" },                   // バッタ（真昼）: ぴょんと飛びこんでくる
   dragonfly:   { layer: "air", hp: 1, r: 14, fire: 2.6, move: "ladybug", wind: true },   // トンボ（夕暮れ）: 列で横切る。風に流される
   moth:        { layer: "air", hp: 1, r: 14, fire: 3.0, move: "ghost", wind: true },     // ガ（夕暮れ）: ゆらゆら。風に流される
@@ -970,6 +971,9 @@ const Battle = (() => {
         for (let i = 0; i < 6; i++) spawnFiller(kind, fromLeft ? -20 : W + 20, y0, { dir: fromLeft ? 1 : -1, y0, delay: i * 0.32 });
       } else if (mv === "bee") {
         for (let i = 0; i < 3; i++) { const x = freeX(0, "air", 30); if (x !== null) spawnFiller(kind, x, -20, { delay: i * 0.35, tx: null }); }
+      } else if (mv === "hover") {   // 1匹が、自機から遠い側の画面のはしを、自機の近くまでゆっくり降りてくる
+        const x = player.x < W / 2 ? W - 34 : stripRight() + 34;
+        spawnFiller(kind, x, -20, { hy: H * rand(0.48, 0.56), stayT: FILLER_TYPES[kind].stay || 4 });
       } else {
         for (let i = 0; i < 2; i++) { const x = freeX(0, "air", 40); if (x !== null) spawnFiller(kind, x, -24 - i * 50, { bx: 0 }); }
       }
@@ -1245,6 +1249,10 @@ const Battle = (() => {
         } else {
           f.y -= 135 * BATTLE.fillerSpeed * dt; f.x += f.vx * BATTLE.fillerSpeed * dt;
         }
+      } else if (moveOf(f.type) === "hover") {   // 近くまで降りて、とどまって、上へ帰る
+        if (f.y < f.hy && !f.leave) f.y += Math.min(90, (f.hy - f.y) * 1.5 + 20) * dt;
+        else if (!f.leave) { f.stayT -= dt; f.x += Math.sin(f.age * 1.2) * 30 * dt; if (f.stayT <= 0) f.leave = true; }
+        else f.y -= 120 * dt;
       } else if (moveOf(f.type) === "ghost") {
         f.y += H / 11 * BATTLE.fillerSpeed * (def.speed || 1) * dt;
         f.x += Math.sin(f.age * 1.3) * 40 * dt;
@@ -1256,7 +1264,7 @@ const Battle = (() => {
         f.fire -= dt;
         if (f.fire <= 0 && f.y > 0 && f.y < H * 0.68) {
           f.fire = def.fire * BATTLE.fillerFireScale * fillerDense() / P.fireRate / fireRamp() * rand(0.8, 1.2);
-          fireAt(f.x, f.y, def.spread || [0]);
+          fireAt(f.x, f.y, def.spread || [0], undefined, def.keep);
         }
       }
     }
@@ -1365,11 +1373,11 @@ const Battle = (() => {
     ebullets = ebullets.filter(b => b.y < H + 20 && b.y > -20 && b.x > -20 && b.x < W + 20);
   }
 
-  function fireAt(x, y, pattern, kind) {
+  function fireAt(x, y, pattern, kind, keep) {
     const ang = Math.atan2(player.y - y, player.x - x);
     for (const da of pattern) {
       const sp = BATTLE.enemyBulletSpeed * P.bulletSpeed;   // 難易度の線（bulletSpeed）。世界1のはじめはゆっくり
-      ebullets.push({ x, y, vx: Math.cos(ang + da) * sp, vy: Math.sin(ang + da) * sp, kind });
+      ebullets.push({ x, y, vx: Math.cos(ang + da) * sp, vy: Math.sin(ang + da) * sp, kind, keep });
     }
   }
 
@@ -1766,11 +1774,11 @@ const Battle = (() => {
     player.hp = Math.min(BATTLE.playerMaxHp, player.hp + BATTLE.healOnAbsorb);
     post("word", () => { showWord = { word: e.word, t: BATTLE.wordShowTime }; });
     slow = BATTLE.slowTime;
-    // 光が広がって、画面上の雑魚と敵の弾が全部消える
+    // 光が広がって、画面上の雑魚と敵の弾が全部消える（keep の虫＝コガネムシは残る。10/25-2）
     wave = { x: e.x, y: e.y, age: 0 };
-    fillers.forEach(f => addPop(f.x, f.y, "#fff8d8", 0.8, f.layer === "ground"));
-    fillers = [];
-    ebullets = [];
+    fillers.forEach(f => { if (!FILLER_TYPES[f.type].keep) addPop(f.x, f.y, "#fff8d8", 0.8, f.layer === "ground"); });
+    fillers = fillers.filter(f => FILLER_TYPES[f.type].keep);
+    ebullets = ebullets.filter(b => b.keep);   // keep の虫の弾も残る
     if (e.role === "boss") {
       // 大ボスを吸い込んだらバトル終了。残っている雑魚はみんな花になる
       enemies.forEach(x => (x.hp = 0));
@@ -2351,6 +2359,12 @@ const Battle = (() => {
       ctx.fillStyle = "rgba(220,240,255,0.8)";
       for (const s of [-1, 1]) { ctx.beginPath(); ctx.ellipse(s * 10, -3, 10, 3.5 + flap * 1.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.ellipse(s * 9, 4, 9, 3, 0, 0, Math.PI * 2); ctx.fill(); }
       ctx.fillStyle = lit ? "#ffd0a0" : "#d86a2a"; ctx.fillRect(-2.5, -10, 5, 22);
+    } else if (k === "kanabun") {   // コガネムシ: つやのある緑の丸い背中
+      ctx.fillStyle = lit ? "#c8f0c0" : "#3f8a5a";
+      ctx.beginPath(); ctx.ellipse(0, 1, 10, 12, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "#1f4a30"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(0, -10); ctx.lineTo(0, 13); ctx.stroke();
+      ctx.fillStyle = "#1f4a30"; ctx.beginPath(); ctx.arc(0, -11, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.5)"; ctx.beginPath(); ctx.ellipse(-4, -3, 2, 4, -0.3, 0, Math.PI * 2); ctx.fill();
     } else if (k === "moth") {
       ctx.fillStyle = lit ? "#f4ead0" : "#bba98a";
       for (const s of [-1, 1]) { ctx.beginPath(); ctx.ellipse(s * 7, 0, 9 * (0.5 + flap * 0.5), 10, s * 0.3, 0, Math.PI * 2); ctx.fill(); }
