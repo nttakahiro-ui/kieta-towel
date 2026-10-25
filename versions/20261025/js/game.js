@@ -136,7 +136,7 @@ const BATTLE = {
   // 本番の表紙（10/3-9）
   countStep: 0.45,             // 表紙のあとのカウント「3」「2」「1」のそれぞれの時間（秒）
   countGo: 0.5,                // 「出撃！」の時間（秒）。カウントの合計は2秒以内
-  choiceTime: 10,              // 選ぶ時間（秒）。選ばなければ「つよい弾」になる
+  choiceTime: 10,              // （10/25-14 から使っていない。持ち物選択は時間制限なし）
   bigBombMul: 2,               // （10/25-1 から使っていない。前の「大きなふわりタイフーン」のゲージの倍率）
 
   // --- 天気（data/stages.js の weather） ---
@@ -595,6 +595,12 @@ const Battle = (() => {
     bino = { x: W / 2 + 10, y: H * 0.42 };
     state = "sortie"; sortieNo = 1; reacted = 0; sortieStep = "cover";   // 発見の旅の表紙から始める   // 「出撃1 探検」の画面から始める
     loadout = null; powerBonus = 0; shield = 0; gaugeMul = 1;
+    // 救出の旅をもう一度（10/25-14。結果画面のボタン）: 発見の旅をとばして、持ち物選択から。発見で見つけたことばの記録（opts.foundIds）は残す
+    if (opts.foundIds) {
+      found = new Set(opts.foundIds); reacted = found.size;
+      nextIdx = script.length;   // 発見の旅のことばは出さない
+      sortieNo = 2; sortieStep = "choice";
+    }
     running = true;
     lastTs = performance.now();
     cancelAnimationFrame(rafId);
@@ -1037,10 +1043,7 @@ const Battle = (() => {
     if (paused) return;
     if (tut) { tut.t += realDt; return; }   // チュートリアルの案内のあいだは止まる
     if (state === "sortie") {   // 出撃の画面のあいだは止まっている
-      if (sortieNo === 2 && sortieStep === "choice" && !choiceFree) {   // 初めては時間制限なし（10/21-1）
-        choiceT -= realDt;
-        if (choiceT <= 0) { chooseLoadout("power"); sortieStep = "cover"; }   // 選ばなければ「つよい弾」で表紙へ
-      }
+      // （持ち物選択の時間制限は、10/25-14 になくした。選ぶまで待つ）
       if (sortieStep === "count") {
         const prev = countStepNo();
         countT += realDt;
@@ -1102,7 +1105,7 @@ const Battle = (() => {
 
     if (state === "clear") {
       stateTimer -= dt;
-      if (stateTimer <= 0) { stop(); opts.onEnd(absorbed.map(w => w.id), { time: t, hits, downs, gameOvers, score, maxCombo, bombsUsed, missed: missed.map(w => w.id) }); }
+      if (stateTimer <= 0) { stop(); opts.onEnd(absorbed.map(w => w.id), { time: t, hits, downs, gameOvers, score, maxCombo, bombsUsed, missed: missed.map(w => w.id), found: [...found] }); }
       return;
     }
     if (phase === "round1") { updateExplore(dt); return; }   // 1回目の旅（双眼鏡）。雑魚・弾・木・天気は出さない
@@ -3170,6 +3173,13 @@ const Battle = (() => {
     // （見出しの下の「（光で助けよう）」は、10/25-1 に消した）
     ctx.font = font(16); ctx.fillStyle = "#4b5e3a";
     ctx.fillText(tx("choice.title", { trip: window.TEXTS.trips[2].name }), W / 2, top + 82);
+    // 上の空きに、ゆれるふわり（2のコマ）と、主人公の「考える」絵（10/25-14: 「どれにしようかな」の場面）
+    const ay0 = top + 104, ay1 = choiceRects()[0].y - 10, ah = ay1 - ay0;
+    if (ah > 40) {
+      const fs = Math.min(110, ah), hh = Math.min(ah, 150);
+      drawFuwariArt(2, W / 2 - fs * 0.45, ay0 + ah / 2, fs, Math.sin(t * 2.2) * 0.12);
+      drawHero("think", W / 2 + fs * 0.15, ay1 - hh, hh);
+    }
     choiceRects().forEach((r, i) => {
       const l = LOADOUTS[i];
       ctx.fillStyle = "#fffdf7"; ctx.strokeStyle = "#e0b03a"; ctx.lineWidth = 3;
@@ -3185,7 +3195,6 @@ const Battle = (() => {
       }
       ctx.font = font(13); ctx.fillStyle = "#5d6b4c";
       ctx.fillText(l.desc, r.x + 18, r.y + 45);
-      if (i === 0) { ctx.textAlign = "right"; ctx.font = font(11); ctx.fillStyle = "#b0a080"; ctx.fillText(tx("choice.defaultMark"), r.x + r.w - 12, r.y + 22); }
       ctx.textAlign = "center";
     });
     // ぜんぶ消しの説明（1行。長ければ2行）
@@ -3193,14 +3202,7 @@ const Battle = (() => {
     ctx.font = font(12); ctx.fillStyle = "#6b5a3a";
     const tl = wrapText(tx("choice.typhoonNote"), bw);
     tl.forEach((l, i) => ctx.fillText(l, W / 2, last.y + last.h + 18 + i * 17));
-    // 残り時間（初めて選ぶときは時間制限なし）
-    if (choiceFree) return;
-    const ty = last.y + last.h + 22 + tl.length * 17;
-    const k = Math.max(0, choiceT / BATTLE.choiceTime);
-    ctx.fillStyle = "rgba(0,0,0,0.08)"; roundRect(W / 2 - bw / 2, ty, bw, 8, 4); ctx.fill();
-    ctx.fillStyle = "#e0b03a"; roundRect(W / 2 - bw / 2, ty, bw * k, 8, 4); ctx.fill();
-    ctx.font = font(13); ctx.fillStyle = "#7a8a68";
-    ctx.fillText(tx("choice.timeLeft", { n: Math.ceil(choiceT) }), W / 2, ty + 24);
+    // （残り時間の帯と「あと○秒」は、10/25-14 に時間制限といっしょになくした）
   }
 
   // ふわりの一言（吹き出し）。画面からはみ出さない位置に出す
