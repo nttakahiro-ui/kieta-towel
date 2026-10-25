@@ -234,8 +234,8 @@ const Sound = (() => {
     } else if (name === "odai") {    // お題が出た
       ["E5", "A5", "C6"].forEach((n, i) => tone(freq(n), t + i * 0.12, 0.4, "triangle", 0.22));
     } else if (name === "boing") {   // ダミーで弾がはね返る（ぼよん）
-      sweep(260, 520, 0.12, "sine", 0.25);
-      sweep(520, 300, 0.15, "sine", 0.18, 0.1);
+      sweep(260, 520, 0.12, "sine", 0.45);        // 10/25-16: 大きく（前は 0.25・0.18）
+      sweep(520, 300, 0.15, "sine", 0.35, 0.1);
     } else if (name === "hirameki") { // ひらめき
       ["G6", "C7", "E7"].forEach((n, i) => tone(freq(n), t + i * 0.05, 0.5, "sine", 0.16));
     } else if (name === "shield") {  // 盾が守った

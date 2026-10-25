@@ -87,7 +87,7 @@ const BATTLE = {
 
   // --- お題バトル（2周目の中ボス2回と大ボス1回） ---
   odai: true,                  // お題バトルのスイッチ（true＝オン、false＝オフ。オフで今までの中ボス・大ボス戦）
-  odaiIntroTime: 2.5,          // 始まりのスローと、問題文を画面中央に大きく出す秒数（この間は弾が当たらない）。10/8に2.5秒に
+  odaiIntroTime: 2.5,          // （10/25-16 から使っていない。問題文を読む時間は文の長さで決める: odaiReadPerChar など）
   odaiBigFont: 26,             // 問題文を画面中央に出すときの文字の大きさのいちばん上（px）。画面の幅に3行以内に収まるまで小さくする
   odaiSmallFont: 20,           // 問題文を上の帯の下に移したあとの文字の大きさのいちばん上（px）。枠の中に2行で収まるまで小さくする（10/25-3）
   odaiPanelLines: 2,           // 帯の下の問題文の行数（14pxでも入らないときだけ odaiMaxLines まで）
@@ -129,7 +129,14 @@ const BATTLE = {
   // ステージ1の案内（10/21-2）。初めてそれが起きた瞬間にだけ、1〜2行で出す。文は data/texts.js の hints
   hintTime: 3.4,               // 案内を出す秒数
   hintSlow: 1,                 // 案内を出すとき、ゆっくりにする秒数
-  odaiHintExtra: 1.5,          // 最初のお題で案内を添えるとき、読む時間をのばす秒数（2.5 → 4秒）
+  odaiHintExtra: 2,            // ステージ1の初回のお題（案内を添えるとき）、読む時間にさらに足す秒数（10/25-16 に1.5 → 2）
+  odaiReadPerChar: 0.1,        // お題の問題文を読む時間: 1文字あたりの秒数（10/25-16。50文字なら 0.1×50＋1 ＝ 6秒）
+  odaiReadBase: 1,             //   ＋この秒数
+  odaiReadMin: 2.5,            //   最短
+  odaiReadMax: 7,              //   最長（ステージ1の初回は、これに odaiHintExtra を足す）
+  odaiWrongTime: 0.8,          // ちがうことばに当てたとき、「ちがうよ」を画面の中ほどに大きく出す秒数・そのことばが赤く点滅する秒数（10/25-16）
+  odaiWrongRun: 3,             // 続けてこの回数ちがうことばに当てたら、ふわりが「問題をもう一度読んでみよう」
+  shellNearDone: 0.2,          // 殻の残りがこの割合以下（ほどけるまでの8割まで光を当てた）になると、黄色く光る（あと少しの印。10/25-16）
   tutCloseAfter: 0.8,          // 紙芝居（デバッグ）の札を閉じられるまでの秒数
 
   // 旅の名前と表紙の文は data/texts.js の trips（10/21-1 に移した）
@@ -449,6 +456,7 @@ const Battle = (() => {
   let bounces = [];          // ダミーではね返った弾
   let bombsUsed = 0;
   let typhoon = null;        // ぜんぶ消しの演出（タオルをくるっと振り回す）
+  let wrongFx = null;        // お題で「ちがうよ」を大きく出している（10/25-16）{ age }
   let powerFx = null;        // 「パワーアップ！」の大きな文字（10/25-9）{ age }
   let bombing = false;       // 「ぜんぶ消し」で反応させている最中（ゲージをためない）
   let wave = null;           // 吸い込んだときに広がる光
@@ -585,7 +593,7 @@ const Battle = (() => {
     slow = 0; wave = null; gauge = 0; bombsUsed = 0; fsay = null; odai = null; bounces = [];
     msgQ = []; msgGap = 0; msgWasBusy = false;
     choiceFree = !!opts.firstChoice;
-    tut = null; hintOpts = opts.hints || null; hintShown = {}; hintCard = null; bombHinted = false; bombFlash = 0; powerFx = null;
+    tut = null; hintOpts = opts.hints || null; hintShown = {}; hintCard = null; bombHinted = false; bombFlash = 0; powerFx = null; wrongFx = null;
     stripFlash = 0; sortieStep = "choice"; freed = [];
     explore = { t: 0, next: 0, list: [], bugs: [], bugT: 2, endT: 0, flies: [], streaks: [] };
     {
@@ -1066,6 +1074,7 @@ const Battle = (() => {
     updateMsgs(realDt);
     if (guide) { guide.t -= realDt; if (guide.t <= 0) guide = null; }
     if (typhoon) { typhoon.age += realDt; if (typhoon.age > 0.9) typhoon = null; }
+    if (wrongFx) { wrongFx.age += realDt; if (wrongFx.age > BATTLE.odaiWrongTime) wrongFx = null; }
     if (powerFx) { powerFx.age += realDt; if (powerFx.age > BATTLE.powerFxTime) powerFx = null; }
     if (odai && odai.intro > 0) odai.intro -= realDt;
     for (const b of bounces) { b.age += realDt; b.x += b.vx * realDt; b.y += b.vy * realDt; }
@@ -1206,6 +1215,7 @@ const Battle = (() => {
       if (e.appearT > 0 && !(odai && e.pattern !== "odai")) { e.appearT -= dt; e.flash = Math.max(0, e.flash - dt); continue; }
       e.age += dt;
       e.flash = Math.max(0, e.flash - dt);
+      if (e.wrongT > 0) e.wrongT = Math.max(0, e.wrongT - dt);
       if (e.parts) for (const p of e.parts) p.flash = Math.max(0, p.flash - dt);
       if (odai && e.pattern !== "odai") continue;   // お題バトルの間は、画面のほかの語句も止める（動かない・撃たない）
       if (e.pattern === "odai") {
@@ -1552,7 +1562,10 @@ const Battle = (() => {
     const cands = shuffle([real, ...odaiDummies(real)]);   // ならびは毎回入れかえ
     // 3つとも同じ大きさ（いちばん長い語句が、縦書きで画面に入る大きさ。24px より小さくしない）
     clearMsgs(9); msgQ = [];   // お題が始まるときは、出ているメッセージと待っているものを、すべて消してから問題文を出す
-    odai = { real, boss: isBoss, t: 0, intro: BATTLE.odaiIntroTime, firstHit: null, q: real.odaiQuestion || real.question };
+    const q = real.odaiQuestion || real.question;
+    // 問題文を読む時間（10/25-16）: 文の長さに合わせる。1文字あたり odaiReadPerChar 秒＋odaiReadBase 秒（最短 odaiReadMin、最長 odaiReadMax）
+    const read = Math.min(BATTLE.odaiReadMax, Math.max(BATTLE.odaiReadMin, Array.from(q).length * BATTLE.odaiReadPerChar + BATTLE.odaiReadBase));
+    odai = { real, boss: isBoss, t: 0, intro: read, firstHit: null, q, wrongRun: 0 };
     // 案内: 最初のお題は、問題文の下に1行そえて、読む時間を少しのばす（順番待ちにはのせない。お題がいちばん大事なため）
     if (hintOpts && !hintShown.odai && (hintOpts.all || !(hintOpts.seen && hintOpts.seen.odai))) {
       hintShown.odai = true; if (hintOpts.mark) hintOpts.mark("odai");
@@ -1565,7 +1578,7 @@ const Battle = (() => {
     // お題のあいだは、雑魚と雑魚の弾を出さない（10/3-12）。始まる瞬間に画面の雑魚と弾を消す（殻から飛ぶ弾は、読む時間が終わってから）
     fillers.forEach(f => addPop(f.x, f.y, "#fff8d8", 0.8, f.layer === "ground"));
     fillers = []; ebullets = [];
-    slow = BATTLE.odaiIntroTime;   // 吸い込みと同じスロー。読む時間をつくる
+    slow = odai.intro;   // 吸い込みと同じスロー。読む時間をつくる（10/25-16: 読む時間の長さに合わせる。前は最初のお題の案内でのばした分が消えていた）
     // （「お題だよ！」の一言は、問題文と重なるので出さない。説明はチュートリアルで。10/7-1）
     Sound.se("odai");
   }
@@ -1580,15 +1593,19 @@ const Battle = (() => {
         Sound.se("hirameki");
       }
     }
-    if (!e.dummy) { damageWord(e, s.x); return; }
+    if (!e.dummy) { odai.wrongRun = 0; damageWord(e, s.x); return; }
     // ダミー: 弾がはね返る。少し減点（コンボは切らない）
     e.flash = 0.12;
     bounces.push({ x: s.x, y: e.y + e.h / 2, vx: (Math.random() - 0.5) * 120, vy: 320, age: 0 });
     if (t - e.penaltyAt >= BATTLE.odaiPenaltyCool) {   // 間違いなので減点（同じダミーで続けては減らさない）
       e.penaltyAt = t;
       score = Math.max(0, score - BATTLE.odaiPenalty);
-      floats.push({ x: e.x, y: e.y - e.size, text: `ちがうよ −${BATTLE.odaiPenalty}`, big: true, wrong: true, age: 0 });
+      floats.push({ x: e.x, y: e.y - e.size, text: `−${BATTLE.odaiPenalty}`, big: true, wrong: true, age: 0 });
       Sound.se("boing");
+      // 10/25-16: 「ちがうよ」を画面の中ほどに大きく。そのことばは赤く点滅。続けて3回ちがったら、ふわりが一言
+      wrongFx = { age: 0 }; e.wrongT = BATTLE.odaiWrongTime;
+      odai.wrongRun++;
+      if (odai.wrongRun >= BATTLE.odaiWrongRun) { odai.wrongRun = 0; fsay = { text: tx("rescue.odaiReread"), t: BATTLE.fuwariSayTime }; }   // お題のあいだは順番待ちが止まるので、直接出す
     }
   }
 
@@ -2073,6 +2090,7 @@ const Battle = (() => {
     if (guide) drawGuide();
     if (typhoon) drawTyphoon();
     if (powerFx) drawPowerFx();
+    if (wrongFx) drawWrongFx();
 
     // 吸い込んだときに広がる光
     if (wave) {
@@ -2263,6 +2281,19 @@ const Battle = (() => {
     }
     ctx.restore();
   }
+
+  // お題の「ちがうよ」（10/25-16）: 画面の中ほどに大きく、少しゆれて消える
+  function drawWrongFx() {
+    const k = wrongFx.age / BATTLE.odaiWrongTime;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, (1 - k) * 2.5);
+    ctx.translate(W / 2 + Math.sin(wrongFx.age * 40) * 4 * (1 - k), H * 0.5);
+    ctx.font = font(40); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
+    ctx.lineWidth = 10; ctx.strokeStyle = "#ffffff"; ctx.strokeText(tx("rescue.odaiWrong"), 0, 0);
+    ctx.fillStyle = "#d8413a"; ctx.fillText(tx("rescue.odaiWrong"), 0, 0);
+    ctx.restore();
+  }
+  const wrongBlink = e => e.wrongT > 0 && Math.floor(e.wrongT * 10) % 2 === 0;   // ちがうことば: 赤く点滅
 
   // 「パワーアップ！」（10/25-9）: 大きく、ぽんと出て、少し上がりながら消える
   //   10/25-11: 助けたことばの大きな表示（画面の中ほど）と重ならないよう、自機の上に出す（パワーアップは、ことばを助けた瞬間に起きるので）
@@ -2577,7 +2608,7 @@ const Battle = (() => {
       const wob = p.flash > 0 ? (Math.random() - 0.5) * 3 : 0;
       ctx.globalAlpha = alpha;
       ctx.shadowColor = "rgba(255,214,90,0.9)"; ctx.shadowBlur = 12;
-      ctx.lineWidth = 8; ctx.strokeStyle = e.flash > 0 ? "#fff6c8" : (theme.wordStroke || "#fff6d8");
+      ctx.lineWidth = 8; ctx.strokeStyle = wrongBlink(e) ? "#ff6b6b" : e.flash > 0 ? "#fff6c8" : (theme.wordStroke || "#fff6d8");
       ctx.strokeText(ch, x + wob, py);
       ctx.shadowBlur = 0;
       ctx.fillStyle = fillColor; ctx.fillText(ch, x + wob, py);
@@ -2615,15 +2646,16 @@ const Battle = (() => {
     const kanaUp = hasKanji(e.word.word) ? BATTLE.kanaSize * 0.6 : 0;
     const rx = e.w / 2 + 22, ry = e.size * 0.85 + kanaUp * 0.6, cy = y - kanaUp * 0.5;   // 10/7-1: 白く光る大きなもの
     ctx.save();
+    const near = k <= BATTLE.shellNearDone;   // あと少し: 黄色く光る（10/25-16）
     if (!front) {
-      ctx.globalAlpha = 0.45 + 0.5 * k;
-      ctx.shadowColor = "rgba(255,255,255,1)"; ctx.shadowBlur = 18;
-      ctx.fillStyle = "rgba(255,255,255,0.75)";
+      ctx.globalAlpha = near ? 0.8 + 0.2 * Math.sin(t * 10) : 0.45 + 0.5 * k;
+      ctx.shadowColor = near ? "rgba(255,214,60,1)" : "rgba(255,255,255,1)"; ctx.shadowBlur = near ? 26 : 18;
+      ctx.fillStyle = near ? "rgba(255,232,120,0.85)" : "rgba(255,255,255,0.75)";
       ctx.beginPath(); ctx.ellipse(x, cy, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
       ctx.shadowBlur = 0;
       // ふちの毛羽（残りが少ないほど減る）
       const n = Math.round(10 + 14 * k);
-      ctx.fillStyle = "#ffffff";
+      ctx.fillStyle = near ? "#ffe27a" : "#ffffff";
       for (let i = 0; i < n; i++) {
         const a = i / n * Math.PI * 2 + Math.sin(t * 0.8 + i) * 0.05;
         ctx.beginPath(); ctx.arc(x + Math.cos(a) * rx, cy + Math.sin(a) * ry, 4 + 3 * k + Math.sin(t * 2 + i * 1.7) * 1, 0, Math.PI * 2); ctx.fill();
@@ -2646,6 +2678,11 @@ const Battle = (() => {
   function drawCharShell(role, cx, cy, sz, k) {
     if (k <= 0) return;
     ctx.save();
+    if (k <= BATTLE.shellNearDone) {   // あと少し: 文字のまわりが黄色く光る（10/25-16）
+      const g = ctx.createRadialGradient(cx, cy, sz * 0.2, cx, cy, sz * 0.9);
+      g.addColorStop(0, `rgba(255,224,90,${0.65 + 0.25 * Math.sin(t * 10)})`); g.addColorStop(1, "rgba(255,224,90,0)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, sz * 0.9, 0, Math.PI * 2); ctx.fill();
+    }
     if (role === "boss") {   // 霧のかたまり: 文字のまわりに、うすいもや
       ctx.globalAlpha = 0.25 + 0.4 * k;
       ctx.fillStyle = SHELL.boss.bit;
@@ -2694,7 +2731,7 @@ const Battle = (() => {
       ctx.shadowColor = `rgba(255,255,230,${f})`; ctx.shadowBlur = 26;
     }
     ctx.lineWidth = 8;
-    ctx.strokeStyle = e.flash > 0 ? "#fff6c8" : (theme.wordStroke || (e.last ? "#fff6d8" : "#ffffff"));   // 縁取りの色は時間帯で変えられる
+    ctx.strokeStyle = wrongBlink(e) ? "#ff6b6b" : e.flash > 0 ? "#fff6c8" : (theme.wordStroke || (e.last ? "#fff6d8" : "#ffffff"));   // 縁取りの色は時間帯で変えられる（ちがうことばは赤く点滅）
     if (e.parts) {
       for (const p of e.parts) if (!p.broken) ctx.strokeText(p.ch, x + p.ox, y);
     } else {
