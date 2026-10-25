@@ -453,6 +453,29 @@ body { position: fixed; inset: 0; }
 #warp.on { animation: warpFx 1.6s ease-in-out forwards; }
 #warp .flash { position: absolute; inset: 0; background: #fff; }
 #warp.on .flash { animation: warpFlash 1.6s ease-in-out forwards; }
+/* ワープの会話の演出（10/25-18） */
+.warp-talk { position: fixed; inset: 0; z-index: 60; overflow: hidden; background: #f6efe0; }
+.warp-talk.hidden { display: none; }
+.wt-strip { position: absolute; top: 0; bottom: 0; left: 0; width: 200%; display: flex; transform: translateX(0); }
+.wt-strip.go { transition: transform 2.5s ease-in-out; transform: translateX(-50%); }
+.wt-img { flex: 1; background-size: cover; background-position: center; }
+.wt-seam { position: absolute; top: 0; bottom: 0; left: 50%; width: 0; }
+.wt-strip::after { content: ""; position: absolute; top: 0; bottom: 0; left: calc(50% - 60px); width: 120px; background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,0.95), rgba(255,255,255,0)); }
+.wt-stage { position: absolute; left: 0; right: 0; bottom: max(40px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; align-items: center; isolation: isolate; }
+.wt-bubble { max-width: 300px; margin: 0 16px 10px; background: rgba(255,253,245,0.97); border: 2.5px solid #e0b03a; border-radius: 16px; padding: 12px 16px; font-size: 17px; line-height: 1.5; color: #4b3a1a; text-align: center; opacity: 0; transition: opacity .3s; }
+.wt-bubble.on { opacity: 1; }
+.wt-bubble.hero { border-color: #6f9a4a; }
+.wt-chars { position: relative; display: flex; align-items: flex-end; justify-content: center; gap: 4px; padding: 10px 26px 4px; }
+.wt-chars::before { content: ""; position: absolute; inset: -10px -20px -14px; background: radial-gradient(ellipse at center, #fff7ea 55%, rgba(255,247,234,0.85) 66%, rgba(255,247,234,0) 74%); z-index: -1; }   /* 主人公の絵の紙の地が、明るい背景の上で四角く見えないように */
+.wt-chars > img { position: relative; }
+.wt-chars.fly { animation: wtFly 0.8s ease-in-out infinite alternate; }
+@keyframes wtFly { from { transform: translateY(0); } to { transform: translateY(-14px); } }
+.wt-hero { width: auto; height: min(170px, 24vh); }
+.wt-fuwari { width: min(96px, 13vh); height: auto; }
+.wt-title { position: absolute; left: 0; right: 0; top: 34%; margin: 0; text-align: center; font-size: 30px; font-weight: bold; color: #3d5a8a; text-shadow: 0 0 8px #fff, 0 0 18px #fff; opacity: 0; transition: opacity .5s; }
+.wt-title.on { opacity: 1; }
+.wt-flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; transition: opacity .6s; }
+.wt-flash.on { opacity: 1; }
 #warp p { position: relative; font-size: 28px; font-weight: bold; color: #48693a; text-shadow: 0 0 8px #fff, 0 0 16px #fff; }
 @keyframes warpFx { 0% { opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; } }
 @keyframes warpFlash { 0% { opacity: 0; } 30% { opacity: 1; } 60% { opacity: 0.2; } 100% { opacity: 0; } }
