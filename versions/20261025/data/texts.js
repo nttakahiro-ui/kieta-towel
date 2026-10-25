@@ -42,7 +42,7 @@ window.TEXTS = {
   rescue: {
     start: "ことばを助けよう！",
     moveHint: "← 指でふわりを動かそう →",
-    powerUp: "光が強くなった！",
+    powerUp: "パワーアップ！",   // パワーの段階が上がった瞬間に、画面に大きく（10/25-9。前は「光が強くなった！」）
     odaiLost: "あっ、行っちゃった…",
     typhoon: "ぜんぶ消し！",
     typhoonReady: "ぜんぶ消し OK！",

@@ -118,7 +118,7 @@ const Cards = (() => {
       if (o.record) {
         if (o.record.newBest) { const nb = document.createElement("div"); nb.className = "best-new"; nb.textContent = "ベスト更新！"; rk.appendChild(nb); }
         const ms = document.createElement("div"); ms.className = "marks-now";
-        [["all", "10語すべて助けた"], ["noDown", "元気をなくさなかった"], ["noHit", "一度もぶつからなかった"]].forEach(([k, label]) => {
+        [["all", "10語すべて助けた"], ["noDown", "元気をなくさなかった"]].forEach(([k, label]) => {
           const m = document.createElement("span"); m.className = "mark" + (o.record.now[k] ? " on" : ""); m.textContent = label;
           ms.appendChild(m);
         });

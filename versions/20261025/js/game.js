@@ -23,8 +23,8 @@ const BATTLE = {
   fallTime: { zako: 10, mid: 12.5 }, // 空中の語句が画面の上から下まで降りる秒数（大きいほどゆっくり）。10/7に10/6の前とあとの中間にした
   edgeFallTime: 13.5,          // 「端にかくれる」語句が降りる秒数
   crossTime: 6,                // 「横切る」語句が画面を横切る秒数
-  zakoPatternHp: { cross: 0.3, edge: 0.3, treeshade: 1.4 },   // ザコの殻の硬さの倍率（10/25-8）。横切る・端にかくれる語句は当てられる時間が短いのでやわらかく、木のかげの語句は上で待つあいだにほどけないよう硬く
-  crossY: 0.2,                 // 「横切る」語句が通る高さ（画面の高さに対する割合）
+  zakoPatternHp: { cross: 0.5, edge: 0.3, treeshade: 1.4 },   // ザコの殻の硬さの倍率（10/25-8）。端にかくれる語句は当てられる時間が短いのでやわらかく、木のかげの語句は上で待つあいだにほどけないよう硬く。横切る語句は 10/25-9 に中ほどを通るようにした（横に追う時間が短いので0.5倍。画面のまん中あたりでほどける）
+  crossY: 0.47,                // 「横切る」語句が通る高さ（画面の高さに対する割合。10/25-9 に0.2から中ほどへ）
   escortCount: 4,              // 「雑魚のうしろ」の語句を守る雑魚の数
   kanaSize: 13,                // 敵の語句の上に出すふりがなの大きさ（px）
   zakoAppearTime: 1,           // ザコの語句が画面に全部入ってから、止まって光る秒数（この間は撃てない。「来た」とわかる）
@@ -189,6 +189,7 @@ const BATTLE = {
   respawnInv: 2,               // 復活したあと、無敵で点滅する秒数
   wordShowTime: 1.5,           // 吸い込んだ語句を画面中央に大きく出す秒数（この間は弾が当たらない）
   fuwariSayTime: 3,
+  powerFxTime: 1.3,            // 「パワーアップ！」を出す秒数（10/25-9）
   fuwariSize: 62,              // 自機のふわりの絵の幅（px。10/25-6）
   fuwariExploreSize: 50,       // 発見の旅の、下のまん中の小さなふわりの幅
   fuwariFrameTime: 0.18,       // 飛んでいるときに1→2→3のコマを切り替える秒数
@@ -234,6 +235,9 @@ const EXPLORE_MOVES = {
   firefly: { speedMul: 0.5, flies: 4, stray: 4, fog: 0.35, hint: false },   // 霧が濃い。ことばのまわりにホタルが flies 匹集まる（stray ＝ ひとりで飛ぶホタル）。きらっと光る目印は出さない
 };
 
+// ===== ぜんぶ消しのボタンの色（10/25-9）: ゲージがたまったら赤橙（画面のほかの場所に使っていない色）。たまっていないときは薄い色のまま
+const BOMB_COLORS = { full: "#f2541b", fullRim: "#ffd2b8" };
+
 // ===== 弾の色（10/25-7。ここだけ書きかえれば、敵の弾と味方の光の色が変わる） =====
 // 敵の弾は単純な球。濃い色の球に、明るい桃色の細い縁取り（どの時間帯の背景でも浮いて見える）。少し脈打つ
 const BULLET_COLORS = {
@@ -272,14 +276,12 @@ const GOLD_COLOR = "#c8901a";
 const ENEMY_COLOR = { zako: "#5f8a3c", mid: "#b2733d", boss: "#c4577a" };
 
 // バトルの中での強さ（1945型）。語句を BATTLE.powerEvery 語吸い込むごとに1段階上がる。毎バトル最初の段階から
-// shots: 弾の本数、rate: 弾の間隔の倍率（小さいほど速い）、thick: 太い弾（当たりが広く、2発分）、body / line: ふわりの色
-// 最初から2本。強化で3本 → 4本 → 太い弾
-// カードの総数は、ふわりの横の数字に出すだけで、強さには関係しない
+// 3段（10/25-9）: 1本 → 2本 → 3本（正面が太い）。前の「4方向の太い光」はやめた
+// spread: 光の向き（0 ＝ 正面。数が大きいほど外へ広がる）、thick: 太い光にする向き（当たりが広く、2発分）、rate: 光の間隔の倍率（小さいほど速い）
 const POWER_LEVELS = [
-  { shots: 2, rate: 1, thick: false, body: "#fffdf7", line: "#c9d9b4" },
-  { shots: 3, rate: 1, thick: false, body: "#eef8df", line: "#8fbf5e" },
-  { shots: 4, rate: 1, thick: false, body: "#fff4cf", line: "#dcb64e" },
-  { shots: 4, rate: 1, thick: true,  body: "#fde6ee", line: "#e08aa6" },
+  { spread: [0],               thick: [],  rate: 1 },
+  { spread: [-0.35, 0.35],     thick: [],  rate: 1 },
+  { spread: [-0.55, 0, 0.55],  thick: [0], rate: 1 },
 ];
 // 画面の言葉は data/texts.js（window.TEXTS）から読む。tx("rescue.start") や tx("explore.endSome", { n: 3 }) のように使う
 function tx(path, vars) {
@@ -292,7 +294,6 @@ function tx(path, vars) {
 const LOADOUTS = ["power", "shield", "bomb"].map(id => ({ id, get name() { return tx(`choice.items.${id}.name`); }, get desc() { return tx(`choice.items.${id}.desc`); }, get kana() { return (window.TEXTS.choice.items[id] || {}).kana || ""; } }));
 
 // 弾の本数ごとの、横のならび
-const SHOT_SPREAD = { 1: [0], 2: [-0.6, 0.6], 3: [-1, 0, 1], 4: [-1.5, -0.5, 0.5, 1.5] };
 
 // フォント: css/style.css の --font を読む（指定は CSS の1か所だけ）。読めないときの予備
 let FONT_FAMILY = '"Hiragino Maru Gothic ProN","Hiragino Maru Gothic Pro","Zen Maru Gothic",sans-serif';
@@ -446,6 +447,7 @@ const Battle = (() => {
   let bounces = [];          // ダミーではね返った弾
   let bombsUsed = 0;
   let typhoon = null;        // ぜんぶ消しの演出（タオルをくるっと振り回す）
+  let powerFx = null;        // 「パワーアップ！」の大きな文字（10/25-9）{ age }
   let bombing = false;       // 「ぜんぶ消し」で反応させている最中（ゲージをためない）
   let wave = null;           // 吸い込んだときに広がる光
 
@@ -581,7 +583,7 @@ const Battle = (() => {
     slow = 0; wave = null; gauge = 0; bombsUsed = 0; fsay = null; odai = null; bounces = [];
     msgQ = []; msgGap = 0; msgWasBusy = false;
     choiceFree = !!opts.firstChoice;
-    tut = null; hintOpts = opts.hints || null; hintShown = {}; hintCard = null; bombHinted = false; bombFlash = 0;
+    tut = null; hintOpts = opts.hints || null; hintShown = {}; hintCard = null; bombHinted = false; bombFlash = 0; powerFx = null;
     stripFlash = 0; sortieStep = "choice"; freed = [];
     explore = { t: 0, next: 0, list: [], bugs: [], bugT: 2, endT: 0, flies: [], streaks: [] };
     {
@@ -1058,6 +1060,7 @@ const Battle = (() => {
     updateMsgs(realDt);
     if (guide) { guide.t -= realDt; if (guide.t <= 0) guide = null; }
     if (typhoon) { typhoon.age += realDt; if (typhoon.age > 0.9) typhoon = null; }
+    if (powerFx) { powerFx.age += realDt; if (powerFx.age > BATTLE.powerFxTime) powerFx = null; }
     if (odai && odai.intro > 0) odai.intro -= realDt;
     for (const b of bounces) { b.age += realDt; b.x += b.vx * realDt; b.y += b.vy * realDt; }
     bounces = bounces.filter(b => b.age < 0.5);
@@ -1135,6 +1138,8 @@ const Battle = (() => {
           const w = script[nextIdx];
           // 中ボスのお題は、画面にいるほかの語句が助かるか、いなくなるまで待って始める（お題のあいだは語句が止まって当たらないので。10/25-8）
           if (phase === "round2" && BATTLE.odai && w.role === "mid" && enemies.some(e => e.role === "zako" && !e.ground && e.hp > 0)) { nextAt = roundT; break; }   // 待つあいだ、あとの語句の時刻も後ろにずらす（まとめて出ないように）
+          // 横切る語句は、通る高さに木があるあいだは出さない（木をよけながら横に追えないので。10/25-9）
+          if (patOf(w).pattern === "cross" && !isShortWord(w) && obs.some(o => Math.abs(o.y - H * BATTLE.crossY) < o.r + H * 0.2)) { nextAt = roundT; break; }
           nextIdx++;
           nextAt += roundInterval();
           if (phase === "round2" && BATTLE.odai && w.role === "mid") { startOdai(w, false); break; }
@@ -1165,9 +1170,8 @@ const Battle = (() => {
     if (shotTimer <= 0) {
       // ふわりの段階で弾の数が増える
       // お題バトルの間は正面1本だけ（強化は一時休止。広がる弾がダミーに当たらないように）
-      const spread = odai ? [0] : (SHOT_SPREAD[level.shots] || [0]);
-      const thick = odai ? false : level.thick;
-      for (const k of spread) shots.push({ x: player.x + k * 9, y: player.y - 22, vx: k * 55, thick });
+      const spread = odai ? [0] : level.spread;
+      for (const k of spread) shots.push({ x: player.x + k * 9, y: player.y - 22, vx: k * 55, thick: !odai && level.thick.includes(k) });
       shotTimer = BATTLE.shotInterval * level.rate;
     }
     for (const s of shots) { s.y -= BATTLE.shotSpeed * dt; s.x += s.vx * dt; }
@@ -1442,7 +1446,7 @@ const Battle = (() => {
   // 「何回の連射でこわれるか」が変わらない（強くなっても手ごたえが同じ）。地上の語句（たねで倒す）は今のまま
   function shotUnits() {
     if (odai) return 1;   // お題バトルの間は正面1本だけ
-    return (SHOT_SPREAD[level.shots] || [0]).length * (level.thick ? 2 : 1);
+    return level.spread.length + level.thick.length;   // 太い光は2本分
   }
   const shotDamage = e => (e.role === "zako" && !e.ground && BATTLE.zakoHpByShots) ? BATTLE.shotPower / shotUnits() : 1;   // 1発で削る量（パワーの初期値はここで2割下げる）
 
@@ -1823,8 +1827,8 @@ const Battle = (() => {
     const lv = POWER_LEVELS[Math.min(Math.floor(absorbed.length / BATTLE.powerEvery) + powerBonus, POWER_LEVELS.length - 1)];
     if (lv !== level && absorbed.length < opts.total) {
       level = lv;
-      post("banner", () => { banner = { text: tx("rescue.powerUp"), t: 1.2, color: "rgba(220,170,60,0.9)" }; });
-      setTimeout(() => Sound.se("power"), 350);
+      powerFx = { age: 0 };   // その瞬間に、画面に大きく「パワーアップ！」と音（順番待ちはしない。10/25-9）
+      Sound.se("power");
     }
     const n = Math.min(60, 14 + e.word.word.length * 5);
     for (let i = 0; i < n; i++) {
@@ -2062,6 +2066,7 @@ const Battle = (() => {
     }
     if (guide) drawGuide();
     if (typhoon) drawTyphoon();
+    if (powerFx) drawPowerFx();
 
     // 吸い込んだときに広がる光
     if (wave) {
@@ -2250,6 +2255,18 @@ const Battle = (() => {
       ctx.fillStyle = "rgba(255,255,255,0.85)";
       for (const p of streaks) { ctx.beginPath(); ctx.arc(p.x, p.y, 2 + p.s * 1.5, 0, Math.PI * 2); ctx.fill(); }
     }
+    ctx.restore();
+  }
+
+  // 「パワーアップ！」（10/25-9）: 画面の中ほどに大きく、ぽんと出て、少し上がりながら消える
+  function drawPowerFx() {
+    const k = powerFx.age / BATTLE.powerFxTime, pop = k < 0.15 ? 0.6 + k / 0.15 * 0.55 : 1.15 - Math.min(1, (k - 0.15) / 0.2) * 0.15;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, (1 - k) * 3);
+    ctx.translate(W / 2, H * 0.42 - k * 30); ctx.scale(pop, pop);
+    ctx.font = font(44); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
+    ctx.lineWidth = 10; ctx.strokeStyle = "#ffffff"; ctx.strokeText(tx("rescue.powerUp"), 0, 0);
+    ctx.fillStyle = "#d39a12"; ctx.fillText(tx("rescue.powerUp"), 0, 0);
     ctx.restore();
   }
 
@@ -3266,34 +3283,39 @@ const Battle = (() => {
 
   // 「ぜんぶ消し」のボタン: ふわりマークのまわりにゲージ。満タンで光る
   function drawBombButton() {
-    const b = bombButton(), full = gauge >= 100;
+    const b = bombButton(), full = gauge >= 100, C = BOMB_COLORS;
     ctx.save();
     if (bombFlash > 0) {   // たまった瞬間: 大きく光る
       const k = bombFlash / 1.2;
       const g2 = ctx.createRadialGradient(b.x, b.y, b.r * 0.5, b.x, b.y, b.r * (1.8 + 1.4 * k));
-      g2.addColorStop(0, `rgba(255,236,140,${0.9 * k})`); g2.addColorStop(1, "rgba(255,236,140,0)");
+      g2.addColorStop(0, `rgba(255,120,60,${0.9 * k})`); g2.addColorStop(1, "rgba(255,120,60,0)");
       ctx.fillStyle = g2; ctx.beginPath(); ctx.arc(b.x, b.y, b.r * (1.8 + 1.4 * k), 0, Math.PI * 2); ctx.fill();
     }
-    if (full) {
-      const g = ctx.createRadialGradient(b.x, b.y, b.r * 0.5, b.x, b.y, b.r * 1.8);
-      g.addColorStop(0, `rgba(255,240,170,${0.5 + Math.sin(t * 6) * 0.3})`); g.addColorStop(1, "rgba(255,240,170,0)");
-      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(b.x, b.y, b.r * 1.8, 0, Math.PI * 2); ctx.fill();
+    const pulse = full ? 0.5 + 0.5 * Math.sin(t * 6) : 0, r = b.r * (1 + pulse * 0.08);
+    if (full) {   // たまったら: 赤橙に変わり、脈打って光る（10/25-9）
+      const g = ctx.createRadialGradient(b.x, b.y, r * 0.6, b.x, b.y, r * 2);
+      g.addColorStop(0, `rgba(255,110,50,${0.35 + pulse * 0.4})`); g.addColorStop(1, "rgba(255,110,50,0)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(b.x, b.y, r * 2, 0, Math.PI * 2); ctx.fill();
     }
-    ctx.fillStyle = "rgba(255,253,245,0.85)";
-    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = "rgba(0,0,0,0.1)"; ctx.lineWidth = 5;
-    ctx.beginPath(); ctx.arc(b.x, b.y, b.r - 3, 0, Math.PI * 2); ctx.stroke();
-    ctx.strokeStyle = full ? "#e0b03a" : "#8cbf5a"; ctx.lineCap = "round";
-    ctx.beginPath(); ctx.arc(b.x, b.y, b.r - 3, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * gauge / 100); ctx.stroke();
+    ctx.fillStyle = full ? C.full : "rgba(255,253,245,0.85)";
+    ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = full ? C.fullRim : "rgba(0,0,0,0.1)"; ctx.lineWidth = full ? 3 : 5;
+    ctx.beginPath(); ctx.arc(b.x, b.y, r - 3, 0, Math.PI * 2); ctx.stroke();
+    if (!full) {   // たまっていないとき: 今の薄い色のゲージ
+      ctx.strokeStyle = "#8cbf5a"; ctx.lineWidth = 5; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.arc(b.x, b.y, b.r - 3, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * gauge / 100); ctx.stroke();
+    }
     // ふわりマーク（小さなふわり。たまったら3のコマ）
     drawFuwariArt(full ? 3 : 1, b.x, b.y, b.r * 1.5);
-    ctx.font = font(full ? 10 : 9); ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.lineWidth = 3; ctx.strokeStyle = "#ffffff";
-    ctx.strokeText(tx(full ? "rescue.typhoonTap" : "rescue.typhoonLabel"), b.x, b.y - b.r - 7);
-    ctx.fillStyle = full ? "#b0801a" : "#7a8a68";
-    ctx.fillText(tx(full ? "rescue.typhoonTap" : "rescue.typhoonLabel"), b.x, b.y - b.r - 7);
+    // 上の文字: たまったら「タップ」を大きく
+    const label = tx(full ? "rescue.typhoonTap" : "rescue.typhoonLabel");
+    ctx.font = font(full ? 17 : 9); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
+    const ly = b.y - r - (full ? 13 : 7);
+    ctx.lineWidth = full ? 5 : 3; ctx.strokeStyle = "#ffffff"; ctx.strokeText(label, b.x, ly);
+    ctx.fillStyle = full ? C.full : "#7a8a68"; ctx.fillText(label, b.x, ly);
     ctx.restore();
   }
+
 
   // 帯: 画面の左端に、10のあき枠を上から縦にならべる（出てくる順。いちばん下が大ボス）
   // はじめは「？」、探検で見つけると灰色の名前、本番で吸い込むと金色。名前は枠の中に縦書き
