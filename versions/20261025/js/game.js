@@ -201,6 +201,7 @@ const BATTLE = {
   timeBarH: 6,                 // 発見の旅の残り時間の帯の太さ（px。画面のいちばん上。10/25-12）
   timeBarWarn: 10,             // 残り何秒で帯の色が変わるか
   exploreTimeScore: 100,       // 発見の旅: 基準の時間より早く終われば残り1秒につき＋、おそければ1秒につき−（10/25-17）
+  exploreOverMsg: 2,           // 基準の時間を過ぎた瞬間に「時間オーバー！…」を出す秒数（10/25-21）
   exploreAgainGap: 2,          // 見つけられずに消えたことばが、出直すまでの間隔（秒）
   stripFoundFlash: 0.5,        // 見つけた瞬間に、左の枠の名前がきらっと光る秒数            // 「パワーアップ！」を出す秒数（10/25-9）
   fuwariSize: 62,              // 自機のふわりの絵の幅（px。10/25-6）
@@ -1830,6 +1831,10 @@ const Battle = (() => {
         if (d.look >= (exMove.lookTime || BATTLE.lookTime)) findWord(d);
       }
     }
+    if (!ex.over && ex.t >= BATTLE.exploreTime && reacted < words.length) {   // 基準の時間を過ぎた瞬間: 上に「時間オーバー！…」を2秒（10/25-21）
+      ex.over = BATTLE.exploreOverMsg; Sound.se("boing");
+    }
+    if (ex.over > 0) ex.over = Math.max(0, ex.over - dt);
     for (const d of ex.list) if (!d.found && d.age >= d.life && !ex.again.includes(d.word)) ex.again.push(d.word);   // 見つけられずに消えた: あとで出直す
     ex.list = ex.list.filter(d => d.found ? d.foundT < 0.9 : d.age < d.life);
     // 飾りの虫（円の中を横切る）
@@ -3156,6 +3161,16 @@ const Battle = (() => {
     }
     ctx.globalAlpha = 1;
     drawHud();
+    if (ex.over > 0) {   // 時間オーバー！ 1秒ごとに−100点（10/25-21）
+      const a = Math.min(1, ex.over / 0.3, (BATTLE.exploreOverMsg - ex.over) / 0.2 + 0.01);
+      ctx.save(); ctx.globalAlpha = Math.max(0, a);
+      ctx.font = font(18); ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      const text = tx("explore.overTime", { p: BATTLE.exploreTimeScore }), tw = Math.min(W - 24, ctx.measureText(text).width + 32);
+      ctx.fillStyle = "rgba(255,240,236,0.97)"; ctx.strokeStyle = "#e0483a"; ctx.lineWidth = 2.5;
+      roundRect(W / 2 - tw / 2, 44, tw, 40, 14); ctx.fill(); ctx.stroke();   // 点数（右上）と重ならない高さ
+      ctx.fillStyle = "#c8382c"; ctx.fillText(text, W / 2, 65, W - 40);
+      ctx.restore();
+    }
     if (!moved && state === "play") {   // 操作のヒント
       ctx.globalAlpha = hintFadeIn();   // 点滅しない（10/25-12）
       ctx.font = font(16); ctx.lineWidth = 5; ctx.strokeStyle = "#ffffff";
@@ -3250,7 +3265,8 @@ const Battle = (() => {
       }
       // ふわり（仮の絵）と吹き出し（表紙の文）
       ctx.font = font(16);
-      const lines = wrapText(trip.cover, W - 110), bw = W - 92, bh = lines.length * 22 + 20, bx = 70, by = cy + 40 + dy;
+      // {sec} ＝ そのステージの発見の旅の基準の時間（stages.js の値。10/25-21）
+      const lines = wrapText(trip.cover.replace("{sec}", Math.round(BATTLE.exploreTime)), W - 110), bw = W - 92, bh = lines.length * 22 + 20, bx = 70, by = cy + 40 + dy;
       drawFuwariArt(1, 40, by + bh / 2, 50);   // セリフの横の小さなふわり（1のコマ）
       ctx.fillStyle = "rgba(255,253,245,0.97)"; ctx.strokeStyle = line; ctx.lineWidth = 2;
       roundRect(bx, by, bw, bh, 14); ctx.fill(); ctx.stroke();
