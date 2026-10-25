@@ -3093,13 +3093,20 @@ const Battle = (() => {
       let fs = 50; ctx.font = font(fs);
       while (ctx.measureText(trip.name).width > W - 40 && fs > 30) { fs -= 2; ctx.font = font(fs); }
       drawHeading(trip.name, trip.kana, W / 2, cy - 56, fs, main);
+      // チュートリアルのステージ（ステージ1）: 発見の旅の表紙の見出しのすぐ下に1行（毎回。10/25-10）。そのぶん下の文を下げる
+      const tut = sortieNo === 1 && opts.stage && opts.stage.tutorial ? wrapTextFont(tx("tutorial.cover"), 14, W - 40) : [];
+      if (tut.length) {
+        ctx.font = font(14); ctx.fillStyle = "#6f9a4a";
+        tut.forEach((l, i) => ctx.fillText(l, W / 2, cy - 14 + i * 18));
+      }
+      const dy = tut.length ? tut.length * 18 + 8 : 0;
       if (trip.sub) {   // 見出しの下の1行（毎回。長ければ2行）
         ctx.font = font(15); ctx.fillStyle = green ? "#4b5e3a" : "#7a6a40";
-        wrapText(trip.sub, W - 48).forEach((l, i, a) => ctx.fillText(l, W / 2, cy + 2 + (i - (a.length - 1) / 2) * 20));
+        wrapText(trip.sub, W - 48).forEach((l, i, a) => ctx.fillText(l, W / 2, cy + 2 + dy + (i - (a.length - 1) / 2) * 20));
       }
       // ふわり（仮の絵）と吹き出し（表紙の文）
       ctx.font = font(16);
-      const lines = wrapText(trip.cover, W - 110), bw = W - 92, bh = lines.length * 22 + 20, bx = 70, by = cy + 40;
+      const lines = wrapText(trip.cover, W - 110), bw = W - 92, bh = lines.length * 22 + 20, bx = 70, by = cy + 40 + dy;
       drawFuwariArt(1, 40, by + bh / 2, 50);   // セリフの横の小さなふわり（1のコマ）
       ctx.fillStyle = "rgba(255,253,245,0.97)"; ctx.strokeStyle = line; ctx.lineWidth = 2;
       roundRect(bx, by, bw, bh, 14); ctx.fill(); ctx.stroke();
