@@ -93,7 +93,7 @@ const Cards = (() => {
     const line = t => { const p = document.createElement("p"); p.innerHTML = phraseHTML(t); nx.appendChild(p); };
     if (notHelped.length) { line(tx("results.nextHelp", { names: names(notHelped) })); if (wrong.length) line(tx("results.nextQuizAlso", { names: names(wrong) })); }
     else if (wrong.length) line(tx("results.nextQuiz", { names: names(wrong) }));
-    $("cards-rule").textContent = "";   // （条件の一言は、クイズの前の画面と発見のたびの表紙にあるので、ここには書かない。10/25-1）
+    $("cards-rule").textContent = "";   // （条件の一言は、クイズの前の画面と発見の旅の表紙にあるので、ここには書かない。10/25-1）
     // 中心の大きなボタン（10/25-1）: 間違えた問題があれば「クイズをもう一度」、なければ「つぎへ」（10枚そろったらレシピ完成へ）
     const done = ownedCount >= o.words.length;
     const rb = $("cards-retake");
@@ -108,7 +108,7 @@ const Cards = (() => {
     rk.innerHTML = "";
     if (o.stats) {
       const st = o.stats;
-      $("cards-summary").textContent = `ぶつかった ${st.hits}回${st.downs ? `　元気がなくなった ${st.downs}回` : ""}${st.gameOvers ? `　救出のたびのやり直し ${st.gameOvers}回` : ""}　いちばん長いれんぞく ${st.maxCombo}`;   // バトルの時間は出さない（調整パネルの中だけ）
+      $("cards-summary").textContent = `ぶつかった ${st.hits}回${st.downs ? `　元気がなくなった ${st.downs}回` : ""}${st.gameOvers ? `　救出の旅のやり直し ${st.gameOvers}回` : ""}　いちばん長いれんぞく ${st.maxCombo}`;   // バトルの時間は出さない（調整パネルの中だけ）
       // 点数とランク
       const r = rankOf(st.score);
       const sc = document.createElement("div"); sc.className = "rank-score"; sc.textContent = `${st.score} 点`;

@@ -129,7 +129,7 @@ const Quiz = (() => {
       const p1 = document.createElement("p"); p1.style.margin = "0"; p1.textContent = "正解は";
       const p2 = document.createElement("p"); p2.className = "answer"; p2.textContent = w.choices[w.answer];
       const p3 = document.createElement("p"); p3.className = "memo"; p3.textContent = w.memo;
-      const b = document.createElement("button"); b.className = "btn"; b.textContent = "つぎへ";
+      const b = document.createElement("button"); b.className = "btn"; b.textContent = "次へ";
       b.addEventListener("click", next);
       fb.append(p1, p2, p3, b);
       fb.classList.remove("hidden");

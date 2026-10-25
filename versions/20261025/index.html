@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap">
-  <link rel="stylesheet" href="css/style.css?v=38">
+  <link rel="stylesheet" href="css/style.css?v=39">
 </head>
 <body>
   <div id="app">
@@ -49,7 +49,7 @@
           <div id="title-stage" class="stage-name"></div>
         </div>
         <div class="fuwari-line"><span class="fuwari-icon"></span>ふわりのカード <b id="title-cards">0</b> 枚</div>
-        <button id="btn-start" class="btn btn-main">はじめる</button>
+        <button id="btn-start" class="btn btn-main">始める</button>
         <p class="title-note">音が出ます</p>
         <button id="btn-sound" class="link-btn sound-btn"></button>
         <button id="btn-hero" class="link-btn"></button>
@@ -62,7 +62,7 @@
     <section id="screen-stages" class="screen scroll">
       <div class="stages-box">
         <div class="stages-nav"><button id="btn-world-back" class="link-btn hidden"></button><button id="btn-rbook" class="link-btn"></button><button id="btn-zukan" class="link-btn"></button></div>
-        <h2 id="stages-world-title" class="stages-title">ステージをえらぶ</h2>
+        <h2 id="stages-world-title" class="stages-title">ステージを選ぶ</h2>
         <p class="stages-note">印: <span class="mark on">10語</span> 10語すべて助けた　<span class="mark on">元気</span> 元気をなくさなかった　<span class="mark on">ぶつからず</span> 一度もぶつからなかった</p>
         <div id="stages-list"></div>
         <button id="btn-warp" class="btn btn-main warp-btn hidden"></button>
@@ -82,7 +82,7 @@
     <!-- バトル -->
     <section id="screen-battle" class="screen">
       <canvas id="battle-canvas"></canvas>
-      <button id="btn-pause" class="pause-btn" aria-label="ひとやすみ">Ⅱ</button>
+      <button id="btn-pause" class="pause-btn" aria-label="ひと休み">Ⅱ</button>
     </section>
 
     <!-- クイズの前に、今日あつめたことばを見せる -->
@@ -179,12 +179,12 @@
   <!-- バトルの一時停止メニュー -->
   <div id="pause-menu" class="overlay hidden">
     <div class="overlay-box">
-      <h2>ひとやすみ</h2>
+      <h2>ひと休み</h2>
       <div class="btn-row">
-        <button id="pm-continue" class="btn btn-main">つづける</button>
+        <button id="pm-continue" class="btn btn-main">続ける</button>
         <button id="pm-tutorial" class="btn btn-sub">説明をもう一度</button>
         <button id="pm-sound" class="btn btn-sub sound-btn"></button>
-        <button id="pm-retry" class="btn btn-sub">はじめからやりなおす</button>
+        <button id="pm-retry" class="btn btn-sub">始めからやり直す</button>
         <button id="pm-stages" class="btn btn-sub">ステージ一覧へ</button>
         <button id="pm-title" class="btn btn-sub">タイトルへ</button>
       </div>
@@ -235,14 +235,14 @@
   <!-- 横向きのとき -->
   <div id="rotate"><div><div class="rotate-icon"></div><p>縦にしてね</p></div></div>
 
-  <script src="data/words.js?v=38"></script>
-  <script src="data/stages.js?v=38"></script>
-  <script src="data/texts.js?v=38"></script>
-  <script src="js/audio.js?v=38"></script>
-  <script src="js/game.js?v=38"></script>
-  <script src="js/quiz.js?v=38"></script>
-  <script src="js/cards.js?v=38"></script>
-  <script src="js/recipebook.js?v=38"></script>
-  <script src="js/main.js?v=38"></script>
+  <script src="data/words.js?v=39"></script>
+  <script src="data/stages.js?v=39"></script>
+  <script src="data/texts.js?v=39"></script>
+  <script src="js/audio.js?v=39"></script>
+  <script src="js/game.js?v=39"></script>
+  <script src="js/quiz.js?v=39"></script>
+  <script src="js/cards.js?v=39"></script>
+  <script src="js/recipebook.js?v=39"></script>
+  <script src="js/main.js?v=39"></script>
 </body>
 </html>
