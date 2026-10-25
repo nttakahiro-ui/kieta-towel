@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap">
-  <link rel="stylesheet" href="css/style.css?v=53">
+  <link rel="stylesheet" href="css/style.css?v=55">
 </head>
 <body>
   <div id="app">
@@ -179,6 +179,17 @@
 
   <!-- ワープの演出（10/22-1）: 白く光って、次の世界の背景に切りかわる -->
   <div id="warp"><div class="flash"></div><p id="warp-text"></p></div>
+  <!-- ワープの会話の演出（10/25-18。その世界へ初めてワープするときだけ。約10秒、タップで飛ばせる） -->
+  <div id="warp-talk" class="warp-talk hidden">
+    <div id="wt-strip" class="wt-strip"><div id="wt-bg1" class="wt-img"></div><div id="wt-bg2" class="wt-img"></div></div>
+    <div class="wt-seam"></div>
+    <p id="wt-title" class="wt-title"></p>
+    <div class="wt-stage">
+      <p id="wt-bubble" class="wt-bubble"></p>
+      <div id="wt-chars" class="wt-chars"><img id="wt-hero" class="hero-img wt-hero" alt=""><img id="wt-fuwari" class="wt-fuwari" src="assets/fuwari_1.png" alt=""></div>
+    </div>
+    <div class="wt-flash"></div>
+  </div>
 
   <!-- バトルの一時停止メニュー -->
   <div id="pause-menu" class="overlay hidden">
@@ -239,14 +250,14 @@
   <!-- 横向きのとき -->
   <div id="rotate"><div><div class="rotate-icon"></div><p>縦にしてね</p></div></div>
 
-  <script src="data/words.js?v=53"></script>
-  <script src="data/stages.js?v=53"></script>
-  <script src="data/texts.js?v=53"></script>
-  <script src="js/audio.js?v=53"></script>
-  <script src="js/game.js?v=53"></script>
-  <script src="js/quiz.js?v=53"></script>
-  <script src="js/cards.js?v=53"></script>
-  <script src="js/recipebook.js?v=53"></script>
-  <script src="js/main.js?v=53"></script>
+  <script src="data/words.js?v=55"></script>
+  <script src="data/stages.js?v=55"></script>
+  <script src="data/texts.js?v=55"></script>
+  <script src="js/audio.js?v=55"></script>
+  <script src="js/game.js?v=55"></script>
+  <script src="js/quiz.js?v=55"></script>
+  <script src="js/cards.js?v=55"></script>
+  <script src="js/recipebook.js?v=55"></script>
+  <script src="js/main.js?v=55"></script>
 </body>
 </html>

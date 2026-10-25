@@ -22,11 +22,12 @@ const Save = (() => {
   // retake: クイズで不正解だった語句（あとで図鑑の受け直しクイズに使う。バトルで取り逃がした語句は入れない）
   // best: ステージごとのベストスコア（{ score }。救出の旅を最後まで終えたステージにある＝ステージ一覧で枠が光る）。印は 10/25-17 にやめた
   // glowHint: 「クリアしたステージは光るよ…」の案内を見たか（10/25-17）
+  // warpSeen: その世界へのワープの会話の演出を見たか（世界の番号 → true。10/25-18）
   // hero: 選んだ主人公（"boy"／"girl"）、introSeen: 目的の画面を見たか（10/21-2）
   // world: ステージ一覧で今いる世界（10/22-1。ワープで進む）
   // gemsSeen: レシピブックの宝石がはまる演出を見たステージ（10/25-4。初めてそろったときだけ演出する）
   // found: ステージごとの、発見の旅で見つけたことばの id（10/25-15。「救出の旅をもう一度」で使う。救出で10のことばすべて助けたら消す）
-  let data = { cards: {}, cleared: {}, retake: {}, best: {}, hero: null, introSeen: false, world: 1, gemsSeen: {}, found: {}, glowHint: false };
+  let data = { cards: {}, cleared: {}, retake: {}, best: {}, hero: null, introSeen: false, world: 1, gemsSeen: {}, found: {}, glowHint: false, warpSeen: {} };
   // localStorage が使えなくても落ちないようにする
   function load() {
     try {
@@ -39,6 +40,7 @@ const Save = (() => {
         data.best = d.best || {};
         for (const b of Object.values(data.best)) if (b) { delete b.noHit; delete b.all; delete b.noDown; }   // 前の版の印の記録は消す（10/25-9 noHit、10/25-17 all・noDown）
         data.glowHint = !!d.glowHint;
+        data.warpSeen = d.warpSeen || {};
         data.hero = d.hero || null;
         data.introSeen = !!d.introSeen;
         data.world = d.world || 1;
@@ -485,8 +487,51 @@ const Main = (() => {
     showScreen("stages");
     $("screen-stages").scrollTop = 0;
   }
+  // ワープの会話の演出（10/25-18）: その世界へ初めてワープするときだけ。約10秒、画面のどこをタップしても最後に飛ぶ。2回目からは下の短い光
+  //   会話の文は texts.js の worlds.warpTalk、秒数はここの WARP_TALK
+  const WARP_TALK = { lines: [1, 3, 5], lineEnd: 6.5, depart: 6.5, title: 9, end: 10, frame: 0.18 };
+  let wtTimers = [];
+  function warpTalk(id) {
+    const T = WARP_TALK, talk = (window.TEXTS.worlds.warpTalk || {})[id] || [];
+    const box = $("warp-talk"), bubble = $("wt-bubble"), hero = $("wt-hero"), fu = $("wt-fuwari"), strip = $("wt-strip"), chars = $("wt-chars");
+    const at = (sec, fn) => wtTimers.push(setTimeout(fn, sec * 1000));
+    wtTimers.forEach(clearTimeout); wtTimers = [];
+    $("wt-bg1").style.backgroundImage = `url(assets/bg_world${id - 1}.jpg)`;
+    $("wt-bg2").style.backgroundImage = `url(assets/bg_world${id}.jpg)`;
+    strip.classList.remove("go"); chars.classList.remove("fly"); bubble.classList.remove("on"); $("wt-title").classList.remove("on"); box.querySelector(".wt-flash").classList.remove("on");
+    hero.src = heroSrc("think"); fu.src = "assets/fuwari_1.png";
+    const wd = window.WORLDS.find(w => w.id === id);
+    $("wt-title").textContent = tx("worlds.title", { id, name: wd ? wd.name : "" });
+    box.classList.remove("hidden");
+    Sound.play("title");
+    const finish = () => {
+      wtTimers.forEach(clearTimeout); wtTimers = [];
+      box.onclick = null; box.classList.add("hidden");
+      Save.data.world = id; Save.store(); toStages();
+    };
+    box.onclick = finish;   // タップで飛ばす
+    talk.forEach((ln, i) => at(T.lines[i] !== undefined ? T.lines[i] : 1 + i * 2, () => {
+      bubble.classList.remove("on");
+      setTimeout(() => {
+        bubble.textContent = ln.text; bubble.classList.toggle("hero", ln.who === "hero"); bubble.classList.add("on");
+        if (ln.who === "hero") hero.src = heroSrc("point");   // 主人公が話すときは「指さす」
+      }, 150);
+    }));
+    at(T.depart, () => {   // 出発: ふわりがはばたき、背景が次の世界へ流れる
+      bubble.classList.remove("on");
+      chars.classList.add("fly"); strip.classList.add("go");
+      Sound.se("power");
+      let f = 0; const iv = setInterval(() => { f = (f + 1) % 3; fu.src = `assets/fuwari_${f + 1}.png`; }, T.frame * 1000);
+      wtTimers.push(setTimeout(() => clearInterval(iv), (T.end - T.depart) * 1000));
+    });
+    at(T.title, () => { $("wt-title").classList.add("on"); Sound.se("shine"); });
+    at(T.end - 0.6, () => box.querySelector(".wt-flash").classList.add("on"));
+    at(T.end, finish);
+  }
+
   // ワープの演出: 白く光って、次の世界の背景に切りかわる（約1.6秒）
   function warpTo(id) {
+    if (!Save.data.warpSeen[id]) { Save.data.warpSeen[id] = true; Save.store(); warpTalk(id); return; }   // 初めては会話の演出（10/25-18）
     const fx = $("warp");
     fx.style.backgroundImage = `url(assets/bg_world${id}.jpg)`;
     $("warp-text").textContent = tx("worlds.warping", { id });
@@ -663,6 +708,7 @@ const Main = (() => {
       Save.data.best = {};
       Save.data.found = {};   // 発見の記録も消す（10/25-15）
       Save.data.glowHint = false;
+      Save.data.warpSeen = {};   // ワープの会話の演出も、もう一度見られるように（10/25-18）
       Save.data.gemsSeen = {};   // レシピの演出を見た記録も消す（もう一度演出が見られるように）
       Save.store();
       TutSave.reset();   // チュートリアルを見た記録も消す（この版の分）
