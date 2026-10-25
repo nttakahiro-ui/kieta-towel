@@ -129,7 +129,7 @@ const BATTLE = {
   countStep: 0.45,             // 表紙のあとのカウント「3」「2」「1」のそれぞれの時間（秒）
   countGo: 0.5,                // 「出撃！」の時間（秒）。カウントの合計は2秒以内
   choiceTime: 10,              // 選ぶ時間（秒）。選ばなければ「つよい弾」になる
-  bigBombMul: 2,               // 「大きなふわりタイフーン」のときの、ゲージのたまる速さの倍率
+  bigBombMul: 2,               // （10/25-1 から使っていない。前の「大きなふわりタイフーン」のゲージの倍率）
 
   // --- 天気（data/stages.js の weather） ---
   windDir: 1,                  // 風で自機が流される向き（1 ＝ 右へ、-1 ＝ 左へ）
@@ -144,7 +144,7 @@ const BATTLE = {
   guideTime: 2.4,              // 木のよけ方の案内（矢印）を出す秒数
   shadeWait: 2.5,              // 「木のかげ」の語句が、木が去ってから待つ秒数（そのあと降りてくる）
 
-  // --- 「ふわりタイフーン」ボム ---
+  // --- 「ぜんぶ消し」ボム ---
   bombGain: 12,                // 語句を倒したときにたまるゲージ（×コンボ倍率）。100で満タン
   bombButtonR: 26,             // 画面左下のふわりマーク（ボムのボタン）の大きさ（px）
 
@@ -383,7 +383,7 @@ const Battle = (() => {
   let lastPX = 0, lastPY = 0;   // いちばん最近の指の位置
   let lock = false;          // 照準に地上の敵が入っているか
   let slow = 0;              // ゆっくりの残り時間（秒）
-  let gauge = 0;             // 「ふわりタイフーン」ボムのゲージ（0〜100）
+  let gauge = 0;             // 「ぜんぶ消し」ボムのゲージ（0〜100）
   let fsay = null;           // ふわりの一言（吹き出し）
   // 画面の一言・案内・問題文の順番待ち（10/7-1）。同時に出すのは1つだけ。消えてから次を出す
   let msgQ = [], msgGap = 0, msgWasBusy = false;
@@ -417,11 +417,11 @@ const Battle = (() => {
   let stripFlash = 0;        // 出撃の瞬間に帯の灰色の名前がいっせいに光る（残り秒）
   let powerBonus = 0;        // 「つよい弾」で上がる強さの段階
   let shield = 0;            // 「盾」の残り（1回だけ防ぐ）
-  let gaugeMul = 1;          // 「大きなふわりタイフーン」のゲージ倍率
+  let gaugeMul = 1;          // 「ひっさつ」のゲージ倍率
   let bounces = [];          // ダミーではね返った弾
   let bombsUsed = 0;
-  let typhoon = null;        // ふわりタイフーンの演出（タオルをくるっと振り回す）
-  let bombing = false;       // 「ふわりタイフーン」で反応させている最中（ゲージをためない）
+  let typhoon = null;        // ぜんぶ消しの演出（タオルをくるっと振り回す）
+  let bombing = false;       // 「ぜんぶ消し」で反応させている最中（ゲージをためない）
   let wave = null;           // 吸い込んだときに広がる光
 
   function font(size) { return `bold ${size}px ${FONT_FAMILY}`; }
@@ -449,7 +449,7 @@ const Battle = (() => {
   // 左端の縦の帯の右はし
   const stripRight = () => 6 + BATTLE.stripWidth;
 
-  // 「ふわりタイフーン」ボムのボタン（画面左下のふわりマーク）
+  // 「ぜんぶ消し」ボムのボタン（画面左下のふわりマーク）
   function bombButton() { return { x: 14 + BATTLE.bombButtonR, y: H - 18 - BATTLE.bombButtonR, r: BATTLE.bombButtonR }; }
 
   // ===== 操作: 指一本のドラッグ（指の動いたぶんだけ自機が動く） =====
@@ -475,7 +475,7 @@ const Battle = (() => {
         }
         return;
     }
-    // ふわりマークをタップ: ゲージが満タンなら「ふわりタイフーン」
+    // ふわりマークをタップ: ゲージが満タンなら「ぜんぶ消し」
     const rect = canvas.getBoundingClientRect(), bb = bombButton();
     if (phase !== "round1" && Math.hypot(e.clientX - rect.left - bb.x, e.clientY - rect.top - bb.y) < bb.r + 10) {   // （1回目の旅にはボタンがない）
       if (gauge >= 100 && state === "play") useBomb();
@@ -716,14 +716,14 @@ const Battle = (() => {
     Sound.se("start");
     if (sortieNo === 1) {
       player.x = W / 2; player.y = H - 70;   // 1回目の旅: ふわりは下のまん中で待つ（動かない・撃たない）
-      post("say", () => { fsay = { text: tx("explore.start"), t: BATTLE.fuwariSayTime }; });
+      // （始まりのふわりの一言は、表紙と案内に同じことがあるので出さない。10/25-1）
     } else {
       startPhase("round2");
       player.x = W / 2; player.y = H * 0.8;
       moved = false;   // 2回目の旅の最初に、もう一度「ゆびでふわりをうごかそう」を出す
       stripFlash = 0.6;   // 帯の灰色の名前がいっせいに光る
       hint("rescueStart");   // 案内: 救出のたびが始まった
-      post("say", () => { fsay = { text: tx("rescue.start"), t: BATTLE.fuwariSayTime, big: true }; });
+      // （「ことばを助けよう！」の一言は、表紙の「ことばを助けに行こう！」と同じなので出さない。10/25-1）
       Sound.se("power");
     }
   }
@@ -735,7 +735,7 @@ const Battle = (() => {
     loadout = id;
     if (id === "power") powerBonus = 1;
     if (id === "shield") shield = 1;
-    if (id === "bomb") gaugeMul = BATTLE.bigBombMul;
+    if (id === "bomb") gauge = 100;   // ひっさつ: ぜんぶ消しがすぐ使える（救出のたびの最初からゲージ満タン。10/25-1）
     level = POWER_LEVELS[Math.min(Math.floor(absorbed.length / BATTLE.powerEvery) + powerBonus, POWER_LEVELS.length - 1)];
     Sound.se("item");
   }
@@ -1516,7 +1516,7 @@ const Battle = (() => {
     if (!ok) post("say", () => { fsay = { text: tx("rescue.odaiLost"), t: 2 }; });
   }
 
-  // 「ふわりタイフーン」: 画面の雑魚と敵の弾を全部消す。1周目は、出ている語句を全部「反応」させる
+  // 「ぜんぶ消し」: 画面の雑魚と敵の弾を全部消す。1周目は、出ている語句を全部「反応」させる
   // 2周目と大ボスのときは、語句には効かない（雑魚と敵の弾だけ）
   function useBomb() {
     gauge = 0;
@@ -1975,9 +1975,9 @@ const Battle = (() => {
       ctx.font = font(16);
       ctx.lineWidth = 5; ctx.strokeStyle = "#ffffff"; ctx.lineJoin = "round";
       const hy = Math.min(H - 24, player.y + 54);
-      ctx.strokeText(tx("rescue.moveHint"), W / 2, hy);
+      if (!hintCard) ctx.strokeText(tx("rescue.moveHint"), W / 2, hy);   // 案内が出ているあいだは出さない（同じことを2か所に書かない）
       ctx.fillStyle = "#48693a";
-      ctx.fillText(tx("rescue.moveHint"), W / 2, hy);
+      if (!hintCard) ctx.fillText(tx("rescue.moveHint"), W / 2, hy);
       ctx.globalAlpha = 1;
     }
     if (banner) drawBanner();
@@ -2120,7 +2120,7 @@ const Battle = (() => {
     ctx.restore();
   }
 
-  // ふわりタイフーン（仮の絵）: 自機のまわりでタオルがくるっと回りながら広がり、白いうずが残る
+  // ぜんぶ消し（仮の絵）: 自機のまわりでタオルがくるっと回りながら広がり、白いうずが残る
   function drawTyphoon() {
     const k = typhoon.age / 0.9, cx = player.x, cy = player.y;
     ctx.save();
@@ -2821,8 +2821,8 @@ const Battle = (() => {
       ctx.font = font(16); ctx.lineWidth = 5; ctx.strokeStyle = "#ffffff";
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
       const hy = Math.min(H - 110, bino.y + B + 26);
-      ctx.strokeText(tx("explore.moveHint"), W / 2, hy);
-      ctx.fillStyle = "#48693a"; ctx.fillText(tx("explore.moveHint"), W / 2, hy);
+      if (!hintCard) ctx.strokeText(tx("explore.moveHint"), W / 2, hy);
+      ctx.fillStyle = "#48693a"; if (!hintCard) ctx.fillText(tx("explore.moveHint"), W / 2, hy);
       ctx.globalAlpha = 1;
     }
     if (banner) drawBanner();
@@ -2900,8 +2900,10 @@ const Battle = (() => {
       while (ctx.measureText(trip.name).width > W - 40 && fs > 30) { fs -= 2; ctx.font = font(fs); }
       ctx.fillStyle = main;
       ctx.fillText(trip.name, W / 2, cy - 56);
-      ctx.font = font(26);
-      ctx.fillText(trip.sub, W / 2, cy - 6);
+      if (trip.sub) {   // 見出しの下の1行（毎回。長ければ2行）
+        ctx.font = font(15); ctx.fillStyle = green ? "#4b5e3a" : "#7a6a40";
+        wrapText(trip.sub, W - 48).forEach((l, i, a) => ctx.fillText(l, W / 2, cy - 10 + (i - (a.length - 1) / 2) * 20));
+      }
       // ふわり（仮の絵）と吹き出し（表紙の文）
       ctx.font = font(16);
       const lines = wrapText(trip.cover, W - 110), bw = W - 92, bh = lines.length * 22 + 20, bx = 70, by = cy + 40;
@@ -2912,10 +2914,6 @@ const Battle = (() => {
       roundRect(bx, by, bw, bh, 14); ctx.fill(); ctx.stroke();
       ctx.fillStyle = green ? "#3f5a30" : "#6b4a10";
       lines.forEach((l, i) => ctx.fillText(l, bx + bw / 2, by + 21 + i * 22));
-      if (sortieNo === 2 && reacted < (opts.total - 1)) {   // 発見のたびで見つけられなかったことばがあるとき
-        ctx.font = font(13); ctx.fillStyle = "#7a6a40";
-        ctx.fillText(tx("coverFoundNote", { n: reacted }), W / 2, by + bh + 22);
-      }
       if (sortieNo === 1) drawHero("point", 8, H - H / 3 - 8, H / 3);   // 発見のたびの表紙: 主人公の「指さす」絵（左下）
       ctx.globalAlpha = 0.6 + Math.sin(performance.now() / 250) * 0.4;
       ctx.font = font(22); ctx.fillStyle = accent;
@@ -2955,8 +2953,7 @@ const Battle = (() => {
     const top = by + bh + 8;
     ctx.font = font(34); ctx.fillStyle = "#b0801a";
     ctx.fillText(window.TEXTS.trips[2].name, W / 2, top + 24);
-    ctx.font = font(16);
-    ctx.fillText(`（${window.TEXTS.trips[2].sub}）`, W / 2, top + 52);
+    // （見出しの下の「（光で助けよう）」は、10/25-1 に消した）
     ctx.font = font(16); ctx.fillStyle = "#4b5e3a";
     ctx.fillText(tx("choice.title", { trip: window.TEXTS.trips[2].name }), W / 2, top + 82);
     choiceRects().forEach((r, i) => {
@@ -2971,7 +2968,7 @@ const Battle = (() => {
       if (i === 0) { ctx.textAlign = "right"; ctx.font = font(11); ctx.fillStyle = "#b0a080"; ctx.fillText(tx("choice.defaultMark"), r.x + r.w - 12, r.y + 22); }
       ctx.textAlign = "center";
     });
-    // ふわりタイフーンの説明（1行。長ければ2行）
+    // ぜんぶ消しの説明（1行。長ければ2行）
     const last = choiceRects()[2], bw = last.w;
     ctx.font = font(12); ctx.fillStyle = "#6b5a3a";
     const tl = wrapText(tx("choice.typhoonNote"), bw);
@@ -3060,7 +3057,7 @@ const Battle = (() => {
     ctx.font = font(16); ctx.fillStyle = "#4b5e3a";
     ctx.strokeText(String(score), W - 14, top);
     ctx.fillText(String(score), W - 14, top);
-    // パワーと持ちものは、左下のふわりタイフーンのボタンの横に小さく（1回目の旅は光を使わないので出さない）
+    // パワーと持ちものは、左下のぜんぶ消しのボタンの横に小さく（1回目の旅は光を使わないので出さない）
     if (phase === "round1") { drawStrip(); return; }
     const b = bombButton();
     ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.font = font(11);
@@ -3075,7 +3072,7 @@ const Battle = (() => {
     drawStrip();
   }
 
-  // 「ふわりタイフーン」のボタン: ふわりマークのまわりにゲージ。満タンで光る
+  // 「ぜんぶ消し」のボタン: ふわりマークのまわりにゲージ。満タンで光る
   function drawBombButton() {
     const b = bombButton(), full = gauge >= 100;
     ctx.save();
@@ -3105,7 +3102,7 @@ const Battle = (() => {
   // はじめは「？」、探検で見つけると灰色の名前、本番で吸い込むと金色。名前は枠の中に縦書き
   function drawStrip() {
     const x = 6, cw = BATTLE.stripWidth, gap = 3;
-    const y0 = 40, y1 = bombButton().y - bombButton().r - 22;   // 体力ゲージの下から、ふわりタイフーンのボタンの上まで
+    const y0 = 40, y1 = bombButton().y - bombButton().r - 22;   // 体力ゲージの下から、ぜんぶ消しのボタンの上まで
     const n = Math.max(1, slots.length), sh = (y1 - y0 - gap * (n - 1)) / n;
     ctx.save();
     ctx.fillStyle = "rgba(255,253,245,0.55)";

@@ -146,7 +146,7 @@ const TUNE_ITEMS = [
   ["odaiBigFont", "お題の問題文（中央）の文字のいちばん大きいとき", 16, 48, 1],
   ["odaiSmallFont", "お題の問題文（上の帯の下）の文字のいちばん大きいとき", 11, 30, 1],
   ["odaiMaxLines", "お題の問題文の行数の上限", 1, 5, 1],
-  ["bombGain", "ふわりタイフーンゲージのたまる速さ（1語あたり）", 2, 50, 1],
+  ["bombGain", "ぜんぶ消しゲージのたまる速さ（1語あたり）", 2, 50, 1],
   ["autoGroundCount", "自動のステージで地上に出る語句の数", 0, 5, 1],
 ];
 const TUNE_KEY = "kietaTowel.tune.v1";
