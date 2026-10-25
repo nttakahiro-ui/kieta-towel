@@ -221,31 +221,19 @@ const moveOf = type => FILLER_TYPES[type].move || type;
 // 雑魚の群れの出やすさ（数が大きいほどよく出る）。stages.js の theme.bugs がないステージで使う
 const FILLER_WAVES = { ladybugs: 3, bees: 2, ghost: 2, weeds: 3, thorn: 1 };
 
-// ===== 敵の弾の絵（ここだけ書き換えれば、弾の見た目が変わる） =====
-// image に画像のパスを入れると、その画像で描く（例: "img/seed.png"）
-const ENEMY_BULLET_ART = {
-  radius: 11,
-  image: null,
-  // 仮の絵: 綿のたね（白いふわふわに、茶色のたね）
-  draw(ctx, x, y, r, t) {
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate(t * 2);
-    ctx.fillStyle = "#ffffff";
-    ctx.strokeStyle = "#c9b99a";
-    ctx.lineWidth = 1.5;
-    for (let i = 0; i < 5; i++) {
-      const a = (i / 5) * Math.PI * 2;
-      ctx.beginPath();
-      ctx.arc(Math.cos(a) * r * 0.55, Math.sin(a) * r * 0.55, r * 0.6, 0, Math.PI * 2);
-      ctx.fill(); ctx.stroke();
-    }
-    ctx.fillStyle = "#8a6a45";
-    ctx.beginPath();
-    ctx.ellipse(0, 0, r * 0.35, r * 0.25, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
+// ===== 弾の色（10/25-7。ここだけ書きかえれば、敵の弾と味方の光の色が変わる） =====
+// 敵の弾は単純な球。濃い色の球に、明るい桃色の細い縁取り（どの時間帯の背景でも浮いて見える）。少し脈打つ
+const BULLET_COLORS = {
+  zako: "#8a1f68",       // ザコの殻・虫の弾: 赤紫
+  mid: "#b0142e",        // 中ボスの殻の弾: 赤
+  boss: "#3f1466",       // 大ボスの殻の弾: 濃い紫
+  rim: "#ffa8d6",        // 敵の弾の縁取り: 明るい桃色
+  rimWidth: 2,           // 縁取りの太さ（px）
+  pulse: 0.12,           // 脈打つ大きさ（半径の何割ふくらむか）
+  pulseSpeed: 7,         // 脈打つ速さ
+  shot: "#ffe6f2",       // 味方の光（ふわりの光）: 白寄りの明るい桃色
+  shotRim: "#f283bb",    // 味方の光の縁取り（明るい背景でも見えるように、少し濃い桃色）
+  shotHalo: "rgba(255,240,248,0.5)",   // 味方の光のまわりの、やわらかい光の輪
 };
 
 // 時間帯の色（data/stages.js の theme 欄で、ステージごとに上書きする）。ここは「真昼」の色
@@ -266,7 +254,6 @@ const DEFAULT_THEME = {
 const GOLD_COLOR = "#c8901a";
 
 // 自機の弾の色
-const SHOT_COLOR = "#ff5fa2";
 
 // 敵の文字の色（役割ごと）
 const ENEMY_COLOR = { zako: "#5f8a3c", mid: "#b2733d", boss: "#c4577a" };
@@ -1225,7 +1212,7 @@ const Battle = (() => {
       if (e.pattern === "odai" && odai && odai.intro > 0) e.fire = Math.max(e.fire, 0.5);
       if (e.fire <= 0 && e.y > 0 && e.y < H * 0.62) {
         e.fire = BATTLE.enemyFireInterval[e.role] / P.fireRate / fireRamp() * (e.pattern === "odai" ? 3 : 1) * (0.8 + Math.random() * 0.4);
-        fireAt(e.x, e.y + (e.ground ? 0 : e.h / 2), BATTLE.shotPattern[e.role] || [0], { zako: "seed", mid: "thorn", boss: "mist" }[e.role]);   // 殻から飛ぶ: まゆ＝たね、いばら＝とげ、霧＝もや
+        fireAt(e.x, e.y + (e.ground ? 0 : e.h / 2), BATTLE.shotPattern[e.role] || [0], e.role);   // 殻から飛ぶ弾の色: ザコ＝赤紫、中ボス＝赤、大ボス＝濃い紫（10/25-7）
       }
     }
 
@@ -1914,15 +1901,14 @@ const Battle = (() => {
     // 綿のたね（体力回復）
     for (const it of items) drawItem(it);
 
-    // 自機の弾: 地面（緑・生成り・水色）と重ならない明るい桃色に、白と濃い色の縁取り
+    // 自機の弾（ふわりの光）: 白寄りの明るい桃色の細長い光。敵の弾（濃い色の球）と見分けられるように（10/25-7。色は BULLET_COLORS）
     for (const s of shots) {
       const k = BATTLE.shotDrawScale;   // 見た目だけ大きく（当たりは今のまま）
-      ctx.fillStyle = "rgba(255,250,215,0.4)";   // ふわりの光: まわりにやわらかい光の輪
+      ctx.fillStyle = BULLET_COLORS.shotHalo;   // まわりにやわらかい光の輪
       ctx.beginPath(); ctx.ellipse(s.x, s.y, (s.thick ? 12 : 8) * k, (s.thick ? 18 : 12) * k, 0, 0, Math.PI * 2); ctx.fill();
       ctx.beginPath(); ctx.ellipse(s.x, s.y, (s.thick ? 7 : 4) * k, (s.thick ? 13 : 8) * k, 0, 0, Math.PI * 2);
-      ctx.lineWidth = 4; ctx.strokeStyle = "rgba(120,30,70,0.55)"; ctx.stroke();
-      ctx.lineWidth = 2; ctx.strokeStyle = "#ffffff"; ctx.stroke();
-      ctx.fillStyle = SHOT_COLOR; ctx.fill();
+      ctx.lineWidth = 2; ctx.strokeStyle = BULLET_COLORS.shotRim; ctx.stroke();
+      ctx.fillStyle = BULLET_COLORS.shot; ctx.fill();
     }
 
     // 空中の雑魚
@@ -2708,29 +2694,12 @@ const Battle = (() => {
     ctx.globalAlpha = 1;
   }
 
+  // 敵の弾（10/25-7）: 単純な球。色は BULLET_COLORS（虫の弾はザコと同じ赤紫）
   function drawEnemyBullet(b) {
-    const r = BATTLE.enemyBulletSize;
-    if (b.kind === "thorn") {   // いばらのとげ（進む向きにとがる）
-      ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(Math.atan2(b.vy, b.vx));
-      ctx.beginPath(); ctx.moveTo(r * 1.3, 0); ctx.lineTo(-r * 0.8, r * 0.6); ctx.lineTo(-r * 0.5, 0); ctx.lineTo(-r * 0.8, -r * 0.6); ctx.closePath();
-      ctx.lineWidth = 3; ctx.strokeStyle = "#ffffff"; ctx.lineJoin = "round"; ctx.stroke();
-      ctx.fillStyle = "#6a5a2a"; ctx.fill();
-      ctx.restore(); return;
-    }
-    if (b.kind === "mist") {    // 霧のつぶ
-      ctx.save();
-      ctx.fillStyle = "rgba(150,145,180,0.95)"; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(b.x, b.y, r * 0.75, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = "rgba(230,228,245,0.9)";
-      ctx.beginPath(); ctx.arc(b.x - r * 0.25, b.y - r * 0.25, r * 0.3, 0, Math.PI * 2); ctx.fill();
-      ctx.restore(); return;
-    }
-    const art = ENEMY_BULLET_ART;
-    if (art.image) {
-      if (!art._img) { art._img = new Image(); art._img.src = art.image; }
-      if (art._img.complete) { ctx.drawImage(art._img, b.x - art.radius, b.y - art.radius, art.radius * 2, art.radius * 2); return; }
-    }
-    art.draw(ctx, b.x, b.y, BATTLE.enemyBulletSize, t);
+    const C = BULLET_COLORS, r = BATTLE.enemyBulletSize * (1 + C.pulse * Math.sin(t * C.pulseSpeed + b.x * 0.05));
+    ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = C[b.kind] || C.zako; ctx.fill();
+    ctx.lineWidth = C.rimWidth; ctx.strokeStyle = C.rim; ctx.stroke();
   }
 
   // 自機＝ふわり（10/25-6。A君はふわりに乗っている設定なので、乗り物の絵はない）
