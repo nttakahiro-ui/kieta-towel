@@ -461,6 +461,8 @@ const Battle = (() => {
   let bounces = [];          // ダミーではね返った弾
   let bombsUsed = 0;
   let typhoon = null;        // ぜんぶ消しの演出（タオルをくるっと振り回す）
+  let extraUsed = false;     // 延長戦をしたか（1回だけ。10/25-19）
+  let extraRound = false;    // いま延長戦か
   let wrongFx = null;        // お題で「ちがうよ」を大きく出している（10/25-16）{ age }
   let powerFx = null;        // 「パワーアップ！」の大きな文字（10/25-9）{ age }
   let bombing = false;       // 「ぜんぶ消し」で反応させている最中（ゲージをためない）
@@ -500,6 +502,13 @@ const Battle = (() => {
     if (paused) { resume(); return; }
     if (tut) { if (tut.t >= BATTLE.tutCloseAfter) closeTut(); return; }
     if (!player) return;
+    if (state === "extraAsk") {   // 「行く」→ 延長戦、「クイズへ」→ クイズ
+      const rect = canvas.getBoundingClientRect(), x = e.clientX - rect.left, y = e.clientY - rect.top;
+      const b = extraButtons().find(q => x >= q.x && x <= q.x + q.w && y >= q.y && y <= q.y + q.h);
+      if (b && b.id === "go") { Sound.se("start"); startExtra(); }
+      else if (b) { Sound.se("item"); finishBattle(); }
+      return;
+    }
     if (state === "sortie") {   // 旅の画面: 選ぶ（救出の旅だけ）→ 表紙をタップ → カウント
         if (sortieNo === 2 && sortieStep === "say") { sortieStep = "choice"; Sound.se("item"); return; }   // ふわりの一言 → 持ち物選択
         if (sortieNo === 2 && sortieStep === "choice") {
@@ -598,7 +607,7 @@ const Battle = (() => {
     slow = 0; wave = null; gauge = 0; bombsUsed = 0; fsay = null; odai = null; bounces = [];
     msgQ = []; msgGap = 0; msgWasBusy = false;
     choiceFree = !!opts.firstChoice;
-    tut = null; hintOpts = opts.hints || null; hintShown = {}; hintCard = null; bombHinted = false; bombFlash = 0; powerFx = null; wrongFx = null;
+    tut = null; hintOpts = opts.hints || null; hintShown = {}; hintCard = null; bombHinted = false; bombFlash = 0; powerFx = null; wrongFx = null; extraUsed = false; extraRound = false;
     stripFlash = 0; sortieStep = "choice"; freed = [];
     explore = { t: 0, next: 0, nextAt: BATTLE.exploreFirst, again: [], list: [], bugs: [], bugT: 2, endT: 0, flies: [], streaks: [] };
     {
@@ -907,7 +916,7 @@ const Battle = (() => {
     const hp = BATTLE.hpOverride[role] || (role === "zako" ? Math.max(1, Math.max(word.hp, P.zakoHp) * (ground ? 1 : (BATTLE.zakoPatternHp[pattern] || 1))) : Math.max(1, Math.round(word.hp * P.bossHpScale)));
     if (od) { x = W / 2; y = -size - od.slot * 40; }
     const e = {
-      hold: BATTLE.firstHold && phase === "round2" && !od && word === script[0],   // ステージ1の救出の旅の1語目
+      hold: BATTLE.firstHold && phase === "round2" && !od && !extraRound && word === script[0],   // ステージ1の救出の旅の1語目
       word, role, size, w, h: size * 1.2, ground, pattern, lane,
       slot: od ? od.slot : 0, dummy: od ? !od.real : false, odaiReal: od ? od.real : false, penaltyAt: -9,
       last: phase !== "round1",                    // 2周目と大ボスは、倒せば吸い込む
@@ -1119,9 +1128,14 @@ const Battle = (() => {
 
     if (state === "clear") {
       stateTimer -= dt;
-      if (stateTimer <= 0) { stop(); opts.onEnd(absorbed.map(w => w.id), { time: t, hits, downs, gameOvers, score, maxCombo, bombsUsed, missed: missed.map(w => w.id), found: [...found] }); }
+      if (stateTimer <= 0) {
+        // 大ボスのあと、助けられなかったことばがあれば、その場で「もう一度さがしに行く？」（延長戦は1回だけ。10/25-19）
+        if (!extraUsed && extraWords().length) { state = "extraAsk"; drag = null; Sound.se("odai"); return; }
+        finishBattle();
+      }
       return;
     }
+    if (state === "extraAsk") return;   // 「行く」「クイズへ」を待っている
     if (phase === "round1") { updateExplore(dt); return; }   // 1回目の旅（双眼鏡）。雑魚・弾・木・天気は出さない
 
     // ===== 台本: 決まった時刻に、決まった順番で語句を出す（倒したかどうかには関係しない） =====
@@ -1136,6 +1150,9 @@ const Battle = (() => {
           state = "sortie"; sortieNo = 2; choiceT = BATTLE.choiceTime; sortieStep = "say";
           scoreAtMain = score;
           drag = null;
+        } else if (extraRound) {   // 延長戦が終わった: そのままクイズへ（大ボスはもう助けたので出ない）
+          extraRound = false;
+          state = "clear"; stateTimer = 1.5;
         } else {
           startPhase("boss");
           if (BATTLE.odai) startOdai(bossWord, true); else spawn(bossWord);
@@ -1925,6 +1942,49 @@ const Battle = (() => {
     }
   }
 
+  function finishBattle() {
+    stop(); opts.onEnd(absorbed.map(w => w.id), { time: t, hits, downs, gameOvers, score, maxCombo, bombsUsed, missed: missed.map(w => w.id), found: [...found] });
+  }
+  // 延長戦に出すことば: 助けられなかったことば（同じことばは1回。大ボスはもう助けたので出ない）
+  function extraWords() {
+    const ids = new Set(absorbed.map(w => w.id)), out = [];
+    for (const w of missed) if (!ids.has(w.id) && !out.includes(w)) out.push(w);
+    return out;
+  }
+  // 延長戦（10/25-19）: 残ったことばだけが出る救出の旅。持ち物・元気・パワー・ゲージは今のまま。全部終わったら、そのままクイズへ
+  function startExtra() {
+    const list = extraWords();
+    extraUsed = true; extraRound = true;
+    missed = [];   // 延長戦でまた逃がしたら、もう一度ここに入る
+    script = list;
+    enemies = []; fillers = []; ebullets = []; bombs = []; items = []; odai = null; obs = []; rest = null;
+    state = "play"; drag = null;
+    startPhase("round2");
+    post("banner", () => { banner = { text: tx("rescue.extraStart"), t: 1.6, color: "rgba(201,138,30,0.92)" }; });
+  }
+  // 「もう一度さがしに行く？」の2つのボタンの場所
+  function extraButtons() {
+    const bw = Math.min(W - 60, 150), bh = 54, gap = 14, y = H * 0.52;
+    return [{ id: "go", x: W / 2 - bw - gap / 2, y, w: bw, h: bh }, { id: "quiz", x: W / 2 + gap / 2, y, w: bw, h: bh }];
+  }
+  function drawExtraAsk() {
+    ctx.save();
+    ctx.fillStyle = "rgba(40,50,35,0.45)"; ctx.fillRect(0, 0, W, H);
+    const pw = Math.min(W - 32, 340), ph = 220, px = W / 2 - pw / 2, py = H * 0.52 - 140;
+    ctx.fillStyle = "rgba(255,253,245,0.98)"; ctx.strokeStyle = "#e0b03a"; ctx.lineWidth = 3;
+    roundRect(px, py, pw, ph, 18); ctx.fill(); ctx.stroke();
+    drawFuwariArt(1, W / 2, py - 6, 64);
+    ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.font = font(17); ctx.fillStyle = "#4b3a1a";
+    wrapText(tx("rescue.extraAsk", { n: extraWords().length }), pw - 40).forEach((l, i) => ctx.fillText(l, W / 2, py + 46 + i * 26));
+    extraButtons().forEach(b => {
+      ctx.fillStyle = b.id === "go" ? "#6f9a4a" : "#fffdf7"; ctx.strokeStyle = b.id === "go" ? "#4f7a32" : "#c9b98f"; ctx.lineWidth = 2.5;
+      roundRect(b.x, b.y, b.w, b.h, 16); ctx.fill(); ctx.stroke();
+      ctx.font = font(19); ctx.fillStyle = b.id === "go" ? "#ffffff" : "#6b5a3a";
+      ctx.fillText(tx(b.id === "go" ? "rescue.extraGo" : "rescue.extraQuiz"), b.x + b.w / 2, b.y + b.h / 2 + 1);
+    });
+    ctx.restore();
+  }
+
   function updateThreads(dt) {
     for (const th of threads) {
       th.age += dt;
@@ -2200,6 +2260,7 @@ const Battle = (() => {
     if (state === "sortie") drawSortie();
     if (tut) drawTut();
     if (state === "clear") centerText(`${absorbed.length}のことばを助けた！`, `${score}点`);
+    if (state === "extraAsk") drawExtraAsk();
     if (paused) {
       ctx.fillStyle = "rgba(248,243,228,0.85)";
       ctx.fillRect(0, 0, W, H);
