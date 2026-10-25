@@ -50,11 +50,15 @@ const BATTLE = {
   fillerMax: 11,               // 同時に出ている雑魚の最大数（本番での値。坂の倍率がかかる）
   fillerSpeed: 0.83,           // 雑魚の動く速さの倍率（1＝10/6の速さ）
   fillerScale: 0.8,            // 雑魚の当たりの大きさの倍率
+  shotPower: 0.8,              // ふわりの光の1発あたりの強さ（ザコの語句の殻を削る量。10/25-1 に2割下げた。中ボス・大ボスの文字には使わない）
+  firstHoldY: 0.42,            // ステージ1の救出のたびの1語目が止まって待つ高さ（画面の高さに対する割合。stages.js の firstHold）
+  firstHold: false,            // 救出のたびの1語目を止めて、助けるまで弾も虫も出さない（stages.js の override.battle でステージ1だけ true）
+  odaiShellFire: true,         // お題バトルで殻（中ボス・大ボス）から弾を撃つか（ステージ1は override.battle で false）
   imageDecoAlpha: 0.5,         // 背景の絵の上を流れる地面の飾り（綿の実・花・草むら）の濃さ（10/21-2）
   fillerDrawScale: 0.65,       // 雑魚（殻を守る虫）の見た目の大きさの倍率（10/7-1: 小さく暗い色に。当たりは fillerScale のまま）
   fillerDark: "brightness(0.55) saturate(0.6)",
   fillerOutline: "rgba(15,10,20,0.95)",   // 虫のまわりの濃い輪郭の色   // 虫を暗い色にする（CSS の filter。使えない端末では、上に暗い色を重ねる）
-  shotDrawScale: 1.2,          // ふわりの光（自機の弾）の見た目の倍率（10/7-1 に1.5、10/21-1 に1.2。語句や敵が隠れないように。当たりは今のまま）
+  shotDrawScale: 1.0,          // ふわりの光（自機の弾）の見た目の倍率（10/7-1 に1.5、10/21-1 に1.2、10/25-1 に元の1.0。当たりは今のまま）
   fillerAlpha: 0.72,           // 雑魚の濃さ（1でふつう。小さいほど薄い）
   fillerAvoid: 90,             // 語句のまわり、この距離（px）には雑魚を出さない
   fillerFireScale: 1.5,         // 雑魚が撃つ間隔の倍率（大きいほど撃たない）
@@ -158,7 +162,8 @@ const BATTLE = {
     bulletSpeed:   [[1, 0.6], [12, 1.15]],     // 敵の弾の速さの倍率（ステージ1はゆっくり）
     speedScale:    [[1, 0.85], [12, 1.25]],    // 語句の速さの倍率
     fillerDensity: [[1, 0.6], [12, 1.6]],     // 救出のたびの虫の濃さ（数と間隔。虫1匹の弾の量は変えない）
-    zakoHp:        [[1, 4], [12, 6.5]],       // ザコの語句の硬さ（弾1本あたり。四捨五入）
+    zakoHp:        [[1, 4], [12, 5]],         // ザコの語句の硬さ（弾1本あたり。四捨五入）。10/25-1: 殻は少しだけ上げる
+    fillerHp:      [[1, 1], [12, 3]],         // 虫の硬さの倍率（四捨五入）。10/25-1: 耐久は主に虫で上げる
     bossHpScale:   [[1, 1.1], [12, 2]],       // 中ボス・大ボスの1文字あたりの耐久の倍率
     tricky:        [[1, 0], [12, 6.2]],       // 意地の悪い語句の数（四捨五入。patterns が "auto" のステージだけ）
   },
@@ -195,7 +200,18 @@ const FILLER_TYPES = {
   weed:    { layer: "ground", hp: 1, r: 18, fire: 2.6 },                     // からまり草: 畑に生えている
   thorn:   { layer: "ground", hp: 1, r: 20, fire: 3.4, spread: [-0.3, 0, 0.3] }, // いばらの株: 3方向に撃つ（雑魚はみな1発で崩れる）
 };
-// 雑魚の群れの出やすさ（数が大きいほどよく出る）
+// 時間帯の虫（10/25-1。絵は仮の図形）。move ＝ 動き方（ladybug 横の列／bee 急降下して引き返す／ghost ゆらゆら降りる）、
+// speed ＝ 速さの倍率、wind ＝ 風に流される、glow ＝ 光る（霧の中の目印）。どの虫を出すかは stages.js の theme.bugs
+Object.assign(FILLER_TYPES, {
+  butterfly:   { layer: "air", hp: 1, r: 14, fire: 0.5, move: "ghost" },                 // ちょうちょ（明け方）: ゆっくり降りながらよく撃つ（ステージ1の「弾が少し来る」はおもにこれ。ステージ1はお題で殻が撃たないため）
+  grasshopper: { layer: "air", hp: 1, r: 13, fire: 2.4, move: "bee" },                   // バッタ（真昼）: ぴょんと飛びこんでくる
+  dragonfly:   { layer: "air", hp: 1, r: 14, fire: 2.6, move: "ladybug", wind: true },   // トンボ（夕暮れ）: 列で横切る。風に流される
+  moth:        { layer: "air", hp: 1, r: 14, fire: 3.0, move: "ghost", wind: true },     // ガ（夕暮れ）: ゆらゆら。風に流される
+  bat:         { layer: "air", hp: 1, r: 14, fire: 2.0, move: "bee", speed: 1.3 },       // コウモリ（夜）: 速い
+  firefly:     { layer: "air", hp: 1, r: 12, fire: 3.4, move: "ghost", glow: true },     // ホタル（夜）: 光る
+});
+const moveOf = type => FILLER_TYPES[type].move || type;
+// 雑魚の群れの出やすさ（数が大きいほどよく出る）。stages.js の theme.bugs がないステージで使う
 const FILLER_WAVES = { ladybugs: 3, bees: 2, ghost: 2, weeds: 3, thorn: 1 };
 
 // ===== 敵の弾の絵（ここだけ書き換えれば、弾の見た目が変わる） =====
@@ -688,9 +704,8 @@ const Battle = (() => {
   // 木のよけ方の案内: 1秒スローにして、ふわりが一言、矢印で示す
   function startGuide(g) {
     clearMsgs(5);
-    guide = Object.assign(g, { t: BATTLE.guideTime });
+    guide = Object.assign(g, { t: BATTLE.guideTime, text: tx(g.kind === "gate" ? "rescue.treeGate" : "rescue.treeDodge") });   // 文字は画面の中ほど、矢印は木の横（10/25-1）
     slow = Math.max(slow, BATTLE.guideSlow);
-    fsay = { text: tx(g.kind === "gate" ? "rescue.treeGate" : "rescue.treeDodge"), t: BATTLE.guideTime };
     Sound.se("odai");
   }
 
@@ -704,6 +719,7 @@ const Battle = (() => {
     if (p !== "round1") Sound.fadeTo("battle");   // 本番の曲へ（探検は静かめの曲）
   }
   // カウントの今の段階（0〜2 ＝「3」「2」「1」、3 ＝「出撃！」）
+  const holdOn = () => enemies.some(e => e.hold && e.hp > 0);   // 1語目を待っているあいだ（弾も虫も出さない。台本も進めない）
   const countStepNo = () => Math.min(3, Math.floor(countT / BATTLE.countStep));
   const roundInterval = () => phase === "round1" ? BATTLE.roundInterval1 : BATTLE.roundInterval2;
   // 坂: 今の出撃の弾の量の倍率（大きいほど撃つ間隔が短い）
@@ -836,6 +852,7 @@ const Battle = (() => {
     const hp = BATTLE.hpOverride[role] || (role === "zako" ? Math.max(word.hp, P.zakoHp) : Math.max(1, Math.round(word.hp * P.bossHpScale)));
     if (od) { x = W / 2; y = -size - od.slot * 40; }
     const e = {
+      hold: BATTLE.firstHold && phase === "round2" && !od && word === script[0],   // ステージ1の救出のたびの1語目
       word, role, size, w, h: size * 1.2, ground, pattern, lane,
       slot: od ? od.slot : 0, dummy: od ? !od.real : false, odaiReal: od ? od.real : false, penaltyAt: -9,
       last: phase !== "round1",                    // 2周目と大ボスは、倒せば吸い込む
@@ -903,10 +920,11 @@ const Battle = (() => {
 
   // ===== 雑魚の群れを出す =====
   // 本番と大ボスだけ雑魚を濃くする（難しさは雑魚の弾でなく数で作る）
-  const fillerDense = () => phase === "round1" ? 1 : P.fillerDensity;   // 難易度の線（fillerDensity）
+  const fillerDense = () => phase === "round1" ? 1 : P.fillerDensity * ((theme.bugs && theme.bugs.density) || 1);   // 難易度の線（fillerDensity）× 時間帯の虫の数
   function spawnFiller(type, x, y, extra) {
     const def = FILLER_TYPES[type];
-    fillers.push(Object.assign({ type, layer: def.layer, hp: def.hp, r: def.r * BATTLE.fillerScale, x, y, age: 0, flash: 0,
+    const fhp = Math.max(1, Math.round(def.hp * (P.fillerHp || 1)));   // 虫の硬さ（難易度の線）
+    fillers.push(Object.assign({ type, layer: def.layer, hp: fhp, maxHp: fhp, r: def.r * BATTLE.fillerScale, x, y, age: 0, flash: 0,
       fire: def.fire ? rand(0.8, 1.6) * def.fire * BATTLE.fillerFireScale * fillerDense() / P.fireRate / fireRamp() : 0 }, extra || {}));
   }
   // 語句の近くかどうか（雑魚を出す場所をえらぶとき用）
@@ -930,6 +948,21 @@ const Battle = (() => {
   }
 
   function spawnWave() {
+    // 時間帯の虫（theme.bugs.kinds）: どれか1種類を、その動き方の群れで出す
+    const kinds = theme.bugs && theme.bugs.kinds;
+    if (kinds && kinds.length) {
+      const kind = kinds[Math.floor(Math.random() * kinds.length)], mv = moveOf(kind);
+      if (mv === "ladybug") {
+        const fromLeft = Math.random() < 0.5, y0 = freeRow();
+        if (y0 === null) return;
+        for (let i = 0; i < 6; i++) spawnFiller(kind, fromLeft ? -20 : W + 20, y0, { dir: fromLeft ? 1 : -1, y0, delay: i * 0.32 });
+      } else if (mv === "bee") {
+        for (let i = 0; i < 3; i++) { const x = freeX(0, "air", 30); if (x !== null) spawnFiller(kind, x, -20, { delay: i * 0.35, tx: null }); }
+      } else {
+        for (let i = 0; i < 2; i++) { const x = freeX(0, "air", 40); if (x !== null) spawnFiller(kind, x, -24 - i * 50, { bx: 0 }); }
+      }
+      return;
+    }
     const names = Object.keys(FILLER_WAVES).filter(n => groundOn || !["weeds", "thorn"].includes(n));   // 地上のない世界では、地上の雑魚を出さない
     let sum = names.reduce((a, n) => a + FILLER_WAVES[n], 0), r = Math.random() * sum, name = names[0];
     for (const n of names) { r -= FILLER_WAVES[n]; if (r <= 0) { name = n; break; } }
@@ -1052,7 +1085,7 @@ const Battle = (() => {
         }
       }
     } else if (phase !== "boss") {
-      if (!odai) {   // お題バトルの間は、台本を止める
+      if (!odai && !holdOn()) {   // お題バトルの間と、1語目を待っているあいだは、台本を止める
         roundT += dt;
         if (obsActive()) {
           const list = (obsDef.items || []).filter(it => it.at !== undefined);   // 時刻で出す木
@@ -1081,7 +1114,7 @@ const Battle = (() => {
     }
 
     // 雑魚の群れを出す（1周目と大ボスのときは少なめ）
-    if (!odai && !rest) fillerTimer -= dt;   // お題のあいだと、木の前後の休みのあいだは、雑魚を出さない
+    if (!odai && !rest && !holdOn()) fillerTimer -= dt;   // お題のあいだと、木の前後の休みのあいだは、雑魚を出さない
     if (fillerTimer <= 0) {
       const rp = BATTLE.ramp[phase] || BATTLE.ramp.round2;   // 坂: 今の出撃の濃さ
       const dn = rp.filler * fillerDense();
@@ -1159,9 +1192,11 @@ const Battle = (() => {
         e.y = H * BATTLE.crossY + Math.sin(e.age * 2) * 14;
       } else {
         e.y += (H + e.size * 2) / BATTLE.fallTime[e.role] * dt * e.spd;
+        if (e.hold) e.y = Math.min(e.y, H * BATTLE.firstHoldY);   // ステージ1の救出のたびの1語目: 中ほどで止まって待つ
         e.x = e.bx + Math.sin(e.age * BATTLE.swaySpeed + e.phase) * BATTLE.sway;
       }
-      // 弾を撃つ（画面の上のほうにいる間だけ）
+      // 弾を撃つ（画面の上のほうにいる間だけ）。1語目を待っているあいだと、ステージ1のお題では撃たない
+      if (holdOn() || (e.pattern === "odai" && !BATTLE.odaiShellFire)) continue;
       e.fire -= dt;
       if (e.pattern === "odai" && odai && odai.intro > 0) e.fire = Math.max(e.fire, 0.5);
       if (e.fire <= 0 && e.y > 0 && e.y < H * 0.62) {
@@ -1184,25 +1219,26 @@ const Battle = (() => {
         } else {
           f.escort = null;   // 守る相手がいなくなったら、ふつうの綿毛おばけになる
         }
-      } else if (f.type === "ladybug") {
-        f.x += f.dir * 170 * BATTLE.fillerSpeed * dt;
+      } else if (moveOf(f.type) === "ladybug") {
+        f.x += f.dir * 170 * BATTLE.fillerSpeed * (def.speed || 1) * dt;
         f.y = f.y0 + Math.sin(f.x / 60) * 28 + f.age * 6;
         f.ang = Math.atan2(Math.cos(f.x / 60) * 28 / 60 * f.dir, f.dir);
-      } else if (f.type === "bee") {
+      } else if (moveOf(f.type) === "bee") {
         if (f.tx === null) { f.tx = player.x; f.turn = H * rand(0.38, 0.5); }
         if (!f.back) {
-          f.y += 340 * BATTLE.fillerSpeed * dt;
+          f.y += 340 * BATTLE.fillerSpeed * (def.speed || 1) * dt;
           f.x += (f.tx - f.x) * 2 * dt;
           if (f.y > f.turn) { f.back = true; f.vx = (f.x < W / 2 ? 1 : -1) * 160; }
         } else {
           f.y -= 135 * BATTLE.fillerSpeed * dt; f.x += f.vx * BATTLE.fillerSpeed * dt;
         }
-      } else if (f.type === "ghost") {
-        f.y += H / 11 * BATTLE.fillerSpeed * dt;
+      } else if (moveOf(f.type) === "ghost") {
+        f.y += H / 11 * BATTLE.fillerSpeed * (def.speed || 1) * dt;
         f.x += Math.sin(f.age * 1.3) * 40 * dt;
       } else {
         f.y += sc * dt;     // 地上の雑魚は地面といっしょに流れる
       }
+      if (def.wind && weatherOn("wind")) f.x += BATTLE.windDir * BATTLE.windStrength * 1.6 * dt;   // 夕暮れの虫は風に流される
       if (def.fire) {
         f.fire -= dt;
         if (f.fire <= 0 && f.y > 0 && f.y < H * 0.68) {
@@ -1365,7 +1401,7 @@ const Battle = (() => {
     if (odai) return 1;   // お題バトルの間は正面1本だけ
     return (SHOT_SPREAD[level.shots] || [0]).length * (level.thick ? 2 : 1);
   }
-  const shotDamage = e => (e.role === "zako" && !e.ground && BATTLE.zakoHpByShots) ? 1 / shotUnits() : 1;
+  const shotDamage = e => (e.role === "zako" && !e.ground && BATTLE.zakoHpByShots) ? BATTLE.shotPower / shotUnits() : 1;   // 1発で削る量（パワーの初期値はここで2割下げる）
 
   function damageWord(e, hitX, amt = 1) {
     e.flash = 0.12;
@@ -1915,6 +1951,13 @@ const Battle = (() => {
     ctx.globalAlpha = 1;
 
     if (fogLevel > 0.01) drawFog();
+    // ホタルの光（霧の上にも出る。霧の中の目印）
+    for (const f of fillers) if (FILLER_TYPES[f.type].glow && !(f.delay > 0)) {
+      const a = 0.5 + Math.sin(t * 4 + f.x) * 0.3;
+      const g = ctx.createRadialGradient(f.x, f.y + 4, 1, f.x, f.y + 4, 16);
+      g.addColorStop(0, `rgba(230,255,140,${a})`); g.addColorStop(1, "rgba(230,255,140,0)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(f.x, f.y + 4, 16, 0, Math.PI * 2); ctx.fill();
+    }
     drawWeather();
     drawPlayer();
     for (const f of freed) {   // 助けた語句（金色に光って、小さくなりながらふわりへ）
@@ -2144,33 +2187,31 @@ const Battle = (() => {
   }
 
   // 木のよけ方の案内の矢印
+  // 木の案内（10/25-1）: 矢印は木の横（よける向き）、文字は画面の中ほどの案内の位置に分けて出す
   function drawGuide() {
     const k = Math.min(1, guide.t / 0.3), pulse = 0.6 + Math.sin(t * 10) * 0.4;
-    const y = player.y - 48;
-    const x1 = player.x;
-    let x2;
-    if (guide.kind === "dodge") x2 = player.x + guide.dir * 80;
-    else {
-      x2 = Math.abs(guide.gx - x1) < 24 ? x1 : guide.gx;   // もうすきまの下にいれば横の矢印は出さない
-      // すきまの場所に下向きの印
-      const gy = Math.max(70, Math.min(player.y - 90, guide.tree.y));
-      ctx.save(); ctx.globalAlpha = k;
-      ctx.fillStyle = `rgba(255,214,90,${0.6 + pulse * 0.4})`; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.moveTo(guide.gx - 16, gy - 10); ctx.lineTo(guide.gx + 16, gy - 10); ctx.lineTo(guide.gx, gy + 12); ctx.closePath();
+    const tr = guide.tree, ty = Math.max(70, Math.min(H - 140, tr.y));
+    ctx.save(); ctx.globalAlpha = k;
+    if (guide.kind === "dodge") {   // 木の横に、よける向きの矢印
+      const dir = guide.dir, x1 = tr.x + dir * (tr.r + 10), x2 = x1 + dir * 64;
+      ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 12; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(x1, ty); ctx.lineTo(x2 - dir * 10, ty); ctx.stroke();
+      ctx.strokeStyle = `rgba(230,160,40,${0.7 + pulse * 0.3})`; ctx.lineWidth = 7;
+      ctx.beginPath(); ctx.moveTo(x1, ty); ctx.lineTo(x2 - dir * 10, ty); ctx.stroke();
+      ctx.fillStyle = `rgba(230,160,40,${0.7 + pulse * 0.3})`; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(x2 + dir * 8, ty); ctx.lineTo(x2 - dir * 12, ty - 14); ctx.lineTo(x2 - dir * 12, ty + 14); ctx.closePath();
       ctx.stroke(); ctx.fill();
-      ctx.restore();
+    } else {                        // 木と木のあいだに、下向きの印
+      ctx.fillStyle = `rgba(255,214,90,${0.6 + pulse * 0.4})`; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(guide.gx - 16, ty - 10); ctx.lineTo(guide.gx + 16, ty - 10); ctx.lineTo(guide.gx, ty + 12); ctx.closePath();
+      ctx.stroke(); ctx.fill();
     }
-    if (x2 === x1) return;
-    const dir = Math.sign(x2 - x1);
-    ctx.save();
-    ctx.globalAlpha = k;
-    ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 12; ctx.lineCap = "round";
-    ctx.beginPath(); ctx.moveTo(x1, y); ctx.lineTo(x2 - dir * 10, y); ctx.stroke();
-    ctx.strokeStyle = `rgba(230,160,40,${0.7 + pulse * 0.3})`; ctx.lineWidth = 7;
-    ctx.beginPath(); ctx.moveTo(x1, y); ctx.lineTo(x2 - dir * 10, y); ctx.stroke();
-    ctx.fillStyle = `rgba(230,160,40,${0.7 + pulse * 0.3})`; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(x2 + dir * 8, y); ctx.lineTo(x2 - dir * 12, y - 14); ctx.lineTo(x2 - dir * 12, y + 14); ctx.closePath();
-    ctx.stroke(); ctx.fill();
+    // 文字: 画面の中ほどに
+    ctx.font = font(20); ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    const tw = ctx.measureText(guide.text).width + 36, cy = H * 0.5;
+    ctx.fillStyle = "rgba(255,253,245,0.95)"; ctx.strokeStyle = "#e0b03a"; ctx.lineWidth = 2.5;
+    roundRect(W / 2 - tw / 2, cy - 22, tw, 44, 16); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#8a5a10"; ctx.fillText(guide.text, W / 2, cy + 1);
     ctx.restore();
   }
 
@@ -2280,6 +2321,40 @@ const Battle = (() => {
     ctx.restore();
   }
 
+  // 時間帯の虫の絵（仮の図形。10/25-1）。描いたら true
+  function drawBug(f, lit) {
+    const k = f.type, flap = Math.abs(Math.sin(f.age * 14));
+    if (k === "butterfly") {
+      ctx.fillStyle = lit ? "#ffd6f0" : "#f59ac8";
+      for (const s of [-1, 1]) { ctx.beginPath(); ctx.ellipse(s * 7, -3, 8 * (0.4 + flap * 0.6), 9, s * 0.4, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.ellipse(s * 5, 7, 5 * (0.4 + flap * 0.6), 6, -s * 0.4, 0, Math.PI * 2); ctx.fill(); }
+      ctx.fillStyle = "#5a3a2a"; ctx.fillRect(-1.5, -9, 3, 18);
+    } else if (k === "grasshopper") {
+      ctx.fillStyle = lit ? "#cfe8a0" : "#7fae3a";
+      ctx.beginPath(); ctx.ellipse(0, 0, 6, 13, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "#4f7a26"; ctx.lineWidth = 2.5;
+      for (const s of [-1, 1]) { ctx.beginPath(); ctx.moveTo(s * 4, 4); ctx.lineTo(s * 13, -2); ctx.lineTo(s * 11, 12); ctx.stroke(); }
+    } else if (k === "dragonfly") {
+      ctx.rotate((f.dir || 1) > 0 ? Math.PI / 2 : -Math.PI / 2);
+      ctx.fillStyle = "rgba(220,240,255,0.8)";
+      for (const s of [-1, 1]) { ctx.beginPath(); ctx.ellipse(s * 10, -3, 10, 3.5 + flap * 1.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.ellipse(s * 9, 4, 9, 3, 0, 0, Math.PI * 2); ctx.fill(); }
+      ctx.fillStyle = lit ? "#ffd0a0" : "#d86a2a"; ctx.fillRect(-2.5, -10, 5, 22);
+    } else if (k === "moth") {
+      ctx.fillStyle = lit ? "#f4ead0" : "#bba98a";
+      for (const s of [-1, 1]) { ctx.beginPath(); ctx.ellipse(s * 7, 0, 9 * (0.5 + flap * 0.5), 10, s * 0.3, 0, Math.PI * 2); ctx.fill(); }
+      ctx.fillStyle = "#6a5a40"; ctx.fillRect(-2, -8, 4, 16);
+    } else if (k === "bat") {
+      ctx.fillStyle = lit ? "#a090c0" : "#3a2f50";
+      ctx.beginPath(); ctx.moveTo(0, -4);
+      for (const s of [-1, 1]) { ctx.lineTo(s * 18, -8 + flap * 8); ctx.lineTo(s * 12, 2); ctx.lineTo(s * 6, -1); }
+      ctx.lineTo(0, 6); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI * 2); ctx.fill();
+    } else if (k === "firefly") {
+      ctx.fillStyle = "#4a4a30"; ctx.beginPath(); ctx.ellipse(0, -3, 4, 6, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = lit ? "#ffffff" : "#e8ff7a"; ctx.beginPath(); ctx.arc(0, 5, 5, 0, Math.PI * 2); ctx.fill();
+    } else return false;
+    return true;
+  }
+
   // 雑魚の絵（仮）
   function drawFiller(f) {
     if (f.delay > 0) return;
@@ -2295,7 +2370,8 @@ const Battle = (() => {
     if (!hasFilter) f._darkFallback = true;
     if (f.flash > 0) ctx.translate((Math.random() - 0.5) * 3, 0);
     const lit = f.flash > 0;
-    if (f.type === "ladybug") {
+    if (drawBug(f, lit)) { /* 時間帯の虫（仮の図形） */ }
+    else if (f.type === "ladybug") {
       ctx.rotate((f.ang || 0) + (f.dir > 0 ? Math.PI / 2 : -Math.PI / 2));
       ctx.fillStyle = "rgba(255,255,255,0.7)";   // はね
       ctx.beginPath(); ctx.ellipse(-8, 2, 8, 4, 0.5 + Math.sin(t * 40) * 0.3, 0, Math.PI * 2); ctx.fill();
@@ -2357,7 +2433,7 @@ const Battle = (() => {
       ctx.beginPath(); ctx.arc(x, y, r * BATTLE.fillerDrawScale * 0.9, 0, Math.PI * 2); ctx.fill();
     }
     // 硬い雑魚は、のこりの硬さを小さな点で
-    if (FILLER_TYPES[f.type].hp > 1 && f.hp < FILLER_TYPES[f.type].hp) {
+    if ((f.maxHp || 1) > 1 && f.hp < f.maxHp) {
       ctx.fillStyle = "rgba(0,0,0,0.25)";
       for (let i = 0; i < f.hp; i++) { ctx.beginPath(); ctx.arc(x - (f.hp - 1) * 4 + i * 8, y - f.r - 6, 2.5, 0, Math.PI * 2); ctx.fill(); }
     }
