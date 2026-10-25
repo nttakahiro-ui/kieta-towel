@@ -2139,7 +2139,7 @@ const Battle = (() => {
     if (hintCard) drawHintCard();
     if (state === "sortie") drawSortie();
     if (tut) drawTut();
-    if (state === "clear") centerText(`${absorbed.length}語助けた！`, `${score}点`);
+    if (state === "clear") centerText(`${absorbed.length}のことばを助けた！`, `${score}点`);
     if (paused) {
       ctx.fillStyle = "rgba(248,243,228,0.85)";
       ctx.fillRect(0, 0, W, H);

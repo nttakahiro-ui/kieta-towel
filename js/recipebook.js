@@ -29,6 +29,20 @@ const RecipeBook = (() => {
     return new Set(stages().filter(s => { const ws = words.filter(w => w.stage === s.id); return ws.length && ws.every(w => cards[w.id]); }).map(s => s.id));
   }
 
+  // 世界ごとの扇形（10/25-13）: 台座を中心から外へ3本の仕切り線で3つに分け、扇形ごとに薄く世界の色（stages.js の WORLDS の color）を敷く
+  function sectors(list) {
+    const RR = R + 30, pt = a => `${(C + Math.cos(a) * RR).toFixed(1)},${(C + Math.sin(a) * RR).toFixed(1)}`;
+    let fills = "", lines = "";
+    (window.WORLDS || []).forEach(wd => {
+      const idx = list.map((s, i) => (s.world === wd.id ? i : -1)).filter(i => i >= 0);
+      if (!idx.length) return;
+      const a0 = angle(idx[0] - 0.5), a1 = angle(idx[idx.length - 1] + 0.5), large = a1 - a0 > Math.PI ? 1 : 0;
+      fills += `<path d="M${C},${C} L${pt(a0)} A${RR},${RR} 0 ${large} 1 ${pt(a1)} Z" fill="${wd.color || "#cccccc"}" fill-opacity="0.16"/>`;
+      lines += `<line x1="${C}" y1="${C}" x2="${pt(a0).replace(",", '" y2="')}" stroke="#c9b98f" stroke-width="2"/>`;   // 扇形の始まりの仕切り線（3つで3本）
+    });
+    return fills + lines;
+  }
+
   // el に台座を描く。o: { lit: Set（光っている stage id）, drop: 宝石がはまる演出をする stage id, onTap(stageId), small: 小さい台座（目的の画面） }
   function render(el, o) {
     const lit = o.lit || new Set(), k = lit.size / 12;
@@ -55,6 +69,7 @@ const RecipeBook = (() => {
       `<radialGradient id="rbGlow"><stop offset="0.55" stop-color="#fff6c8" stop-opacity="${(0.55 * k).toFixed(2)}"/><stop offset="1" stop-color="#fff6c8" stop-opacity="0"/></radialGradient></defs>` +
       `<circle cx="${C}" cy="${C}" r="${C - 4}" fill="url(#rbGlow)"/>` +
       `<circle cx="${C}" cy="${C}" r="${R + 30}" fill="url(#rbBase)" stroke="#c9b98f" stroke-width="3"/>` +
+      sectors(list) +
       `<circle cx="${C}" cy="${C}" r="${R - 30}" fill="rgba(255,255,255,0.35)" stroke="#d8cba8" stroke-width="1.5"/>`;
     const towel = `<g opacity="${(0.15 + 0.85 * k).toFixed(2)}" transform="translate(${C},${C - 16})">` +
       `<rect x="-34" y="-24" width="68" height="44" rx="6" fill="#ffffff" stroke="#c9b98f" stroke-width="2"/>` +
