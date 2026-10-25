@@ -271,12 +271,19 @@ const Main = (() => {
     document.querySelectorAll(".screen").forEach(s => s.classList.toggle("active", s.id === `screen-${name}`));
   }
 
+  // タイトル画面の「レシピ ○/12」「カード ○/120」（10/25-20。前は「ふわりのカード ○枚」）
+  function titleCounts() {
+    $("title-recipes-label").textContent = tx("title.recipes"); $("title-cards-label").textContent = tx("title.cards");
+    $("title-recipes").textContent = RecipeBook.litIds(Save.data.cards).size;
+    $("title-cards").textContent = Save.cardCount();
+    $("title-cards-total").textContent = window.WORDS.length;
+  }
   function toTitle() {
     Battle.stop();
     Sound.play("title");
     $("title-world").textContent = `世界${world.id}　${world.name}`;
     $("title-stage").textContent = stage.name;
-    $("title-cards").textContent = Save.cardCount();
+    titleCounts();
     showTuneTag();
     showScreen("title");
   }
@@ -442,10 +449,11 @@ const Main = (() => {
     back.classList.toggle("hidden", wid <= 1);
     back.textContent = tx("worlds.back", { id: wid - 1 });
     back.onclick = () => { Save.data.world = wid - 1; Save.store(); toStages(); };
-    $("btn-zukan").textContent = tx("zukan.button");
+    $("btn-zukan").textContent = tx("zukan.buttonCount", { n: Save.cardCount(), total: window.WORDS.length });   // 下の「タイトルへ」の横（10/25-20）
     // いちばん上に、今いる世界の4つの宝石（レシピブックの台座の一部）。タップでレシピブック（12個の台座の全体）へ（10/25-17）
     const litSet = RecipeBook.litIds(Save.data.cards);
     RecipeBook.render($("stages-gems"), { lit: litSet, world: wid });
+    $("stages-gems-head").textContent = tx("recipeBook.head"); $("stages-gems-count").textContent = `${litSet.size}/12`;   // 見出し「12のレシピ ○/12」（10/25-20）
     $("stages-gems").onclick = toRecipeBook;
     const box = $("stages-list");
     box.innerHTML = "";
@@ -660,7 +668,7 @@ const Main = (() => {
     $("dbg-all-cards").addEventListener("click", () => {
       window.WORDS.forEach(w => { Save.data.cards[w.id] = true; });
       Save.store();
-      $("title-cards").textContent = Save.cardCount();
+      titleCounts();
       $("dbg-all-cards").textContent = "すべてのカードをそろえた";
     });
     $("btn-zukan-back").addEventListener("click", toStages);
@@ -707,7 +715,7 @@ const Main = (() => {
       Save.data.gemsSeen = {};   // レシピの演出を見た記録も消す（もう一度演出が見られるように）
       Save.store();
       TutSave.reset();   // チュートリアルを見た記録も消す（この版の分）
-      $("title-cards").textContent = 0;
+      titleCounts();
     });
 
     // アプリが裏に回ったら、バトルと音を止める
@@ -729,7 +737,7 @@ const Main = (() => {
 
     $("title-world").textContent = `世界${world.id}　${world.name}`;
     $("title-stage").textContent = stage.name;
-    $("title-cards").textContent = Save.cardCount();
+    titleCounts();
     showTuneTag();
     showScreen(Save.data.introSeen ? "title" : "intro");   // 初めて開いたときは、目的の画面から
   }
