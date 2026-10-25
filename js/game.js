@@ -23,6 +23,7 @@ const BATTLE = {
   fallTime: { zako: 10, mid: 12.5 }, // 空中の語句が画面の上から下まで降りる秒数（大きいほどゆっくり）。10/7に10/6の前とあとの中間にした
   edgeFallTime: 13.5,          // 「端にかくれる」語句が降りる秒数
   crossTime: 6,                // 「横切る」語句が画面を横切る秒数
+  zakoPatternHp: { cross: 0.3, edge: 0.3, treeshade: 1.4 },   // ザコの殻の硬さの倍率（10/25-8）。横切る・端にかくれる語句は当てられる時間が短いのでやわらかく、木のかげの語句は上で待つあいだにほどけないよう硬く
   crossY: 0.2,                 // 「横切る」語句が通る高さ（画面の高さに対する割合）
   escortCount: 4,              // 「雑魚のうしろ」の語句を守る雑魚の数
   kanaSize: 13,                // 敵の語句の上に出すふりがなの大きさ（px）
@@ -50,7 +51,8 @@ const BATTLE = {
   fillerMax: 11,               // 同時に出ている雑魚の最大数（本番での値。坂の倍率がかかる）
   fillerSpeed: 0.83,           // 雑魚の動く速さの倍率（1＝10/6の速さ）
   fillerScale: 0.8,            // 雑魚の当たりの大きさの倍率
-  shotPower: 0.8,              // ふわりの光の1発あたりの強さ（ザコの語句の殻を削る量。10/25-1 に2割下げた。中ボス・大ボスの文字には使わない）
+  shotPower: 0.35,             // ふわりの光の1発あたりの強さ（ザコの語句の殻を削る量。10/25-1 に0.8、10/25-8 に0.35。中ボス・大ボスの文字には使わない）
+                               //   10/25-8 の目安: 光を当て続けて、ことばが画面の中央あたり（高さの35〜65%）に来るころに殻がほどける
   firstHoldY: 0.42,            // ステージ1の救出の旅の1語目が止まって待つ高さ（画面の高さに対する割合。stages.js の firstHold）
   firstHold: false,            // 救出の旅の1語目を止めて、助けるまで弾も虫も出さない（stages.js の override.battle でステージ1だけ true）
   odaiShellFire: true,         // お題バトルで殻（中ボス・大ボス）から弾を撃つか（ステージ1は override.battle で false）
@@ -164,7 +166,7 @@ const BATTLE = {
     bulletSpeed:   [[1, 0.6], [12, 1.15]],     // 敵の弾の速さの倍率（ステージ1はゆっくり）
     speedScale:    [[1, 0.85], [12, 1.25]],    // 語句の速さの倍率
     fillerDensity: [[1, 0.6], [12, 1.6]],     // 救出の旅の虫の濃さ（数と間隔。虫1匹の弾の量は変えない）
-    zakoHp:        [[1, 4], [12, 5]],         // ザコの語句の硬さ（弾1本あたり。四捨五入）。10/25-1: 殻は少しだけ上げる
+    zakoHp:        [[1, 10], [12, 11]],       // ザコの語句の硬さ（弾1本あたり。四捨五入）。10/25-1: 4〜5、10/25-8: 10〜11（殻が画面の中央あたりでほどけるように）
     fillerHp:      [[1, 1], [12, 3]],         // 虫の硬さの倍率（四捨五入）。10/25-1: 耐久は主に虫で上げる
     bossHpScale:   [[1, 1.1], [12, 2]],       // 中ボス・大ボスの1文字あたりの耐久の倍率
     tricky:        [[1, 0], [12, 6.2]],       // 意地の悪い語句の数（四捨五入。patterns が "auto" のステージだけ）
@@ -223,10 +225,11 @@ const FILLER_WAVES = { ladybugs: 3, bees: 2, ghost: 2, weeds: 3, thorn: 1 };
 
 // ===== 発見の旅の、ことばの動きの型（10/25-7） =====
 // stages.js の explore: { move: "fall" } で選ぶ（書いていないステージは "drift"）。数は、ここか stages.js の explore 欄で上書きできる
+// lookTime ＝ 見つめて見つかるまでの秒数（書いていない型は BATTLE.lookTime）
 // 双眼鏡で見つめる操作はどの型も同じ。世界2・3の探し方（箱を開ける・星をなぞる）は、ここに型を足して差しかえる
 const EXPLORE_MOVES = {
   drift:   {},                                                        // ゆっくり漂う（ステージ1）
-  fall:    { fallSpeed: 46, sway: 34, swaySpeed: 1.4, wait: 2, lifeMul: 2 },   // 落ち葉のように揺れながら降る。地面に落ちたら wait 秒あとに上から出直す（ただよう時間は lifeMul 倍）
+  fall:    { fallSpeed: 46, sway: 34, swaySpeed: 1.4, wait: 2, lifeMul: 2, lookTime: 1 },   // 落ち葉のように揺れながら降る。地面に落ちたら wait 秒あとに上から出直す（ただよう時間は lifeMul 倍）。見つめる時間は1秒（10/25-8）
   wind:    { wind: 40, gust: 0.35, binoDrift: 14, wait: 0.8 },        // 風で右へ流される（gust ＝ 風の強弱）。右に出たら wait 秒あとに左から出直す。双眼鏡も binoDrift px/秒 流される
   firefly: { speedMul: 0.5, flies: 4, stray: 4, fog: 0.35, hint: false },   // 霧が濃い。ことばのまわりにホタルが flies 匹集まる（stray ＝ ひとりで飛ぶホタル）。きらっと光る目印は出さない
 };
@@ -318,7 +321,7 @@ function stageParams(stage) {
   const ov = (stage && stage.override) || {};
   const P = { difficulty: d };
   for (const k of Object.keys(BATTLE.difficulty)) P[k] = ov[k] !== undefined ? ov[k] : lineAt(BATTLE.difficulty[k], d);
-  P.zakoHp = Math.max(1, Math.round(P.zakoHp));
+  P.zakoHp = Math.max(1, Math.round(P.zakoHp * 10) / 10);   // 10/25-8: 0.1 きざみ（前は整数に四捨五入。ステージごとの速さの差に合わせるため）
   P.tricky = Math.max(0, Math.round(P.tricky));
   return P;
 }
@@ -870,8 +873,15 @@ const Battle = (() => {
     let y = -size;
     if (pattern === "edge") x = lane < 0.5 ? -w / 2 : W + w / 2;
     if (pattern === "cross") { x = lane < 0.5 ? -w / 2 - 10 : W + w / 2 + 10; y = H * BATTLE.crossY; }
+    // 木の真上に出る語句は、木と同じ速さで降りるので、ずっと木にかくれて光が届かない（10/25-8）。木の列をよけて横にずらす（木のかげの語句は別）
+    if (pattern === "normal" && !ground && !od) for (const o of obs) {
+      if (o.y < y || o.y - o.r > H || Math.abs(x - o.x) >= o.r + w / 2 + 8) continue;
+      const lo = left + margin, hi = W - margin, toR = o.x + o.r + w / 2 + 16, toL = o.x - o.r - w / 2 - 16;
+      x = toR <= hi && (toL < lo || x >= o.x) ? toR : toL >= lo ? toL : x;
+    }
     // 硬さ: ザコは難易度で決まる硬さ、中ボス・大ボスは文字1つあたりの耐久 × 難易度の倍率
-    const hp = BATTLE.hpOverride[role] || (role === "zako" ? Math.max(word.hp, P.zakoHp) : Math.max(1, Math.round(word.hp * P.bossHpScale)));
+    //   横切る・端にかくれる語句は、画面にいる（当てられる）時間が短いので、BATTLE.zakoPatternHp の倍率でやわらかくする（10/25-8）
+    const hp = BATTLE.hpOverride[role] || (role === "zako" ? Math.max(1, Math.max(word.hp, P.zakoHp) * (ground ? 1 : (BATTLE.zakoPatternHp[pattern] || 1))) : Math.max(1, Math.round(word.hp * P.bossHpScale)));
     if (od) { x = W / 2; y = -size - od.slot * 40; }
     const e = {
       hold: BATTLE.firstHold && phase === "round2" && !od && word === script[0],   // ステージ1の救出の旅の1語目
@@ -1123,6 +1133,8 @@ const Battle = (() => {
         if (rest) updateRest(dt);
         while (!rest && nextIdx < script.length && roundT >= nextAt) {
           const w = script[nextIdx];
+          // 中ボスのお題は、画面にいるほかの語句が助かるか、いなくなるまで待って始める（お題のあいだは語句が止まって当たらないので。10/25-8）
+          if (phase === "round2" && BATTLE.odai && w.role === "mid" && enemies.some(e => e.role === "zako" && !e.ground && e.hp > 0)) { nextAt = roundT; break; }   // 待つあいだ、あとの語句の時刻も後ろにずらす（まとめて出ないように）
           nextIdx++;
           nextAt += roundInterval();
           if (phase === "round2" && BATTLE.odai && w.role === "mid") { startOdai(w, false); break; }
@@ -1322,6 +1334,7 @@ const Battle = (() => {
         for (const e of enemies.slice().sort((a, b) => b.y - a.y)) {   // 下にいる語句から当たる
           if (e.ground || e.hp <= 0 || !onScreen(e) || e.appearT > 0) continue;   // 画面に全部入るまで・入ってすぐの1秒は当たらない
           if (e.pattern === "odai" ? (odai && odai.intro > 0) : (e.role === "boss" && e.age < BATTLE.bossEnterTime)) continue;   // 読む時間・降りてくる間は当たらない
+          if (odai && e.pattern !== "odai") continue;   // お題バトルの間、止まっているほかの語句には当たらない（上のほうで殻がほどけないように。10/25-8）
           const pad = (s.thick ? 6 : 0) + (e.pattern === "odai" ? 4 : BATTLE.wordHitPad);   // お題の語句は今のまま（となりの列に当たらないように）
           if (Math.abs(s.x - e.x) < e.w / 2 + pad && Math.abs(s.y - e.y) < e.h / 2) {
             if (e.vertical && !e.dummy) {   // 縦書き: 下から順に砕ける。砕けた文字のところは通りぬける
@@ -1734,7 +1747,7 @@ const Battle = (() => {
       d.hintT += dt;
       if (d.age < d.life && d.vis > 0.5 && inBino(d.x, d.y, 0.9)) {
         d.look += dt;
-        if (d.look >= BATTLE.lookTime) findWord(d);
+        if (d.look >= (exMove.lookTime || BATTLE.lookTime)) findWord(d);
       }
     }
     ex.list = ex.list.filter(d => d.found ? d.foundT < 0.9 : d.age < d.life);
@@ -2899,7 +2912,7 @@ const Battle = (() => {
         ctx.strokeStyle = "rgba(255,255,255,0.6)";
         ctx.beginPath(); ctx.ellipse(d.x, d.y, rr, d.size * 0.9, 0, 0, Math.PI * 2); ctx.stroke();
         ctx.strokeStyle = "#e0b03a";
-        ctx.beginPath(); ctx.ellipse(d.x, d.y, rr, d.size * 0.9, 0, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, d.look / BATTLE.lookTime)); ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(d.x, d.y, rr, d.size * 0.9, 0, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, d.look / (exMove.lookTime || BATTLE.lookTime))); ctx.stroke();
         ctx.restore();
       }
     }
