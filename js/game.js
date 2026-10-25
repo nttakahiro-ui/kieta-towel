@@ -186,7 +186,11 @@ const BATTLE = {
   respawnRise: 0.6,            // 復活のとき、画面の下から上がってくる秒数
   respawnInv: 2,               // 復活したあと、無敵で点滅する秒数
   wordShowTime: 1.5,           // 吸い込んだ語句を画面中央に大きく出す秒数（この間は弾が当たらない）
-  fuwariSayTime: 3,            // 周の始まりの、ふわりの一言を出す秒数
+  fuwariSayTime: 3,
+  fuwariSize: 62,              // 自機のふわりの絵の幅（px。10/25-6）
+  fuwariExploreSize: 50,       // 発見の旅の、下のまん中の小さなふわりの幅
+  fuwariFrameTime: 0.18,       // 飛んでいるときに1→2→3のコマを切り替える秒数
+  fuwariBombSize: 0.75,        // ぜんぶ消しの大きなふわり（3のコマ）の幅（画面の短いほうの何倍か）            // 周の始まりの、ふわりの一言を出す秒数
   slowTime: 0.3,               // 吸い込む瞬間に画面全体がゆっくりになる秒数
   slowScale: 0.25,             // ゆっくりのときの速さ（1でふつう、小さいほどゆっくり）
   stripWidth: 24,              // 左端の「集めたことば」の縦の帯の幅（px。縦書き1文字分ほど）
@@ -285,7 +289,7 @@ function tx(path, vars) {
   return v;
 }
 // 本番に持っていくもの（仮の3つ）。選ばなければ最初の「つよい光」になる。名前と説明は texts.js の choice.items
-const LOADOUTS = ["power", "shield", "bomb"].map(id => ({ id, get name() { return tx(`choice.items.${id}.name`); }, get desc() { return tx(`choice.items.${id}.desc`); } }));
+const LOADOUTS = ["power", "shield", "bomb"].map(id => ({ id, get name() { return tx(`choice.items.${id}.name`); }, get desc() { return tx(`choice.items.${id}.desc`); }, get kana() { return (window.TEXTS.choice.items[id] || {}).kana || ""; } }));
 
 // 弾の本数ごとの、横のならび
 const SHOT_SPREAD = { 1: [0], 2: [-0.6, 0.6], 3: [-1, 0, 1], 4: [-1.5, -0.5, 0.5, 1.5] };
@@ -1061,7 +1065,7 @@ const Battle = (() => {
     updatePops(dt);
     for (const f of freed) {   // 助けた語句が、ふわりのところへ飛んでいく（0.7秒）
       f.age += realDt;
-      const k = Math.min(1, f.age / 0.7), tx = player.x + 26, ty = player.y - 6;
+      const k = Math.min(1, f.age / 0.7), tx = player.x, ty = player.y;
       f.x += (tx - f.x) * Math.min(1, realDt * (2 + k * 10)); f.y += (ty - f.y) * Math.min(1, realDt * (2 + k * 10));
       if (f.age >= 0.7) { f.done = true; player.glow = 0.4; }
     }
@@ -1806,7 +1810,7 @@ const Battle = (() => {
         th.x += th.vx * dt; th.y += th.vy * dt;
         th.vx *= 0.93; th.vy *= 0.93;
       } else {                        // 自機（ふわり）へ吸い込まれる
-        const tx = player.x + 26, ty = player.y - 6;
+        const tx = player.x, ty = player.y;
         const k = Math.min(1, (th.age - th.scatter) * 3.2);
         th.x += (tx - th.x) * k * dt * 9;
         th.y += (ty - th.y) * k * dt * 9;
@@ -2199,14 +2203,13 @@ const Battle = (() => {
       ctx.strokeStyle = `rgba(255,255,255,${(1 - k) * 0.8})`; ctx.lineWidth = 10 * (1 - k) + 2;
       ctx.beginPath(); ctx.arc(cx, cy, r, a0, a0 + Math.PI * 1.1); ctx.stroke();
     }
-    // 回るタオル
-    const rr = 26 + k * 110, ang = k * Math.PI * 4;
-    ctx.translate(cx + Math.cos(ang) * rr, cy + Math.sin(ang) * rr);
-    ctx.rotate(ang + Math.PI / 2);
-    ctx.globalAlpha = 1 - k * 0.7;
-    ctx.fillStyle = "#fffdf7"; ctx.strokeStyle = "#c9d9b4"; ctx.lineWidth = 2;
-    roundRect(-22, -14, 44, 28, 6); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "#cfe3b3"; ctx.fillRect(-22, 6, 44, 4);
+    // 大きなふわり（3のコマ）が画面のまん中にふくらんで、消えていく（10/25-6）
+    const grow = Math.min(1, k * 4), big = Math.min(W, H) * BATTLE.fuwariBombSize * (0.5 + grow * 0.5);
+    ctx.globalAlpha = Math.min(1, (1 - k) * 2.5);
+    const g = ctx.createRadialGradient(W / 2, H * 0.45, big * 0.2, W / 2, H * 0.45, big * 0.8);
+    g.addColorStop(0, "rgba(255,246,200,0.8)"); g.addColorStop(1, "rgba(255,246,200,0)");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(W / 2, H * 0.45, big * 0.8, 0, Math.PI * 2); ctx.fill();
+    drawFuwariArt(3, W / 2, H * 0.45, big, Math.sin(k * Math.PI * 2) * 0.15);
     ctx.restore();
   }
 
@@ -2730,57 +2733,53 @@ const Battle = (() => {
     art.draw(ctx, b.x, b.y, BATTLE.enemyBulletSize, t);
   }
 
-  // 自機（仮の形: A君が乗る雲）と、横にいるふわり
+  // 自機＝ふわり（10/25-6。A君はふわりに乗っている設定なので、乗り物の絵はない）
+  // 絵は assets/fuwari_1〜3.png（資料/絵/ のふわりの絵から tools/fuwari_cut.js で切り出し、背景を透明にしたもの）
+  const fuwariImgs = [1, 2, 3].map(n => Object.assign(new Image(), { src: `assets/fuwari_${n}.png` }));
+  // ふわりの絵を (x, y) を中心に、幅 size で描く。frame: 1〜3
+  function drawFuwariArt(frame, x, y, size, rot) {
+    const img = fuwariImgs[frame - 1];
+    if (!img.complete || !img.naturalWidth) return false;
+    ctx.save(); ctx.translate(x, y); if (rot) ctx.rotate(rot);
+    ctx.drawImage(img, -size / 2, -size / 2, size, size);
+    ctx.restore();
+    return true;
+  }
+  // 飛んでいるときのコマ: 1→2→3 を順に切り替える
+  function fuwariFrame() { return 1 + Math.floor(t / BATTLE.fuwariFrameTime) % 3; }
+
   function drawPlayer() {
     const { x, y } = player;
     if (shield > 0) {   // 盾のまく
       ctx.save();
       ctx.strokeStyle = `rgba(140,190,230,${0.6 + Math.sin(t * 4) * 0.2})`; ctx.lineWidth = 3;
       ctx.fillStyle = "rgba(200,230,250,0.18)";
-      ctx.beginPath(); ctx.arc(x, y + 2, 30, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.arc(x, y + 2, 34, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       ctx.restore();
     }
-    if (player.inv > 0 && Math.floor(t * 12) % 2 === 0) ctx.globalAlpha = 0.4;
-    // 雲
-    ctx.fillStyle = "#ffffff";
-    ctx.strokeStyle = "#b9cfa0";
-    ctx.lineWidth = 2;
-    const puffs = [[-16, 4, 11], [0, -2, 15], [16, 4, 11], [-6, 8, 10], [8, 8, 10]];
-    ctx.beginPath();
-    for (const [dx, dy, r] of puffs) { ctx.moveTo(x + dx + r, y + dy); ctx.arc(x + dx, y + dy, r, 0, Math.PI * 2); }
-    ctx.stroke();
-    for (const [dx, dy, r] of puffs) { ctx.beginPath(); ctx.arc(x + dx, y + dy, r, 0, Math.PI * 2); ctx.fill(); }
-    // A君（仮: 小さな頭と葉っぱの帽子）
-    ctx.fillStyle = "#f3d9b8";
-    ctx.beginPath(); ctx.arc(x, y - 16, 7, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "#7fae55";
-    ctx.beginPath(); ctx.ellipse(x + 2, y - 23, 7, 3.5, -0.4, 0, Math.PI * 2); ctx.fill();
-    ctx.globalAlpha = 1;
-
-    // ふわり（白い小さなタオル）。集めたカードの枚数を数字で表示
-    const fx = x + 34, fy = y - 8 + Math.sin(t * 3) * 3;
-    if (player.glow > 0) {   // 吸い込むときに光る
-      const gr = ctx.createRadialGradient(fx, fy, 2, fx, fy, 30);
-      gr.addColorStop(0, `rgba(255,248,200,${player.glow / 0.35})`);
+    const explore1 = sortieNo === 1;   // 発見の旅: 下のまん中で待つ小さなふわり（1のコマ）
+    const glow = player.glow, fy = y + Math.sin(t * 3) * 2;
+    if (glow > 0) {   // ことばを助けた瞬間: 光って、2のコマ
+      const gr = ctx.createRadialGradient(x, fy, 4, x, fy, 46);
+      gr.addColorStop(0, `rgba(255,248,200,${Math.min(1, glow / 0.35)})`);
       gr.addColorStop(1, "rgba(255,248,200,0)");
       ctx.fillStyle = gr;
-      ctx.beginPath(); ctx.arc(fx, fy, 30, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x, fy, 46, 0, Math.PI * 2); ctx.fill();
     }
+    if (player.inv > 0 && Math.floor(t * 12) % 2 === 0) ctx.globalAlpha = 0.4;
+    const frame = typhoon ? 3 : glow > 0 && !explore1 ? 2 : explore1 ? 1 : fuwariFrame();
+    const size = (explore1 ? BATTLE.fuwariExploreSize : BATTLE.fuwariSize) * (1 + glow * 0.5);
+    if (!drawFuwariArt(frame, x, fy, size)) {   // 絵の読みこみ前は、白い四角
+      ctx.fillStyle = "#fffdf7"; ctx.strokeStyle = "#c9b98f"; ctx.lineWidth = 2;
+      roundRect(x - 18, fy - 16, 36, 32, 6); ctx.fill(); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
     if (player.notice > 0) {   // 1回目の語句に反応した「！」
       ctx.font = font(16); ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      ctx.lineWidth = 4; ctx.strokeStyle = "#ffffff"; ctx.strokeText("！", fx + 2, fy - 24);
-      ctx.fillStyle = "#e0a93a"; ctx.fillText("！", fx + 2, fy - 24);
+      ctx.lineWidth = 4; ctx.strokeStyle = "#ffffff"; ctx.strokeText("！", x + size * 0.42, fy - size * 0.45);
+      ctx.fillStyle = "#e0a93a"; ctx.fillText("！", x + size * 0.42, fy - size * 0.45);
     }
-    if (fsay) drawFuwariSay(fx, fy);
-    const sc = 1 + player.glow * 0.6;
-    ctx.fillStyle = level.body;
-    ctx.strokeStyle = level.line;
-    ctx.lineWidth = 2;
-    roundRect(fx - 12 * sc, fy - 10 * sc, 24 * sc, 20 * sc, 6);
-    ctx.fill(); ctx.stroke();
-    // ふわりの顔（前は、これまでに集めたカードの枚数を出していた。遊ぶのに使わないので消した。10/21-1）
-    ctx.fillStyle = "#6b5a3a";
-    ctx.beginPath(); ctx.arc(fx - 4 * sc, fy - 1, 1.6 * sc, 0, Math.PI * 2); ctx.arc(fx + 4 * sc, fy - 1, 1.6 * sc, 0, Math.PI * 2); ctx.fill();
+    if (fsay) drawFuwariSay(x, fy - size * 0.2);
   }
 
   // お題の問題文: 始まりは画面中央に大きく、読む時間が終わったら上の帯の下へ小さく移す
@@ -2960,9 +2959,7 @@ const Battle = (() => {
     const ph = 22 + lines.length * 21, py = 46;
     ctx.fillStyle = "rgba(255,253,245,0.96)"; ctx.strokeStyle = "#9cbf7c"; ctx.lineWidth = 2.5;
     roundRect(px, py, pw, ph, 14); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "#fffdf7"; ctx.strokeStyle = "#c9d9b4"; ctx.lineWidth = 2;   // ふわり（仮の絵）
-    roundRect(px + 10, py + ph / 2 - 11, 26, 22, 6); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "#6b5a3a"; ctx.beginPath(); ctx.arc(px + 19, py + ph / 2 - 1, 1.6, 0, Math.PI * 2); ctx.arc(px + 27, py + ph / 2 - 1, 1.6, 0, Math.PI * 2); ctx.fill();
+    drawFuwariArt(1, px + 24, py + ph / 2, 34);   // セリフの横の小さなふわり（1のコマ）
     ctx.fillStyle = "#3f4a35";
     lines.forEach((l, i) => ctx.fillText(l, px + 46, py + 11 + 10.5 + i * 21));
     ctx.restore();
@@ -3020,10 +3017,8 @@ const Battle = (() => {
       // ふわり（仮の絵）と吹き出し（表紙の文）
       ctx.font = font(16);
       const lines = wrapText(trip.cover, W - 110), bw = W - 92, bh = lines.length * 22 + 20, bx = 70, by = cy + 40;
-      ctx.fillStyle = "#fffdf7"; ctx.strokeStyle = line; ctx.lineWidth = 2;
-      roundRect(24, by + bh / 2 - 14, 34, 28, 8); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = "#6b5a3a"; ctx.beginPath(); ctx.arc(35, by + bh / 2 - 2, 1.8, 0, Math.PI * 2); ctx.arc(47, by + bh / 2 - 2, 1.8, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = "rgba(255,253,245,0.97)"; ctx.strokeStyle = line;
+      drawFuwariArt(1, 40, by + bh / 2, 50);   // セリフの横の小さなふわり（1のコマ）
+      ctx.fillStyle = "rgba(255,253,245,0.97)"; ctx.strokeStyle = line; ctx.lineWidth = 2;
       roundRect(bx, by, bw, bh, 14); ctx.fill(); ctx.stroke();
       ctx.fillStyle = green ? "#3f5a30" : "#6b4a10";
       lines.forEach((l, i) => ctx.fillText(l, bx + bw / 2, by + 21 + i * 22));
@@ -3054,9 +3049,7 @@ const Battle = (() => {
     ctx.font = font(18);
     const lines = wrapText(say, W - 84);
     const bh = lines.length * 28 + 28, bw = W - 40, bx = 20, by = H * 0.42 - bh / 2;
-    ctx.fillStyle = "#fffdf7"; ctx.strokeStyle = "#c9d9b4"; ctx.lineWidth = 2;   // ふわり（仮の絵）
-    roundRect(W / 2 - 22, by - 54, 44, 36, 9); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "#6b5a3a"; ctx.beginPath(); ctx.arc(W / 2 - 7, by - 37, 2.2, 0, Math.PI * 2); ctx.arc(W / 2 + 7, by - 37, 2.2, 0, Math.PI * 2); ctx.fill();
+    drawFuwariArt(1, W / 2, by - 44, 72);   // セリフの上のふわり（1のコマ）
     ctx.fillStyle = "rgba(255,253,245,0.98)"; ctx.strokeStyle = "#e0b03a"; ctx.lineWidth = 2.5;
     roundRect(bx, by, bw, bh, 18); ctx.fill(); ctx.stroke();
     ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = "#4b3a1a";
@@ -3090,6 +3083,12 @@ const Battle = (() => {
       ctx.textAlign = "left";
       ctx.font = font(20); ctx.fillStyle = "#8a5a10";
       ctx.fillText(l.name, r.x + 18, r.y + 22);
+      if (l.kana) {   // 名前の頭の漢字の上に、小さくふりがな（10/25-6: 必殺ワザ）
+        const kanji = (l.name.match(/^[\u4e00-\u9fff]+/) || [""])[0], kw = ctx.measureText(kanji).width;
+        ctx.font = font(10); ctx.textAlign = "center";
+        ctx.fillText(l.kana, r.x + 18 + kw / 2, r.y + 7);
+        ctx.textAlign = "left";
+      }
       ctx.font = font(13); ctx.fillStyle = "#5d6b4c";
       ctx.fillText(l.desc, r.x + 18, r.y + 45);
       if (i === 0) { ctx.textAlign = "right"; ctx.font = font(11); ctx.fillStyle = "#b0a080"; ctx.fillText(tx("choice.defaultMark"), r.x + r.w - 12, r.y + 22); }
@@ -3220,9 +3219,8 @@ const Battle = (() => {
     ctx.beginPath(); ctx.arc(b.x, b.y, b.r - 3, 0, Math.PI * 2); ctx.stroke();
     ctx.strokeStyle = full ? "#e0b03a" : "#8cbf5a"; ctx.lineCap = "round";
     ctx.beginPath(); ctx.arc(b.x, b.y, b.r - 3, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * gauge / 100); ctx.stroke();
-    // ふわりマーク（小さなタオル）
-    ctx.fillStyle = full ? "#fff4cf" : "#fffdf7"; ctx.strokeStyle = full ? "#dcb64e" : "#c9d9b4"; ctx.lineWidth = 2;
-    roundRect(b.x - 11, b.y - 9, 22, 18, 5); ctx.fill(); ctx.stroke();
+    // ふわりマーク（小さなふわり。たまったら3のコマ）
+    drawFuwariArt(full ? 3 : 1, b.x, b.y, b.r * 1.5);
     ctx.font = font(full ? 10 : 9); ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.lineWidth = 3; ctx.strokeStyle = "#ffffff";
     ctx.strokeText(tx(full ? "rescue.typhoonTap" : "rescue.typhoonLabel"), b.x, b.y - b.r - 7);

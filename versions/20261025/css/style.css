@@ -517,6 +517,9 @@ body { position: fixed; inset: 0; }
 }
 .intro-book-caption { font-size: 15px; line-height: 1.5; color: #6b5a3a; margin: 6px 0 0; }
 .intro-heroes .hero-img { width: auto; height: min(160px, 20vh); }
+.intro-heroes { align-items: center; }
+.intro-fuwari { width: min(84px, 11vh); height: auto; align-self: flex-start; margin-top: 4px; animation: fuwariFloat 2.4s ease-in-out infinite; }   /* 目的の画面のふわり（10/25-6） */
+@keyframes fuwariFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
 .intro-lines { margin: 10px 0 6px; }
 
 /* レシピ完成の画面 */
