@@ -107,8 +107,8 @@ const BATTLE = {
   exploreGap: 3.4,             // 語句が現れる間隔（秒）
   exploreLife: 10,             // 語句がただよっている時間（秒）。見つけられなければ消える
   exploreSpeed: 24,            // 語句がただよう速さ（px/秒）
-  binoA: 0.275,                // 双眼鏡（横長の楕円1つ。10/7-1）の横の半径（画面の幅に対する割合）
-  binoB: 0.182,                // 双眼鏡の縦の半径（画面の幅に対する割合）。見える広さは、前の2つの円（半径0.17・中心のはなれ0.62）と同じ
+  binoR: 0.17,                 // 双眼鏡（正円2つを横に重ねた形。10/25-1 に楕円からもどした）の円の半径（画面の幅に対する割合）
+  binoSpread: 0.62,            // 2つの円の中心のはなれぐあい（半径に対する割合。1より小さいと重なる）
   binoMove: 1.15,              // 指を動かした量に対して、双眼鏡が動く量
   exploreDark: 0.98,           // 円の外の暗さ（0〜1。1でまっ暗）
   lookTime: 0.5,               // 円の中で見つめると見つかるまでの時間（秒・合計）
@@ -1591,9 +1591,10 @@ const Battle = (() => {
   }
 
   // ===== 1回目の旅: 双眼鏡でことばをさがす =====
-  const binoA = () => W * BATTLE.binoA, binoB = () => W * BATTLE.binoB;
-  const inBino = (x, y, k = 1) => ((x - bino.x) / (binoA() * k)) ** 2 + ((y - bino.y) / (binoB() * k)) ** 2 < 1;
-  function exploreWords() { return script.slice(0, 9); }   // 大ボスをのぞく9語（出てくる順）
+  const binoR = () => W * BATTLE.binoR;
+  const binoCenters = () => { const d = binoR() * BATTLE.binoSpread; return [{ x: bino.x - d, y: bino.y }, { x: bino.x + d, y: bino.y }]; };
+  const inBino = (x, y, k = 1) => binoCenters().some(c => Math.hypot(x - c.x, y - c.y) < binoR() * k);
+  function exploreWords() { return script.concat([bossWord]); }   // 10語すべて（10/25-1）。大ボスの語句も同じ形でただよう（殻は救出のたびだけ）
 
   function spawnDrifter(word, center) {
     const size = isShortWord(word) ? Math.round(BATTLE.fontSize.zako * BATTLE.shortScale) : BATTLE.fontSize.zako;
@@ -2722,9 +2723,16 @@ const Battle = (() => {
     ctx.restore();
   }
 
+  // 双眼鏡のふち: 2つの円の外側の輪郭だけ（重なっている部分の線は描かない。10/25-1）
+  function binoOutline(cs, r) {
+    const d = (cs[1].x - cs[0].x) / 2, th = Math.acos(Math.min(1, d / r));   // 円どうしが交わる角度
+    ctx.beginPath(); ctx.arc(cs[0].x, cs[0].y, r, th, Math.PI * 2 - th); ctx.stroke();            // 左の円: 右側（重なり）をのぞく
+    ctx.beginPath(); ctx.arc(cs[1].x, cs[1].y, r, Math.PI + th, Math.PI - th); ctx.stroke();      // 右の円: 左側（重なり）をのぞく
+  }
+
   // 発見のたびの画面: 暗い中に、双眼鏡の2つの円の中だけが見える（仮の見た目）
   function drawExplore() {
-    const ex = explore, A = binoA(), B = binoB();
+    const ex = explore, R = binoR(), cs = binoCenters();
     // 飾りの虫
     for (const b of ex.bugs) {
       ctx.save(); ctx.translate(b.x, b.y);
@@ -2774,12 +2782,11 @@ const Battle = (() => {
       m.clearRect(0, 0, W, H);
       m.fillStyle = `rgba(10,16,34,${BATTLE.exploreDark})`; m.fillRect(0, 0, W, H);
       m.globalCompositeOperation = "destination-out";
-      m.save();   // 楕円: 円を縦にちぢめてくりぬく（ふちはぼかす）
-      m.translate(bino.x, bino.y); m.scale(1, B / A);
-      const g = m.createRadialGradient(0, 0, A * 0.85, 0, 0, A);
-      g.addColorStop(0, "rgba(0,0,0,1)"); g.addColorStop(1, "rgba(0,0,0,0)");
-      m.fillStyle = g; m.beginPath(); m.arc(0, 0, A, 0, Math.PI * 2); m.fill();
-      m.restore();
+      for (const c of cs) {   // 2つの円をくりぬく（ふちはぼかす）
+        const g = m.createRadialGradient(c.x, c.y, R * 0.8, c.x, c.y, R);
+        g.addColorStop(0, "rgba(0,0,0,1)"); g.addColorStop(1, "rgba(0,0,0,0)");
+        m.fillStyle = g; m.beginPath(); m.arc(c.x, c.y, R, 0, Math.PI * 2); m.fill();
+      }
       ctx.drawImage(maskCv, 0, 0, W, H);
     }
     // 暗いところで、語句のある場所がきらっと光る（さがす手がかり）
@@ -2799,9 +2806,9 @@ const Battle = (() => {
     // 双眼鏡のふち
     ctx.save();
     ctx.strokeStyle = "rgba(40,44,60,0.9)"; ctx.lineWidth = 5;
-    ctx.beginPath(); ctx.ellipse(bino.x, bino.y, A, B, 0, 0, Math.PI * 2); ctx.stroke();
+    binoOutline(cs, R);
     ctx.strokeStyle = "rgba(200,215,240,0.35)"; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.ellipse(bino.x, bino.y, A - 4, B - 4, 0, 0, Math.PI * 2); ctx.stroke();
+    binoOutline(cs, R - 4);
     ctx.restore();
     drawPlayer();
     // 浮かぶ文字（みつけた！）
@@ -2820,7 +2827,7 @@ const Battle = (() => {
       ctx.globalAlpha = 0.7 + Math.sin(t * 4) * 0.3;
       ctx.font = font(16); ctx.lineWidth = 5; ctx.strokeStyle = "#ffffff";
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      const hy = Math.min(H - 110, bino.y + B + 26);
+      const hy = Math.min(H - 110, bino.y + R + 26);
       if (!hintCard) ctx.strokeText(tx("explore.moveHint"), W / 2, hy);
       ctx.fillStyle = "#48693a"; if (!hintCard) ctx.fillText(tx("explore.moveHint"), W / 2, hy);
       ctx.globalAlpha = 1;
@@ -2902,7 +2909,7 @@ const Battle = (() => {
       ctx.fillText(trip.name, W / 2, cy - 56);
       if (trip.sub) {   // 見出しの下の1行（毎回。長ければ2行）
         ctx.font = font(15); ctx.fillStyle = green ? "#4b5e3a" : "#7a6a40";
-        wrapText(trip.sub, W - 48).forEach((l, i, a) => ctx.fillText(l, W / 2, cy - 10 + (i - (a.length - 1) / 2) * 20));
+        wrapText(trip.sub, W - 48).forEach((l, i, a) => ctx.fillText(l, W / 2, cy + 2 + (i - (a.length - 1) / 2) * 20));
       }
       // ふわり（仮の絵）と吹き出し（表紙の文）
       ctx.font = font(16);
@@ -3139,15 +3146,7 @@ const Battle = (() => {
         ctx.fillStyle = "#ffffff";
         ctx.fillText(tx("rescue.groundMark"), x + cw + 9, y + sh / 2);
       }
-      // 大ボスの枠: 助けるまで小さく「さいごに出る」の印（帯の右に出す。文は texts.js）
-      if (w === bossWord && !got) {
-        ctx.font = font(8);
-        const tw = ctx.measureText(tx("rescue.lastMark")).width + 6;
-        ctx.fillStyle = ENEMY_COLOR.boss;
-        roundRect(x + cw + 2, y + sh / 2 - 6, tw, 12, 5); ctx.fill();
-        ctx.fillStyle = "#ffffff";
-        ctx.fillText(tx("rescue.lastMark"), x + cw + 2 + tw / 2, y + sh / 2);
-      }
+      // （大ボスの枠の「さいごに出る」の印は、10/25-1 に廃止。発見のたびで10語すべてを探すため）
     });
     ctx.restore();
   }
