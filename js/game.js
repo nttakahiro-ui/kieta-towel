@@ -196,6 +196,7 @@ const BATTLE = {
   respawnInv: 2,               // 復活したあと、無敵で点滅する秒数
   wordShowTime: 1.5,           // 吸い込んだ語句を画面中央に大きく出す秒数（この間は弾が当たらない）
   fuwariSayTime: 3,
+  bombShell: 0.5,              // ぜんぶ消しで、画面のことばの殻の硬さを何倍にするか（0.5 ＝ 半分減る。ほどけはしない。10/25-17）
   powerFxTime: 1.3,
   timeBarH: 6,                 // 発見の旅の残り時間の帯の太さ（px。画面のいちばん上。10/25-12）
   timeBarWarn: 10,             // 残り何秒で帯の色が変わるか
@@ -1483,6 +1484,7 @@ const Battle = (() => {
       if (!p) return;
       p.hp--;
       p.flash = 0.12;
+      if (e.role === "boss") bossCheer(e);
       if (p.hp > 0) { Sound.se("hit"); return; }
       // 文字が砕ける: その文字の読みが鳴る
       p.broken = true;
@@ -1652,6 +1654,27 @@ const Battle = (() => {
       }
       enemies = enemies.filter(e => e.hp > 0);
       bombing = false;   // 反応させたぶんでは、ゲージはたまらない
+    } else {
+      // 救出の旅（10/25-17）: 画面のことばの殻の硬さが半分減る（ほどけはしない）。中ボス・大ボスは文字ごとに
+      for (const e of enemies) {
+        if (e.ground || e.hp <= 0 || !onScreen(e) || !hasShell(e)) continue;
+        if (e.parts) { for (const p of e.parts) if (!p.broken && !p.deco) { p.hp *= BATTLE.bombShell; p.flash = 0.3; } }
+        else e.hp *= BATTLE.bombShell;
+        e.flash = 0.3;
+        if (e.role === "boss") bossCheer(e);
+      }
+    }
+  }
+  // 大ボスの殻: 2割減るごとに、ふわりが短い声（10/25-17。言葉は texts.js の rescue.bossCheer から順に）
+  function bossCheer(e) {
+    if (!e.parts) return;
+    let hp = 0, max = 0;
+    for (const p of e.parts) if (!p.deco) { hp += p.broken ? 0 : Math.max(0, p.hp); max += p.maxHp; }
+    const step = Math.floor((1 - hp / Math.max(1e-6, max)) * 5 + 1e-6);   // 0〜5（2割ごと）
+    if (step > (e.cheer || 0) && step < 5) {
+      e.cheer = step;
+      const list = window.TEXTS.rescue.bossCheer || [];
+      if (list.length) fsay = { text: list[(step - 1) % list.length], t: BATTLE.fuwariSayTime, small: true };   // お題のあいだは順番待ちが止まるので、直接出す
     }
   }
 

@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap">
-  <link rel="stylesheet" href="css/style.css?v=51">
+  <link rel="stylesheet" href="css/style.css?v=53">
 </head>
 <body>
   <div id="app">
@@ -58,12 +58,13 @@
       </div>
     </section>
 
-    <!-- ステージ一覧（ベストスコアと2つの印） -->
+    <!-- ステージ一覧（10/25-17: 上に今いる世界の4つの宝石。クリアしたステージは枠が光る） -->
     <section id="screen-stages" class="screen scroll">
       <div class="stages-box">
-        <div class="stages-nav"><button id="btn-world-back" class="link-btn hidden"></button><button id="btn-rbook" class="link-btn"></button><button id="btn-zukan" class="link-btn"></button></div>
+        <div class="stages-nav"><button id="btn-world-back" class="link-btn hidden"></button><button id="btn-zukan" class="link-btn"></button></div>
+        <div id="stages-gems" class="world-gems" role="button" aria-label="レシピブック"></div>
         <h2 id="stages-world-title" class="stages-title">ステージを選ぶ</h2>
-        <p class="stages-note">印: <span class="mark on">10のことば</span> 10のことばすべて助けた　<span class="mark on">ノーダメージ</span> 元気を1つもへらさなかった</p>
+        <p id="stages-hint" class="fuwari-hint hidden"></p>
         <div id="stages-list"></div>
         <button id="btn-warp" class="btn btn-main warp-btn hidden"></button>
         <div class="btn-row"><button id="btn-stages-back" class="btn btn-sub">タイトルへ</button></div>
@@ -109,7 +110,7 @@
         <div id="quiz-choices" class="quiz-choices"></div>
         <div id="quiz-feedback" class="quiz-feedback hidden"></div>
         <div id="quiz-get" class="quiz-get hidden"></div>
-        <div class="btn-row"><button id="btn-quiz-quit" class="link-btn">とちゅうでやめる</button></div>
+        <div class="quiz-quit-row"><button id="btn-quiz-quit" class="link-btn">とちゅうでやめる</button></div>
       </div>
     </section>
 
@@ -238,14 +239,14 @@
   <!-- 横向きのとき -->
   <div id="rotate"><div><div class="rotate-icon"></div><p>縦にしてね</p></div></div>
 
-  <script src="data/words.js?v=51"></script>
-  <script src="data/stages.js?v=51"></script>
-  <script src="data/texts.js?v=51"></script>
-  <script src="js/audio.js?v=51"></script>
-  <script src="js/game.js?v=51"></script>
-  <script src="js/quiz.js?v=51"></script>
-  <script src="js/cards.js?v=51"></script>
-  <script src="js/recipebook.js?v=51"></script>
-  <script src="js/main.js?v=51"></script>
+  <script src="data/words.js?v=53"></script>
+  <script src="data/stages.js?v=53"></script>
+  <script src="data/texts.js?v=53"></script>
+  <script src="js/audio.js?v=53"></script>
+  <script src="js/game.js?v=53"></script>
+  <script src="js/quiz.js?v=53"></script>
+  <script src="js/cards.js?v=53"></script>
+  <script src="js/recipebook.js?v=53"></script>
+  <script src="js/main.js?v=53"></script>
 </body>
 </html>

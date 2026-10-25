@@ -205,7 +205,10 @@ body { position: fixed; inset: 0; }
 .stage-row .nm { font-size: 17px; font-weight: bold; }
 .stage-row .sub { font-size: 12px; color: #7a8a68; }
 .stage-row .marks { display: flex; flex-direction: column; gap: 3px; }
-.stage-row .marks .mark { font-size: 9.5px; padding: 1px 5px; margin: 0; text-align: center; white-space: nowrap; }   /* 印の文字が長くなったので小さめに（10/25-13） */
+.stage-row.cleared { background: #fffbe6; box-shadow: 0 0 0 3px #f2d27a, 0 0 16px rgba(255, 210, 90, 0.75); }   /* クリアしたステージは枠が光る（10/25-17） */
+.stage-row .row-gem { width: 34px; height: 34px; display: block; }   /* カードが10枚そろったステージの宝石 */
+.world-gems { width: min(calc(100vw - 60px), 300px); margin: 4px auto 0; cursor: pointer; }   /* ステージ一覧のいちばん上: 今いる世界の4つの宝石 */
+.world-gems .rb-svg.world { max-height: 22vh; }
 .stage-row .sub { white-space: nowrap; }
 .mark { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 999px; background: #e9e4d4; color: #a8a08a; margin: 0 2px; }
 .mark.on { background: #f3c64e; color: #5e4612; }
@@ -475,6 +478,13 @@ body { position: fixed; inset: 0; }
 .cards-main { font-size: 22px; padding: 16px 36px; min-width: 240px; }
 .quiz-get { min-width: 210px; }
 .quiz-get .get-label { white-space: nowrap; }
+/* 10/25-17: 「カードゲット！」は選択肢の真下でなく、画面の左下あたりに小さめに。「とちゅうでやめる」は画面のいちばん下の右はしに小さく */
+.quiz-get { left: 12px; top: auto; bottom: max(44px, calc(env(safe-area-inset-bottom) + 34px)); transform: none; min-width: 0; padding: 8px 14px 12px; }
+.quiz-get .get-label { font-size: 18px; margin-bottom: 4px; }
+.quiz-get .get-card { min-width: 110px; padding: 6px 12px; }
+.quiz-get .get-card .w { font-size: 18px; }
+.quiz-quit-row { position: fixed; right: 10px; bottom: max(8px, env(safe-area-inset-bottom)); }
+.quiz-quit-row .link-btn { font-size: 12px; opacity: 0.8; }
 
 /* 結果画面の2ページ（10/25-3）: どちらもスクロールなしで画面の高さに収める。横スワイプでも行き来できる */
 #screen-cards { overflow: hidden; }

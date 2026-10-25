@@ -121,12 +121,7 @@ const Cards = (() => {
       // ベスト更新と、今回とれた印
       if (o.record) {
         if (o.record.newBest) { const nb = document.createElement("div"); nb.className = "best-new"; nb.textContent = "ベスト更新！"; rk.appendChild(nb); }
-        const ms = document.createElement("div"); ms.className = "marks-now";
-        ["all", "noDown"].forEach(k => {   // 印は texts.js の marks（10/25-13）
-          const m = document.createElement("span"); m.className = "mark" + (o.record.now[k] ? " on" : ""); m.textContent = tx(`marks.${k}.mark`);
-          ms.appendChild(m);
-        });
-        rk.appendChild(ms);
+        // （今回とれた印は 10/25-17 にやめた）
       }
     }
     const list = $("cards-list");
