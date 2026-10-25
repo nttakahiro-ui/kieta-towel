@@ -86,10 +86,12 @@ const BATTLE = {
   // --- お題バトル（2周目の中ボス2回と大ボス1回） ---
   odai: true,                  // お題バトルのスイッチ（true＝オン、false＝オフ。オフで今までの中ボス・大ボス戦）
   odaiIntroTime: 2.5,          // 始まりのスローと、問題文を画面中央に大きく出す秒数（この間は弾が当たらない）。10/8に2.5秒に
-  odaiBigFont: 26,             // 問題文を画面中央に出すときの文字の大きさのいちばん上（px）。長い問題は3行に収まるまで小さくする
-  odaiSmallFont: 20,           // 問題文を上の帯の下に移したあとの文字の大きさのいちばん上（px）。同じく3行に収まるまで小さくする
+  odaiBigFont: 26,             // 問題文を画面中央に出すときの文字の大きさのいちばん上（px）。画面の幅に3行以内に収まるまで小さくする
+  odaiSmallFont: 20,           // 問題文を上の帯の下に移したあとの文字の大きさのいちばん上（px）。枠の中に2行で収まるまで小さくする（10/25-3）
+  odaiPanelLines: 2,           // 帯の下の問題文の行数（14pxでも入らないときだけ odaiMaxLines まで）
   odaiMaxLines: 3,             // 問題文の行数の上限
-  odaiMinFont: 12,             // 問題文の文字の大きさのいちばん下（px）
+  odaiFitFont: 14,             // 問題文の文字の大きさのいちばん下（px。10/25-3）
+  odaiMinFont: 12,             // （3行にしても14pxで入らないときだけ、ここまで小さくする）
   odaiTimeLimit: 20,           // 中ボスのお題の制限時間（秒）。時間切れは取り逃がし。大ボスは制限なし
   odaiPenalty: 300,            // ダミーに当てたときの減点（コンボは切らない）
   odaiPenaltyCool: 1,          // 同じダミーで続けて減点しない秒数（連射で何度も減らないように）
@@ -158,7 +160,7 @@ const BATTLE = {
   // ステージごとの手上書きは data/stages.js の override 欄
   // 難易度の線（10/21-2）: 難易度＝ステージ番号（1〜12）。[難易度, 値] の2点（1と12）を結ぶ一直線。ステージ1の手ごたえは10/21-1のまま
   difficulty: {
-    fireRate:      [[1, 0.31], [12, 1.7]],    // 弾の多さ（敵が撃つ間隔の逆数。大きいほど弾が多い。1 ＝ 10/3の基準）
+    fireRate:      [[1, 0.31], [12, 1.85]],    // 弾の多さ（敵が撃つ間隔の逆数。大きいほど弾が多い。1 ＝ 10/3の基準）
     bulletSpeed:   [[1, 0.6], [12, 1.15]],     // 敵の弾の速さの倍率（ステージ1はゆっくり）
     speedScale:    [[1, 0.85], [12, 1.25]],    // 語句の速さの倍率
     fillerDensity: [[1, 0.6], [12, 1.6]],     // 救出のたびの虫の濃さ（数と間隔。虫1匹の弾の量は変えない）
@@ -201,9 +203,10 @@ const FILLER_TYPES = {
   thorn:   { layer: "ground", hp: 1, r: 20, fire: 3.4, spread: [-0.3, 0, 0.3] }, // いばらの株: 3方向に撃つ（雑魚はみな1発で崩れる）
 };
 // 時間帯の虫（10/25-1。絵は仮の図形）。move ＝ 動き方（ladybug 横の列／bee 急降下して引き返す／ghost ゆらゆら降りる）、
-// speed ＝ 速さの倍率、wind ＝ 風に流される、glow ＝ 光る（霧の中の目印）。どの虫を出すかは stages.js の theme.bugs
+// hover 近くまで降りてとどまる。stay ＝ とどまる秒数）、keep ＝ ことばを助けたときの光で消えない、speed ＝ 速さの倍率、wind ＝ 風に流される、glow ＝ 光る（霧の中の目印）。どの虫を出すかは stages.js の theme.bugs
 Object.assign(FILLER_TYPES, {
-  butterfly:   { layer: "air", hp: 1, r: 14, fire: 0.5, move: "ghost" },                 // ちょうちょ（明け方）: ゆっくり降りながらよく撃つ（ステージ1の「弾が少し来る」はおもにこれ。ステージ1はお題で殻が撃たないため）
+  butterfly:   { layer: "air", hp: 1, r: 14, fire: 1.8, move: "ghost" },                 // ちょうちょ（明け方）: ゆっくり降りながら、ときどき撃つ
+  kanabun:     { layer: "air", hp: 6, r: 14, fire: 0.5, move: "hover", stay: 6, keep: true },      // コガネムシ（明け方。10/25-2）: 自機の近くまでゆっくり降りてきて、しばらくとどまってゆっくり撃ち、上へ帰る（ステージ1の「弾が少し来る」はおもにこれ）
   grasshopper: { layer: "air", hp: 1, r: 13, fire: 2.4, move: "bee" },                   // バッタ（真昼）: ぴょんと飛びこんでくる
   dragonfly:   { layer: "air", hp: 1, r: 14, fire: 2.6, move: "ladybug", wind: true },   // トンボ（夕暮れ）: 列で横切る。風に流される
   moth:        { layer: "air", hp: 1, r: 14, fire: 3.0, move: "ghost", wind: true },     // ガ（夕暮れ）: ゆらゆら。風に流される
@@ -970,6 +973,9 @@ const Battle = (() => {
         for (let i = 0; i < 6; i++) spawnFiller(kind, fromLeft ? -20 : W + 20, y0, { dir: fromLeft ? 1 : -1, y0, delay: i * 0.32 });
       } else if (mv === "bee") {
         for (let i = 0; i < 3; i++) { const x = freeX(0, "air", 30); if (x !== null) spawnFiller(kind, x, -20, { delay: i * 0.35, tx: null }); }
+      } else if (mv === "hover") {   // 1匹が、自機から遠い側の画面のはしを、自機の近くまでゆっくり降りてくる
+        const x = player.x < W / 2 ? W - 34 : stripRight() + 34;
+        spawnFiller(kind, x, -20, { hy: H * rand(0.48, 0.56), stayT: FILLER_TYPES[kind].stay || 4 });
       } else {
         for (let i = 0; i < 2; i++) { const x = freeX(0, "air", 40); if (x !== null) spawnFiller(kind, x, -24 - i * 50, { bx: 0 }); }
       }
@@ -1245,6 +1251,10 @@ const Battle = (() => {
         } else {
           f.y -= 135 * BATTLE.fillerSpeed * dt; f.x += f.vx * BATTLE.fillerSpeed * dt;
         }
+      } else if (moveOf(f.type) === "hover") {   // 近くまで降りて、とどまって、上へ帰る
+        if (f.y < f.hy && !f.leave) f.y += Math.min(90, (f.hy - f.y) * 1.5 + 20) * dt;
+        else if (!f.leave) { f.stayT -= dt; f.x += Math.sin(f.age * 1.2) * 30 * dt; if (f.stayT <= 0) f.leave = true; }
+        else f.y -= 120 * dt;
       } else if (moveOf(f.type) === "ghost") {
         f.y += H / 11 * BATTLE.fillerSpeed * (def.speed || 1) * dt;
         f.x += Math.sin(f.age * 1.3) * 40 * dt;
@@ -1256,7 +1266,7 @@ const Battle = (() => {
         f.fire -= dt;
         if (f.fire <= 0 && f.y > 0 && f.y < H * 0.68) {
           f.fire = def.fire * BATTLE.fillerFireScale * fillerDense() / P.fireRate / fireRamp() * rand(0.8, 1.2);
-          fireAt(f.x, f.y, def.spread || [0]);
+          fireAt(f.x, f.y, def.spread || [0], undefined, def.keep);
         }
       }
     }
@@ -1365,11 +1375,11 @@ const Battle = (() => {
     ebullets = ebullets.filter(b => b.y < H + 20 && b.y > -20 && b.x > -20 && b.x < W + 20);
   }
 
-  function fireAt(x, y, pattern, kind) {
+  function fireAt(x, y, pattern, kind, keep) {
     const ang = Math.atan2(player.y - y, player.x - x);
     for (const da of pattern) {
       const sp = BATTLE.enemyBulletSpeed * P.bulletSpeed;   // 難易度の線（bulletSpeed）。世界1のはじめはゆっくり
-      ebullets.push({ x, y, vx: Math.cos(ang + da) * sp, vy: Math.sin(ang + da) * sp, kind });
+      ebullets.push({ x, y, vx: Math.cos(ang + da) * sp, vy: Math.sin(ang + da) * sp, kind, keep });
     }
   }
 
@@ -1490,19 +1500,19 @@ const Battle = (() => {
   }
   // 小さく出したときの問題文の帯の位置（集めたことばの帯の下）
   // 問題文の大きさを、長さに合わせて決める: いちばん上の大きさから、行数の上限に収まるまで小さくする
-  function fitOdaiText(text, maxFont, width) {
-    let fs = maxFont, lines;
-    for (;;) {
-      ctx.font = font(fs);
-      lines = wrapText(text, width);
-      if (lines.length <= BATTLE.odaiMaxLines || fs <= BATTLE.odaiMinFont) break;
-      fs--;
-    }
-    return { fs, lines, lh: Math.round(fs * 1.38) };
+  // 10/25-3: 行数（maxLines）に収まり、どの行も幅（width）からはみ出さない大きさまで小さくする。いちばん下は 14px。
+  // 14px でも maxLines に入らないときだけ、行数を odaiMaxLines（3行）まで許す（それでも入らなければ odaiMinFont まで小さく）
+  function fitOdaiText(text, maxFont, width, maxLines) {
+    const fits = (fs, n) => { ctx.font = font(fs); const ls = wrapText(text, width); return ls.length <= n && ls.every(l => ctx.measureText(l).width <= width) ? ls : null; };
+    const want = maxLines || BATTLE.odaiMaxLines;
+    for (let fs = maxFont; fs >= BATTLE.odaiFitFont; fs--) { const ls = fits(fs, want); if (ls) return { fs, lines: ls, lh: Math.round(fs * 1.38) }; }
+    for (let fs = BATTLE.odaiFitFont; fs >= BATTLE.odaiMinFont; fs--) { const ls = fits(fs, BATTLE.odaiMaxLines); if (ls) return { fs, lines: ls, lh: Math.round(fs * 1.38) }; }
+    ctx.font = font(BATTLE.odaiMinFont);
+    return { fs: BATTLE.odaiMinFont, lines: wrapText(text, width), lh: Math.round(BATTLE.odaiMinFont * 1.38) };
   }
   function odaiPanel() {
     const y = 40;   // 上の体力ゲージ・点数の下
-    const f = fitOdaiText(odai ? odai.q : "", BATTLE.odaiSmallFont, W - stripRight() - 34);
+    const f = fitOdaiText(odai ? odai.q : "", BATTLE.odaiSmallFont, W - stripRight() - 42, BATTLE.odaiPanelLines);   // 枠の中に2行（内側の幅）
     return { y, lines: f.lines, fs: f.fs, lh: f.lh, h: f.lines.length * f.lh + 14 };
   }
   function odaiTop() { const p = odaiPanel(); return p.y + p.h; }
@@ -1766,11 +1776,11 @@ const Battle = (() => {
     player.hp = Math.min(BATTLE.playerMaxHp, player.hp + BATTLE.healOnAbsorb);
     post("word", () => { showWord = { word: e.word, t: BATTLE.wordShowTime }; });
     slow = BATTLE.slowTime;
-    // 光が広がって、画面上の雑魚と敵の弾が全部消える
+    // 光が広がって、画面上の雑魚と敵の弾が全部消える（keep の虫＝コガネムシは残る。10/25-2）
     wave = { x: e.x, y: e.y, age: 0 };
-    fillers.forEach(f => addPop(f.x, f.y, "#fff8d8", 0.8, f.layer === "ground"));
-    fillers = [];
-    ebullets = [];
+    fillers.forEach(f => { if (!FILLER_TYPES[f.type].keep) addPop(f.x, f.y, "#fff8d8", 0.8, f.layer === "ground"); });
+    fillers = fillers.filter(f => FILLER_TYPES[f.type].keep);
+    ebullets = ebullets.filter(b => b.keep);   // keep の虫の弾も残る
     if (e.role === "boss") {
       // 大ボスを吸い込んだらバトル終了。残っている雑魚はみんな花になる
       enemies.forEach(x => (x.hp = 0));
@@ -2351,6 +2361,12 @@ const Battle = (() => {
       ctx.fillStyle = "rgba(220,240,255,0.8)";
       for (const s of [-1, 1]) { ctx.beginPath(); ctx.ellipse(s * 10, -3, 10, 3.5 + flap * 1.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.ellipse(s * 9, 4, 9, 3, 0, 0, Math.PI * 2); ctx.fill(); }
       ctx.fillStyle = lit ? "#ffd0a0" : "#d86a2a"; ctx.fillRect(-2.5, -10, 5, 22);
+    } else if (k === "kanabun") {   // コガネムシ: つやのある緑の丸い背中
+      ctx.fillStyle = lit ? "#c8f0c0" : "#3f8a5a";
+      ctx.beginPath(); ctx.ellipse(0, 1, 10, 12, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "#1f4a30"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(0, -10); ctx.lineTo(0, 13); ctx.stroke();
+      ctx.fillStyle = "#1f4a30"; ctx.beginPath(); ctx.arc(0, -11, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "rgba(255,255,255,0.5)"; ctx.beginPath(); ctx.ellipse(-4, -3, 2, 4, -0.3, 0, Math.PI * 2); ctx.fill();
     } else if (k === "moth") {
       ctx.fillStyle = lit ? "#f4ead0" : "#bba98a";
       for (const s of [-1, 1]) { ctx.beginPath(); ctx.ellipse(s * 7, 0, 9 * (0.5 + flap * 0.5), 10, s * 0.3, 0, Math.PI * 2); ctx.fill(); }
@@ -2771,7 +2787,7 @@ const Battle = (() => {
     ctx.save();
     ctx.textAlign = "left"; ctx.textBaseline = "top";
     if (odai.intro > 0) {
-      const { fs, lh, lines } = fitOdaiText(odai.q, BATTLE.odaiBigFont, W - 64);   // 短い問題は大きく、長い問題は小さく
+      const { fs, lh, lines } = fitOdaiText(odai.q, BATTLE.odaiBigFont, W - 72, BATTLE.odaiMaxLines);   // 画面の幅に3行以内（はみ出さない大きさ）
       ctx.font = font(14);
       const hl = odai.hint ? wrapText(odai.hint, W - 72) : [];   // 最初のお題だけ、案内を1行そえる
       const h = lines.length * lh + 50 + hl.length * 20 + (hl.length ? 10 : 0), y = H * 0.4 - h / 2;
