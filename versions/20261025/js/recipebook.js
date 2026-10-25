@@ -62,6 +62,7 @@ const RecipeBook = (() => {
     const list = stages();
     let gems = "";
     list.forEach((s, i) => {
+      if (o.world && s.world !== o.world) return;   // 世界の4つだけを出すとき、ほかの世界の宝石は描かない
       const x = C + Math.cos(angle(i)) * R, y = C + Math.sin(angle(i)) * R, on = lit.has(s.id) || o.drop === s.id;
       const halo = on ? `<circle r="26" fill="url(#rbHalo${i})"/>` : "";
       const art = GEM_ART(s.gem || "#cccccc", on, 19, s.id);
@@ -90,7 +91,16 @@ const RecipeBook = (() => {
       `<path d="M-34 -12 H34 M-34 10 H34" stroke="#e3d8bd" stroke-width="2"/>` +
       `${[-28, -20, -12, -4, 4, 12, 20, 28].map(x => `<line x1="${x}" y1="20" x2="${x}" y2="27" stroke="#c9b98f" stroke-width="2"/>`).join("")}</g>`;
     const count = o.small ? "" : `<text x="${C}" y="${C + 38}" class="rb-count">${lit.size + (o.drop && !lit.has(o.drop) ? 1 : 0)}/12</text>`;
-    el.innerHTML = `<svg class="rb-svg${o.small ? " small" : ""}" viewBox="0 0 ${VB} ${VB}" role="img" aria-label="レシピブック">${base}${towel}${count}${labels}${gems}</svg>`;
+    // o.world: その世界の4つの宝石のところだけを大きく切り取って出す（ステージ一覧のいちばん上。10/25-17）
+    let vb = `0 0 ${VB} ${VB}`;
+    if (o.world) {
+      const pts = list.map((s, i) => (s.world === o.world ? [C + Math.cos(angle(i)) * R, C + Math.sin(angle(i)) * R] : null)).filter(Boolean);
+      if (pts.length) {
+        const m = 34, x0 = Math.min(...pts.map(p => p[0])) - m, x1 = Math.max(...pts.map(p => p[0])) + m, y0 = Math.min(...pts.map(p => p[1])) - m, y1 = Math.max(...pts.map(p => p[1])) + m;
+        vb = `${x0.toFixed(0)} ${y0.toFixed(0)} ${(x1 - x0).toFixed(0)} ${(y1 - y0).toFixed(0)}`;
+      }
+    }
+    el.innerHTML = `<svg class="rb-svg${o.small ? " small" : ""}${o.world ? " world" : ""}" viewBox="${vb}" role="img" aria-label="レシピブック">${base}${o.world ? "" : towel + count + labels}${gems}</svg>`;
     if (o.onTap) el.querySelectorAll(".rb-gem").forEach(g => g.addEventListener("click", () => o.onTap(Number(g.dataset.stage))));
   }
 

@@ -20,12 +20,13 @@ const SoundPref = {
 const Save = (() => {
   // cards: 集めたカード、cleared: クリアしたステージ、
   // retake: クイズで不正解だった語句（あとで図鑑の受け直しクイズに使う。バトルで取り逃がした語句は入れない）
-  // best: ステージごとのベストスコアと2つの印（{ score, all, noDown }。10/25-9 に「一度もぶつからなかった」noHit をやめた）
+  // best: ステージごとのベストスコア（{ score }。救出の旅を最後まで終えたステージにある＝ステージ一覧で枠が光る）。印は 10/25-17 にやめた
+  // glowHint: 「クリアしたステージは光るよ…」の案内を見たか（10/25-17）
   // hero: 選んだ主人公（"boy"／"girl"）、introSeen: 目的の画面を見たか（10/21-2）
   // world: ステージ一覧で今いる世界（10/22-1。ワープで進む）
   // gemsSeen: レシピブックの宝石がはまる演出を見たステージ（10/25-4。初めてそろったときだけ演出する）
   // found: ステージごとの、発見の旅で見つけたことばの id（10/25-15。「救出の旅をもう一度」で使う。救出で10のことばすべて助けたら消す）
-  let data = { cards: {}, cleared: {}, retake: {}, best: {}, hero: null, introSeen: false, world: 1, gemsSeen: {}, found: {} };
+  let data = { cards: {}, cleared: {}, retake: {}, best: {}, hero: null, introSeen: false, world: 1, gemsSeen: {}, found: {}, glowHint: false };
   // localStorage が使えなくても落ちないようにする
   function load() {
     try {
@@ -36,7 +37,8 @@ const Save = (() => {
         data.cleared = d.cleared || {};
         data.retake = d.retake || {};
         data.best = d.best || {};
-        for (const b of Object.values(data.best)) if (b) delete b.noHit;   // 前の版の「一度もぶつからなかった」の記録は消す（10/25-9）
+        for (const b of Object.values(data.best)) if (b) { delete b.noHit; delete b.all; delete b.noDown; }   // 前の版の印の記録は消す（10/25-9 noHit、10/25-17 all・noDown）
+        data.glowHint = !!d.glowHint;
         data.hero = d.hero || null;
         data.introSeen = !!d.introSeen;
         data.world = d.world || 1;
@@ -365,21 +367,17 @@ const Main = (() => {
     });
     const owned = Save.data.cards;
     if (words.filter(w => owned[w.id]).length >= CARDS.clearCount) Save.data.cleared[stage.id] = true;
-    // ベストスコアと2つの印（一度とった印は消えない。次のステージに進む条件ではない）。受け直しのときはバトルの記録はさわらない
+    // ベストスコア（印は 10/25-17 にやめた）。受け直しのときはバトルの記録はさわらない
     const st = (!retake && lastStats) || { score: 0, hits: 1, downs: 1 };
-    const now = { all: lastIds.length >= words.length, noDown: st.downs === 0 };
-    const prev = Save.data.best[stage.id] || { score: 0, all: false, noDown: false };
+    const prev = Save.data.best[stage.id] || { score: 0 };
     const newBest = !retake && st.score > prev.score;
-    if (!retake) Save.data.best[stage.id] = {
-      score: Math.max(prev.score, st.score),
-      all: prev.all || now.all, noDown: prev.noDown || now.noDown
-    };
+    if (!retake) Save.data.best[stage.id] = { score: Math.max(prev.score, st.score) };
     Save.store();
     showScreen("cards");
     $("screen-cards").scrollTop = 0;
     Cards.showCards({
       stage, words, results, owned, newIds, stats: retake ? null : lastStats,
-      record: retake ? null : { newBest, now, best: Save.data.best[stage.id] },
+      record: retake ? null : { newBest, best: Save.data.best[stage.id] },
       retake, helpedCount: lastIds.length, retakeIds: Save.data.retake,
       onRetake: startRetake,
       onRescue: Save.data.found[stage.id] ? () => toBattle(true) : null,   // 救出の旅をもう一度（10/25-14。発見の記録があるステージだけ。記録はブラウザに保存 10/25-15）
@@ -443,6 +441,11 @@ const Main = (() => {
     back.textContent = tx("worlds.back", { id: wid - 1 });
     back.onclick = () => { Save.data.world = wid - 1; Save.store(); toStages(); };
     $("btn-zukan").textContent = tx("zukan.button");
+    // いちばん上に、今いる世界の4つの宝石（レシピブックの台座の一部）。タップでレシピブック（12個の台座の全体）へ（10/25-17）
+    const litSet = RecipeBook.litIds(Save.data.cards);
+    RecipeBook.render($("stages-gems"), { lit: litSet, world: wid });
+    $("stages-gems").onclick = toRecipeBook;
+    let anyCleared = false;
     const box = $("stages-list");
     box.innerHTML = "";
     worldStages(wid).forEach(s => {
@@ -457,18 +460,22 @@ const Main = (() => {
       const nm = document.createElement("span"); nm.className = "nm"; nm.textContent = s.name;
       const sub = document.createElement("span"); sub.className = "sub";
       sub.textContent = open ? `難易度 ${s.difficulty || 1}　ベスト ${b ? b.score : 0}点　カード ${got}/10` : tx("worlds.notReady");
+      // 10/25-17: 印はやめた。クリアした（救出の旅を最後まで終えた）ステージは枠が光り、カードが10枚そろったステージには宝石の絵
+      if (b) { row.classList.add("cleared"); anyCleared = true; }
       const marks = document.createElement("span"); marks.className = "marks";
-      ["all", "noDown"].forEach(k => {   // 印は texts.js の marks（10/25-13）
-        const m = document.createElement("span"); m.className = "mark" + (b && b[k] ? " on" : ""); m.textContent = tx(`marks.${k}.short`);
-        marks.appendChild(m);
-      });
-      if (s.tutorial) { const tg = document.createElement("span"); tg.className = "tut-tag"; tg.textContent = tx("tutorial.mark"); nm.appendChild(tg); }   // ステージ1は「チュートリアル」（10/25-10）
+      if (litSet.has(s.id)) marks.innerHTML = `<svg class="row-gem" viewBox="-22 -22 44 44">${GEM_ART(s.gem, true, 19, s.id)}</svg>`;
       main.append(nm, sub);
       row.append(no, main);
       if (open) row.appendChild(marks);
       if (open) row.addEventListener("click", () => { Sound.se("start"); selectStage(s.id); toBattle(); });
       box.appendChild(row);
     });
+    // 初めてステージが光ったときの案内（1回だけ。10/25-17）
+    const hintEl = $("stages-hint");
+    const showGlowHint = anyCleared && !Save.data.glowHint;
+    hintEl.textContent = showGlowHint ? tx("stagesHint.glow") : "";
+    hintEl.classList.toggle("hidden", !showGlowHint);
+    if (showGlowHint) { Save.data.glowHint = true; Save.store(); }
     // ワープ: この世界のカードがそろったら、次の世界へのボタン（ボタンが出る＝進める）
     const warp = $("btn-warp");
     const canWarp = wid < window.WORLDS.length && (worldDone(wid) || openAll);
@@ -603,8 +610,7 @@ const Main = (() => {
       $(`hero-${h}`).addEventListener("click", () => { Save.data.hero = h; Save.data.introSeen = true; Save.store(); toTitle(); });
     });
     $("btn-zukan").addEventListener("click", toZukan);
-    $("btn-rbook").textContent = tx("recipeBook.button");
-    $("btn-rbook").addEventListener("click", toRecipeBook);
+    // （右上の「レシピブック」ボタンは 10/25-17 に消した。ステージ一覧のいちばん上の宝石をタップ）
     $("rbook-back").addEventListener("click", toStages);
     $("ending-next").addEventListener("click", toStages);
     // 目的の画面の台座（空）と一言
@@ -656,6 +662,7 @@ const Main = (() => {
       Save.data.retake = {};
       Save.data.best = {};
       Save.data.found = {};   // 発見の記録も消す（10/25-15）
+      Save.data.glowHint = false;
       Save.data.gemsSeen = {};   // レシピの演出を見た記録も消す（もう一度演出が見られるように）
       Save.store();
       TutSave.reset();   // チュートリアルを見た記録も消す（この版の分）

@@ -110,7 +110,7 @@ const BATTLE = {
 
   // --- 本番に持っていくもの（出撃2の前に3つから1つ選ぶ） ---
   // 1回目の旅（さがす）: 双眼鏡（10/3-11）。見た目はすべて仮
-  exploreTime: 40,             // 1回目の旅の長さ（秒）。時間切れでも何も失わない
+  exploreTime: 40,             // 発見の旅の基準の時間（秒）。10/25-17 から時間切れはなく、10のことばを見つけるまで続く（早いと＋点、おそいと−点）
   exploreFirst: 1.2,           // 最初の語句が現れるまで（秒）
   exploreGap: 3.4,             // 語句が現れる間隔（秒）
   exploreLife: 10,             // 語句がただよっている時間（秒）。見つけられなければ消える
@@ -196,9 +196,13 @@ const BATTLE = {
   respawnInv: 2,               // 復活したあと、無敵で点滅する秒数
   wordShowTime: 1.5,           // 吸い込んだ語句を画面中央に大きく出す秒数（この間は弾が当たらない）
   fuwariSayTime: 3,
+  bombShell: 0.5,              // ぜんぶ消しで、画面のことばの殻の硬さを何倍にするか（0.5 ＝ 半分減る。ほどけはしない。10/25-17）
   powerFxTime: 1.3,
   timeBarH: 6,                 // 発見の旅の残り時間の帯の太さ（px。画面のいちばん上。10/25-12）
-  timeBarWarn: 10,             // 残り何秒で帯の色が変わるか            // 「パワーアップ！」を出す秒数（10/25-9）
+  timeBarWarn: 10,             // 残り何秒で帯の色が変わるか
+  exploreTimeScore: 100,       // 発見の旅: 基準の時間より早く終われば残り1秒につき＋、おそければ1秒につき−（10/25-17）
+  exploreAgainGap: 2,          // 見つけられずに消えたことばが、出直すまでの間隔（秒）
+  stripFoundFlash: 0.5,        // 見つけた瞬間に、左の枠の名前がきらっと光る秒数            // 「パワーアップ！」を出す秒数（10/25-9）
   fuwariSize: 62,              // 自機のふわりの絵の幅（px。10/25-6）
   fuwariExploreSize: 50,       // 発見の旅の、下のまん中の小さなふわりの幅
   fuwariFrameTime: 0.18,       // 飛んでいるときに1→2→3のコマを切り替える秒数
@@ -239,7 +243,7 @@ const FILLER_WAVES = { ladybugs: 3, bees: 2, ghost: 2, weeds: 3, thorn: 1 };
 // 双眼鏡で見つめる操作はどの型も同じ。世界2・3の探し方（箱を開ける・星をなぞる）は、ここに型を足して差しかえる
 const EXPLORE_MOVES = {
   drift:   {},                                                        // ゆっくり漂う（ステージ1）
-  fall:    { fallSpeed: 46, sway: 34, swaySpeed: 1.4, wait: 2, lifeMul: 2, lookTime: 1 },   // 落ち葉のように揺れながら降る。地面に落ちたら wait 秒あとに上から出直す（ただよう時間は lifeMul 倍）。見つめる時間は1秒（10/25-8）
+  fall:    { fallSpeed: 69, sway: 34, swaySpeed: 1.4, wait: 2, lifeMul: 2, lookTime: 1, maxOn: 2 },   // 10/25-17: 落ちる速さ 46 → 69（1.5倍）、同時に2つまで（maxOn）   // 落ち葉のように揺れながら降る。地面に落ちたら wait 秒あとに上から出直す（ただよう時間は lifeMul 倍）。見つめる時間は1秒（10/25-8）
   wind:    { wind: 40, gust: 0.35, binoDrift: 14, wait: 0.8 },        // 風で右へ流される（gust ＝ 風の強弱）。右に出たら wait 秒あとに左から出直す。双眼鏡も binoDrift px/秒 流される
   firefly: { speedMul: 0.5, flies: 4, stray: 4, fog: 0.35, hint: false },   // 霧が濃い。ことばのまわりにホタルが flies 匹集まる（stray ＝ ひとりで飛ぶホタル）。きらっと光る目印は出さない
 };
@@ -435,6 +439,7 @@ const Battle = (() => {
   let fogLevel = 0;          // 霧の濃さ（0〜1。お題バトルと大ボスのときはうすくなる）
   let streaks = [];          // 風・雨・雪の見た目
   let found = new Set();     // 探検で見つけた語句の id
+  let foundAt = {};          // 見つけた時刻（id → t。左の枠の名前をきらっと光らせる。10/25-17）
   let loadout = null;        // 本番に持っていくもの（LOADOUTS の id）
   let choiceT = 0;           // 選ぶ時間の残り（秒）
   let choiceFree = false;    // 持ち物選択に時間制限がないか（初めて選ぶとき。main.js の opts.firstChoice）
@@ -576,7 +581,7 @@ const Battle = (() => {
     // 台本: 大ボス以外の語句を、データの順番（order）でならべる
     script = words.filter(w => w !== bossWord).sort((a, b) => patOf(a).order - patOf(b).order);
     slots = script.concat([bossWord]);   // 帯の10のあき枠（出てくる順。いちばん右が大ボス）
-    found = new Set();
+    found = new Set(); foundAt = {};
     vanish = [];
     fluff = Array.from({ length: 18 }, () => ({ x: Math.random() * W, y: Math.random() * H, r: 2 + Math.random() * 4, v: 30 + Math.random() * 40, p: Math.random() * 6 }));
     cloudShadows = Array.from({ length: 3 }, (_, i) => ({ x: Math.random() * W, y: (i / 3) * H, rx: rand(70, 120), ry: rand(35, 55) }));
@@ -595,7 +600,7 @@ const Battle = (() => {
     choiceFree = !!opts.firstChoice;
     tut = null; hintOpts = opts.hints || null; hintShown = {}; hintCard = null; bombHinted = false; bombFlash = 0; powerFx = null; wrongFx = null;
     stripFlash = 0; sortieStep = "choice"; freed = [];
-    explore = { t: 0, next: 0, list: [], bugs: [], bugT: 2, endT: 0, flies: [], streaks: [] };
+    explore = { t: 0, next: 0, nextAt: BATTLE.exploreFirst, again: [], list: [], bugs: [], bugT: 2, endT: 0, flies: [], streaks: [] };
     {
       const se = (opts.stage && opts.stage.explore) || {}, type = EXPLORE_MOVES[se.move] ? se.move : "drift";
       exMove = Object.assign({ move: type }, EXPLORE_MOVES[type], se);
@@ -646,7 +651,7 @@ const Battle = (() => {
     hintShown[id] = true;
     if (hintOpts.mark) hintOpts.mark(id);
     const text = tx("hints." + id, Object.assign({ seed: seedName() }, vars || {}));
-    post("tutorial", () => { hintCard = { text, t: BATTLE.hintTime }; slow = Math.max(slow, BATTLE.hintSlow); });
+    post("tutorial", () => { hintCard = { text, t: BATTLE.hintTime, yellow: id === "seed" }; slow = Math.max(slow, BATTLE.hintSlow); });   // たねの案内は黄色い帯（たねが黄色いとわかるように。10/25-17）
   }
   // ぜんぶ消しのゲージがたまった（10/25-1）: 初めての1回だけ、1秒ゆっくりにして案内。以後はたまるたびに左下が光って音が鳴る
   function bombReady() {
@@ -1479,6 +1484,7 @@ const Battle = (() => {
       if (!p) return;
       p.hp--;
       p.flash = 0.12;
+      if (e.role === "boss") bossCheer(e);
       if (p.hp > 0) { Sound.se("hit"); return; }
       // 文字が砕ける: その文字の読みが鳴る
       p.broken = true;
@@ -1648,6 +1654,27 @@ const Battle = (() => {
       }
       enemies = enemies.filter(e => e.hp > 0);
       bombing = false;   // 反応させたぶんでは、ゲージはたまらない
+    } else {
+      // 救出の旅（10/25-17）: 画面のことばの殻の硬さが半分減る（ほどけはしない）。中ボス・大ボスは文字ごとに
+      for (const e of enemies) {
+        if (e.ground || e.hp <= 0 || !onScreen(e) || !hasShell(e)) continue;
+        if (e.parts) { for (const p of e.parts) if (!p.broken && !p.deco) { p.hp *= BATTLE.bombShell; p.flash = 0.3; } }
+        else e.hp *= BATTLE.bombShell;
+        e.flash = 0.3;
+        if (e.role === "boss") bossCheer(e);
+      }
+    }
+  }
+  // 大ボスの殻: 2割減るごとに、ふわりが短い声（10/25-17。言葉は texts.js の rescue.bossCheer から順に）
+  function bossCheer(e) {
+    if (!e.parts) return;
+    let hp = 0, max = 0;
+    for (const p of e.parts) if (!p.deco) { hp += p.broken ? 0 : Math.max(0, p.hp); max += p.maxHp; }
+    const step = Math.floor((1 - hp / Math.max(1e-6, max)) * 5 + 1e-6);   // 0〜5（2割ごと）
+    if (step > (e.cheer || 0) && step < 5) {
+      e.cheer = step;
+      const list = window.TEXTS.rescue.bossCheer || [];
+      if (list.length) fsay = { text: list[(step - 1) % list.length], t: BATTLE.fuwariSayTime, small: true };   // お題のあいだは順番待ちが止まるので、直接出す
     }
   }
 
@@ -1738,7 +1765,16 @@ const Battle = (() => {
     }
     ex.t += dt;
     const words = exploreWords();
-    while (ex.next < words.length && ex.t >= BATTLE.exploreFirst + ex.next * BATTLE.exploreGap) spawnDrifter(words[ex.next++]);
+    // 出す順: はじめの10のことば → 見つけられずに消えたことば（時間切れがないので、見つかるまで出直す。10/25-17）
+    // exMove.maxOn ＝ 同時に出しておく数の上限（ステージ2の落ち葉は2つ）。いっぱいのときは、空くまで待って時刻を後ろにずらす
+    while (ex.t >= ex.nextAt) {
+      const w = ex.next < words.length ? words[ex.next] : ex.again[0];
+      if (!w) break;
+      if (exMove.maxOn && ex.list.filter(d => !d.found).length >= exMove.maxOn) { ex.nextAt = ex.t; break; }
+      if (ex.next < words.length) ex.next++; else ex.again.shift();
+      spawnDrifter(w);
+      ex.nextAt += ex.next < words.length ? BATTLE.exploreGap : BATTLE.exploreAgainGap;
+    }
     const mv = exMove;
     if (mv.move === "wind") {   // 風: 双眼鏡も少し流される（指で押さえていても）
       const dx = mv.binoDrift * windNow() / mv.wind * dt, nx = Math.min(Math.max(bino.x + dx, stripRight() + 10), W - 10);
@@ -1777,6 +1813,7 @@ const Battle = (() => {
         if (d.look >= (exMove.lookTime || BATTLE.lookTime)) findWord(d);
       }
     }
+    for (const d of ex.list) if (!d.found && d.age >= d.life && !ex.again.includes(d.word)) ex.again.push(d.word);   // 見つけられずに消えた: あとで出直す
     ex.list = ex.list.filter(d => d.found ? d.foundT < 0.9 : d.age < d.life);
     // 飾りの虫（円の中を横切る）
     ex.bugT -= dt;
@@ -1800,11 +1837,13 @@ const Battle = (() => {
       for (const k of ex.streaks) k.x += windNow() * k.sp * dt;
       ex.streaks = ex.streaks.filter(k => k.x < W + 80);
     }
-    // 終わり: 40秒たった、または9語ぜんぶ見つけた
+    // 終わり: 10のことばをぜんぶ見つけたとき（時間切れはない。10/25-17）。基準の時間（exploreTime）より早ければ残り1秒につき＋、おそければ1秒につき−（0点より下にはしない）
     const all = reacted >= words.length;
-    if (ex.t >= BATTLE.exploreTime || (all && ex.list.length === 0)) {
+    if (all && ex.list.length === 0) {
       ex.endT = 2.4;
-      const text = tx(all ? "explore.endAll" : "explore.endSome", { n: reacted });
+      const diff = BATTLE.exploreTime - ex.t, sec = Math.ceil(Math.abs(diff)), pts = sec * BATTLE.exploreTimeScore;
+      if (diff >= 0) score += pts; else score = Math.max(0, score - pts);
+      const text = tx(diff >= 0 ? "explore.endEarly" : "explore.endLate", { n: sec, p: pts });
       post("banner", () => { banner = { text, t: 2.4, color: "rgba(72,105,58,0.92)" }; });
     }
   }
@@ -1820,7 +1859,7 @@ const Battle = (() => {
     player.glow = 0.5;
     player.notice = 0.8;   // ふわりの「！」
     reacted++;
-    found.add(d.word.id);
+    found.add(d.word.id); foundAt[d.word.id] = t;
     score += BATTLE.scoreWord;
     gauge = Math.min(100, gauge + BATTLE.bombGain * gaugeMul);
     floats.push({ x: d.x, y: d.y - d.size, text: tx("explore.found"), big: false, found: true, age: 0 });
@@ -3084,7 +3123,7 @@ const Battle = (() => {
     ctx.font = font(15); ctx.textAlign = "left"; ctx.textBaseline = "middle";
     const px = stripRight() + 8, pw = W - px - 10, lines = wrapText(hintCard.text, pw - 56);
     const ph = 22 + lines.length * 21, py = 46;
-    ctx.fillStyle = "rgba(255,253,245,0.96)"; ctx.strokeStyle = "#9cbf7c"; ctx.lineWidth = 2.5;
+    ctx.fillStyle = hintCard.yellow ? "rgba(255,236,150,0.97)" : "rgba(255,253,245,0.96)"; ctx.strokeStyle = hintCard.yellow ? "#e0b03a" : "#9cbf7c"; ctx.lineWidth = 2.5;
     roundRect(px, py, pw, ph, 14); ctx.fill(); ctx.stroke();
     drawFuwariArt(1, px + 24, py + ph / 2, 34);   // セリフの横の小さなふわり（1のコマ）
     ctx.fillStyle = "#3f4a35";
@@ -3138,9 +3177,9 @@ const Battle = (() => {
       while (ctx.measureText(trip.name).width > W - 40 && fs > 30) { fs -= 2; ctx.font = font(fs); }
       drawHeading(trip.name, trip.kana, W / 2, cy - 56, fs, main);
       // チュートリアルのステージ（ステージ1）: 発見の旅の表紙の見出しのすぐ下に1行（毎回。10/25-10）。そのぶん下の文を下げる
-      const tut = sortieNo === 1 && opts.stage && opts.stage.tutorial ? wrapTextFont(tx("tutorial.cover"), 14, W - 40) : [];
+      const tut = sortieNo === 1 && opts.stage && opts.stage.tutorial ? wrapTextFont(tx("tutorial.cover"), 15, W - 40) : [];
       if (tut.length) {
-        ctx.font = font(14); ctx.fillStyle = "#6f9a4a";
+        ctx.font = font(15); ctx.fillStyle = "#6f9a4a";
         tut.forEach((l, i) => ctx.fillText(l, W / 2, cy - 14 + i * 18));
       }
       const dy = tut.length ? tut.length * 18 + 8 : 0;
@@ -3234,11 +3273,7 @@ const Battle = (() => {
       ctx.fillText(l.desc, r.x + 18, r.y + 45);
       ctx.textAlign = "center";
     });
-    // ぜんぶ消しの説明（1行。長ければ2行）
-    const last = choiceRects()[2], bw = last.w;
-    ctx.font = font(12); ctx.fillStyle = "#6b5a3a";
-    const tl = wrapText(tx("choice.typhoonNote"), bw);
-    tl.forEach((l, i) => ctx.fillText(l, W / 2, last.y + last.h + 18 + i * 17));
+    // （ぜんぶ消しの説明の1行は、10/25-17 に消した）
     // （残り時間の帯と「あと○秒」は、10/25-14 に時間制限といっしょになくした）
   }
 
@@ -3280,10 +3315,11 @@ const Battle = (() => {
 
   function drawHud() {
     const top = 14;
-    if (phase === "round1") {   // 1回目の旅: 体力のかわりに、残り時間を画面のいちばん上の細い帯で（10/25-12。文字は出さない。残り10秒で色が変わる）
-      const left = Math.max(0, BATTLE.exploreTime - explore.t), k = left / BATTLE.exploreTime;
+    if (phase === "round1") {   // 1回目の旅: 体力のかわりに、基準の時間までの残りを画面のいちばん上の細い帯で（10/25-12。残り10秒で色が変わる）
+      const left = BATTLE.exploreTime - explore.t, k = Math.max(0, left) / BATTLE.exploreTime;
       ctx.fillStyle = "rgba(255,255,255,0.35)"; ctx.fillRect(0, 0, W, BATTLE.timeBarH);
-      ctx.fillStyle = left <= BATTLE.timeBarWarn ? "#f0a84a" : "#8fd0f0"; ctx.fillRect(0, 0, W * k, BATTLE.timeBarH);
+      if (left >= 0) { ctx.fillStyle = left <= BATTLE.timeBarWarn ? "#f0a84a" : "#8fd0f0"; ctx.fillRect(0, 0, W * k, BATTLE.timeBarH); }
+      else { ctx.fillStyle = "#e0483a"; ctx.fillRect(0, 0, W * Math.min(1, -left / BATTLE.exploreTime), BATTLE.timeBarH); }   // 基準を過ぎた: 赤くなって伸びる（10/25-17）
     } else {
     // 体力
     ctx.fillStyle = "rgba(255,255,255,0.85)";
@@ -3307,8 +3343,8 @@ const Battle = (() => {
     }
     }
     ctx.lineWidth = 4; ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.lineJoin = "round";
-    // 元気（残機）: ふわりの小さな絵（1のコマ）をならべる。失ったぶんはうすく（10/25-12。前は雲の絵）
-    for (let i = 0; i < BATTLE.lives; i++) {
+    // 元気（残機）: ふわりの小さな絵（1のコマ）をならべる。失ったぶんはうすく（10/25-12。前は雲の絵）。発見の旅では減らないので出さない（10/25-17）
+    if (phase !== "round1") for (let i = 0; i < BATTLE.lives; i++) {
       const lx = 160 + i * 26, ly = top + 8;
       ctx.save();
       ctx.globalAlpha = i < lives ? 1 : 0.25;
@@ -3394,8 +3430,9 @@ const Battle = (() => {
       ctx.fillStyle = got ? "#8a5a10" : (seen ? "#a3a396" : "#c2bdab");
       const top = y + sh / 2 - (chars.length - 1) * fs / 2;
       chars.forEach((ch, k) => ctx.fillText(VERTICAL_GLYPH[ch] || ch, x + cw / 2, top + k * fs));
-      if (stripFlash > 0 && seen && !got) {   // 出撃の瞬間: 灰色の名前がいっせいに光る
-        const k = stripFlash / 0.6;
+      const justFound = foundAt[w.id] !== undefined && t - foundAt[w.id] < BATTLE.stripFoundFlash;   // 発見の旅で見つけた瞬間: その名前がきらっと（10/25-17）
+      if ((stripFlash > 0 || justFound) && seen && !got) {   // 出撃の瞬間: 灰色の名前がいっせいに光る
+        const k = justFound ? 1 - (t - foundAt[w.id]) / BATTLE.stripFoundFlash : stripFlash / 0.6;
         ctx.save();
         ctx.globalAlpha = k;
         ctx.shadowColor = "rgba(255,214,90,1)"; ctx.shadowBlur = 12;
