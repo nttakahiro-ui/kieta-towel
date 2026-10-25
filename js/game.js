@@ -646,7 +646,7 @@ const Battle = (() => {
     hintShown[id] = true;
     if (hintOpts.mark) hintOpts.mark(id);
     const text = tx("hints." + id, Object.assign({ seed: seedName() }, vars || {}));
-    post("tutorial", () => { hintCard = { text, t: BATTLE.hintTime }; slow = Math.max(slow, BATTLE.hintSlow); });
+    post("tutorial", () => { hintCard = { text, t: BATTLE.hintTime, yellow: id === "seed" }; slow = Math.max(slow, BATTLE.hintSlow); });   // たねの案内は黄色い帯（たねが黄色いとわかるように。10/25-17）
   }
   // ぜんぶ消しのゲージがたまった（10/25-1）: 初めての1回だけ、1秒ゆっくりにして案内。以後はたまるたびに左下が光って音が鳴る
   function bombReady() {
@@ -3084,7 +3084,7 @@ const Battle = (() => {
     ctx.font = font(15); ctx.textAlign = "left"; ctx.textBaseline = "middle";
     const px = stripRight() + 8, pw = W - px - 10, lines = wrapText(hintCard.text, pw - 56);
     const ph = 22 + lines.length * 21, py = 46;
-    ctx.fillStyle = "rgba(255,253,245,0.96)"; ctx.strokeStyle = "#9cbf7c"; ctx.lineWidth = 2.5;
+    ctx.fillStyle = hintCard.yellow ? "rgba(255,236,150,0.97)" : "rgba(255,253,245,0.96)"; ctx.strokeStyle = hintCard.yellow ? "#e0b03a" : "#9cbf7c"; ctx.lineWidth = 2.5;
     roundRect(px, py, pw, ph, 14); ctx.fill(); ctx.stroke();
     drawFuwariArt(1, px + 24, py + ph / 2, 34);   // セリフの横の小さなふわり（1のコマ）
     ctx.fillStyle = "#3f4a35";
@@ -3138,9 +3138,9 @@ const Battle = (() => {
       while (ctx.measureText(trip.name).width > W - 40 && fs > 30) { fs -= 2; ctx.font = font(fs); }
       drawHeading(trip.name, trip.kana, W / 2, cy - 56, fs, main);
       // チュートリアルのステージ（ステージ1）: 発見の旅の表紙の見出しのすぐ下に1行（毎回。10/25-10）。そのぶん下の文を下げる
-      const tut = sortieNo === 1 && opts.stage && opts.stage.tutorial ? wrapTextFont(tx("tutorial.cover"), 14, W - 40) : [];
+      const tut = sortieNo === 1 && opts.stage && opts.stage.tutorial ? wrapTextFont(tx("tutorial.cover"), 15, W - 40) : [];
       if (tut.length) {
-        ctx.font = font(14); ctx.fillStyle = "#6f9a4a";
+        ctx.font = font(15); ctx.fillStyle = "#6f9a4a";
         tut.forEach((l, i) => ctx.fillText(l, W / 2, cy - 14 + i * 18));
       }
       const dy = tut.length ? tut.length * 18 + 8 : 0;
@@ -3234,11 +3234,7 @@ const Battle = (() => {
       ctx.fillText(l.desc, r.x + 18, r.y + 45);
       ctx.textAlign = "center";
     });
-    // ぜんぶ消しの説明（1行。長ければ2行）
-    const last = choiceRects()[2], bw = last.w;
-    ctx.font = font(12); ctx.fillStyle = "#6b5a3a";
-    const tl = wrapText(tx("choice.typhoonNote"), bw);
-    tl.forEach((l, i) => ctx.fillText(l, W / 2, last.y + last.h + 18 + i * 17));
+    // （ぜんぶ消しの説明の1行は、10/25-17 に消した）
     // （残り時間の帯と「あと○秒」は、10/25-14 に時間制限といっしょになくした）
   }
 
@@ -3307,8 +3303,8 @@ const Battle = (() => {
     }
     }
     ctx.lineWidth = 4; ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.lineJoin = "round";
-    // 元気（残機）: ふわりの小さな絵（1のコマ）をならべる。失ったぶんはうすく（10/25-12。前は雲の絵）
-    for (let i = 0; i < BATTLE.lives; i++) {
+    // 元気（残機）: ふわりの小さな絵（1のコマ）をならべる。失ったぶんはうすく（10/25-12。前は雲の絵）。発見の旅では減らないので出さない（10/25-17）
+    if (phase !== "round1") for (let i = 0; i < BATTLE.lives; i++) {
       const lx = 160 + i * 26, ly = top + 8;
       ctx.save();
       ctx.globalAlpha = i < lives ? 1 : 0.25;

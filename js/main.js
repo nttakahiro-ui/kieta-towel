@@ -462,7 +462,6 @@ const Main = (() => {
         const m = document.createElement("span"); m.className = "mark" + (b && b[k] ? " on" : ""); m.textContent = tx(`marks.${k}.short`);
         marks.appendChild(m);
       });
-      if (s.tutorial) { const tg = document.createElement("span"); tg.className = "tut-tag"; tg.textContent = tx("tutorial.mark"); nm.appendChild(tg); }   // ステージ1は「チュートリアル」（10/25-10）
       main.append(nm, sub);
       row.append(no, main);
       if (open) row.appendChild(marks);
