@@ -499,3 +499,42 @@ body { position: fixed; inset: 0; }
 #cards-p2 .rank-name { font-size: 15px; padding: 4px 14px; }
 #cards-p2 .marks-now .mark { font-size: 11px; }
 #cards-p2 .cards-summary { margin: 4px 0 0; }
+
+/* レシピブック（10/25-4）: 円い台座と12個の宝石（js/recipebook.js） */
+.rb-box { width: min(calc(100vw - 40px), 320px); margin: 0 auto; }
+.rb-box.small { width: min(calc(100vw - 80px), 190px, 26vh); }
+.rb-svg { width: 100%; height: auto; display: block; }
+.rb-world { font-size: 15px; fill: #8a7a50; text-anchor: middle; dominant-baseline: middle; }
+.rb-count { font-size: 22px; font-weight: bold; fill: #8a5a10; text-anchor: middle; }
+.rb-gem { cursor: pointer; }
+.rb-drop { animation: rbDrop 1.3s cubic-bezier(.2,.8,.3,1) both; }
+@keyframes rbDrop {
+  0% { transform: translate(0, -170px) scale(2); opacity: 0; }
+  35% { opacity: 1; }
+  70% { transform: translate(0, 0) scale(1.25); }
+  85% { transform: translate(0, 0) scale(0.9); }
+  100% { transform: translate(0, 0) scale(1); opacity: 1; }
+}
+.intro-book-caption { font-size: 15px; line-height: 1.5; color: #6b5a3a; margin: 6px 0 0; }
+.intro-heroes .hero-img { width: auto; height: min(160px, 20vh); }
+.intro-lines { margin: 10px 0 6px; }
+
+/* レシピ完成の画面 */
+#screen-recipe { overflow: hidden; }
+.recipe-box { height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 12px 16px; box-sizing: border-box; text-align: center; }
+.recipe-box .recipe-name { font-size: 20px; margin: 8px 0 4px; }
+.recipe-box .recipe-hero { width: auto; height: min(150px, 18vh); }
+
+/* レシピブックの画面 */
+#screen-recipebook { overflow: hidden; }
+.rbook-box { height: 100%; display: flex; flex-direction: column; justify-content: center; padding: 12px 16px; box-sizing: border-box; max-width: 440px; margin: 0 auto; }
+.rbook-info { min-height: 3.2em; text-align: center; font-size: 15px; line-height: 1.6; color: #4b5e3a; white-space: pre-line; margin: 10px 0 0; }
+.stages-nav #btn-rbook { margin-left: auto; font-size: 15px; font-weight: bold; margin-right: 14px; }
+.stages-nav #btn-zukan { margin-left: 0; }
+
+/* 12個そろったとき */
+#screen-ending { background: #f6ecd6; overflow: hidden; }   /* 主人公の絵の紙（#fff7ea）より少し暗くして、紙の地を消す */
+.ending-box { height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 16px; box-sizing: border-box; text-align: center; }
+.ending-title { font-size: 28px; color: #b0801a; margin: 0 0 8px; }
+.ending-line { font-size: 17px; color: #6b5a3a; margin: 6px 0 14px; }
+.recipe-box .recipe-name { white-space: pre-line; }

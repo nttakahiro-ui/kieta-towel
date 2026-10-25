@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap">
-  <link rel="stylesheet" href="css/style.css?v=37">
+  <link rel="stylesheet" href="css/style.css?v=38">
 </head>
 <body>
   <div id="app">
@@ -21,6 +21,8 @@
       <div class="intro-box">
         <div class="intro-heroes"><img class="hero-img" src="assets/hero_boy_point.jpg" alt=""><img class="hero-img" src="assets/hero_girl_point.jpg" alt=""></div>
         <div id="intro-lines" class="intro-lines"></div>
+        <div id="intro-book" class="rb-box small"></div>
+        <p id="intro-book-caption" class="intro-book-caption"></p>
         <p id="intro-tap" class="intro-tap"></p>
       </div>
     </section>
@@ -59,7 +61,7 @@
     <!-- ステージ一覧（ベストスコアと3つの印） -->
     <section id="screen-stages" class="screen scroll">
       <div class="stages-box">
-        <div class="stages-nav"><button id="btn-world-back" class="link-btn hidden"></button><button id="btn-zukan" class="link-btn"></button></div>
+        <div class="stages-nav"><button id="btn-world-back" class="link-btn hidden"></button><button id="btn-rbook" class="link-btn"></button><button id="btn-zukan" class="link-btn"></button></div>
         <h2 id="stages-world-title" class="stages-title">ステージをえらぶ</h2>
         <p class="stages-note">印: <span class="mark on">10語</span> 10語すべて助けた　<span class="mark on">元気</span> 元気をなくさなかった　<span class="mark on">ぶつからず</span> 一度もぶつからなかった</p>
         <div id="stages-list"></div>
@@ -137,18 +139,36 @@
       </div>
     </section>
 
-    <!-- レシピ完成 -->
-    <section id="screen-recipe" class="screen scroll">
+    <!-- レシピ完成（10/25-4）: 台座に、そのステージの宝石がはまる -->
+    <section id="screen-recipe" class="screen">
       <div class="recipe-box">
-        <img id="recipe-hero" class="hero-img hero-mid" alt="">
-        <p class="recipe-label">レシピ完成</p>
-        <p id="recipe-hint" class="fuwari-hint hidden"></p>
+        <p id="recipe-label" class="recipe-label"></p>
+        <div id="recipe-book" class="rb-box"></div>
         <h2 id="recipe-name" class="recipe-name"></h2>
-        <div id="recipe-fluff" class="recipe-fluff"></div>
-        <div class="recipe-art"><div class="recipe-towel"></div></div>
-        <ol id="recipe-words" class="recipe-words"></ol>
-        <p id="recipe-next" class="recipe-next"></p>
+        <img id="recipe-hero" class="hero-img recipe-hero" alt="">
+        <p id="recipe-hint" class="fuwari-hint hidden"></p>
         <div id="recipe-buttons" class="btn-row"></div>
+      </div>
+    </section>
+
+    <!-- レシピブック（10/25-4）: ステージ一覧からいつでも -->
+    <section id="screen-recipebook" class="screen">
+      <div class="rbook-box">
+        <div class="cards-top left"><button id="rbook-back" class="link-btn"></button></div>
+        <h2 id="rbook-title" class="zukan-title"></h2>
+        <div id="rbook-ring" class="rb-box"></div>
+        <p id="rbook-info" class="rbook-info"></p>
+      </div>
+    </section>
+
+    <!-- 12個そろったとき（10/25-4。仮の1画面） -->
+    <section id="screen-ending" class="screen">
+      <div class="ending-box">
+        <h2 id="ending-title" class="ending-title"></h2>
+        <div class="intro-heroes"><img class="hero-img" src="assets/hero_boy_joy.jpg" alt=""><img class="hero-img" src="assets/hero_girl_joy.jpg" alt=""></div>
+        <div id="ending-book" class="rb-box small"></div>
+        <p id="ending-line" class="ending-line"></p>
+        <div class="btn-row"><button id="ending-next" class="btn btn-main"></button></div>
       </div>
     </section>
   </div>
@@ -186,6 +206,7 @@
       <div class="btn-row">
         <button id="dbg-tune" class="btn btn-debug">調整パネルを開く</button>
         <button id="dbg-open-all" class="btn btn-debug">すべてのステージを開く: オフ</button>
+        <button id="dbg-all-cards" class="btn btn-debug">すべてのカードをそろえる</button>
         <button id="dbg-invincible" class="btn btn-debug">無敵: オフ</button>
         <button id="dbg-odai" class="btn btn-debug">お題バトル: オン</button>
         <button id="dbg-reset" class="btn btn-debug">記録を消す</button>
@@ -214,13 +235,14 @@
   <!-- 横向きのとき -->
   <div id="rotate"><div><div class="rotate-icon"></div><p>縦にしてね</p></div></div>
 
-  <script src="data/words.js?v=37"></script>
-  <script src="data/stages.js?v=37"></script>
-  <script src="data/texts.js?v=37"></script>
-  <script src="js/audio.js?v=37"></script>
-  <script src="js/game.js?v=37"></script>
-  <script src="js/quiz.js?v=37"></script>
-  <script src="js/cards.js?v=37"></script>
-  <script src="js/main.js?v=37"></script>
+  <script src="data/words.js?v=38"></script>
+  <script src="data/stages.js?v=38"></script>
+  <script src="data/texts.js?v=38"></script>
+  <script src="js/audio.js?v=38"></script>
+  <script src="js/game.js?v=38"></script>
+  <script src="js/quiz.js?v=38"></script>
+  <script src="js/cards.js?v=38"></script>
+  <script src="js/recipebook.js?v=38"></script>
+  <script src="js/main.js?v=38"></script>
 </body>
 </html>

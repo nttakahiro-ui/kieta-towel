@@ -163,30 +163,20 @@ const Cards = (() => {
     $("cards-buttons").innerHTML = "";
   }
 
-  // レシピ完成表示（絵や演出は仮）
+  // レシピ完成の画面（10/25-4）: 台座が出て、そのステージの宝石が光ってはまる（初めてそろったときだけ。2回目からは光った状態）。
+  // o: { stage, lit（光っている stage id の Set）, isNew（初めてそろった）, onNext, hint, heroSrc }
   function showRecipe(o) {
     Sound.play("recipe");
     showHint("recipe-hint", o.hint); showHero("recipe-hero", o.heroSrc);
-    $("recipe-name").textContent = o.stage.recipe;
-    // 綿毛がふわふわ舞う（仮の演出）
-    const fl = $("recipe-fluff");
-    fl.innerHTML = "";
-    for (let i = 0; i < 18; i++) {
-      const sp = document.createElement("span");
-      sp.style.left = `${Math.random() * 100}%`;
-      sp.style.animationDelay = `${Math.random() * 5}s`;
-      sp.style.animationDuration = `${5 + Math.random() * 4}s`;
-      const sz = 6 + Math.random() * 10;
-      sp.style.width = sp.style.height = `${sz}px`;
-      fl.appendChild(sp);
-    }
-    const ol = $("recipe-words");
-    ol.innerHTML = "";
-    o.words.forEach(w => { const li = document.createElement("li"); li.textContent = w.word; ol.appendChild(li); });
-    $("recipe-next").innerHTML = "ステージクリア！<br>次のステージはまだありません";
+    $("recipe-label").textContent = tx("recipe.label");
+    $("recipe-name").textContent = tx("recipe.revived", { name: o.stage.recipe });
+    const lit = new Set(o.lit);
+    if (o.isNew) lit.delete(o.stage.id);   // はまる演出をする宝石は、まだ光っていない状態から
+    RecipeBook.render($("recipe-book"), { lit, drop: o.isNew ? o.stage.id : null });
+    if (o.isNew) setTimeout(() => Sound.se("shine"), 900);
     const btns = $("recipe-buttons");
     btns.innerHTML = "";
-    btns.append(button("もう一度あそぶ", "btn-main", o.onRetry), button("ステージ一覧へ", "btn-sub", o.onTitle));
+    btns.append(button(tx("recipe.next"), "btn-main", o.onNext));
   }
 
   return { showCards, showRecipe, phraseHTML, names };
