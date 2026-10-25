@@ -53,8 +53,28 @@ const Cards = (() => {
   function showHint(id, text) { const el = $(id); el.textContent = text || ""; el.classList.toggle("hidden", !text); }
   function showHero(id, src) { const el = $(id); if (src) el.src = src; el.classList.toggle("hidden", !src); }
 
+  // 結果画面の2ページ（10/25-3）: 1ページ目＝カードの枚数と次にすること、2ページ目＝今回のカードの一覧とランク
+  function setPage(n) { $("cards-pages").classList.toggle("p2", n === 2); }
+  let swipeBound = false;
+  function bindSwipe() {
+    if (swipeBound) return; swipeBound = true;
+    let sx = null, sy = null;
+    const el = $("screen-cards");
+    el.addEventListener("touchstart", e => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; }, { passive: true });
+    el.addEventListener("touchend", e => {
+      if (sx === null) return;
+      const dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy;
+      sx = null;
+      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) setPage(dx < 0 ? 2 : 1);   // 左へスワイプ＝2ページ目、右へ＝1ページ目
+    });
+  }
+
   function showCards(o) {
     Sound.play("card");
+    bindSwipe(); setPage(1);
+    $("cards-to-p2").textContent = tx("results.toCards"); $("cards-to-p2").onclick = () => setPage(2);
+    $("cards-to-p1").textContent = tx("results.toBack"); $("cards-to-p1").onclick = () => setPage(1);
+    $("cards-title").textContent = tx("results.cardsTitle");
     showHint("cards-hint", o.hint); showHero("cards-hero", o.heroSrc);
     const got = o.results.filter(r => r.correct).map(r => r.id);
     const ownedCount = o.words.filter(w => o.owned[w.id]).length;

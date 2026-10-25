@@ -86,10 +86,12 @@ const BATTLE = {
   // --- お題バトル（2周目の中ボス2回と大ボス1回） ---
   odai: true,                  // お題バトルのスイッチ（true＝オン、false＝オフ。オフで今までの中ボス・大ボス戦）
   odaiIntroTime: 2.5,          // 始まりのスローと、問題文を画面中央に大きく出す秒数（この間は弾が当たらない）。10/8に2.5秒に
-  odaiBigFont: 26,             // 問題文を画面中央に出すときの文字の大きさのいちばん上（px）。長い問題は3行に収まるまで小さくする
-  odaiSmallFont: 20,           // 問題文を上の帯の下に移したあとの文字の大きさのいちばん上（px）。同じく3行に収まるまで小さくする
+  odaiBigFont: 26,             // 問題文を画面中央に出すときの文字の大きさのいちばん上（px）。画面の幅に3行以内に収まるまで小さくする
+  odaiSmallFont: 20,           // 問題文を上の帯の下に移したあとの文字の大きさのいちばん上（px）。枠の中に2行で収まるまで小さくする（10/25-3）
+  odaiPanelLines: 2,           // 帯の下の問題文の行数（14pxでも入らないときだけ odaiMaxLines まで）
   odaiMaxLines: 3,             // 問題文の行数の上限
-  odaiMinFont: 12,             // 問題文の文字の大きさのいちばん下（px）
+  odaiFitFont: 14,             // 問題文の文字の大きさのいちばん下（px。10/25-3）
+  odaiMinFont: 12,             // （3行にしても14pxで入らないときだけ、ここまで小さくする）
   odaiTimeLimit: 20,           // 中ボスのお題の制限時間（秒）。時間切れは取り逃がし。大ボスは制限なし
   odaiPenalty: 300,            // ダミーに当てたときの減点（コンボは切らない）
   odaiPenaltyCool: 1,          // 同じダミーで続けて減点しない秒数（連射で何度も減らないように）
@@ -158,7 +160,7 @@ const BATTLE = {
   // ステージごとの手上書きは data/stages.js の override 欄
   // 難易度の線（10/21-2）: 難易度＝ステージ番号（1〜12）。[難易度, 値] の2点（1と12）を結ぶ一直線。ステージ1の手ごたえは10/21-1のまま
   difficulty: {
-    fireRate:      [[1, 0.31], [12, 1.7]],    // 弾の多さ（敵が撃つ間隔の逆数。大きいほど弾が多い。1 ＝ 10/3の基準）
+    fireRate:      [[1, 0.31], [12, 1.85]],    // 弾の多さ（敵が撃つ間隔の逆数。大きいほど弾が多い。1 ＝ 10/3の基準）
     bulletSpeed:   [[1, 0.6], [12, 1.15]],     // 敵の弾の速さの倍率（ステージ1はゆっくり）
     speedScale:    [[1, 0.85], [12, 1.25]],    // 語句の速さの倍率
     fillerDensity: [[1, 0.6], [12, 1.6]],     // 救出のたびの虫の濃さ（数と間隔。虫1匹の弾の量は変えない）
@@ -1498,19 +1500,19 @@ const Battle = (() => {
   }
   // 小さく出したときの問題文の帯の位置（集めたことばの帯の下）
   // 問題文の大きさを、長さに合わせて決める: いちばん上の大きさから、行数の上限に収まるまで小さくする
-  function fitOdaiText(text, maxFont, width) {
-    let fs = maxFont, lines;
-    for (;;) {
-      ctx.font = font(fs);
-      lines = wrapText(text, width);
-      if (lines.length <= BATTLE.odaiMaxLines || fs <= BATTLE.odaiMinFont) break;
-      fs--;
-    }
-    return { fs, lines, lh: Math.round(fs * 1.38) };
+  // 10/25-3: 行数（maxLines）に収まり、どの行も幅（width）からはみ出さない大きさまで小さくする。いちばん下は 14px。
+  // 14px でも maxLines に入らないときだけ、行数を odaiMaxLines（3行）まで許す（それでも入らなければ odaiMinFont まで小さく）
+  function fitOdaiText(text, maxFont, width, maxLines) {
+    const fits = (fs, n) => { ctx.font = font(fs); const ls = wrapText(text, width); return ls.length <= n && ls.every(l => ctx.measureText(l).width <= width) ? ls : null; };
+    const want = maxLines || BATTLE.odaiMaxLines;
+    for (let fs = maxFont; fs >= BATTLE.odaiFitFont; fs--) { const ls = fits(fs, want); if (ls) return { fs, lines: ls, lh: Math.round(fs * 1.38) }; }
+    for (let fs = BATTLE.odaiFitFont; fs >= BATTLE.odaiMinFont; fs--) { const ls = fits(fs, BATTLE.odaiMaxLines); if (ls) return { fs, lines: ls, lh: Math.round(fs * 1.38) }; }
+    ctx.font = font(BATTLE.odaiMinFont);
+    return { fs: BATTLE.odaiMinFont, lines: wrapText(text, width), lh: Math.round(BATTLE.odaiMinFont * 1.38) };
   }
   function odaiPanel() {
     const y = 40;   // 上の体力ゲージ・点数の下
-    const f = fitOdaiText(odai ? odai.q : "", BATTLE.odaiSmallFont, W - stripRight() - 34);
+    const f = fitOdaiText(odai ? odai.q : "", BATTLE.odaiSmallFont, W - stripRight() - 42, BATTLE.odaiPanelLines);   // 枠の中に2行（内側の幅）
     return { y, lines: f.lines, fs: f.fs, lh: f.lh, h: f.lines.length * f.lh + 14 };
   }
   function odaiTop() { const p = odaiPanel(); return p.y + p.h; }
@@ -2785,7 +2787,7 @@ const Battle = (() => {
     ctx.save();
     ctx.textAlign = "left"; ctx.textBaseline = "top";
     if (odai.intro > 0) {
-      const { fs, lh, lines } = fitOdaiText(odai.q, BATTLE.odaiBigFont, W - 64);   // 短い問題は大きく、長い問題は小さく
+      const { fs, lh, lines } = fitOdaiText(odai.q, BATTLE.odaiBigFont, W - 72, BATTLE.odaiMaxLines);   // 画面の幅に3行以内（はみ出さない大きさ）
       ctx.font = font(14);
       const hl = odai.hint ? wrapText(odai.hint, W - 72) : [];   // 最初のお題だけ、案内を1行そえる
       const h = lines.length * lh + 50 + hl.length * 20 + (hl.length ? 10 : 0), y = H * 0.4 - h / 2;
