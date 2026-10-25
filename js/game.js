@@ -189,7 +189,9 @@ const BATTLE = {
   respawnInv: 2,               // 復活したあと、無敵で点滅する秒数
   wordShowTime: 1.5,           // 吸い込んだ語句を画面中央に大きく出す秒数（この間は弾が当たらない）
   fuwariSayTime: 3,
-  powerFxTime: 1.3,            // 「パワーアップ！」を出す秒数（10/25-9）
+  powerFxTime: 1.3,
+  timeBarH: 6,                 // 発見の旅の残り時間の帯の太さ（px。画面のいちばん上。10/25-12）
+  timeBarWarn: 10,             // 残り何秒で帯の色が変わるか            // 「パワーアップ！」を出す秒数（10/25-9）
   fuwariSize: 62,              // 自機のふわりの絵の幅（px。10/25-6）
   fuwariExploreSize: 50,       // 発見の旅の、下のまん中の小さなふわりの幅
   fuwariFrameTime: 0.18,       // 飛んでいるときに1→2→3のコマを切り替える秒数
@@ -1026,6 +1028,7 @@ const Battle = (() => {
     const dt = Math.min((ts - lastTs) / 1000, 0.05);
     lastTs = ts;
     update(dt);
+    frameNo++;
     draw();
     rafId = requestAnimationFrame(loop);
   }
@@ -2108,7 +2111,7 @@ const Battle = (() => {
     drawBombButton();
     // 操作のヒント（まだ動かしていないとき）
     if (!moved && state !== "clear") {
-      ctx.globalAlpha = 0.6 + Math.sin(t * 4) * 0.3;
+      ctx.globalAlpha = hintFadeIn();   // 点滅しない。出るときに一度ふわっと現れるだけ（10/25-12）
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
       ctx.font = font(16);
       ctx.lineWidth = 5; ctx.strokeStyle = "#ffffff"; ctx.lineJoin = "round";
@@ -2295,7 +2298,7 @@ const Battle = (() => {
   // 木のよけ方の案内の矢印
   // 木の案内（10/25-1）: 矢印は木の横（よける向き）、文字は画面の中ほどの案内の位置に分けて出す
   function drawGuide() {
-    const k = Math.min(1, guide.t / 0.3), pulse = 0.6 + Math.sin(t * 10) * 0.4;
+    const k = Math.min(1, guide.t / 0.3), pulse = 1;   // 矢印は点滅させない（10/25-12）
     const tr = guide.tree, ty = Math.max(70, Math.min(H - 140, tr.y));
     ctx.save(); ctx.globalAlpha = k;
     if (guide.kind === "dodge") {   // 木の横に、よける向きの矢印
@@ -3014,7 +3017,7 @@ const Battle = (() => {
     ctx.globalAlpha = 1;
     drawHud();
     if (!moved && state === "play") {   // 操作のヒント
-      ctx.globalAlpha = 0.7 + Math.sin(t * 4) * 0.3;
+      ctx.globalAlpha = hintFadeIn();   // 点滅しない（10/25-12）
       ctx.font = font(16); ctx.lineWidth = 5; ctx.strokeStyle = "#ffffff";
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
       const hy = Math.min(H - 110, bino.y + R + 26);
@@ -3228,17 +3231,24 @@ const Battle = (() => {
     ctx.restore();
   }
 
+  // 操作のヒント（「指で双眼鏡を動かそう」など）は点滅させず、出るときに0.6秒かけてふわっと現れる（10/25-12）
+  let moveHintAt = null, moveHintFrame = -1, frameNo = 0;
+  function hintFadeIn() {
+    if (moveHintAt === null || frameNo - moveHintFrame > 2) moveHintAt = t;   // しばらく出ていなかったら、もう一度ふわっと（時間はゲームの時間）
+    moveHintFrame = frameNo;
+    return Math.min(1, (t - moveHintAt) / 0.6);
+  }
+
   function drawHud() {
     const top = 14;
+    if (phase === "round1") {   // 1回目の旅: 体力のかわりに、残り時間を画面のいちばん上の細い帯で（10/25-12。文字は出さない。残り10秒で色が変わる）
+      const left = Math.max(0, BATTLE.exploreTime - explore.t), k = left / BATTLE.exploreTime;
+      ctx.fillStyle = "rgba(255,255,255,0.35)"; ctx.fillRect(0, 0, W, BATTLE.timeBarH);
+      ctx.fillStyle = left <= BATTLE.timeBarWarn ? "#f0a84a" : "#8fd0f0"; ctx.fillRect(0, 0, W * k, BATTLE.timeBarH);
+    } else {
     // 体力
     ctx.fillStyle = "rgba(255,255,255,0.85)";
     roundRect(12, top, 130, 16, 8); ctx.fill();
-    if (phase === "round1") {   // 1回目の旅: 体力のかわりに、のこり時間（元気は減らない）
-      const k = Math.max(0, 1 - explore.t / BATTLE.exploreTime);
-      ctx.fillStyle = "#8fb8d8"; roundRect(14, top + 2, 126 * k, 12, 6); ctx.fill();
-      ctx.save(); ctx.font = font(10); ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillStyle = "#3d5a70";
-      ctx.fillText(tx("explore.timeLabel"), 18, top + 8); ctx.restore();
-    } else {
     const rate = player.hp / BATTLE.playerMaxHp;
     ctx.fillStyle = rate > 0.4 ? "#8cbf5a" : (Math.floor(t * 4) % 2 ? "#e39a8e" : "#f2c4bb");
     roundRect(14, top + 2, 126 * rate, 12, 6); ctx.fill();
@@ -3258,15 +3268,12 @@ const Battle = (() => {
     }
     }
     ctx.lineWidth = 4; ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.lineJoin = "round";
-    // 残機: 機体（雲）の絵をならべる。失ったぶんはうすく
+    // 元気（残機）: ふわりの小さな絵（1のコマ）をならべる。失ったぶんはうすく（10/25-12。前は雲の絵）
     for (let i = 0; i < BATTLE.lives; i++) {
       const lx = 160 + i * 26, ly = top + 8;
       ctx.save();
-      ctx.globalAlpha = i < lives ? 1 : 0.22;
-      ctx.fillStyle = "#ffffff"; ctx.strokeStyle = "#9cbf7c"; ctx.lineWidth = 1.5;
-      for (const [dx, dy, r] of [[-6, 2, 5], [0, -1, 7], [6, 2, 5]]) { ctx.beginPath(); ctx.arc(lx + dx, ly + dy, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
-      for (const [dx, dy, r] of [[-6, 2, 5], [0, -1, 7], [6, 2, 5]]) { ctx.beginPath(); ctx.arc(lx + dx, ly + dy, r - 1, 0, Math.PI * 2); ctx.fill(); }
-      ctx.fillStyle = "#f3d9b8"; ctx.beginPath(); ctx.arc(lx, ly - 7, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = i < lives ? 1 : 0.25;
+      drawFuwariArt(1, lx, ly, 26);
       ctx.restore();
     }
     // 点数（右）。上に出すのは体力ゲージ、残機、点数だけ
