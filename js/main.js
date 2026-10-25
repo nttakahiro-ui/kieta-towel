@@ -24,7 +24,8 @@ const Save = (() => {
   // hero: 選んだ主人公（"boy"／"girl"）、introSeen: 目的の画面を見たか（10/21-2）
   // world: ステージ一覧で今いる世界（10/22-1。ワープで進む）
   // gemsSeen: レシピブックの宝石がはまる演出を見たステージ（10/25-4。初めてそろったときだけ演出する）
-  let data = { cards: {}, cleared: {}, retake: {}, best: {}, hero: null, introSeen: false, world: 1, gemsSeen: {} };
+  // found: ステージごとの、発見の旅で見つけたことばの id（10/25-15。「救出の旅をもう一度」で使う。救出で10のことばすべて助けたら消す）
+  let data = { cards: {}, cleared: {}, retake: {}, best: {}, hero: null, introSeen: false, world: 1, gemsSeen: {}, found: {} };
   // localStorage が使えなくても落ちないようにする
   function load() {
     try {
@@ -40,6 +41,7 @@ const Save = (() => {
         data.introSeen = !!d.introSeen;
         data.world = d.world || 1;
         data.gemsSeen = d.gemsSeen || {};
+        data.found = d.found || {};
       }
     } catch (e) { /* 読めないときは空のまま */ }
   }
@@ -286,7 +288,6 @@ const Main = (() => {
   let reviewing = false;     // 今のステージ1がおさらいか
 
   // rescueAgain: 結果画面の「救出の旅をもう一度」（10/25-14）。発見の旅をとばして持ち物選択から（前の発見の記録を使う）
-  const lastFound = {};   // ステージごとの、発見の旅で見つけたことばの id
   function toBattle(rescueAgain) {
     reviewing = reviewNext && stage.id === 1;
     showScreen("battle");
@@ -303,9 +304,12 @@ const Main = (() => {
         bombHintSeen: !!TutSave.load().bombReady,     // ぜんぶ消しの案内（初めての1回だけ。記録は版ごと）
         onBombHint: () => TutSave.mark("bombReady"),
         onFirstChoice: () => TutSave.mark("choice"),
-        foundIds: rescueAgain === true ? (lastFound[stage.id] || []) : null,
+        foundIds: rescueAgain === true ? (Save.data.found[stage.id] || []) : null,
         onEnd: (ids, stats) => {
-          lastStats = stats; lastIds = ids; lastFound[stage.id] = stats.found;
+          lastStats = stats; lastIds = ids;
+          // 発見の記録はブラウザに保存（10/25-15）。10のことばすべて助けたら、もういらないので消す
+          if (ids.length >= words.length) delete Save.data.found[stage.id]; else Save.data.found[stage.id] = stats.found;
+          Save.store();
           const m = Math.floor(stats.time / 60), sec = String(Math.floor(stats.time % 60)).padStart(2, "0");
           Tune.setInfo(`前回のバトル（${stage.name}）: ${m}分${sec}秒　回収 ${ids.length}語　被弾 ${stats.hits}回　失った機体 ${stats.downs}機　本番やり直し ${stats.gameOvers}回　${stats.score}点`);
           reviewNext = false;
@@ -378,7 +382,7 @@ const Main = (() => {
       record: retake ? null : { newBest, now, best: Save.data.best[stage.id] },
       retake, helpedCount: lastIds.length, retakeIds: Save.data.retake,
       onRetake: startRetake,
-      onRescue: lastFound[stage.id] ? () => toBattle(true) : null,   // 救出の旅をもう一度（10/25-14。この遊びの中で発見の旅をしたステージだけ）
+      onRescue: Save.data.found[stage.id] ? () => toBattle(true) : null,   // 救出の旅をもう一度（10/25-14。発見の記録があるステージだけ。記録はブラウザに保存 10/25-15）
       onRecipe: toRecipe,
       onRetry: toBattle,
       onTitle: toStages,
@@ -398,7 +402,7 @@ const Main = (() => {
     Save.data.gemsSeen[stage.id] = true;
     Save.store();
     showScreen("recipe");
-    Cards.showRecipe({ stage, lit, isNew, heroSrc: heroSrc("joy"), hint: "",
+    Cards.showRecipe({ stage, words, lit, isNew, heroSrc: heroSrc("joy"), hint: "",
       onNext: () => (isNew && lit.size >= 12 ? toEnding() : toStages()) });
   }
   // レシピブック（ステージ一覧から）: 宝石をタップすると、どのステージか・レシピ名が出る
@@ -651,6 +655,8 @@ const Main = (() => {
       Save.data.cleared = {};
       Save.data.retake = {};
       Save.data.best = {};
+      Save.data.found = {};   // 発見の記録も消す（10/25-15）
+      Save.data.gemsSeen = {};   // レシピの演出を見た記録も消す（もう一度演出が見られるように）
       Save.store();
       TutSave.reset();   // チュートリアルを見た記録も消す（この版の分）
       $("title-cards").textContent = 0;
