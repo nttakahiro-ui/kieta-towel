@@ -221,31 +221,29 @@ const moveOf = type => FILLER_TYPES[type].move || type;
 // 雑魚の群れの出やすさ（数が大きいほどよく出る）。stages.js の theme.bugs がないステージで使う
 const FILLER_WAVES = { ladybugs: 3, bees: 2, ghost: 2, weeds: 3, thorn: 1 };
 
-// ===== 敵の弾の絵（ここだけ書き換えれば、弾の見た目が変わる） =====
-// image に画像のパスを入れると、その画像で描く（例: "img/seed.png"）
-const ENEMY_BULLET_ART = {
-  radius: 11,
-  image: null,
-  // 仮の絵: 綿のたね（白いふわふわに、茶色のたね）
-  draw(ctx, x, y, r, t) {
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate(t * 2);
-    ctx.fillStyle = "#ffffff";
-    ctx.strokeStyle = "#c9b99a";
-    ctx.lineWidth = 1.5;
-    for (let i = 0; i < 5; i++) {
-      const a = (i / 5) * Math.PI * 2;
-      ctx.beginPath();
-      ctx.arc(Math.cos(a) * r * 0.55, Math.sin(a) * r * 0.55, r * 0.6, 0, Math.PI * 2);
-      ctx.fill(); ctx.stroke();
-    }
-    ctx.fillStyle = "#8a6a45";
-    ctx.beginPath();
-    ctx.ellipse(0, 0, r * 0.35, r * 0.25, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
+// ===== 発見の旅の、ことばの動きの型（10/25-7） =====
+// stages.js の explore: { move: "fall" } で選ぶ（書いていないステージは "drift"）。数は、ここか stages.js の explore 欄で上書きできる
+// 双眼鏡で見つめる操作はどの型も同じ。世界2・3の探し方（箱を開ける・星をなぞる）は、ここに型を足して差しかえる
+const EXPLORE_MOVES = {
+  drift:   {},                                                        // ゆっくり漂う（ステージ1）
+  fall:    { fallSpeed: 46, sway: 34, swaySpeed: 1.4, wait: 2, lifeMul: 2 },   // 落ち葉のように揺れながら降る。地面に落ちたら wait 秒あとに上から出直す（ただよう時間は lifeMul 倍）
+  wind:    { wind: 40, gust: 0.35, binoDrift: 14, wait: 0.8 },        // 風で右へ流される（gust ＝ 風の強弱）。右に出たら wait 秒あとに左から出直す。双眼鏡も binoDrift px/秒 流される
+  firefly: { speedMul: 0.5, flies: 4, stray: 4, fog: 0.35, hint: false },   // 霧が濃い。ことばのまわりにホタルが flies 匹集まる（stray ＝ ひとりで飛ぶホタル）。きらっと光る目印は出さない
+};
+
+// ===== 弾の色（10/25-7。ここだけ書きかえれば、敵の弾と味方の光の色が変わる） =====
+// 敵の弾は単純な球。濃い色の球に、明るい桃色の細い縁取り（どの時間帯の背景でも浮いて見える）。少し脈打つ
+const BULLET_COLORS = {
+  zako: "#8a1f68",       // ザコの殻・虫の弾: 赤紫
+  mid: "#b0142e",        // 中ボスの殻の弾: 赤
+  boss: "#3f1466",       // 大ボスの殻の弾: 濃い紫
+  rim: "#ffa8d6",        // 敵の弾の縁取り: 明るい桃色
+  rimWidth: 2,           // 縁取りの太さ（px）
+  pulse: 0.12,           // 脈打つ大きさ（半径の何割ふくらむか）
+  pulseSpeed: 7,         // 脈打つ速さ
+  shot: "#ffe6f2",       // 味方の光（ふわりの光）: 白寄りの明るい桃色
+  shotRim: "#f283bb",    // 味方の光の縁取り（明るい背景でも見えるように、少し濃い桃色）
+  shotHalo: "rgba(255,240,248,0.5)",   // 味方の光のまわりの、やわらかい光の輪
 };
 
 // 時間帯の色（data/stages.js の theme 欄で、ステージごとに上書きする）。ここは「真昼」の色
@@ -266,7 +264,6 @@ const DEFAULT_THEME = {
 const GOLD_COLOR = "#c8901a";
 
 // 自機の弾の色
-const SHOT_COLOR = "#ff5fa2";
 
 // 敵の文字の色（役割ごと）
 const ENEMY_COLOR = { zako: "#5f8a3c", mid: "#b2733d", boss: "#c4577a" };
@@ -437,6 +434,7 @@ const Battle = (() => {
   let bombHinted = false, bombFlash = 0;   // ぜんぶ消しの案内を出したか、ゲージがたまったときに左下を光らせる残り秒
   let explore = null;        // 1回目の旅（双眼鏡）の状態 { t, next, list, bugs, bugT, endT }
   let bino = null;           // 双眼鏡の中心 { x, y }
+  let exMove = EXPLORE_MOVES.drift;   // 発見の旅の、ことばの動きの型（10/25-7。stages.js の explore 欄）
   let maskCv = null;         // 双眼鏡の外を暗くするための裏の画面
   let stripFlash = 0;        // 出撃の瞬間に帯の灰色の名前がいっせいに光る（残り秒）
   let powerBonus = 0;        // 「つよい弾」で上がる強さの段階
@@ -582,7 +580,11 @@ const Battle = (() => {
     choiceFree = !!opts.firstChoice;
     tut = null; hintOpts = opts.hints || null; hintShown = {}; hintCard = null; bombHinted = false; bombFlash = 0;
     stripFlash = 0; sortieStep = "choice"; freed = [];
-    explore = { t: 0, next: 0, list: [], bugs: [], bugT: 2, endT: 0 };
+    explore = { t: 0, next: 0, list: [], bugs: [], bugT: 2, endT: 0, flies: [], streaks: [] };
+    {
+      const se = (opts.stage && opts.stage.explore) || {}, type = EXPLORE_MOVES[se.move] ? se.move : "drift";
+      exMove = Object.assign({ move: type }, EXPLORE_MOVES[type], se);
+    }
     bino = { x: W / 2 + 10, y: H * 0.42 };
     state = "sortie"; sortieNo = 1; reacted = 0; sortieStep = "cover";   // 発見の旅の表紙から始める   // 「出撃1 探検」の画面から始める
     loadout = null; powerBonus = 0; shield = 0; gaugeMul = 1;
@@ -1225,7 +1227,7 @@ const Battle = (() => {
       if (e.pattern === "odai" && odai && odai.intro > 0) e.fire = Math.max(e.fire, 0.5);
       if (e.fire <= 0 && e.y > 0 && e.y < H * 0.62) {
         e.fire = BATTLE.enemyFireInterval[e.role] / P.fireRate / fireRamp() * (e.pattern === "odai" ? 3 : 1) * (0.8 + Math.random() * 0.4);
-        fireAt(e.x, e.y + (e.ground ? 0 : e.h / 2), BATTLE.shotPattern[e.role] || [0], { zako: "seed", mid: "thorn", boss: "mist" }[e.role]);   // 殻から飛ぶ: まゆ＝たね、いばら＝とげ、霧＝もや
+        fireAt(e.x, e.y + (e.ground ? 0 : e.h / 2), BATTLE.shotPattern[e.role] || [0], e.role);   // 殻から飛ぶ弾の色: ザコ＝赤紫、中ボス＝赤、大ボス＝濃い紫（10/25-7）
       }
     }
 
@@ -1667,11 +1669,22 @@ const Battle = (() => {
     const minX = stripRight() + w / 2 + 12, maxX = Math.max(minX, W - w / 2 - 12);
     let x = rand(minX, maxX), y = rand(100, H * 0.7);
     for (let k = 0; k < 10 && inBino(x, y, 1.5); k++) { x = rand(minX, maxX); y = rand(100, H * 0.7); }   // 双眼鏡のすぐそばには出さない
-    const a = Math.random() * Math.PI * 2, sp = center ? 6 : BATTLE.exploreSpeed * rand(0.7, 1.3);
+    const mv = exMove, a = Math.random() * Math.PI * 2, sp = center ? 6 : BATTLE.exploreSpeed * rand(0.7, 1.3) * (mv.speedMul || 1);
     if (center) { x = W / 2; y = H * 0.36; }   // チュートリアル: 最初のことばは中央に、ゆっくり
-    explore.list.push({ word, role: "zako", size, w, h: size * 1.2, x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.6, life: center ? 1e9 : BATTLE.exploreLife,
-      age: 0, look: 0, found: false, foundT: 0, phase: Math.random() * 6, hintT: Math.random() * BATTLE.hintEvery, flash: 0, explore: true, last: false });
+    const d = { word, role: "zako", size, w, h: size * 1.2, x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.6, life: center ? 1e9 : BATTLE.exploreLife * (mv.lifeMul || 1),
+      age: 0, since: 0, vis: 0, wait: 0, look: 0, found: false, foundT: 0, phase: Math.random() * 6, hintT: Math.random() * BATTLE.hintEvery, flash: 0, explore: true, last: false };
+    if (!center) exStart(d, true);
+    if (mv.flies) d.flies = Array.from({ length: mv.flies }, (_, i) => ({ a: i * 2.1 + Math.random(), r: rand(14, 30), sp: rand(0.8, 1.4) * (Math.random() < 0.5 ? 1 : -1), ph: Math.random() * 6 }));
+    explore.list.push(d);
   }
+  // 動きの型ごとの、出てくる場所と向き（first ＝ 初めて出るとき。出直すときは first なし）
+  function exStart(d, first) {
+    const mv = exMove, minX = stripRight() + d.w / 2 + 12, maxX = Math.max(minX, W - d.w / 2 - 12);
+    d.since = 0; d.look = 0;
+    if (mv.move === "fall") { d.baseX = rand(minX, maxX); d.x = d.baseX; d.y = rand(70, 110); d.vx = 0; d.vy = mv.fallSpeed * rand(0.85, 1.15); }
+    else if (mv.move === "wind") { d.vx = mv.wind * rand(0.8, 1.2); d.vy = 0; if (!first) { d.x = minX; d.y = rand(100, H * 0.7); } }
+  }
+  const windNow = () => exMove.wind * (1 + exMove.gust * Math.sin(explore.t * 0.7));
 
   function updateExplore(dt) {
     const ex = explore;
@@ -1686,17 +1699,40 @@ const Battle = (() => {
     ex.t += dt;
     const words = exploreWords();
     while (ex.next < words.length && ex.t >= BATTLE.exploreFirst + ex.next * BATTLE.exploreGap) spawnDrifter(words[ex.next++]);
+    const mv = exMove;
+    if (mv.move === "wind") {   // 風: 双眼鏡も少し流される（指で押さえていても）
+      const dx = mv.binoDrift * windNow() / mv.wind * dt, nx = Math.min(Math.max(bino.x + dx, stripRight() + 10), W - 10);
+      if (drag) drag.px += nx - bino.x;
+      bino.x = nx;
+    }
     for (const d of ex.list) {
       d.age += dt;
       if (d.found) { d.foundT += dt; continue; }
-      d.x += d.vx * dt; d.y += d.vy * dt + Math.sin(d.age * 1.3 + d.phase) * 10 * dt;
+      if (d.wait > 0) { d.wait -= dt; d.vis = 0; if (d.wait <= 0) exStart(d); continue; }   // 落ちた・流れて出たあと、出直すまで見えない
+      d.since += dt;
       const minX = stripRight() + d.w / 2 + 8, maxX = W - d.w / 2 - 8;
-      if (d.x < minX) { d.x = minX; d.vx = Math.abs(d.vx); }
-      if (d.x > maxX) { d.x = maxX; d.vx = -Math.abs(d.vx); }
-      if (d.y < 80) { d.y = 80; d.vy = Math.abs(d.vy); }
-      if (d.y > H * 0.78) { d.y = H * 0.78; d.vy = -Math.abs(d.vy); }
+      let fade = 1;
+      if (mv.move === "fall") {   // 落ち葉: 揺れながら降り、地面（画面の下のほう）に落ちたら消える
+        d.y += d.vy * dt;
+        d.x = Math.min(Math.max(d.baseX + Math.sin(d.age * mv.swaySpeed + d.phase) * mv.sway, minX), maxX);
+        const ground = H * 0.8;
+        fade = Math.min(1, (ground - d.y) / 50);
+        if (d.y >= ground) { d.wait = mv.wait; d.vis = 0; continue; }
+      } else if (mv.move === "wind") {   // 風: 横に流され、右に出たら左から出直す
+        d.x += d.vx * windNow() / mv.wind * dt; d.y += Math.sin(d.age * 1.6 + d.phase) * 14 * dt;
+        fade = Math.min(1, (W - d.x) / 60);
+        if (d.x - d.w / 2 > W) { d.wait = mv.wait; d.vis = 0; continue; }
+      } else {   // ただよう（drift・firefly）
+        d.x += d.vx * dt; d.y += d.vy * dt + Math.sin(d.age * 1.3 + d.phase) * 10 * dt;
+        if (d.x < minX) { d.x = minX; d.vx = Math.abs(d.vx); }
+        if (d.x > maxX) { d.x = maxX; d.vx = -Math.abs(d.vx); }
+        if (d.y < 80) { d.y = 80; d.vy = Math.abs(d.vy); }
+        if (d.y > H * 0.78) { d.y = H * 0.78; d.vy = -Math.abs(d.vy); }
+      }
+      d.vis = Math.max(0, Math.min(1, d.since / 0.8, (d.life - d.age) / 1.2, fade));
+      if (d.flies) for (const f of d.flies) f.a += f.sp * dt;
       d.hintT += dt;
-      if (d.age < d.life && inBino(d.x, d.y, 0.9)) {
+      if (d.age < d.life && d.vis > 0.5 && inBino(d.x, d.y, 0.9)) {
         d.look += dt;
         if (d.look >= BATTLE.lookTime) findWord(d);
       }
@@ -1711,6 +1747,19 @@ const Battle = (() => {
     }
     for (const b of ex.bugs) { b.x += b.vx * dt; b.y += Math.sin(t * 3 + b.ph) * 20 * dt; }
     ex.bugs = ex.bugs.filter(b => b.x > -20 && b.x < W + 20);
+    if (mv.stray) {   // ひとりで飛ぶホタル（ことばの目印ではない）
+      while (ex.flies.length < mv.stray) ex.flies.push({ x: rand(stripRight() + 10, W - 10), y: rand(90, H * 0.75), ph: Math.random() * 6, vx: rand(-14, 14), vy: rand(-10, 10) });
+      for (const f of ex.flies) {
+        f.x += (f.vx + Math.sin(t * 0.9 + f.ph) * 12) * dt; f.y += (f.vy + Math.cos(t * 1.1 + f.ph) * 10) * dt;
+        if (f.x < stripRight() + 10 || f.x > W - 10) f.vx = -f.vx;
+        if (f.y < 90 || f.y > H * 0.78) f.vy = -f.vy;
+      }
+    }
+    if (mv.move === "wind") {   // 風の筋（見た目だけ）
+      if (Math.random() < dt * 6) ex.streaks.push({ x: -60, y: rand(70, H * 0.85), len: rand(30, 70), sp: rand(3, 5) });
+      for (const k of ex.streaks) k.x += windNow() * k.sp * dt;
+      ex.streaks = ex.streaks.filter(k => k.x < W + 80);
+    }
     // 終わり: 40秒たった、または9語ぜんぶ見つけた
     const all = reacted >= words.length;
     if (ex.t >= BATTLE.exploreTime || (all && ex.list.length === 0)) {
@@ -1914,15 +1963,14 @@ const Battle = (() => {
     // 綿のたね（体力回復）
     for (const it of items) drawItem(it);
 
-    // 自機の弾: 地面（緑・生成り・水色）と重ならない明るい桃色に、白と濃い色の縁取り
+    // 自機の弾（ふわりの光）: 白寄りの明るい桃色の細長い光。敵の弾（濃い色の球）と見分けられるように（10/25-7。色は BULLET_COLORS）
     for (const s of shots) {
       const k = BATTLE.shotDrawScale;   // 見た目だけ大きく（当たりは今のまま）
-      ctx.fillStyle = "rgba(255,250,215,0.4)";   // ふわりの光: まわりにやわらかい光の輪
+      ctx.fillStyle = BULLET_COLORS.shotHalo;   // まわりにやわらかい光の輪
       ctx.beginPath(); ctx.ellipse(s.x, s.y, (s.thick ? 12 : 8) * k, (s.thick ? 18 : 12) * k, 0, 0, Math.PI * 2); ctx.fill();
       ctx.beginPath(); ctx.ellipse(s.x, s.y, (s.thick ? 7 : 4) * k, (s.thick ? 13 : 8) * k, 0, 0, Math.PI * 2);
-      ctx.lineWidth = 4; ctx.strokeStyle = "rgba(120,30,70,0.55)"; ctx.stroke();
-      ctx.lineWidth = 2; ctx.strokeStyle = "#ffffff"; ctx.stroke();
-      ctx.fillStyle = SHOT_COLOR; ctx.fill();
+      ctx.lineWidth = 2; ctx.strokeStyle = BULLET_COLORS.shotRim; ctx.stroke();
+      ctx.fillStyle = BULLET_COLORS.shot; ctx.fill();
     }
 
     // 空中の雑魚
@@ -2708,29 +2756,12 @@ const Battle = (() => {
     ctx.globalAlpha = 1;
   }
 
+  // 敵の弾（10/25-7）: 単純な球。色は BULLET_COLORS（虫の弾はザコと同じ赤紫）
   function drawEnemyBullet(b) {
-    const r = BATTLE.enemyBulletSize;
-    if (b.kind === "thorn") {   // いばらのとげ（進む向きにとがる）
-      ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(Math.atan2(b.vy, b.vx));
-      ctx.beginPath(); ctx.moveTo(r * 1.3, 0); ctx.lineTo(-r * 0.8, r * 0.6); ctx.lineTo(-r * 0.5, 0); ctx.lineTo(-r * 0.8, -r * 0.6); ctx.closePath();
-      ctx.lineWidth = 3; ctx.strokeStyle = "#ffffff"; ctx.lineJoin = "round"; ctx.stroke();
-      ctx.fillStyle = "#6a5a2a"; ctx.fill();
-      ctx.restore(); return;
-    }
-    if (b.kind === "mist") {    // 霧のつぶ
-      ctx.save();
-      ctx.fillStyle = "rgba(150,145,180,0.95)"; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(b.x, b.y, r * 0.75, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = "rgba(230,228,245,0.9)";
-      ctx.beginPath(); ctx.arc(b.x - r * 0.25, b.y - r * 0.25, r * 0.3, 0, Math.PI * 2); ctx.fill();
-      ctx.restore(); return;
-    }
-    const art = ENEMY_BULLET_ART;
-    if (art.image) {
-      if (!art._img) { art._img = new Image(); art._img.src = art.image; }
-      if (art._img.complete) { ctx.drawImage(art._img, b.x - art.radius, b.y - art.radius, art.radius * 2, art.radius * 2); return; }
-    }
-    art.draw(ctx, b.x, b.y, BATTLE.enemyBulletSize, t);
+    const C = BULLET_COLORS, r = BATTLE.enemyBulletSize * (1 + C.pulse * Math.sin(t * C.pulseSpeed + b.x * 0.05));
+    ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = C[b.kind] || C.zako; ctx.fill();
+    ctx.lineWidth = C.rimWidth; ctx.strokeStyle = C.rim; ctx.stroke();
   }
 
   // 自機＝ふわり（10/25-6。A君はふわりに乗っている設定なので、乗り物の絵はない）
@@ -2855,7 +2886,7 @@ const Battle = (() => {
     }
     // ただよう語句（見つけた語句は金色に光って、ふわっと上へ消える）
     for (const d of ex.list) {
-      const a = d.found ? 1 - d.foundT / 0.9 : Math.min(1, d.age / 0.8, (d.life - d.age) / 1.2);
+      const a = d.found ? 1 - d.foundT / 0.9 : d.vis;
       if (a <= 0) continue;
       d.last = d.found;
       ctx.font = font(d.size);
@@ -2878,6 +2909,7 @@ const Battle = (() => {
       ctx.fillStyle = th.color; ctx.beginPath(); ctx.arc(th.x, th.y, 2, 0, Math.PI * 2); ctx.fill();
     }
     ctx.globalAlpha = 1;
+    if (exMove.fog) { ctx.fillStyle = `rgba(200,206,220,${exMove.fog})`; ctx.fillRect(0, 0, W, H); }   // 霧（円の中も、うすくかすむ）
     // 双眼鏡の外を暗くする（裏の画面に暗い色をぬって、円の形にくりぬく）
     if (maskCv === null) { try { maskCv = document.createElement("canvas"); } catch (_) { maskCv = false; } }
     if (maskCv) {
@@ -2897,7 +2929,7 @@ const Battle = (() => {
     }
     // 暗いところで、語句のある場所がきらっと光る（さがす手がかり）
     for (const d of ex.list) {
-      if (d.found || BATTLE.hintAlpha <= 0) continue;
+      if (d.found || BATTLE.hintAlpha <= 0 || exMove.hint === false || d.vis < 0.5) continue;
       const k = (d.hintT % BATTLE.hintEvery) / 0.4;
       if (k > 1 || inBino(d.x, d.y, 1)) continue;
       const a = Math.sin(k * Math.PI) * BATTLE.hintAlpha, r = (3 + Math.sin(k * Math.PI) * 6) * BATTLE.hintSize;
@@ -2907,6 +2939,27 @@ const Battle = (() => {
       ctx.beginPath();
       for (let i = 0; i < 8; i++) { const rr = i % 2 ? r * 0.3 : r, an = i * Math.PI / 4; ctx.lineTo(Math.cos(an) * rr, Math.sin(an) * rr); }
       ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+    // ホタル（暗いところでも見える）: ことばのまわりに集まるホタルと、ひとりで飛ぶホタル
+    if (exMove.flies || exMove.stray) {
+      const dots = [];
+      for (const d of ex.list) if (d.flies && !d.found && d.vis > 0) for (const f of d.flies) {
+        const r = f.r * (1 + 0.25 * Math.sin(t * 1.7 + f.ph));
+        dots.push([d.x + Math.cos(f.a) * r, d.y + Math.sin(f.a) * r * 0.7, d.vis]);
+      }
+      for (const f of ex.flies) dots.push([f.x, f.y, 0.8]);
+      for (const [x, y, v] of dots) {
+        const a = v * (0.7 + 0.3 * Math.sin(t * 5 + x * 0.1));
+        const g = ctx.createRadialGradient(x, y, 0.5, x, y, 12);
+        g.addColorStop(0, `rgba(235,255,150,${a})`); g.addColorStop(1, "rgba(235,255,150,0)");
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 12, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = `rgba(250,255,210,${a})`; ctx.beginPath(); ctx.arc(x, y, 2, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    if (ex.streaks.length) {   // 風の筋
+      ctx.save(); ctx.strokeStyle = "rgba(230,236,250,0.28)"; ctx.lineWidth = 1.5; ctx.lineCap = "round";
+      for (const k of ex.streaks) { ctx.beginPath(); ctx.moveTo(k.x, k.y); ctx.lineTo(k.x + k.len, k.y); ctx.stroke(); }
       ctx.restore();
     }
     // 双眼鏡のふち
