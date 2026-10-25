@@ -21,7 +21,7 @@ const Save = (() => {
   // cards: 集めたカード、cleared: クリアしたステージ、
   // retake: クイズで不正解だった語句（あとで図鑑の受け直しクイズに使う。バトルで取り逃がした語句は入れない）
   // best: ステージごとのベストスコア（{ score }。救出の旅を最後まで終えたステージにある＝ステージ一覧で枠が光る）。印は 10/25-17 にやめた
-  // glowHint: 「クリアしたステージは光るよ…」の案内を見たか（10/25-17）
+  // glowHint: 「クリアしたステージは光るよ…」の案内を見たか（10/25-17。10/25-19 から使っていない）
   // warpSeen: その世界へのワープの会話の演出を見たか（世界の番号 → true。10/25-18）
   // hero: 選んだ主人公（"boy"／"girl"）、introSeen: 目的の画面を見たか（10/21-2）
   // world: ステージ一覧で今いる世界（10/22-1。ワープで進む）
@@ -447,7 +447,6 @@ const Main = (() => {
     const litSet = RecipeBook.litIds(Save.data.cards);
     RecipeBook.render($("stages-gems"), { lit: litSet, world: wid });
     $("stages-gems").onclick = toRecipeBook;
-    let anyCleared = false;
     const box = $("stages-list");
     box.innerHTML = "";
     worldStages(wid).forEach(s => {
@@ -462,22 +461,18 @@ const Main = (() => {
       const nm = document.createElement("span"); nm.className = "nm"; nm.textContent = s.name;
       const sub = document.createElement("span"); sub.className = "sub";
       sub.textContent = open ? `難易度 ${s.difficulty || 1}　ベスト ${b ? b.score : 0}点　カード ${got}/10` : tx("worlds.notReady");
-      // 10/25-17: 印はやめた。クリアした（救出の旅を最後まで終えた）ステージは枠が光り、カードが10枚そろったステージには宝石の絵
-      if (b) { row.classList.add("cleared"); anyCleared = true; }
+      // 10/25-17: 印はやめた。クリアした（救出の旅を最後まで終えた）ステージは枠が光り「ステージクリア」。カードが10枚そろったステージは「10のことば」と宝石の絵（10/25-19）
+      if (b) row.classList.add("cleared");
       const marks = document.createElement("span"); marks.className = "marks";
-      if (litSet.has(s.id)) marks.innerHTML = `<svg class="row-gem" viewBox="-22 -22 44 44">${GEM_ART(s.gem, true, 19, s.id)}</svg>`;
+      if (litSet.has(s.id)) marks.innerHTML += `<svg class="row-gem" viewBox="-22 -22 44 44">${GEM_ART(s.gem, true, 19, s.id)}</svg><span class="row-tag full">${tx("stagesTag.full")}</span>`;
+      if (b) marks.innerHTML += `<span class="row-tag clear">${tx("stagesTag.clear")}</span>`;
       main.append(nm, sub);
       row.append(no, main);
       if (open) row.appendChild(marks);
       if (open) row.addEventListener("click", () => { Sound.se("start"); selectStage(s.id); toBattle(); });
       box.appendChild(row);
     });
-    // 初めてステージが光ったときの案内（1回だけ。10/25-17）
-    const hintEl = $("stages-hint");
-    const showGlowHint = anyCleared && !Save.data.glowHint;
-    hintEl.textContent = showGlowHint ? tx("stagesHint.glow") : "";
-    hintEl.classList.toggle("hidden", !showGlowHint);
-    if (showGlowHint) { Save.data.glowHint = true; Save.store(); }
+    // （初めて光ったときの案内は、10/25-19 に「ステージクリア」の表記にかえてやめた）
     // ワープ: この世界のカードがそろったら、次の世界へのボタン（ボタンが出る＝進める）
     const warp = $("btn-warp");
     const canWarp = wid < window.WORLDS.length && (worldDone(wid) || openAll);

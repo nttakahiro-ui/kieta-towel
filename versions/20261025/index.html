@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap">
-  <link rel="stylesheet" href="css/style.css?v=55">
+  <link rel="stylesheet" href="css/style.css?v=58">
 </head>
 <body>
   <div id="app">
@@ -64,7 +64,6 @@
         <div class="stages-nav"><button id="btn-world-back" class="link-btn hidden"></button><button id="btn-zukan" class="link-btn"></button></div>
         <div id="stages-gems" class="world-gems" role="button" aria-label="レシピブック"></div>
         <h2 id="stages-world-title" class="stages-title">ステージを選ぶ</h2>
-        <p id="stages-hint" class="fuwari-hint hidden"></p>
         <div id="stages-list"></div>
         <button id="btn-warp" class="btn btn-main warp-btn hidden"></button>
         <div class="btn-row"><button id="btn-stages-back" class="btn btn-sub">タイトルへ</button></div>
@@ -104,13 +103,13 @@
     <!-- クイズ -->
     <section id="screen-quiz" class="screen scroll">
       <div class="quiz-box">
-        <div class="quiz-head"><span id="quiz-count"></span><span id="quiz-dots" class="quiz-dots"></span></div>
+        <div class="quiz-head"><span id="quiz-count"></span><span id="quiz-dots" class="quiz-dots"></span><button id="btn-quiz-quit" class="link-btn quiz-quit">とちゅうでやめる</button></div>
         <div class="fuwari-talk"><img id="quiz-hero" class="hero-img hero-small" alt=""><span class="fuwari-icon"></span><p id="quiz-say" class="say">助けたことばを思い出そう！</p></div>
         <p id="quiz-question" class="quiz-question"></p>
+        <div class="quiz-get-anchor"><div id="quiz-get" class="quiz-get hidden"></div></div>
         <div id="quiz-choices" class="quiz-choices"></div>
         <div id="quiz-feedback" class="quiz-feedback hidden"></div>
-        <div id="quiz-get" class="quiz-get hidden"></div>
-        <div class="quiz-quit-row"><button id="btn-quiz-quit" class="link-btn">とちゅうでやめる</button></div>
+
       </div>
     </section>
 
@@ -250,14 +249,14 @@
   <!-- 横向きのとき -->
   <div id="rotate"><div><div class="rotate-icon"></div><p>縦にしてね</p></div></div>
 
-  <script src="data/words.js?v=55"></script>
-  <script src="data/stages.js?v=55"></script>
-  <script src="data/texts.js?v=55"></script>
-  <script src="js/audio.js?v=55"></script>
-  <script src="js/game.js?v=55"></script>
-  <script src="js/quiz.js?v=55"></script>
-  <script src="js/cards.js?v=55"></script>
-  <script src="js/recipebook.js?v=55"></script>
-  <script src="js/main.js?v=55"></script>
+  <script src="data/words.js?v=58"></script>
+  <script src="data/stages.js?v=58"></script>
+  <script src="data/texts.js?v=58"></script>
+  <script src="js/audio.js?v=58"></script>
+  <script src="js/game.js?v=58"></script>
+  <script src="js/quiz.js?v=58"></script>
+  <script src="js/cards.js?v=58"></script>
+  <script src="js/recipebook.js?v=58"></script>
+  <script src="js/main.js?v=58"></script>
 </body>
 </html>
