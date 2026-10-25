@@ -23,7 +23,8 @@ const Save = (() => {
   // best: ステージごとのベストスコアと3つの印（{ score, all, noDown, noHit }）
   // hero: 選んだ主人公（"boy"／"girl"）、introSeen: 目的の画面を見たか（10/21-2）
   // world: ステージ一覧で今いる世界（10/22-1。ワープで進む）
-  let data = { cards: {}, cleared: {}, retake: {}, best: {}, hero: null, introSeen: false, world: 1 };
+  // gemsSeen: レシピブックの宝石がはまる演出を見たステージ（10/25-4。初めてそろったときだけ演出する）
+  let data = { cards: {}, cleared: {}, retake: {}, best: {}, hero: null, introSeen: false, world: 1, gemsSeen: {} };
   // localStorage が使えなくても落ちないようにする
   function load() {
     try {
@@ -37,6 +38,7 @@ const Save = (() => {
         data.hero = d.hero || null;
         data.introSeen = !!d.introSeen;
         data.world = d.world || 1;
+        data.gemsSeen = d.gemsSeen || {};
       }
     } catch (e) { /* 読めないときは空のまま */ }
   }
@@ -384,10 +386,36 @@ const Main = (() => {
     });
   }
 
+  // レシピ完成（10/25-4）: 台座に、そのステージの宝石がはまる（初めてそろったときだけ）。12個目なら「つぎへ」で12個そろったときの画面へ
   function toRecipe() {
+    const lit = RecipeBook.litIds(Save.data.cards);
+    const isNew = !Save.data.gemsSeen[stage.id];
+    Save.data.gemsSeen[stage.id] = true;
+    Save.store();
     showScreen("recipe");
-    $("screen-recipe").scrollTop = 0;
-    Cards.showRecipe({ stage, words, onRetry: toBattle, onTitle: toStages, hint: screenHint("recipe"), heroSrc: heroSrc("joy") });
+    Cards.showRecipe({ stage, lit, isNew, heroSrc: heroSrc("joy"), hint: "",
+      onNext: () => (isNew && lit.size >= 12 ? toEnding() : toStages()) });
+  }
+  // レシピブック（ステージ一覧から）: 宝石をタップすると、どのステージか・レシピ名が出る
+  function toRecipeBook() {
+    const lit = RecipeBook.litIds(Save.data.cards);
+    $("rbook-title").textContent = tx("recipeBook.title");
+    $("rbook-back").textContent = tx("recipeBook.back");
+    $("rbook-info").textContent = tx("recipeBook.tapHint");
+    RecipeBook.render($("rbook-ring"), { lit, onTap: id => {
+      const st = window.STAGES.find(x => x.id === id);
+      $("rbook-info").textContent = tx(lit.has(id) ? "recipeBook.litInfo" : "recipeBook.emptyInfo", { id, stage: st.name, recipe: st.recipe });
+    } });
+    showScreen("recipebook");
+  }
+  // 12個そろったとき（今は仮の1画面）
+  function toEnding() {
+    Sound.play("recipe");
+    $("ending-title").textContent = tx("ending.title");
+    $("ending-line").textContent = tx("ending.line");
+    $("ending-next").textContent = tx("ending.next");
+    RecipeBook.render($("ending-book"), { lit: RecipeBook.litIds(Save.data.cards), small: true });
+    showScreen("ending");
   }
 
   // ステージ一覧: 12ステージ。遊べるのは V01 ではステージ1だけ
@@ -565,6 +593,20 @@ const Main = (() => {
       $(`hero-${h}`).addEventListener("click", () => { Save.data.hero = h; Save.data.introSeen = true; Save.store(); toTitle(); });
     });
     $("btn-zukan").addEventListener("click", toZukan);
+    $("btn-rbook").textContent = tx("recipeBook.button");
+    $("btn-rbook").addEventListener("click", toRecipeBook);
+    $("rbook-back").addEventListener("click", toStages);
+    $("ending-next").addEventListener("click", toStages);
+    // 目的の画面の台座（空）と一言
+    RecipeBook.render($("intro-book"), { lit: new Set(), small: true });
+    $("intro-book-caption").innerHTML = tx("intro.bookCaption").replace(/\n/g, "<br>");
+    // デバッグ: すべてのカードをそろえる（12個の宝石の演出を確かめる用。宝石がはまる演出は、まだ見ていないステージで出る）
+    $("dbg-all-cards").addEventListener("click", () => {
+      window.WORDS.forEach(w => { Save.data.cards[w.id] = true; });
+      Save.store();
+      $("title-cards").textContent = Save.cardCount();
+      $("dbg-all-cards").textContent = "すべてのカードをそろえた";
+    });
     $("btn-zukan-back").addEventListener("click", toStages);
     $("btn-hero").textContent = window.TEXTS.intro.rechoose;
     $("btn-hero").addEventListener("click", () => showScreen("hero"));
