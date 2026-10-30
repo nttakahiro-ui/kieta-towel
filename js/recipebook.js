@@ -111,5 +111,54 @@ const RecipeBook = (() => {
     return null;
   }
 
-  return { render, litIds, nextId };
+  // ===== 制作側の絵（11/1。ステージ一覧の世界の帯と、レシピブックの3世界の本） =====
+  // 宝石は絵に描かれた空の枠の上に、GEM_ART（stages.js の gem の色）で描く。枠の位置は絵の幅・高さの%（元の絵から測った値）
+  // 絵が読み込めないときは、前の円い台座（render）にもどる
+  const ART = {
+    band: {   // 世界の帯（world_gs1〜3 の上下の生成りを切った版）。[左からの%, 上からの%]
+      1: { src: "assets/world_band1.jpg", aspect: 4.4735, slots: [[56.1, 67.3], [65.0, 67.3], [73.7, 67.6], [82.6, 68.3]] },
+      2: { src: "assets/world_band2.jpg", aspect: 5.4573, slots: [[55.2, 59.4], [64.4, 59.4], [73.4, 59.0], [82.2, 59.8]] },
+      3: { src: "assets/world_band3.jpg", aspect: 5.0878, slots: [[55.0, 55.9], [63.6, 55.9], [72.1, 56.6], [80.6, 56.2]] },
+      gem: 8.4,   // 宝石の大きさ（帯の幅の%）
+    },
+    book: {   // 3世界の本（world_gall）。ステージ1〜12の順
+      src: "assets/recipe_book.jpg", aspect: 1672 / 941,
+      slots: [[55.5, 24.1], [63.2, 24.1], [70.6, 24.2], [78.1, 24.1], [55.4, 50.9], [63.2, 51.0], [70.6, 51.2], [78.1, 51.0], [55.4, 78.4], [63.2, 78.6], [70.6, 78.4], [78.1, 78.3]],
+      gem: 6.4,   // 宝石の大きさ（本の幅の%）
+    },
+  };
+  // 絵の上に宝石をならべる。cls: 外側の class、list: [[stage, [x%, y%]]]、gemW: 宝石の幅（%）
+  function artHTML(cls, src, aspect, list, gemW, o) {
+    const lit = o.lit || new Set();
+    const gems = list.map(([s, [x, y]]) => {
+      const on = lit.has(s.id) || o.drop === s.id;
+      const halo = on ? `<circle r="25" fill="url(#bkHalo${s.id})"/>` : "";
+      const next = o.next === s.id ? `<circle r="24" class="rb-next"/>` : "";
+      return `<div class="art-slot" style="left:${x}%;top:${y}%;width:${gemW}%">` +
+        `<svg viewBox="-26 -26 52 52"><defs><radialGradient id="bkHalo${s.id}"><stop offset="0" stop-color="${s.gem}" stop-opacity="0.75"/><stop offset="1" stop-color="${s.gem}" stop-opacity="0"/></radialGradient></defs>` +
+        `<g class="rb-gem" data-stage="${s.id}">${next}${on ? `<g class="${o.drop === s.id ? (o.dropClass || "rb-drop") : ""}">${halo}${GEM_ART(s.gem || "#cccccc", true, 17, s.id)}</g>` : `<rect x="-20" y="-20" width="40" height="40" fill="transparent"/>`}</g></svg></div>`;
+    }).join("");
+    return `<div class="${cls}" style="aspect-ratio:${aspect}"><img class="art-img" src="${src}" alt="">${gems}</div>`;
+  }
+  function bindArt(el, o, fallback) {
+    const img = el.querySelector(".art-img");
+    img.addEventListener("error", () => fallback());
+    if (o.onTap) el.querySelectorAll(".art-slot").forEach(d => d.addEventListener("click", e => { e.stopPropagation(); o.onTap(Number(d.querySelector(".rb-gem").dataset.stage)); }));
+  }
+  // ステージ一覧の上: 今いる世界の帯。そのステージの宝石が枠にはまる（未完成は空の枠のまま）
+  function renderBand(el, o) {
+    const cfg = ART.band[o.world];
+    if (!cfg) { render(el, o); return; }
+    const list = stages().filter(s => s.world === o.world).map((s, i) => [s, cfg.slots[i]]).filter(x => x[1]);
+    el.innerHTML = artHTML("art-band", cfg.src, cfg.aspect, list, ART.band.gem, o);
+    bindArt(el, o, () => render(el, o));
+  }
+  // レシピブック・宝石ができた画面: 3世界の本。12の枠に宝石がはまる
+  function renderBook(el, o) {
+    const list = stages().map((s, i) => [s, ART.book.slots[i]]).filter(x => x[1]);
+    el.innerHTML = artHTML("art-book", ART.book.src, ART.book.aspect, list, ART.book.gem, o);
+    bindArt(el, o, () => render(el, o));
+  }
+
+  return { render, renderBand, renderBook, litIds, nextId };
 })();

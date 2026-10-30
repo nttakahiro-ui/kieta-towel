@@ -188,18 +188,18 @@ const Cards = (() => {
     const show = (el, on) => { el.classList.toggle("fx-hide", !on); el.classList.toggle("fx-show", on); };
     $("recipe-fuwari").classList.toggle("hidden", !o.isNew);
     const finalBook = pop => {
-      RecipeBook.render(book, { lit: all, drop: pop ? o.stage.id : null, dropClass: "rb-pop", next: nextId });
+      RecipeBook.renderBook(book, { lit: all, drop: pop ? o.stage.id : null, dropClass: "rb-pop", next: nextId });
       if (pop) { book.classList.remove("flash"); void book.offsetWidth; book.classList.add("flash"); }
     };
     if (!o.isNew) {   // 2回目からは、光った台座が出るだけ（今まで通り）
-      RecipeBook.render(book, { lit: all });
+      RecipeBook.renderBook(book, { lit: all });
       late.forEach(el => show(el, true));
       screen.onclick = null;
       return;
     }
     // ここから、初めてそろったときの演出
     const lit = new Set(o.lit); lit.delete(o.stage.id);
-    RecipeBook.render(book, { lit });
+    RecipeBook.renderBook(book, { lit });   // 11/1: 3世界の本の枠にはまる（前は円い台座）
     late.forEach(el => show(el, false));
     const F = RECIPE_FX, at = (sec, fn) => fxTimers.push(setTimeout(fn, sec * 1000));
     const box = screen.getBoundingClientRect(), br = book.getBoundingClientRect();

@@ -656,3 +656,14 @@ body { position: fixed; inset: 0; }
 .ending-title { font-size: 28px; color: #b0801a; margin: 0 0 8px; }
 .ending-line { font-size: 17px; color: #6b5a3a; margin: 6px 0 14px; }
 .recipe-box .recipe-name { white-space: pre-line; }
+
+/* ===== 制作側の絵: 世界の帯と3世界の本（11/1） ===== */
+.art-band, .art-book { position: relative; width: 100%; }
+.art-img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; border-radius: 6px; }
+.art-slot { position: absolute; transform: translate(-50%, -50%); aspect-ratio: 1; cursor: pointer; }
+.art-slot svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.world-gems:has(.art-band) { width: 100%; margin: 4px 0 0; }   /* ステージ一覧の上の帯は、画面の幅いっぱい */
+.stages-lead { margin: 0 0 2px; text-align: center; font-size: 13px; color: #6b5a3a; }   /* 帯の上の一言（見本 sample_wt01） */
+.rb-box:has(.art-book), #screen-recipe .rb-box:has(.art-book) { width: 100%; max-width: 440px; }   /* 本の絵は横長なので幅いっぱい */
+#screen-recipebook:has(.art-book), #screen-recipe:has(.art-book) { background: var(--cream); }   /* 本の絵の地（生成り）と画面の地をそろえる */
+.btn-row.stages-bottom { justify-content: flex-end; }   /* 下の（カード図鑑）（タイトルへ）は見本どおり右寄せ */

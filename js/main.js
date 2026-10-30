@@ -435,7 +435,8 @@ const Main = (() => {
     $("rbook-title").textContent = tx("recipeBook.title");
     $("rbook-back").textContent = tx("recipeBook.back");
     $("rbook-info").textContent = tx("recipeBook.tapHint");
-    RecipeBook.render($("rbook-ring"), { lit, onTap: id => {
+    $("rbook-count").textContent = `${tx("recipeBook.head")} ${lit.size}/12`;
+    RecipeBook.renderBook($("rbook-ring"), { lit, onTap: id => {   // 11/1: 3世界の本の絵（読み込めないときは円い台座）
       const st = window.STAGES.find(x => x.id === id);
       $("rbook-info").textContent = tx(lit.has(id) ? "recipeBook.litInfo" : "recipeBook.emptyInfo", { id, stage: st.name, recipe: st.recipe });
     } });
@@ -467,9 +468,10 @@ const Main = (() => {
     back.textContent = tx("worlds.back", { id: wid - 1 });
     back.onclick = () => { Save.data.world = wid - 1; Save.store(); toStages(); };
     $("btn-zukan").textContent = tx("zukan.buttonCount", { n: Save.cardCount(), total: window.WORDS.length });   // 下の「タイトルへ」の横（10/25-20）
-    // いちばん上に、今いる世界の4つの宝石（レシピブックの台座の一部）。タップでレシピブック（12個の台座の全体）へ（10/25-17）
+    // いちばん上に、今いる世界の帯の絵（11/1。前は台座の扇形）。宝石が枠にはまる。タップでレシピブックへ
     const litSet = RecipeBook.litIds(Save.data.cards);
-    RecipeBook.render($("stages-gems"), { lit: litSet, world: wid });
+    $("stages-lead").textContent = tx("recipeBook.lead");
+    RecipeBook.renderBand($("stages-gems"), { lit: litSet, world: wid });
     $("stages-gems-head").textContent = tx("recipeBook.head"); $("stages-gems-count").textContent = `${litSet.size}/12`;   // 見出し「宝石 ○/12」（10/25-20・10/31-3）
     $("stages-gems").onclick = toRecipeBook;
     const box = $("stages-list");
