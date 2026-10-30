@@ -817,6 +817,11 @@ const Battle = (() => {
   }
   // 出撃2の画面の、3つの選ぶボタンの場所
   function choiceRects() {
+    const a = choiceArtRect();
+    if (a) {   // 絵があるときは、見本 sample_bg_start のボタンの位置（絵の幅の 11.5〜88.5%、高さの 45.8% から）
+      const bw = a.w * 0.77, bh = Math.max(62, a.h * 0.112), gap = a.h * 0.013, x = a.x + a.w * 0.115, y0 = a.y + a.h * 0.458;
+      return LOADOUTS.map((l, i) => ({ id: l.id, x, y: y0 + i * (bh + gap), w: bw, h: bh }));
+    }
     const bw = Math.min(W - 48, 320), bh = 62, gap = 12, x = W / 2 - bw / 2, y0 = H * 0.42;
     return LOADOUTS.map((l, i) => ({ id: l.id, x, y: y0 + i * (bh + gap), w: bw, h: bh }));
   }
@@ -3317,6 +3322,7 @@ const Battle = (() => {
   // 救出の旅の前のふわりの一言（10/25-5）: 持ち物選択の前に、画面の真ん中に単独で出す。タップで持ち物選択へ
   function drawChoiceSay() {
     const say = retryMain ? tx("choice.retry") : tx("choice.found", { n: reacted });
+    heroThinkImg();   // 次の持ち物選択の主人公の絵を、先に読んでおく
     ctx.font = font(18);
     const lines = wrapText(say, W - 84);
     const bh = lines.length * 28 + 28, bw = W - 40, bx = 20, by = H * 0.42 - bh / 2;
@@ -3339,7 +3345,77 @@ const Battle = (() => {
     if (kana) { ctx.font = font(Math.max(11, Math.round(size * 0.3))); ctx.fillText(kana, x, y - size * 0.72); }
   }
 
+  // 持ち物選択の絵（11/1）: 背景は制作側の bg_start（門と小道）。見本 sample_bg_start の配置で、門のところにふわり（2のコマ）と主人公
+  const choiceBg = Object.assign(new Image(), { src: "assets/choice_bg.jpg" });
+  const heroThinkImgs = {};   // 主人公の「考える」絵の、地が透明なもの（制作側の b03・g03）
+  function heroThinkImg() {
+    const src = `assets/hero_${opts.hero || "boy"}_think.png`;
+    return heroThinkImgs[src] || (heroThinkImgs[src] = Object.assign(new Image(), { src }));
+  }
+  function choiceArtRect() {
+    if (!choiceBg.complete || !choiceBg.naturalWidth) return null;
+    const sc = Math.min(W / choiceBg.naturalWidth, H / choiceBg.naturalHeight), w = choiceBg.naturalWidth * sc, h = choiceBg.naturalHeight * sc;
+    return { x: (W - w) / 2, y: H - h, w, h };   // 画面の下にそろえる（drawArtFit の edge と同じ）
+  }
+  // ボタンの右の小さな絵（見本と同じ: パワーUP＝きらきら、守りUP＝盾、必殺ワザ＝星）
+  function drawChoiceIcon(id, cx, cy, r) {
+    ctx.save(); ctx.translate(cx, cy);
+    if (id === "power") {
+      ctx.fillStyle = "#f2c230";
+      const star4 = (x, y, rr) => { ctx.beginPath(); for (let k = 0; k < 8; k++) { const ang = k * Math.PI / 4 - Math.PI / 2, d = k % 2 ? rr * 0.28 : rr; ctx.lineTo(x + Math.cos(ang) * d, y + Math.sin(ang) * d); } ctx.closePath(); ctx.fill(); };
+      star4(0, 0, r); star4(r * 0.85, -r * 0.75, r * 0.3); star4(r * 0.75, r * 0.8, r * 0.25);
+    } else if (id === "shield") {
+      ctx.beginPath(); ctx.moveTo(0, -r); ctx.quadraticCurveTo(r * 0.5, -r * 0.65, r * 0.85, -r * 0.7); ctx.lineTo(r * 0.8, r * 0.05);
+      ctx.quadraticCurveTo(r * 0.7, r * 0.7, 0, r); ctx.quadraticCurveTo(-r * 0.7, r * 0.7, -r * 0.8, r * 0.05); ctx.lineTo(-r * 0.85, -r * 0.7); ctx.quadraticCurveTo(-r * 0.5, -r * 0.65, 0, -r); ctx.closePath();
+      ctx.fillStyle = "#8fbbe8"; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = "#4f86c6"; ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, -r * 0.82); ctx.lineTo(0, r * 0.82); ctx.strokeStyle = "rgba(79,134,198,0.5)"; ctx.lineWidth = 2; ctx.stroke();
+    } else {
+      ctx.strokeStyle = "#b9a2e6"; ctx.lineWidth = 2.5; ctx.lineCap = "round";
+      for (let k = 0; k < 12; k++) { const ang = k * Math.PI / 6; ctx.beginPath(); ctx.moveTo(Math.cos(ang) * r * 0.8, Math.sin(ang) * r * 0.8); ctx.lineTo(Math.cos(ang) * r * 1.05, Math.sin(ang) * r * 1.05); ctx.stroke(); }
+      ctx.beginPath(); for (let k = 0; k < 10; k++) { const ang = k * Math.PI / 5 - Math.PI / 2, d = k % 2 ? r * 0.3 : r * 0.68; ctx.lineTo(Math.cos(ang) * d, Math.sin(ang) * d); } ctx.closePath();
+      ctx.fillStyle = "#f2c230"; ctx.fill();
+    }
+    ctx.restore();
+  }
+  function drawChoiceArt(a) {
+    drawArtFit(choiceBg, "#fcf6ea");   // 下にそろえ、上の余りは紙の地の色
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    const hs = Math.min(34, a.w * 0.085);
+    drawHeading(window.TEXTS.trips[2].name, window.TEXTS.trips[2].kana, W / 2, a.y + a.h * 0.12, hs, "#9a6418");
+    ctx.font = font(Math.min(16, a.w * 0.042)); ctx.fillStyle = "#3e4a34";
+    ctx.fillText(tx("choice.title", { trip: window.TEXTS.trips[2].name }), W / 2, a.y + a.h * 0.182);
+    // 門の手前の小道に主人公（足もとは絵の高さの 44%）、その左にゆれるふわり
+    const hi = heroThinkImg();
+    const hh = a.h * 0.23, hb = a.y + a.h * 0.44;
+    if (hi.complete && hi.naturalWidth) ctx.drawImage(hi, a.x + a.w * 0.44, hb - hh, hh * hi.naturalWidth / hi.naturalHeight, hh);
+    else drawHero("think", a.x + a.w * 0.47, hb - hh, hh);
+    drawFuwariArt(2, a.x + a.w * 0.34, a.y + a.h * 0.375, a.w * 0.26, Math.sin(t * 2.2) * 0.12);
+    choiceRects().forEach((r, i) => {
+      const l = LOADOUTS[i];
+      ctx.fillStyle = "rgba(255,252,242,0.96)"; ctx.strokeStyle = "#dcae3c"; ctx.lineWidth = 3;
+      roundRect(r.x, r.y, r.w, r.h, 18); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = "rgba(220,174,60,0.35)"; ctx.lineWidth = 1.5;
+      roundRect(r.x + 4, r.y + 4, r.w - 8, r.h - 8, 14); ctx.stroke();
+      const nfs = Math.min(22, r.h * 0.32), dfs = Math.min(14, r.h * 0.2), nx = r.x + r.w * 0.065;
+      ctx.textAlign = "left";
+      ctx.font = font(nfs); ctx.fillStyle = "#8a5a10";
+      ctx.fillText(l.name, nx, r.y + r.h * 0.42);
+      if (l.kana) {
+        const kanji = (l.name.match(/^[\u4e00-\u9fff]+/) || [""])[0], kw = ctx.measureText(kanji).width;
+        ctx.font = font(10); ctx.textAlign = "center";
+        ctx.fillText(l.kana, nx + kw / 2, r.y + r.h * 0.42 - nfs * 0.85);
+        ctx.textAlign = "left";
+      }
+      ctx.font = font(dfs); ctx.fillStyle = "#4b5e3a";
+      ctx.fillText(l.desc, nx, r.y + r.h * 0.73);
+      drawChoiceIcon(l.id, r.x + r.w * 0.85, r.y + r.h / 2, r.h * 0.3);
+      ctx.textAlign = "center";
+    });
+  }
+
   function drawChoice() {
+    const art = choiceArtRect();
+    if (art) { drawChoiceArt(art); return; }   // 絵が読めなかったら、下の今までの見た目
     // （ふわりの一言は、10/25-5 から前の画面に単独で出す）
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     const top = H * 0.08;
@@ -3612,24 +3688,30 @@ const Battle = (() => {
   // ひと休み中（11/1）: 制作側の絵 smple_sleep（文字「ひと休み中」「画面をタップすると続きから」と右下の「Ⅱ」は絵に入っている）
   //   絵は全体を見せ、余りは絵のふちの色で埋める。絵が読み込めないときは前の文字の画面
   const sleepImg = Object.assign(new Image(), { src: "assets/sleep.jpg" });
-  let sleepSmall = null;   // ぼかした余りの絵（小さな裏の画面）
   function drawSleep() {
-    if (sleepImg.complete && sleepImg.naturalWidth) {
-      const sc = Math.min(W / sleepImg.naturalWidth, H / sleepImg.naturalHeight), iw = sleepImg.naturalWidth * sc, ih = sleepImg.naturalHeight * sc;
-      const x0 = (W - iw) / 2, y0 = (H - ih) / 2;
-      ctx.fillStyle = "#f8f0dc"; ctx.fillRect(0, 0, W, H);   // 絵のふちの生成り
-      // 余りは、同じ絵をうんと小さくしてから大きくのばしたもの（ぼかした絵）で埋める。タイトルと同じ見せ方
-      if (sleepSmall === null) { try { sleepSmall = document.createElement("canvas"); sleepSmall.width = 9; sleepSmall.height = 16; sleepSmall.getContext("2d").drawImage(sleepImg, 0, 0, 9, 16); } catch (_) { sleepSmall = false; } }
-      if (sleepSmall && (x0 > 0.5 || y0 > 0.5)) {
-        const k = Math.max(W / 9, H / 16);
-        ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(sleepSmall, (W - 9 * k) / 2, (H - 16 * k) / 2, 9 * k, 16 * k); ctx.restore();
-      }
-      ctx.drawImage(sleepImg, x0, y0, iw, ih);
-      return;
-    }
+    if (drawArtFit(sleepImg)) return;
     ctx.fillStyle = "rgba(248,243,228,0.85)";
     ctx.fillRect(0, 0, W, H);
     centerText("ひと休み中", "画面をタップすると続きから");
+  }
+
+  // 1枚の絵を、切らずに画面へ収めて描く（11/1）。余りは、同じ絵をうんと小さくしてから大きくのばしたもの（ぼかした絵）で埋める。
+  // タイトルと同じ見せ方。絵がまだ読めていなければ false（呼んだほうが今までの見た目で描く）。描いたら絵の場所 {x, y, w, h} を返す
+  // edge（色）を渡すと、絵を画面の下にそろえて、上の余りをその色でぬる（上のふちが紙の地だけの絵）
+  const artSmall = new Map();
+  function drawArtFit(img, edge) {
+    if (!img.complete || !img.naturalWidth) return false;
+    const sc = Math.min(W / img.naturalWidth, H / img.naturalHeight), iw = img.naturalWidth * sc, ih = img.naturalHeight * sc;
+    const x0 = (W - iw) / 2, y0 = edge ? H - ih : (H - ih) / 2;
+    ctx.fillStyle = edge || "#f8f0dc"; ctx.fillRect(0, 0, W, H);   // 絵のふちの生成り
+    let sm = artSmall.get(img);
+    if (sm === undefined) { try { sm = document.createElement("canvas"); sm.width = 9; sm.height = 16; sm.getContext("2d").drawImage(img, 0, 0, 9, 16); } catch (_) { sm = null; } artSmall.set(img, sm); }
+    if (!edge && sm && (x0 > 0.5 || y0 > 0.5)) {
+      const k = Math.max(W / 9, H / 16);
+      ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(sm, (W - 9 * k) / 2, (H - 16 * k) / 2, 9 * k, 16 * k); ctx.restore();
+    }
+    ctx.drawImage(img, x0, y0, iw, ih);
+    return { x: x0, y: y0, w: iw, h: ih };
   }
 
   function centerText(big, small) {
