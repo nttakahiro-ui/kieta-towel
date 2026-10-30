@@ -161,7 +161,7 @@ window.TEXTS = {
     cardGet: "カードゲット！",
   },
   // カード図鑑（10/22-1）
-  zukan: { buttonCount: "カード図鑑 {n}/{total}", button: "カード図鑑", title: "カード図鑑", recipe: "宝石: {name}", recipeYet: "宝石: ？", back: "ステージ一覧へ", empty: "？" },
+  zukan: { buttonCount: "カード図鑑 {n}/{total}", button: "カード図鑑", title: "カード図鑑", recipe: "宝石：{name}", recipeYet: "宝石：？", back: "ステージ一覧へ", empty: "？" },
   // 世界のページとワープ（10/22-1）
   worlds: {
     title: "世界{id}　{name}",

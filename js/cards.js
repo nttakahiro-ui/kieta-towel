@@ -25,6 +25,15 @@ const Cards = (() => {
   const seg = (typeof Intl !== "undefined" && Intl.Segmenter) ? new Intl.Segmenter("ja", { granularity: "word" }) : null;
   const GLUE = new Set(["を", "は", "が", "に", "の", "と", "で", "へ", "も", "や", "よ", "ね", "て", "た", "か", "な", "、", "。", "!", "！", "?", "？", ")", "）", "」"]);   // 「」の閉じかっこも前につける（10/25-14）
   const esc = t => t.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  // カードの見出し（語句）の div。漢字を含む語句には、上に小さく kana 欄のふりがな（11/1。本文にはつけない）
+  function wordEl(w) {
+    const wd = document.createElement("div"); wd.className = "w";
+    if (w.kana && /[\u3400-\u9fff々]/.test(w.word)) {
+      const k = document.createElement("span"); k.className = "kn"; k.textContent = w.kana;
+      wd.append(k, document.createTextNode(w.word));
+    } else wd.textContent = w.word;
+    return wd;
+  }
   function phraseHTML(text) {
     if (!seg) return esc(text);
     const parts = [];
@@ -141,7 +150,7 @@ const Cards = (() => {
       const owned = !!o.owned[w.id];
       c.className = "card" + (owned ? "" : " miss");
       c.style.animationDelay = `${i * 0.08}s`;
-      const wd = document.createElement("div"); wd.className = "w"; wd.textContent = w.word;
+      const wd = wordEl(w);
       const m = document.createElement("div"); m.className = "m"; m.innerHTML = phraseHTML(w.memo);
       c.append(wd, m);
       // まだカードになっていない語句には、理由を出す
@@ -253,5 +262,5 @@ const Cards = (() => {
     };
   }
 
-  return { showCards, showRecipe, phraseHTML, names };
+  return { showCards, showRecipe, phraseHTML, wordEl, names };
 })();
