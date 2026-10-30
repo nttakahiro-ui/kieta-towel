@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <!-- テスト版なので検索エンジンに載せない -->
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#eaf3dc">
+  <title>消えたタオルと白い記憶（テスト版）</title>
+  <!-- 丸みのあるフォント: iPhone はヒラギノ丸ゴ、それ以外は Zen Maru Gothic（Google Fonts）。どれを使うかは css/style.css の --font で決める -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap">
+  <link rel="stylesheet" href="css/style.css?v=65">
+</head>
+<body>
+  <div id="app">
+    <!-- 目的の画面（ゲームを初めて開いたときだけ。10/21-2） -->
+    <section id="screen-intro" class="screen">
+      <div class="intro-box">
+        <div class="intro-heroes"><img class="hero-img" src="assets/hero_boy_point.jpg" alt=""><img class="intro-fuwari" src="assets/fuwari_1.png" alt="ふわり"><img class="hero-img" src="assets/hero_girl_point.jpg" alt=""></div>
+        <div id="intro-lines" class="intro-lines"></div>
+        <div id="intro-book" class="rb-box small"></div>
+        <p id="intro-book-caption" class="intro-book-caption"></p>
+        <p id="intro-tap" class="intro-tap"></p>
+      </div>
+    </section>
+
+    <!-- 主人公を選ぶ画面（10/21-2） -->
+    <section id="screen-hero" class="screen">
+      <div class="hero-box">
+        <h2 id="hero-title" class="hero-title"></h2>
+        <div class="hero-choices">
+          <button id="hero-boy" class="hero-choice"><img class="hero-img" src="assets/hero_boy_joy.jpg" alt=""><span id="hero-boy-name"></span></button>
+          <button id="hero-girl" class="hero-choice"><img class="hero-img" src="assets/hero_girl_joy.jpg" alt=""><span id="hero-girl-name"></span></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- タイトル -->
+    <!-- 10/31-3: 制作側の絵（背景 title_bg.jpg・ロゴ title_logo.png）。絵が読み込めないときは class="art" を外して、前の図形のタイトルにもどす -->
+    <section id="screen-title" class="screen art">
+      <div class="title-box">
+        <img id="title-bg" class="title-art-only title-bg" src="assets/title_bg.jpg" alt="">
+        <p class="title-sub">テスト版</p>
+        <img id="title-logo" class="title-art-only title-logo" src="assets/title_logo.png" alt="消えたタオルと白い記憶 〜消えたレシピを探す旅〜">
+        <h1 class="title-main">消えたタオルと<br>白い記憶</h1>
+        <p class="title-catch">〜消えたレシピを探す旅〜</p>
+        <div class="stage-plate">
+          <div id="title-world" class="stage-world"></div>
+          <div id="title-stage" class="stage-name"></div>
+        </div>
+        <div class="title-progress"><div><span id="title-recipes-label">宝石</span> <b id="title-recipes">0</b>/12</div><div><span id="title-cards-label">カード</span> <b id="title-cards">0</b>/<span id="title-cards-total">120</span></div></div>
+        <button id="btn-start" class="btn btn-main">始める</button>
+        <p class="title-note">音が出ます</p>
+        <div class="title-links">
+          <button id="btn-sound" class="link-btn sound-btn"></button>
+          <button id="btn-hero" class="link-btn"></button>
+          <button id="btn-reset" class="link-btn">記録を消す</button>
+        </div>
+        <button id="btn-tune" class="link-btn hidden">調整パネル</button>
+      </div>
+    </section>
+
+    <!-- ステージ一覧（10/25-17: 上に今いる世界の4つの宝石。クリアしたステージは枠が光る） -->
+    <section id="screen-stages" class="screen scroll">
+      <div class="stages-box">
+        <div class="stages-nav"><button id="btn-world-back" class="link-btn hidden"></button></div>
+        <p id="stages-lead" class="stages-lead"></p>
+        <p class="gems-head"><span id="stages-gems-head"></span> <b id="stages-gems-count"></b></p>
+        <div id="stages-gems" class="world-gems" role="button" aria-label="レシピブック"></div>
+        <h2 id="stages-world-title" class="stages-title">ステージを選ぶ</h2>
+        <div id="stages-list"></div>
+        <button id="btn-warp" class="btn btn-main warp-btn hidden"></button>
+        <div class="btn-row stages-bottom"><button id="btn-zukan" class="btn btn-sub"></button><button id="btn-stages-back" class="btn btn-sub">タイトルへ</button></div>
+      </div>
+    </section>
+
+    <!-- カード図鑑（10/22-1）。今いる世界のステージごとに、集めたカードを読み返す -->
+    <section id="screen-zukan" class="screen scroll">
+      <div class="zukan-box">
+        <h2 id="zukan-title" class="zukan-title"></h2>
+        <div id="zukan-list"></div>
+        <div class="btn-row"><button id="btn-zukan-back" class="btn btn-sub"></button></div>
+      </div>
+    </section>
+
+    <!-- バトル -->
+    <section id="screen-battle" class="screen">
+      <canvas id="battle-canvas"></canvas>
+      <button id="btn-pause" class="pause-btn" aria-label="ひと休み">Ⅱ</button>
+    </section>
+
+    <!-- クイズの前に、今日あつめたことばを見せる -->
+    <section id="screen-review" class="screen">
+      <div class="review-box">
+        <h2 class="review-title">今日助けたことば</h2>
+        <ol id="review-list" class="review-list"></ol>
+        <div class="review-bar"><i id="review-bar"></i></div>
+        <p class="review-note">このあと クイズ！</p>
+      </div>
+    </section>
+
+    <!-- クイズの前の1画面（ステージ1の初回だけ。10/25-1） -->
+    <section id="screen-quizintro" class="screen">
+      <div class="quizintro-box"><p id="quizintro-text" class="quizintro-text"></p><p id="quizintro-tap" class="intro-tap"></p></div>
+    </section>
+
+    <!-- クイズ -->
+    <section id="screen-quiz" class="screen scroll">
+      <div class="quiz-box">
+        <div class="quiz-head"><span id="quiz-count"></span><span id="quiz-dots" class="quiz-dots"></span><button id="btn-quiz-quit" class="link-btn quiz-quit">とちゅうでやめる</button></div>
+        <div class="fuwari-talk"><img id="quiz-hero" class="hero-img hero-small" alt=""><span class="fuwari-icon"></span><p id="quiz-say" class="say">助けたことばを思い出そう！</p></div>
+        <p id="quiz-question" class="quiz-question"></p>
+        <div class="quiz-get-anchor"><div id="quiz-get" class="quiz-get hidden"></div></div>
+        <div id="quiz-choices" class="quiz-choices"></div>
+        <div id="quiz-feedback" class="quiz-feedback hidden"></div>
+
+      </div>
+    </section>
+
+    <!-- カード -->
+    <!-- 結果画面（10/25-3）: スクロールなしの2ページ。横スワイプでも行き来できる -->
+    <section id="screen-cards" class="screen">
+      <div id="cards-pages" class="cards-pages">
+        <div class="cards-page" id="cards-p1">
+          <div class="cards-top"><button id="cards-to-p2" class="link-btn"></button></div>
+          <img id="cards-hero" class="hero-img hero-mid" alt="">
+          <div id="cards-tiers" class="cards-tiers"></div>
+          <div id="cards-next" class="cards-next"></div>
+          <p id="cards-rule" class="cards-rule"></p>
+          <p id="cards-hint" class="fuwari-hint hidden"></p>
+          <div class="btn-row"><button id="cards-retake" class="btn btn-main cards-main hidden"></button></div>
+          <div class="btn-row"><button id="cards-rescue" class="btn btn-main cards-main hidden"></button></div>
+          <div class="btn-row"><button id="cards-quit" class="link-btn"></button></div>
+        </div>
+        <div class="cards-page" id="cards-p2">
+          <div class="cards-top left"><button id="cards-to-p1" class="link-btn"></button></div>
+          <h2 id="cards-title" class="cards-title"></h2>
+          <div id="cards-list" class="cards-list compact"></div>
+          <div id="cards-rank" class="cards-rank"></div>
+          <p id="cards-summary" class="cards-summary"></p>
+          <div id="cards-result" class="cards-result"></div>
+          <div id="cards-buttons" class="btn-row"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- レシピ完成（10/25-4）: 台座に、そのステージの宝石がはまる -->
+    <section id="screen-recipe" class="screen">
+      <div id="recipe-fx" class="recipe-fx"></div>
+      <div class="recipe-box">
+        <p id="recipe-label" class="recipe-label"></p>
+        <div id="recipe-book" class="rb-box"></div>
+        <h2 id="recipe-name" class="recipe-name"></h2>
+        <div class="recipe-cheer"><img id="recipe-hero" class="hero-img recipe-hero" alt=""><img id="recipe-fuwari" class="recipe-fuwari" src="assets/fuwari_3.png" alt=""></div>
+        <p id="recipe-remain" class="recipe-remain"></p>
+        <p id="recipe-hint" class="fuwari-hint hidden"></p>
+        <div id="recipe-buttons" class="btn-row"></div>
+      </div>
+    </section>
+
+    <!-- レシピブック（10/25-4）: ステージ一覧からいつでも -->
+    <section id="screen-recipebook" class="screen">
+      <div class="rbook-box">
+        <div class="cards-top left"><button id="rbook-back" class="link-btn"></button></div>
+        <h2 id="rbook-title" class="zukan-title"></h2>
+        <p id="rbook-count" class="gems-head"></p>
+        <div id="rbook-ring" class="rb-box"></div>
+        <p id="rbook-info" class="rbook-info"></p>
+      </div>
+    </section>
+
+    <!-- 12個そろったとき（10/25-4。仮の1画面） -->
+    <section id="screen-ending" class="screen">
+      <div class="ending-box">
+        <h2 id="ending-title" class="ending-title"></h2>
+        <div class="intro-heroes"><img class="hero-img" src="assets/hero_boy_joy.jpg" alt=""><img class="hero-img" src="assets/hero_girl_joy.jpg" alt=""></div>
+        <div id="ending-book" class="rb-box small"></div>
+        <p id="ending-line" class="ending-line"></p>
+        <div class="btn-row"><button id="ending-next" class="btn btn-main"></button></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ワープの演出（10/22-1）: 白く光って、次の世界の背景に切りかわる -->
+  <div id="warp"><div class="flash"></div><p id="warp-text"></p></div>
+  <!-- ワープの会話の演出（10/25-18。その世界へ初めてワープするときだけ。約10秒、タップで飛ばせる） -->
+  <div id="warp-talk" class="warp-talk hidden">
+    <div id="wt-strip" class="wt-strip"><div id="wt-bg1" class="wt-img"></div><div id="wt-bg2" class="wt-img"></div></div>
+    <div class="wt-seam"></div>
+    <p id="wt-title" class="wt-title"></p>
+    <div class="wt-stage">
+      <p id="wt-bubble" class="wt-bubble"></p>
+      <div id="wt-chars" class="wt-chars"><img id="wt-hero" class="hero-img wt-hero" alt=""><img id="wt-fuwari" class="wt-fuwari" src="assets/fuwari_1.png" alt=""></div>
+    </div>
+    <div class="wt-flash"></div>
+  </div>
+
+  <!-- バトルの一時停止メニュー -->
+  <div id="pause-menu" class="overlay hidden">
+    <div class="overlay-box">
+      <h2>ひと休み</h2>
+      <div class="btn-row">
+        <button id="pm-continue" class="btn btn-main">続ける</button>
+        <button id="pm-tutorial" class="btn btn-sub">説明をもう一度</button>
+        <button id="pm-sound" class="btn btn-sub sound-btn"></button>
+        <button id="pm-retry" class="btn btn-sub">始めからやり直す</button>
+        <button id="pm-stages" class="btn btn-sub">ステージ一覧へ</button>
+        <button id="pm-title" class="btn btn-sub">タイトルへ</button>
+      </div>
+      <div id="pm-debug" class="debug-box hidden">
+        <p class="debug-label">デバッグ</p>
+        <button id="dbg-skip-recon" class="btn btn-debug">探検をとばす</button>
+        <button id="dbg-skip-boss" class="btn btn-debug">大ボスへとぶ</button>
+        <button id="dbg-clear" class="btn btn-debug">すぐクリア（10語ぜんぶ）</button>
+        <button id="dbg-slides" class="btn btn-debug"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- デバッグメニュー（タイトルの文字を5回続けて押すと出る） -->
+  <div id="debug-menu" class="overlay hidden">
+    <div class="overlay-box">
+      <h2>デバッグ</h2>
+      <p class="tune-note">試すとき用。バトル中は、右下の「Ⅱ」の一時停止メニューに、とばす操作が出ます。</p>
+      <div class="btn-row">
+        <button id="dbg-tune" class="btn btn-debug">調整パネルを開く</button>
+        <button id="dbg-open-all" class="btn btn-debug">すべてのステージを開く: オフ</button>
+        <button id="dbg-all-cards" class="btn btn-debug">すべてのカードをそろえる</button>
+        <button id="dbg-invincible" class="btn btn-debug">無敵: オフ</button>
+        <button id="dbg-odai" class="btn btn-debug">お題バトル: オン</button>
+        <button id="dbg-reset" class="btn btn-debug">記録を消す</button>
+        <button id="dbg-off" class="btn btn-sub">デバッグをやめる</button>
+        <button id="dbg-close" class="btn btn-main">とじる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 調整パネル（URLの最後に ?tune をつけると出る。試すとき用） -->
+  <div id="tune" class="tune hidden">
+    <div class="tune-box">
+      <h2>バトルの調整</h2>
+      <p class="tune-note">動かすとすぐ反映されます。この端末にだけ保存されます。</p>
+      <p id="tune-info" class="tune-note"></p>
+      <div id="tune-list"></div>
+      <textarea id="tune-text" class="hidden" readonly></textarea>
+      <div class="btn-row">
+        <button id="tune-copy" class="btn">数値をコピー</button>
+        <button id="tune-reset" class="btn btn-sub">もとにもどす</button>
+        <button id="tune-close" class="btn btn-sub">とじる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 横向きのとき -->
+  <div id="rotate"><div><div class="rotate-icon"></div><p>縦にしてね</p></div></div>
+
+  <script src="data/words.js?v=65"></script>
+  <script src="data/stages.js?v=65"></script>
+  <script src="data/texts.js?v=65"></script>
+  <script src="js/audio.js?v=65"></script>
+  <script src="js/game.js?v=65"></script>
+  <script src="js/quiz.js?v=65"></script>
+  <script src="js/cards.js?v=65"></script>
+  <script src="js/recipebook.js?v=65"></script>
+  <script src="js/main.js?v=65"></script>
+</body>
+</html>
