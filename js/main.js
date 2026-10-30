@@ -453,7 +453,7 @@ const Main = (() => {
     // いちばん上に、今いる世界の4つの宝石（レシピブックの台座の一部）。タップでレシピブック（12個の台座の全体）へ（10/25-17）
     const litSet = RecipeBook.litIds(Save.data.cards);
     RecipeBook.render($("stages-gems"), { lit: litSet, world: wid });
-    $("stages-gems-head").textContent = tx("recipeBook.head"); $("stages-gems-count").textContent = `${litSet.size}/12`;   // 見出し「12のレシピ ○/12」（10/25-20）
+    $("stages-gems-head").textContent = tx("recipeBook.head"); $("stages-gems-count").textContent = `${litSet.size}/12`;   // 見出し「宝石 ○/12」（10/25-20・10/31-3）
     $("stages-gems").onclick = toRecipeBook;
     const box = $("stages-list");
     box.innerHTML = "";
