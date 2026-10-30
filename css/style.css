@@ -667,3 +667,4 @@ body { position: fixed; inset: 0; }
 .rb-box:has(.art-book), #screen-recipe .rb-box:has(.art-book) { width: 100%; max-width: 440px; }   /* 本の絵は横長なので幅いっぱい */
 #screen-recipebook:has(.art-book), #screen-recipe:has(.art-book) { background: var(--cream); }   /* 本の絵の地（生成り）と画面の地をそろえる */
 .btn-row.stages-bottom { justify-content: flex-end; }   /* 下の（カード図鑑）（タイトルへ）は見本どおり右寄せ */
+.pause-btn.sleep-hide { visibility: hidden; }   /* ひと休み中の絵に「Ⅱ」が描いてあるあいだ（11/1） */

@@ -1061,7 +1061,17 @@ const Battle = (() => {
     update(dt);
     frameNo++;
     draw();
+    syncPauseBtn();
     rafId = requestAnimationFrame(loop);
+  }
+  // ひと休み中の絵には右下に「Ⅱ」が描いてあるので、そのあいだは本物の「Ⅱ」のボタンを隠す（11/1。二重にしない）
+  let pauseBtnHidden = false;
+  function syncPauseBtn() {
+    const on = paused && sleepImg.complete && !!sleepImg.naturalWidth;
+    if (on === pauseBtnHidden) return;
+    pauseBtnHidden = on;
+    const b = document.getElementById("btn-pause");
+    if (b && b.classList) b.classList.toggle("sleep-hide", on);
   }
 
   function update(realDt) {
@@ -2269,11 +2279,7 @@ const Battle = (() => {
     if (tut) drawTut();
     if (state === "clear") centerText(`${absorbed.length}のことばを助けた！`, `${score}点`);
     if (state === "extraAsk") drawExtraAsk();
-    if (paused) {
-      ctx.fillStyle = "rgba(248,243,228,0.85)";
-      ctx.fillRect(0, 0, W, H);
-      centerText("ひと休み中", "画面をタップすると続きから");
-    }
+    if (paused) drawSleep();
   }
 
   const exploreBgImgs = {};
@@ -3202,11 +3208,7 @@ const Battle = (() => {
     if (hintCard) drawHintCard();
     if (state === "sortie") drawSortie();
     if (tut) drawTut();
-    if (paused) {
-      ctx.fillStyle = "rgba(248,243,228,0.85)";
-      ctx.fillRect(0, 0, W, H);
-      centerText("ひと休み中", "画面をタップすると続きから");
-    }
+    if (paused) drawSleep();
   }
 
   // 案内（10/21-2）: 画面の上のほうに、ふわりと1〜2行の文。ゲームは止めない
@@ -3605,6 +3607,29 @@ const Battle = (() => {
     ctx.fillStyle = ENEMY_COLOR[word.role];
     ctx.fillText(word.word, W / 2, cy + (showKana ? 12 : 0));
     ctx.globalAlpha = 1;
+  }
+
+  // ひと休み中（11/1）: 制作側の絵 smple_sleep（文字「ひと休み中」「画面をタップすると続きから」と右下の「Ⅱ」は絵に入っている）
+  //   絵は全体を見せ、余りは絵のふちの色で埋める。絵が読み込めないときは前の文字の画面
+  const sleepImg = Object.assign(new Image(), { src: "assets/sleep.jpg" });
+  let sleepSmall = null;   // ぼかした余りの絵（小さな裏の画面）
+  function drawSleep() {
+    if (sleepImg.complete && sleepImg.naturalWidth) {
+      const sc = Math.min(W / sleepImg.naturalWidth, H / sleepImg.naturalHeight), iw = sleepImg.naturalWidth * sc, ih = sleepImg.naturalHeight * sc;
+      const x0 = (W - iw) / 2, y0 = (H - ih) / 2;
+      ctx.fillStyle = "#f8f0dc"; ctx.fillRect(0, 0, W, H);   // 絵のふちの生成り
+      // 余りは、同じ絵をうんと小さくしてから大きくのばしたもの（ぼかした絵）で埋める。タイトルと同じ見せ方
+      if (sleepSmall === null) { try { sleepSmall = document.createElement("canvas"); sleepSmall.width = 9; sleepSmall.height = 16; sleepSmall.getContext("2d").drawImage(sleepImg, 0, 0, 9, 16); } catch (_) { sleepSmall = false; } }
+      if (sleepSmall && (x0 > 0.5 || y0 > 0.5)) {
+        const k = Math.max(W / 9, H / 16);
+        ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(sleepSmall, (W - 9 * k) / 2, (H - 16 * k) / 2, 9 * k, 16 * k); ctx.restore();
+      }
+      ctx.drawImage(sleepImg, x0, y0, iw, ih);
+      return;
+    }
+    ctx.fillStyle = "rgba(248,243,228,0.85)";
+    ctx.fillRect(0, 0, W, H);
+    centerText("ひと休み中", "画面をタップすると続きから");
   }
 
   function centerText(big, small) {
