@@ -28,8 +28,11 @@ const Cards = (() => {
   function phraseHTML(text) {
     if (!seg) return esc(text);
     const parts = [];
+    let open = false;   // 直前が「 （「 のすぐあとでも折り返さない。「 が行の終わりに残らないように）
     for (const { segment } of seg.segment(text)) {
-      if (parts.length && (GLUE.has(segment) || GLUE.has(segment[0]))) parts[parts.length - 1] += segment; else parts.push(segment);
+      // 10/31-3: かぎかっこ（「）の直前では折り返さない（「 を前のかたまりにつける）。端末ごとの制御はしない
+      if (parts.length && (open || segment[0] === "「" || GLUE.has(segment) || GLUE.has(segment[0]))) parts[parts.length - 1] += segment; else parts.push(segment);
+      open = segment.endsWith("「");
     }
     return parts.map(esc).join("<wbr>");
   }

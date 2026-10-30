@@ -62,6 +62,7 @@ const Save = (() => {
 // ===== 調整パネル（URLに ?tune をつけると、タイトルに「調整パネル」が出る） =====
 // [項目の場所, 表示名, 最小, 最大, きざみ]
 const TUNE_ITEMS = [
+  ["speakWords", "読み上げ: オン／オフ（1＝オン、0＝オフ）", 0, 1, 1],
   ["exploreTime", "発見の旅の長さ（秒）", 20, 60, 1],
   ["exploreGap", "発見の旅: 語句が現れる間隔（秒）", 1.5, 6, 0.1],
   ["exploreLife", "発見の旅: 語句がただよう時間（秒）", 4, 20, 0.5],
@@ -198,7 +199,8 @@ const Tune = (() => {
       const b = document.createElement("b");
       const inp = document.createElement("input");
       inp.type = "range"; inp.min = min; inp.max = max; inp.step = step; inp.value = getv(p);
-      const show = () => { b.textContent = getv(p); b.className = getv(p) !== TUNE_DEFAULT[p] ? "changed" : ""; };
+      const isSwitch = typeof p.split(".").reduce((o, k) => o[k], BATTLE) === "boolean";   // スイッチは「オン／オフ」で見せる
+      const show = () => { b.textContent = isSwitch ? (getv(p) ? "オン" : "オフ") : getv(p); b.className = getv(p) !== TUNE_DEFAULT[p] ? "changed" : ""; };
       inp.addEventListener("input", () => {
         const v = Math.round(Number(inp.value) / step) * step;
         const vv = Number(v.toFixed(2));

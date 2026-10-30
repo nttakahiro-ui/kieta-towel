@@ -86,6 +86,7 @@ const BATTLE = {
   comboMax: 3,                 // コンボ倍率のいちばん上
 
   // --- お題バトル（2周目の中ボス2回と大ボス1回） ---
+  speakWords: false,           // ことばの読み上げ（10/31-3 にやめた。コードは残す。調整パネルの「読み上げ: オン／オフ」で戻せる）
   odai: true,                  // お題バトルのスイッチ（true＝オン、false＝オフ。オフで今までの中ボス・大ボス戦）
   odaiIntroTime: 2.5,          // （10/25-16 から使っていない。問題文を読む時間は文の長さで決める: odaiReadPerChar など）
   odaiBigFont: 26,             // 問題文を画面中央に出すときの文字の大きさのいちばん上（px）。画面の幅に3行以内に収まるまで小さくする
@@ -1530,7 +1531,7 @@ const Battle = (() => {
     }
     floats.push({ x: e.vertical ? px + e.size : px, y: e.vertical ? py : e.y - e.size * 0.9, text: p.kana, big: true, kana: true, age: 0 });
     Sound.se("crack");
-    if (p.kana !== "ー") Sound.speak(p.kana);
+    if (p.kana !== "ー" && BATTLE.speakWords) Sound.speak(p.kana);
   }
   // ===== お題バトル =====
   // ダミー2つ: 同じステージのほかの語句（大ボス以外）から、本物と文字数が近いものを2つ（ステージごとに毎回同じ）
@@ -1865,6 +1866,7 @@ const Battle = (() => {
       ex.endT = 2.4;
       const diff = BATTLE.exploreTime - ex.t, sec = Math.ceil(Math.abs(diff)), pts = sec * BATTLE.exploreTimeScore;
       if (diff >= 0) score += pts; else score = Math.max(0, score - pts);
+      ex.settled = true;   // 時間の点を足した（これより前は、画面の点数におくれの−を先に見せる）
       const text = tx(diff >= 0 ? "explore.endEarly" : "explore.endLate", { n: sec, p: pts });
       post("banner", () => { banner = { text, t: 2.4, color: "rgba(72,105,58,0.92)" }; });
     }
@@ -1927,7 +1929,7 @@ const Battle = (() => {
     }
     freed.push({ word: e.word.word, x: e.x, y: e.y, size: e.size, age: 0 });   // ことばは形をたもったまま、ふわりのところへ飛んでくる
     Sound.se("absorb");
-    Sound.speak(e.word.kana || e.word.word);   // 語句を読み上げる（仮: 端末の読み上げ機能）
+    if (BATTLE.speakWords) Sound.speak(e.word.kana || e.word.word);   // 語句を読み上げる（仮: 端末の読み上げ機能。10/31-3 から初期値はオフ）
     player.hp = Math.min(BATTLE.playerMaxHp, player.hp + BATTLE.healOnAbsorb);
     post("word", () => { showWord = { word: e.word, t: BATTLE.wordShowTime }; });
     slow = BATTLE.slowTime;
@@ -3431,8 +3433,11 @@ const Battle = (() => {
     // 点数（右）。上に出すのは体力ゲージ、残機、点数だけ
     ctx.textAlign = "right"; ctx.textBaseline = "top";
     ctx.font = font(16); ctx.fillStyle = "#4b5e3a";
-    ctx.strokeText(String(score), W - 14, top);
-    ctx.fillText(String(score), W - 14, top);
+    // 発見の旅で基準の時間を過ぎたら、おくれの−を終わりを待たずに見せる（指摘39。点の決まりは同じ: 1秒ごとに−、0点より下にはしない）
+    const over = phase === "round1" && !explore.settled ? explore.t - BATTLE.exploreTime : 0;
+    const shown = over > 0 ? Math.max(0, score - Math.ceil(over) * BATTLE.exploreTimeScore) : score;
+    ctx.strokeText(String(shown), W - 14, top);
+    ctx.fillText(String(shown), W - 14, top);
     // パワーと持ちものは、左下のぜんぶ消しのボタンの横に小さく（1回目の旅は光を使わないので出さない）
     if (phase === "round1") { drawStrip(); return; }
     const b = bombButton();
