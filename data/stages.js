@@ -42,9 +42,9 @@
 //   型ごとの数（落ちる速さ・風の強さ・ホタルの数など）は js/game.js の EXPLORE_MOVES。ここに同じ名前で書くと、そのステージだけ上書き（例: { move: "fall", fallSpeed: 40 }）
 //   世界1: ステージ1 drift／2 fall／3 wind／4 firefly。世界2・3の探し方（箱を開ける・星をなぞる）は、世界2・3の設計で型を足す
 window.WORLDS = [
-  { id: 1, name: "原材料の世界",     ground: false, rear: false, color: "#5aa85a" },   // 世界1: 地上なし・うしろからなし（10/21-1）。color ＝ レシピブックの扇形の色（10/25-13。森＝緑）
-  { id: 2, name: "製造工程の世界",   ground: true,  rear: false, color: "#4a86d8" },   // 世界2: 地上の敵・地上の語句・照準◎が入る（工場＝青）
-  { id: 3, name: "タオル進化の世界", ground: true,  rear: true,  color: "#8a5ad0" }    // 世界3: うしろ（下）からも敵が来る（rear はまだ作っていない）（宇宙＝紫）
+  { id: 1, name: "原材料の世界",     ground: false, rear: false, color: "#5aa85a", exploreBg: "assets/explore_bg1.jpg" },   // exploreBg ＝ 発見の旅の背景（11/1。制作側の world01_02〜03_02。上下がつながる絵を縦に流す）。世界1: 地上なし・うしろからなし（10/21-1）。color ＝ レシピブックの扇形の色（10/25-13。森＝緑）
+  { id: 2, name: "製造工程の世界",   ground: true,  rear: false, color: "#4a86d8", exploreBg: "assets/explore_bg2.jpg" },   // 世界2: 地上の敵・地上の語句・照準◎が入る（工場＝青）
+  { id: 3, name: "タオル進化の世界", ground: true,  rear: true,  color: "#8a5ad0", exploreBg: "assets/explore_bg3.jpg" }    // 世界3: うしろ（下）からも敵が来る（rear はまだ作っていない）（宇宙＝紫）
 ];
 
 window.STAGES = [

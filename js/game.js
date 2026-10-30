@@ -119,6 +119,7 @@ const BATTLE = {
   binoR: 0.17,                 // 双眼鏡（正円2つを横に重ねた形。10/25-1 に楕円からもどした）の円の半径（画面の幅に対する割合）
   binoSpread: 0.62,            // 2つの円の中心のはなれぐあい（半径に対する割合。1より小さいと重なる）
   binoMove: 1.15,              // 指を動かした量に対して、双眼鏡が動く量
+  exploreBgSpeed: 18,          // 発見の旅の背景の絵が下へ流れる速さ（px/秒。11/1）
   exploreDark: 0.98,           // 円の外の暗さ（0〜1。1でまっ暗）
   lookTime: 0.5,               // 円の中で見つめると見つかるまでの時間（秒・合計）
   hintEvery: 1.5,              // 暗いところで語句がきらっと光る間隔（秒）
@@ -1866,7 +1867,7 @@ const Battle = (() => {
       ex.endT = 2.4;
       const diff = BATTLE.exploreTime - ex.t, sec = Math.ceil(Math.abs(diff)), pts = sec * BATTLE.exploreTimeScore;
       if (diff >= 0) score += pts; else score = Math.max(0, score - pts);
-      ex.settled = true;   // 時間の点を足した（これより前は、画面の点数におくれの−を先に見せる）
+      ex.settled = true; ex.settledT = ex.t;   // 時間の点を足した（これより前は、画面の点数におくれの−を先に見せる）。時計はこの時刻で止める
       const text = tx(diff >= 0 ? "explore.endEarly" : "explore.endLate", { n: sec, p: pts });
       post("banner", () => { banner = { text, t: 2.4, color: "rgba(72,105,58,0.92)" }; });
     }
@@ -2275,8 +2276,23 @@ const Battle = (() => {
     }
   }
 
+  const exploreBgImgs = {};
+  function drawExploreBg() {
+    const wd = (window.WORLDS || []).find(w => opts.stage && w.id === opts.stage.world), src = wd && wd.exploreBg;
+    if (!src) return false;
+    const img = exploreBgImgs[src] || (exploreBgImgs[src] = Object.assign(new Image(), { src }));
+    if (!img.complete || !img.naturalWidth) return false;   // 読み込めないときは、今までの背景
+    const sc = W / img.naturalWidth, ih = img.naturalHeight * sc;
+    const off = (explore ? explore.t : 0) * BATTLE.exploreBgSpeed % ih;   // 下へ流す
+    for (let y = off - ih; y < H; y += ih) ctx.drawImage(img, 0, y, W, ih + 1);
+    drawLight(theme.imageLight !== undefined ? theme.imageLight : theme.light);   // 時間帯の色（明け方・夕暮れ・夜）は今までどおり重ねる
+    return true;
+  }
+
   // 地面: 草地のうえに、畑・花・小川・あぜ道
   function drawTerrain() {
+    // 発見の旅（11/1）: 世界の背景の絵（stages.js の WORLDS の exploreBg。上下がつながる絵）を縦に流す。見えるのは双眼鏡の中だけ
+    if (phase === "round1" && drawExploreBg()) return;
     // 背景の絵があれば（stages.js の theme.image。10/21-2）: 絵は動かさず画面いっぱいに（はみ出す左右は切る）。
     // その上を、地面の飾り（綿の実・花・草むら）を少なめ・半透明で流す。畑や小川の大きな面は、絵とぶつかるので描かない。
     // 時間帯の色は、いちばん上にうすく重ねる（theme.imageLight。なければ theme.light）
@@ -3169,8 +3185,8 @@ const Battle = (() => {
       ctx.font = font(18); ctx.textAlign = "center"; ctx.textBaseline = "middle";
       const text = tx("explore.overTime", { p: BATTLE.exploreTimeScore }), tw = Math.min(W - 24, ctx.measureText(text).width + 32);
       ctx.fillStyle = "rgba(255,240,236,0.97)"; ctx.strokeStyle = "#e0483a"; ctx.lineWidth = 2.5;
-      roundRect(W / 2 - tw / 2, 44, tw, 40, 14); ctx.fill(); ctx.stroke();   // 点数（右上）と重ならない高さ
-      ctx.fillStyle = "#c8382c"; ctx.fillText(text, W / 2, 65, W - 40);
+      roundRect(W / 2 - tw / 2, 82, tw, 40, 14); ctx.fill(); ctx.stroke();   // 右上の時計（11/1）と重ならない高さ
+      ctx.fillStyle = "#c8382c"; ctx.fillText(text, W / 2, 103, W - 40);
       ctx.restore();
     }
     if (!moved && state === "play") {   // 操作のヒント
@@ -3395,12 +3411,8 @@ const Battle = (() => {
 
   function drawHud() {
     const top = 14;
-    if (phase === "round1") {   // 1回目の旅: 体力のかわりに、基準の時間までの残りを画面のいちばん上の細い帯で（10/25-12。残り10秒で色が変わる）
-      const left = BATTLE.exploreTime - explore.t, k = Math.max(0, left) / BATTLE.exploreTime;
-      ctx.fillStyle = "rgba(255,255,255,0.35)"; ctx.fillRect(0, 0, W, BATTLE.timeBarH);
-      if (left >= 0) { ctx.fillStyle = left <= BATTLE.timeBarWarn ? "#f0a84a" : "#8fd0f0"; ctx.fillRect(0, 0, W * k, BATTLE.timeBarH); }
-      else { ctx.fillStyle = "#e0483a"; ctx.fillRect(0, 0, W * Math.min(1, -left / BATTLE.exploreTime), BATTLE.timeBarH); }   // 基準を過ぎた: 赤くなって伸びる（10/25-17）
-    } else {
+    if (phase === "round1") { drawExploreHud(); return; }   // 発見の旅は、見本 smple_tansaku の配置（11/1）
+    {
     // 体力
     ctx.fillStyle = "rgba(255,255,255,0.85)";
     roundRect(12, top, 130, 16, 8); ctx.fill();
@@ -3434,11 +3446,8 @@ const Battle = (() => {
     // 点数（右）。上に出すのは体力ゲージ、残機、点数だけ
     ctx.textAlign = "right"; ctx.textBaseline = "top";
     ctx.font = font(16); ctx.fillStyle = "#4b5e3a";
-    // 発見の旅で基準の時間を過ぎたら、おくれの−を終わりを待たずに見せる（指摘39。点の決まりは同じ: 1秒ごとに−、0点より下にはしない）
-    const over = phase === "round1" && !explore.settled ? explore.t - BATTLE.exploreTime : 0;
-    const shown = over > 0 ? Math.max(0, score - Math.ceil(over) * BATTLE.exploreTimeScore) : score;
-    ctx.strokeText(String(shown), W - 14, top);
-    ctx.fillText(String(shown), W - 14, top);
+    ctx.strokeText(String(score), W - 14, top);   // （発見の旅の点数は drawExploreHud。11/1）
+    ctx.fillText(String(score), W - 14, top);
     // パワーと持ちものは、左下のぜんぶ消しのボタンの横に小さく（1回目の旅は光を使わないので出さない）
     if (phase === "round1") { drawStrip(); return; }
     const b = bombButton();
@@ -3492,6 +3501,40 @@ const Battle = (() => {
 
   // 帯: 画面の左端に、10のあき枠を上から縦にならべる（出てくる順。いちばん下が大ボス）
   // はじめは「？」、探検で見つけると灰色の名前、本番で吸い込むと金色。名前は枠の中に縦書き
+  // 発見の旅の表示（11/1。見本 smple_tansaku）: 右上に目安の秒数からのカウントダウン（時計の形）、左下に「スコア ○」、左の縦の札
+  //   目安を過ぎたら、時計と数字を赤にして −○ 秒。点数は、おくれの−をその場で引いて見せる（指摘39。点の決まりは同じ）
+  function drawExploreHud() {
+    const tt = explore.settled ? explore.settledT : explore.t;
+    const left = BATTLE.exploreTime - tt, over = left < 0;
+    const sec = over ? -Math.ceil(-left) : Math.ceil(left);
+    const warn = !over && left <= BATTLE.timeBarWarn;
+    // 時計
+    const cr = 25, cx = W - 14 - cr, cy = 18 + cr;
+    const rim = over ? "#e0483a" : (warn ? "#f0a84a" : "#8fc8e8");
+    ctx.save();
+    ctx.fillStyle = over ? "#e0483a" : "#e8b84a"; roundRect(cx - 6, cy - cr - 7, 12, 7, 2); ctx.fill();   // 上のつまみ
+    ctx.fillStyle = rim; ctx.beginPath(); ctx.arc(cx, cy, cr, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#fffdf5"; ctx.beginPath(); ctx.arc(cx, cy, cr - 4, 0, Math.PI * 2); ctx.fill();
+    if (!over) {   // 残りの量（扇形がへっていく）
+      ctx.fillStyle = warn ? "rgba(240,168,74,0.22)" : "rgba(143,200,232,0.25)";
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, cr - 4, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(0, left) / BATTLE.exploreTime); ctx.closePath(); ctx.fill();
+    }
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    const label = over ? `−${-sec}` : String(sec);
+    ctx.font = font(label.length >= 3 ? 16 : 20); ctx.fillStyle = over ? "#d8392a" : "#2f3d55";
+    ctx.fillText(label, cx, cy + 1);
+    // 左下の点数
+    const sb = { x: 6, y: H - 80, w: 96, h: 52 };
+    ctx.fillStyle = "rgba(255,253,245,0.94)"; ctx.strokeStyle = "#b9d39a"; ctx.lineWidth = 2;
+    roundRect(sb.x, sb.y, sb.w, sb.h, 10); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#4b5e3a"; ctx.font = font(11); ctx.fillText(tx("explore.scoreLabel"), sb.x + sb.w / 2, sb.y + 14);
+    const o = over && !explore.settled ? -left : 0;
+    const shown = o > 0 ? Math.max(0, score - Math.ceil(o) * BATTLE.exploreTimeScore) : score;
+    ctx.font = font(20); ctx.fillStyle = "#2f3d2a"; ctx.fillText(String(shown), sb.x + sb.w / 2, sb.y + 35);
+    ctx.restore();
+    drawStrip();
+  }
+
   function drawStrip() {
     const x = 6, cw = BATTLE.stripWidth, gap = 3;
     const y0 = 40, y1 = bombButton().y - bombButton().r - 22;   // 体力ゲージの下から、ぜんぶ消しのボタンの上まで
