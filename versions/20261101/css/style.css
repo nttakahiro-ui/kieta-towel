@@ -668,3 +668,15 @@ body { position: fixed; inset: 0; }
 #screen-recipebook:has(.art-book), #screen-recipe:has(.art-book) { background: var(--cream); }   /* 本の絵の地（生成り）と画面の地をそろえる */
 .btn-row.stages-bottom { justify-content: flex-end; }   /* 下の（カード図鑑）（タイトルへ）は見本どおり右寄せ */
 .pause-btn.sleep-hide { visibility: hidden; }   /* ひと休み中の絵に「Ⅱ」が描いてあるあいだ（11/1） */
+
+/* カード図鑑の絵（11/1）: 地は制作側の bg_g01、見出しは g_title、世界1のステージ見出しは gw1_1〜4 */
+#screen-zukan { background: #eef3d8 url(../assets/zukan_bg.jpg) center top / 640px auto repeat; }
+.zk-title-img { width: min(86%, 340px); height: auto; display: inline-block; margin-bottom: 2px; }
+.zk-head { position: relative; container-type: inline-size; margin: 0 0 6px; }
+.zk-head img { display: block; width: 100%; height: auto; }
+.zk-head .rc.on-art {   /* 絵の「レシピ：〜」があった場所（ステージ名の下、左から25%） */
+  position: absolute; left: 25cqw; top: 13.2cqw; margin: 0;
+  font-size: max(12px, 4.4cqw); font-weight: bold; color: #a8701c; line-height: 1.2;
+  text-shadow: 0 0 2px #fff8e6, 0 0 2px #fff8e6, 1px 1px 0 #fff8e6, -1px -1px 0 #fff8e6, 1px -1px 0 #fff8e6, -1px 1px 0 #fff8e6;
+}
+.card .w .kn { display: block; font-size: 10px; font-weight: normal; color: #6f8a5a; line-height: 1.2; letter-spacing: .02em; }   /* 語句の上のふりがな（11/1） */

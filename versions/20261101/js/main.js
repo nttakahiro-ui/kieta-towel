@@ -566,7 +566,10 @@ const Main = (() => {
   // カード図鑑（10/22-1）: 今いる世界の、ステージごとの10枚。持っているカードは語句と一言メモ、ないものは「？」
   function toZukan() {
     const wid = Save.data.world || 1;
-    $("zukan-title").innerHTML = `${tx("zukan.title")}<br><small>${tx("worlds.title", { id: wid, name: window.WORLDS.find(w => w.id === wid).name })}</small>`;
+    // 見出しは制作側の絵 g_title（11/1）。絵が読めなければ今までの文字
+    const sub = `<small>${tx("worlds.title", { id: wid, name: window.WORLDS.find(w => w.id === wid).name })}</small>`;
+    $("zukan-title").innerHTML = `<img class="zk-title-img" src="assets/zukan_title.png" alt="${tx("zukan.title")}"><br>${sub}`;
+    $("zukan-title").querySelector("img").onerror = () => { $("zukan-title").innerHTML = `${tx("zukan.title")}<br>${sub}`; };
     const box = $("zukan-list");
     box.innerHTML = "";
     worldStages(wid).forEach(s => {
@@ -575,18 +578,27 @@ const Main = (() => {
       const h = document.createElement("h3"); h.textContent = `${s.id}　${s.name}`;
       const done = ws.every(w => Save.data.cards[w.id]);
       const rc = document.createElement("p"); rc.className = "rc"; rc.textContent = done ? tx("zukan.recipe", { name: s.recipe }) : tx("zukan.recipeYet");
+      // 世界1は、ステージの見出しを制作側の絵 gw1_1〜4 に（11/1）。絵の「レシピ：〜」の行は消してあり、同じ場所にゲームが「宝石：〜」を描く
+      let head = h;
+      if (s.world === 1 && s.id <= 4) {
+        head = document.createElement("div"); head.className = "zk-head";
+        const im = document.createElement("img"); im.src = `assets/zukan_s${s.id}.png`; im.alt = h.textContent;
+        im.onerror = () => { head.replaceWith(h, rc); };
+        rc.classList.add("on-art");
+        head.append(im, rc);
+      }
       const list = document.createElement("div"); list.className = "cards-list";
       ws.forEach(w => {
         const c = document.createElement("div");
         if (Save.data.cards[w.id]) {
           c.className = "card";
-          const wd = document.createElement("div"); wd.className = "w"; wd.textContent = w.word;
+          const wd = Cards.wordEl(w);
           const m = document.createElement("div"); m.className = "m"; m.innerHTML = Cards.phraseHTML(w.memo);
           c.append(wd, m);
         } else { c.className = "card empty"; c.textContent = tx("zukan.empty"); }
         list.appendChild(c);
       });
-      sec.append(h, rc, list);
+      if (head === h) sec.append(h, rc, list); else sec.append(head, list);
       box.appendChild(sec);
     });
     $("btn-zukan-back").textContent = tx("zukan.back");
