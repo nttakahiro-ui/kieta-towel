@@ -110,6 +110,52 @@ body { position: fixed; inset: 0; }
 .stages-bottom .btn { font-size: 15px; padding: 12px 16px; }
 .fuwari-line b { font-size: 22px; margin: 0 4px; color: var(--green-dark); }
 .title-note { font-size: 14px; color: #8a937e; margin-top: 14px; }
+.title-art-only { display: none; }
+
+/* タイトル画面の絵（10/31-3）: 制作側の背景 title_bg.jpg（941×1672 を幅640に）とロゴ title_logo.png
+   絵はいつも全体を見せる（上下も左右も切らない）。余ったところは同じ絵をぼかして大きくしたもので埋める
+   文字とボタンの位置は「絵の高さ・幅の何%か」で決める（画面の大きさが変わっても絵とずれない）。文字の大きさは絵の幅の何%か（cqw） */
+#screen-title.art { padding: 0; overflow: hidden; background: #cfe3ef; }
+#screen-title.art::before { content: ""; position: absolute; inset: -40px; background: url(../assets/title_bg.jpg) center / cover; filter: blur(18px) brightness(1.04); }
+#screen-title.art .title-box {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(100%, calc(var(--app-h) * 941 / 1672)); aspect-ratio: 941 / 1672;
+  container-type: inline-size; text-align: center;
+}
+#screen-title.art .title-art-only { display: block; }
+#screen-title.art .title-main, #screen-title.art .title-catch { display: none; }
+#screen-title.art .title-bg { position: absolute; inset: 0; width: 100%; height: 100%; }
+#screen-title.art .title-logo { position: absolute; left: 13%; top: 12.6%; width: 74%; height: auto; }
+#screen-title.art .title-sub {   /* 「テスト版」はゲームが文字で描く（ロゴの絵には入っていない。本番では index.html の1行を消す） */
+  position: absolute; left: 50%; top: 10.2%; transform: translateX(-50%); margin: 0;
+  font-size: 13px; font-size: 3.2cqw; letter-spacing: .2em; font-weight: bold; color: #5d7a3a;
+  background: rgba(255,253,240,0.85); border-radius: 999px; padding: .15em .9em .15em 1.1em;
+}
+/* 絵に描かれた空の札（ステージ名を入れる） */
+#screen-title.art .stage-plate {
+  position: absolute; left: 31%; width: 38%; top: 58.4%; height: 7.4%; margin: 0; padding: 0;
+  background: none; box-shadow: none; border-radius: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+#screen-title.art .stage-world { font-size: 10px; font-size: max(10px, 2.9cqw); color: #5d7a3a; white-space: nowrap; }
+#screen-title.art .stage-name { font-size: 18px; font-size: 4.9cqw; margin-top: .15em; color: #4b3a22; font-weight: bold; white-space: nowrap; }
+/* 「宝石 ○/12」「カード ○/120」: 札と「始める」のあいだ */
+#screen-title.art .title-progress {
+  position: absolute; left: 0; right: 0; top: 70.6%; margin: 0;
+  font-size: 13px; font-size: max(12px, 3.5cqw); line-height: 1.45; color: #3e4a34; text-shadow: 0 0 4px #fffbe8, 0 0 2px #fffbe8;
+}
+#screen-title.art .title-progress b { font-size: 1.2em; color: #3e5a2c; }
+/* 「始める」は絵に描かれたボタン。その上に、押せる透明のボタンを重ねる */
+#screen-title.art #btn-start {
+  position: absolute; left: 28.5%; width: 43%; top: 78%; height: 8%; margin: 0; padding: 0;
+  background: transparent; box-shadow: none; color: transparent; border-radius: 999px;
+}
+#screen-title.art #btn-start:active { transform: none; background: rgba(30,60,20,0.18); }
+#screen-title.art .title-note { position: absolute; left: 0; right: 0; top: 86.9%; margin: 0; font-size: 10px; font-size: max(10px, 2.7cqw); color: #5b6650; text-shadow: 0 0 3px #fffbe8; }
+/* いちばん下の1行（音・主人公を選びなおす・記録を消す）: 見本より一段小さく薄く、絵のじゃまをしない */
+#screen-title.art .title-links { position: absolute; left: 0; right: 0; top: 93.2%; display: flex; justify-content: center; gap: 4cqw; white-space: nowrap; }
+#screen-title.art .title-links .link-btn { margin: 0; padding: 4px 2px; font-size: 10px; font-size: max(10px, 2.6cqw); color: rgba(70,80,60,0.6); text-decoration-color: rgba(70,80,60,0.35); text-shadow: 0 0 3px rgba(255,251,232,0.9); }
+#screen-title.art #btn-tune { position: absolute; right: 2%; top: 1%; margin: 0; font-size: 11px; background: rgba(255,255,255,0.75); border-radius: 8px; padding: 2px 6px; }
 
 /* バトル */
 #screen-battle { padding: 0; touch-action: none; }

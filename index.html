@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap">
-  <link rel="stylesheet" href="css/style.css?v=62">
+  <link rel="stylesheet" href="css/style.css?v=64">
 </head>
 <body>
   <div id="app">
@@ -39,9 +39,12 @@
     </section>
 
     <!-- タイトル -->
-    <section id="screen-title" class="screen">
+    <!-- 10/31-3: 制作側の絵（背景 title_bg.jpg・ロゴ title_logo.png）。絵が読み込めないときは class="art" を外して、前の図形のタイトルにもどす -->
+    <section id="screen-title" class="screen art">
       <div class="title-box">
+        <img id="title-bg" class="title-art-only title-bg" src="assets/title_bg.jpg" alt="">
         <p class="title-sub">テスト版</p>
+        <img id="title-logo" class="title-art-only title-logo" src="assets/title_logo.png" alt="消えたタオルと白い記憶 〜消えたレシピを探す旅〜">
         <h1 class="title-main">消えたタオルと<br>白い記憶</h1>
         <p class="title-catch">〜消えたレシピを探す旅〜</p>
         <div class="stage-plate">
@@ -51,9 +54,11 @@
         <div class="title-progress"><div><span id="title-recipes-label">宝石</span> <b id="title-recipes">0</b>/12</div><div><span id="title-cards-label">カード</span> <b id="title-cards">0</b>/<span id="title-cards-total">120</span></div></div>
         <button id="btn-start" class="btn btn-main">始める</button>
         <p class="title-note">音が出ます</p>
-        <button id="btn-sound" class="link-btn sound-btn"></button>
-        <button id="btn-hero" class="link-btn"></button>
-        <button id="btn-reset" class="link-btn">記録を消す</button>
+        <div class="title-links">
+          <button id="btn-sound" class="link-btn sound-btn"></button>
+          <button id="btn-hero" class="link-btn"></button>
+          <button id="btn-reset" class="link-btn">記録を消す</button>
+        </div>
         <button id="btn-tune" class="link-btn hidden">調整パネル</button>
       </div>
     </section>
@@ -250,14 +255,14 @@
   <!-- 横向きのとき -->
   <div id="rotate"><div><div class="rotate-icon"></div><p>縦にしてね</p></div></div>
 
-  <script src="data/words.js?v=62"></script>
-  <script src="data/stages.js?v=62"></script>
-  <script src="data/texts.js?v=62"></script>
-  <script src="js/audio.js?v=62"></script>
-  <script src="js/game.js?v=62"></script>
-  <script src="js/quiz.js?v=62"></script>
-  <script src="js/cards.js?v=62"></script>
-  <script src="js/recipebook.js?v=62"></script>
-  <script src="js/main.js?v=62"></script>
+  <script src="data/words.js?v=64"></script>
+  <script src="data/stages.js?v=64"></script>
+  <script src="data/texts.js?v=64"></script>
+  <script src="js/audio.js?v=64"></script>
+  <script src="js/game.js?v=64"></script>
+  <script src="js/quiz.js?v=64"></script>
+  <script src="js/cards.js?v=64"></script>
+  <script src="js/recipebook.js?v=64"></script>
+  <script src="js/main.js?v=64"></script>
 </body>
 </html>

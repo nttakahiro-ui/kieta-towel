@@ -3268,7 +3268,8 @@ const Battle = (() => {
       // ふわり（仮の絵）と吹き出し（表紙の文）
       ctx.font = font(16);
       // {sec} ＝ そのステージの発見の旅の基準の時間（stages.js の値。10/25-21）
-      const lines = wrapText(trip.cover.replace("{sec}", Math.round(BATTLE.exploreTime)), W - 110), bw = W - 92, bh = lines.length * 22 + 20, bx = 70, by = cy + 40 + dy;
+      const lines = trip.cover.replace("{sec}", Math.round(BATTLE.exploreTime)).split("\n").flatMap(t => wrapText(t, W - 110)),   // \n で改行（10/31-3）
+            bw = W - 92, bh = lines.length * 22 + 20, bx = 70, by = cy + 40 + dy;
       drawFuwariArt(1, 40, by + bh / 2, 50);   // セリフの横の小さなふわり（1のコマ）
       ctx.fillStyle = "rgba(255,253,245,0.97)"; ctx.strokeStyle = line; ctx.lineWidth = 2;
       roundRect(bx, by, bw, bh, 14); ctx.fill(); ctx.stroke();

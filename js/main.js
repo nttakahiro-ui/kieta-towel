@@ -267,10 +267,25 @@ const Main = (() => {
     const h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
     document.documentElement.style.setProperty("--app-h", `${Math.round(h)}px`);
     if ($("screen-battle").classList.contains("active")) Battle.resize();
+    if ($("screen-title").classList.contains("active")) fitTitleStage();
   }
 
   function showScreen(name) {
     document.querySelectorAll(".screen").forEach(s => s.classList.toggle("active", s.id === `screen-${name}`));
+    if (name === "title") fitTitleStage();
+  }
+  // タイトルの絵の札に、ステージ名が入らないときだけ小さくする（いちばん小さくて12px。10/31-3）
+  function fitTitleStage() {
+    const el = $("title-stage"), box = el.parentElement;
+    el.style.fontSize = ""; el.style.whiteSpace = ""; el.style.lineHeight = ""; el.style.wordBreak = "";
+    if (!$("screen-title").classList.contains("art") || !box.clientWidth) return;
+    const w = box.clientWidth * 0.96;
+    if (el.scrollWidth > w) el.style.fontSize = `${Math.max(12, parseFloat(getComputedStyle(el).fontSize) * w / el.scrollWidth)}px`;
+    if (el.scrollWidth > w) {   // 12pxでも入らないとき（小さい画面の長い名前）は2行に。ことばのかたまりの途中では折り返さない
+      el.style.whiteSpace = "normal"; el.style.lineHeight = "1.15"; el.style.wordBreak = "keep-all";
+      const tn = el.firstChild;
+      if (tn && tn.nodeType === 3) { const sp = document.createElement("span"); sp.innerHTML = Cards.phraseHTML(tn.textContent); el.replaceChild(sp, tn); }
+    }
   }
 
   // タイトル画面の「レシピ ○/12」「カード ○/120」（10/25-20。前は「ふわりのカード ○枚」）
@@ -690,12 +705,18 @@ const Main = (() => {
       toStages();
     });
 
-    // デバッグ: タイトルの文字を5回続けて押す（1.5秒以内）
-    document.querySelector(".title-main").addEventListener("click", () => {
+    // タイトルの絵（10/31-3）: 背景かロゴが読み込めなかったら、前の図形のタイトルにもどす
+    ["title-bg", "title-logo"].forEach(id => {
+      const img = $(id), off = () => { $("screen-title").classList.remove("art"); fitTitleStage(); };
+      img.addEventListener("error", off);
+      if (img.complete && !img.naturalWidth) off();
+    });
+    // デバッグ: タイトルの文字（絵のときはロゴ）を5回続けて押す（1.5秒以内）
+    document.querySelectorAll(".title-main, #title-logo").forEach(t => t.addEventListener("click", () => {
       const now = Date.now();
       titleTaps = titleTaps.filter(x => now - x < 1500).concat(now);
       if (titleTaps.length >= 5) { titleTaps = []; debugMode = true; openDebug(); }
-    });
+    }));
     $("dbg-tune").addEventListener("click", () => { $("debug-menu").classList.add("hidden"); Tune.open(); });
     $("dbg-open-all").addEventListener("click", () => { openAll = !openAll; refreshDebugButtons(); });
     $("dbg-invincible").addEventListener("click", () => { BATTLE.debugInvincible = !BATTLE.debugInvincible; refreshDebugButtons(); });
