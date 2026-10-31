@@ -110,6 +110,9 @@ function runOnce(skill, seed) { HUDLOG.rows.push(["--", skill]); HUDLOG.lastK = 
         nextThink = now / 1000 + skill.react * (0.7 + rnd() * 0.6);
         const fogY = S.fogLevel > 0.5 ? 700 * 0.12 : -20;   // 霧（うすい）: 縁取りは見えるが、霧の奥のほうは気づくのが少しおそい
         let ws = S.enemies.filter(e => e.y > fogY && e.x > -40 && e.x < 415).sort((a, b) => b.y - a.y);
+        // 隠れている地上のことば（10/31-13）: ほかに見えていることばがあれば、そちらを先に。なければ、その下で顔を出すのを待つ
+        const hid = e => (e.gplay === "hide" || e.gplay === "both") && e.hideT % (B.hideOut + B.hideIn) >= B.hideOut;
+        if (ws.length > 1 && hid(ws[0])) ws = [...ws.filter(e => !hid(e)), ...ws.filter(hid)];
         // お題: 本物をわかる確率（know）でえらぶ。「ちがうよ」が出たら、まだ試していないものからえらびなおす
         const cands = S.enemies.filter(e => e.pattern === "odai" && e.hp > 0);
         if (S.odai && S.odai.mode === "order" && cands.length) {   // 大ボス「3つを順に」（10/31-10 試作）: 順を知っている確率（know）で正しいことば。まちがえて正しい順を見たあとは、正しい順に
@@ -159,7 +162,7 @@ function runOnce(skill, seed) { HUDLOG.rows.push(["--", skill]); HUDLOG.lastK = 
       }
     }
     const cb = rafCb; rafCb = null; cb && cb(now);
-    if (i % 30 === 0) for (const e of sb.Battle.peek().enemies || []) if (e.role === "zako" && !e.ground) PAT[e.word.id] = e.pattern;   // 語句の動きの型（取り逃がしを型ごとに数える。10/25-8）
+    if (i % 30 === 0) for (const e of sb.Battle.peek().enemies || []) if (e.role === "zako") PAT[e.word.id] = e.ground ? "ground" + (e.gplay ? "-" + e.gplay : "") : e.pattern;   // 語句の動きの型（取り逃がしを型ごとに数える。10/25-8）。地上のことばは ground（隠れる・動くは -hide など。10/31-13）
     if (process.env.GUIDELOG) { const G = sb.Battle.peek(); if (G.guide && !seenGuide) { seenGuide = true; console.log("GUIDE", G.phase, G.guide.kind, G.guide.dir || "", "ふわり:", G.fsay && G.fsay.text, "木:", Math.round(G.guide.tree.x), Math.round(G.guide.tree.y), "自機:", Math.round(G.player.x)); } }
     if (process.env.OBSLOG && i % 300 === 0) { const S3 = sb.Battle.peek(); if (S3.obs && S3.obs.length) console.log("OBSLOG", S3.phase, Math.round(now/1000), S3.obs.map(o => Math.round(o.x) + "," + Math.round(o.y) + " r" + Math.round(o.r)).join(" | "), "木のかげ:", S3.enemies.filter(e => e.pattern === "treeshade").map(e => e.word.word + "@" + Math.round(e.y)).join(",")); }
     if (process.env.DBG && i === 60 * 400) { const S2 = sb.Battle.peek(); console.log("止まっている:", S2.state, S2.phase, "odai", !!S2.odai, S2.odai && S2.odai.intro, "敵", S2.enemies.map(e => e.word.word + (e.dummy ? "(ダミー)" : "") + "@" + Math.round(e.x) + "," + Math.round(e.y) + " hp" + e.hp).join(" "), "自機", Math.round(S2.player.x), Math.round(S2.player.y), "体力", S2.player.hp); }

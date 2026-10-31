@@ -78,7 +78,12 @@ const BATTLE = {
   bombFlight: 0.4,             // （10/31-12 から使っていない。たねが地面に届くまでの秒数）
   bombRadius: 36,              // 光が当たる広さ（px）
   groundTextScale: 0.78,       // 地上のことばの文字の高さの倍率（少し平たくして、地面に貼りついて見えるように）
+  darkRescue: 0.6,             // 救出の旅の出来事「照明が落ちる」の暗さ（地面と地上のものだけ。発見の旅は0.84）
+  powerStartW23: 1,            // 世界2・3のパワーの初期値の段（0 ＝ 1本、1 ＝ 2本。10/31-13 決定: 救出の旅を派手に。世界1は1本のまま）
   groundHold: false,           // 救出の旅の最初の地上のことばを、中ほどで止めて待つ（stages.js の override.battle でステージ5だけ true）
+  hideOut: 2.5,                // 地上のことば「隠れる」（10/31-13 決定 B改）: 顔を出している秒数（このあいだだけ光が届く）
+  hideIn: 1.5,                 //   隠れている秒数（隠れ場所だけが見える）
+  groundMoveSpeed: 40,         // 地上のことば「動く」: コンベアに乗って横に動く速さ（px/秒。はしで折り返す）
 
   // --- 強さ（1945型） ---
   powerEvery: 3,               // 語句を何語吸い込むごとに1段階強くなるか
@@ -270,7 +275,7 @@ const EXPLORE_MOVES = {
   // 世界2「箱」（10/31-10 試作。構想メモ 2）: 双眼鏡と暗闇は使わない。コンベア（lanes ＝ 画面の高さに対する割合）の上を箱が流れ、指で押さえ続けて hold 秒で開く
   //   boxW・boxH ＝ 箱の大きさ（px）、speed ＝ 流れる速さ（px/秒）、gap ＝ 箱が出てくる間隔（秒）、wait ＝ 流れきった箱が戻ってくるまで（秒）、empty ＝ 空箱の数
   //   open ＝ true で「OPEN」の面が上のときだけ開く（openTime ＝ OPEN の面が上にある秒数、faceTime ＝ ほかの面の秒数）、lock ＝ 鍵つきの箱の数（先に鍵の箱を開ける）
-  box:     { box: true, boxW: 88, boxH: 64, speed: 32, gap: 2.6, wait: 2, empty: 2, hold: 1, lanes: [0.3, 0.52, 0.74], open: false, openTime: 2.4, faceTime: 0.6, lock: 0 },
+  box:     { box: true, boxW: 88, boxH: 64, speed: 32, gap: 2.6, wait: 2, empty: 2, hold: 1, lanes: [0.3, 0.52, 0.74], open: false, openTime: 4, faceTime: 0.5, lock: 0 },   // 10/31-13 決定: OPEN の面は4秒、ほかの面は0.5秒×3（前は2.4秒・0.6秒）
   // 世界3「無重力」（10/31-10 試作。構想メモ 3 の、いちばん単純な形）: ことばが回りながら漂う。向きがまっすぐにそろっているあいだ（align ＝ ずれてよい角度）だけ、指で押さえて hold 秒で見つかる
   //   speed ＝ 漂う速さ（px/秒）、spin ＝ 回る速さ（ラジアン/秒）、maxOn ＝ 同時に漂う数の上限、gap ＝ 次のことばが出てくる間隔（秒）。くっつき・照らすは入れていない
   //   chars ＝ 同時に漂う数を「chars ÷ そのステージのことばの平均の文字数」（切り捨て、minOn〜maxOn）にする（10/31-12 決定: 長いことばのステージほど少なく。ステージ9・10 は5つ、11・12 は4つ）
@@ -452,6 +457,7 @@ const Battle = (() => {
   let rearHinted = false;    // うしろから来る敵の案内を出したか（世界3。10/31-10 試作）
   let groundHinted = false;  // 地上の敵のヒントを出したか
   let groundHeld = false;    // 最初の地上のことばを止めたか（BATTLE.groundHold）
+  let groundIntroShown = false;   // 「隠れる」「動く」の1行を出したか（10/31-13）
   let banner = null;         // 「大ボス あらわる！」などの帯
   let shake = 0;             // 画面のゆれ（被弾したとき）
   let level = POWER_LEVELS[0];
@@ -658,10 +664,10 @@ const Battle = (() => {
     startPhase("round1");
     fillerTimer = 1.2; shotTimer = 0; bombTimer = 0;
     player = { x: W / 2, y: H * 0.8, hp: BATTLE.playerMaxHp, inv: 0, glow: 0, hurt: 0 };
-    level = POWER_LEVELS[0];
+    level = POWER_LEVELS[basePower()];
     score = 0; combo = 0; maxCombo = 0; floats = [];
     hits = 0; downs = 0; lives = BATTLE.lives; gameOvers = 0; scoreAtMain = 0; retryMain = false;
-    paused = false; moved = false; groundHinted = false; groundHeld = false; rearHinted = false; banner = null; shake = 0; showWord = null; threads = []; pops = [];
+    paused = false; moved = false; groundHinted = false; groundHeld = false; groundIntroShown = false; rearHinted = false; banner = null; shake = 0; showWord = null; threads = []; pops = [];
     slow = 0; wave = null; gauge = 0; bombsUsed = 0; fsay = null; odai = null; bounces = [];
     msgQ = []; msgGap = 0; msgWasBusy = false;
     choiceFree = !!opts.firstChoice;
@@ -674,7 +680,7 @@ const Battle = (() => {
     }
     bino = { x: W / 2 + 10, y: H * 0.42 };
     state = "sortie"; sortieNo = 1; reacted = 0; sortieStep = "cover";   // 発見の旅の表紙から始める   // 「出撃1 探検」の画面から始める
-    loadout = null; powerBonus = 0; shield = 0; gaugeMul = 1;
+    loadout = null; powerBonus = basePower(); shield = 0; gaugeMul = 1;
     skills = (opts.skills && opts.skills.length ? opts.skills : ["clear"]).filter(id => SKILL_IDS.includes(id));
     skill = skills.includes(opts.skill) ? opts.skill : skills[0];
     LOADOUT_VARS.skill = skillName(skill);
@@ -824,7 +830,7 @@ const Battle = (() => {
   // 木のよけ方の案内: 1秒スローにして、ふわりが一言、矢印で示す
   function startGuide(g) {
     clearMsgs(5);
-    guide = Object.assign(g, { t: BATTLE.guideTime, text: tx(g.kind === "gate" ? "rescue.treeGate" : "rescue.treeDodge") });   // 文字は画面の中ほど、矢印は木の横（10/25-1）
+    guide = Object.assign(g, { t: BATTLE.guideTime, text: tx((obsDef && obsDef.kind === "pillar" ? "rescue.pillar" : "rescue.tree") + (g.kind === "gate" ? "Gate" : "Dodge")) });   // 文字は画面の中ほど、矢印は木の横（10/25-1）
     slow = Math.max(slow, BATTLE.guideSlow);
     Sound.se("odai");
   }
@@ -846,18 +852,18 @@ const Battle = (() => {
   const fireRamp = () => Math.max(0.1, (BATTLE.ramp[phase] || BATTLE.ramp.round2).fire);
   // ===== 世界2・3の試作（10/31-10） =====
   const skillName = id => tx(`skills.${id}.name`);
+  const basePower = () => (worldDef.id >= 2 ? BATTLE.powerStartW23 : 0);   // パワーの初期値の段（10/31-13 決定: 世界2・3は1段上の2本から。パワーUPでさらに1段）
   const frozen = () => stopT > 0;   // 時間止めのあいだ（敵・弾・ことば・コンベアが止まる）
   // 出来事（stages.js の event: { kind, sortie, at, dur }）がいま起きているか。sortie 1 ＝ 発見の旅の時刻、2 ＝ 救出の旅の時刻
+  //   同じ出来事を発見の旅と救出の旅の両方に書いてよい（10/31-13 決定: ステージ6〜8は救出の旅でも1回）。救出の旅の出来事は、お題のあいだは起こさない（時刻も進めない）
+  const evOn = e => { const tt = e.sortie === 1 ? (phase === "round1" && explore ? explore.t : -1) : (phase !== "round1" && !odai ? rescueT : -1); return tt >= e.at && tt < e.at + e.dur; };
   function evActive(kind) {
-    const e = events.find(v => v.kind === kind);
-    if (!e) return false;
-    const tt = e.sortie === 1 ? (phase === "round1" && explore ? explore.t : -1) : (phase !== "round1" ? rescueT : -1);
-    return tt >= e.at && tt < e.at + e.dur;
+    return events.some(e => e.kind === kind && evOn(e));
   }
-  // 出来事が始まった瞬間に帯を1回
+  // 出来事が始まった瞬間に帯を1回（発見の旅と救出の旅で、それぞれ1回）
   function evBanners() {
-    for (const e of events) if (!evShown[e.kind] && evActive(e.kind)) {
-      evShown[e.kind] = true;
+    for (const e of events) if (!evShown[e.kind + e.sortie] && evOn(e)) {
+      evShown[e.kind + e.sortie] = true;
       Sound.se("odai");
       const text = tx("events." + e.kind);
       post("banner", () => { banner = { text, t: 2.2, color: "rgba(60,80,130,0.92)" }; });
@@ -889,7 +895,7 @@ const Battle = (() => {
     if (choiceFree && opts.onFirstChoice) opts.onFirstChoice();   // 初めて選んだ（次からは10秒の時間制限）
     choiceFree = false;
     loadout = id;
-    if (id === "power") powerBonus = 1;
+    if (id === "power") powerBonus = basePower() + 1;
     if (id === "shield") shield = 1;
     if (id === "bomb") gauge = 100;   // 必殺ワザ: ぜんぶ消しがすぐ使える（救出の旅の最初からゲージ満タン。10/25-1）
     level = POWER_LEVELS[Math.min(Math.floor(absorbed.length / BATTLE.powerEvery) + powerBonus, POWER_LEVELS.length - 1)];
@@ -1041,8 +1047,11 @@ const Battle = (() => {
       last: phase !== "round1",                    // 2周目と大ボスは、倒せば吸い込む
       spd: (phase === "round1" ? BATTLE.round1Speed : 1) * P.speedScale,
       bx: x, x, y, hp, maxHp: hp,
-      age: 0, phase: (word.id * 1.7) % 6, fire: 1.2, flash: 0
+      age: 0, phase: (word.id * 1.7) % 6, fire: 1.2, flash: 0,
+      gplay: ground && phase !== "round1" ? groundPlayOf(word) : null   // 地上のことばの「隠れる」「動く」（10/31-13）
     };
+    if (gHides(e)) e.hideT = Math.random() * BATTLE.hideOut * 0.5;   // 顔を出したところから
+    if (gMoves(e)) e.vx = BATTLE.groundMoveSpeed * (Math.random() < 0.5 ? -1 : 1);
     // 中ボス・大ボスは1文字ずつ壊す: 文字がそれぞれ部品
     // 硬さは「語句全体の硬さ」（役割で決まる）を、壊す文字の数で割った1文字あたりの耐久（上限・下限つき）
     // かっこと、かっこの中の別名は飾り（壊さない・当たらない・読まない）
@@ -1237,7 +1246,7 @@ const Battle = (() => {
     player.glow = Math.max(0, player.glow - dt);
     player.hurt = Math.max(0, player.hurt - dt);
     if (banner) { banner.t -= dt; if (banner.t <= 0) banner = null; }
-    const sc = frozen() ? 0 : scrollSpeed();   // 時間止めのあいだは地面も止まる
+    const sc = frozen() ? 0 : scrollSpeed() * (evActive("reverse") ? -1 : 1);   // 時間止めのあいだは地面も止まる。救出の旅の出来事「コンベアが逆」では、地面の流れが逆（上へ。10/31-13）
 
     // 地面・雲の影・綿毛（奥行きのために、速さを変えて流す）
     for (const s of terrain) s.y += sc * dt;
@@ -1276,7 +1285,7 @@ const Battle = (() => {
     }
     if (state === "extraAsk") return;   // 「行く」「クイズへ」を待っている
     if (phase === "round1") { updateExplore(dt); return; }   // 1回目の旅（双眼鏡）。雑魚・弾・木・天気は出さない
-    if (!frozen()) rescueT += dt;   // 救出の旅の経過（出来事の時刻。10/31-10 試作）
+    if (!frozen() && !odai) rescueT += dt;   // 救出の旅の経過（出来事の時刻。10/31-10 試作）。お題のあいだは進めない（10/31-13）
     evBanners();
     // 出来事「流星雨」（世界3。10/31-10 試作）: 上から、少しななめに流れ星の弾が落ちてくる（お題のあいだと時間止めのあいだは出ない）
     if (evActive("meteor") && !odai && !frozen()) {
@@ -1379,7 +1388,7 @@ const Battle = (() => {
     for (const e of enemies) {
       if (frozen()) { e.flash = Math.max(0, e.flash - dt); if (e.parts) for (const p of e.parts) p.flash = Math.max(0, p.flash - dt); continue; }   // 時間止め: ことばは止まって撃たない
       // ザコの語句: 画面に全部入ったら1秒止まって光る（この間は撃てない）
-      if (e.role === "zako" && e.pattern !== "odai" && !e.appeared && onScreen(e)) { e.appeared = true; e.appearT = BATTLE.zakoAppearTime; if (!e.ground) hint("shell"); else if (worldDef.id > 1 && !e.hold) newInWorld("ground"); }   // 案内: 最初の殻
+      if (e.role === "zako" && e.pattern !== "odai" && !e.appeared && onScreen(e)) { e.appeared = true; e.appearT = BATTLE.zakoAppearTime; if (!e.ground) hint("shell"); else if (worldDef.id > 1 && !e.hold) newInWorld("ground"); if (e.ground) groundIntroHint(e); }   // 案内: 最初の殻
       if (e.appearT > 0 && !(odai && e.pattern !== "odai")) { e.appearT -= dt; e.flash = Math.max(0, e.flash - dt); continue; }
       e.age += dt;
       e.flash = Math.max(0, e.flash - dt);
@@ -1399,6 +1408,18 @@ const Battle = (() => {
         e.x = W / 2 + Math.sin(e.age * 0.7) * range;
       } else if (e.ground) {
         e.y += sc * dt;     // 地上の語句は地面といっしょに流れる
+        if (gHides(e)) {   // 隠れる: 出る hideOut 秒・隠れる hideIn 秒をくり返す。顔を出すときに「ぴょこ」
+          const was = gHidden(e);
+          e.hideT += dt;
+          if (was && !gHidden(e)) { e.popT = 0; if (onScreen(e)) Sound.se("pop"); }
+        }
+        if (e.popT !== undefined) e.popT += dt;
+        if (gMoves(e)) {   // 動く: コンベアに乗って横に動き、はしで折り返す。出来事「コンベアが逆」では逆向き
+          const d = evActive("reverse") ? -1 : 1, lo = stripRight() + e.w / 2 + 16, hi = W - e.w / 2 - 16;
+          e.x += e.vx * d * dt;
+          if (e.x < lo) { e.x = lo; e.vx = Math.abs(e.vx) * d; }
+          if (e.x > hi) { e.x = hi; e.vx = -Math.abs(e.vx) * d; }
+        }
         if (e.hold && e.y >= H * BATTLE.firstHoldY) {   // ステージ5の最初の地上のことば: 中ほどで止まって待つ。止まったところで案内
           e.y = H * BATTLE.firstHoldY;
           if (!e.holdHinted) { e.holdHinted = true; newInWorld("ground", true); }
@@ -1412,7 +1433,7 @@ const Battle = (() => {
         // 木のかげ: 地面といっしょに降りてきて、上のほうで止まって待つ。木が去ってしばらくしたら降りてくる
         const holdY = H * BATTLE.shadeHoldY;
         const treeGone = !e.tree || e.tree.y - e.tree.r > H;
-        if (e.y < holdY) e.y += sc * dt;
+        if (e.y < holdY) e.y += Math.max(sc, 0) * dt;   // 「コンベアが逆」のあいだは上へ戻らず、その場で待つ（10/31-13）
         else if (!treeGone || e.holdT < BATTLE.shadeWait) { if (treeGone) e.holdT += dt; }
         else e.y += (H + e.size * 2) / BATTLE.fallTime[e.role] * dt;
         e.x = e.bx;
@@ -1603,8 +1624,24 @@ const Battle = (() => {
   function onScreen(e) {
     return e.x - e.w / 2 >= 0 && e.x + e.w / 2 <= W && e.y - e.h / 2 >= 0 && e.y + e.h / 2 <= H;
   }
+  // 地上のことばの「隠れる」「動く」（10/31-13 決定 B改）: stages.js の groundPlay（地上のことばの出る順に "hide"／"move"／"both"）
+  function groundPlayOf(word) {
+    const gp = opts.stage && opts.stage.groundPlay;
+    return gp ? gp[script.filter(w => groundIds.has(w.id)).indexOf(word)] || null : null;
+  }
+  const gHides = e => e.gplay === "hide" || e.gplay === "both";
+  const gMoves = e => e.gplay === "move" || e.gplay === "both";
+  const gHidden = e => gHides(e) && e.hideT % (BATTLE.hideOut + BATTLE.hideIn) >= BATTLE.hideOut;   // 隠れているあいだは、光が届かない
+  // そのステージで初めて「隠れる」「動く」ことばが出た瞬間に1行（stages.js の groundIntro: "hide" ステージ6／"move" ステージ7）
+  function groundIntroHint(e) {
+    const k = opts.stage && opts.stage.groundIntro;
+    if (!k || groundIntroShown || !(k === "hide" ? gHides(e) : gMoves(e))) return;
+    groundIntroShown = true;
+    const text = tx("groundIntro." + k);
+    post("tutorial", () => { hintCard = { text, t: BATTLE.hintTime }; slow = Math.max(slow, BATTLE.hintSlow); });
+  }
   function groundTargets() {
-    return enemies.filter(e => e.ground && e.hp > 0 && onScreen(e) && !(e.appearT > 0)).concat(fillers.filter(f => f.layer === "ground" && f.hp > 0 && f.y > 0));
+    return enemies.filter(e => e.ground && e.hp > 0 && onScreen(e) && !(e.appearT > 0) && !gHidden(e)).concat(fillers.filter(f => f.layer === "ground" && f.hp > 0 && f.y > 0));
   }
   function inReach(g, x, y, r) {
     if (g.word) return Math.abs(x - g.x) < g.w / 2 + r && Math.abs(y - g.y) < g.h / 2 + r;
@@ -1735,6 +1772,14 @@ const Battle = (() => {
 
   // 「次は？」にする中ボスと、その1つ前の工程（stages.js の nextAsk に書いた中ボスだけ。10/31-12 決定: 1つ前の工程は nextAsk に書く）
   const nextAskOf = real => { const a = opts.stage && opts.stage.nextAsk && opts.stage.nextAsk[real.word]; return a ? (typeof a === "string" ? { prev: a } : a) : null; };
+  // 「次は？」の2択の相手（10/31-13 決定）: nextAsk の after（工程の順で1つあとのことば）。書いていないときは、同じステージの文字数が近いことば1つ（1つ前の工程は入れない）
+  //   after が大ボスのことばや、ほかのステージのことばのときは、そのことばだけの仮の敵（カードにはならない）
+  function nextAfter(real, prev) {
+    const a = nextAskOf(real).after;
+    if (!a) return odaiDummies(real, prev)[0] || null;
+    const w = opts.words.find(x => x.word === a);
+    return w && w !== bossWord ? w : { id: -130, stage: real.stage, word: a, kana: w ? w.kana : "", hp: 1, role: "zako", order: 0 };
+  }
   function nextPrev(real) {
     const a = nextAskOf(real);
     return a ? opts.words.find(w => w.word === a.prev) || { id: -120, stage: real.stage, word: a.prev, kana: "", hp: 1, role: "zako", order: 0 } : null;
@@ -1762,14 +1807,14 @@ const Battle = (() => {
     const seq = isBoss && orderSet(real);   // 大ボス「3つを順に」
     const prev = !isBoss && nextPrev(real);   // 中ボス「次は？」（世界2。10/31-10 試作）: 1つ前の工程
     const pair = !seq && !prev && whichPair(real);   // 世界3「どっち？」
-    const fixed = prev && (nextAskOf(real).choices || []).map(c => opts.words.find(w => w.word === c)).filter(Boolean);   // 「次は？」の選ぶことばを nextAsk に書いたとき（10/31-12）
-    const cands = seq ? shuffle(seq.slice()) : pair ? shuffle([real, pair]) : shuffle([real, ...(fixed && fixed.length === 2 ? fixed : odaiDummies(real, prev))]);   // ならびは毎回入れかえ
+    const after = prev && nextAfter(real, prev);   // 「次は？」は2択（10/31-13 決定）: 正解と、工程の順で1つあとのことば
+    const cands = seq ? shuffle(seq.slice()) : pair ? shuffle([real, pair]) : after ? shuffle([real, after]) : shuffle([real, ...odaiDummies(real, prev)]);   // ならびは毎回入れかえ
     // 3つとも同じ大きさ（いちばん長い語句が、縦書きで画面に入る大きさ。24px より小さくしない）
     clearMsgs(9); msgQ = [];   // お題が始まるときは、出ているメッセージと待っているものを、すべて消してから問題文を出す
     const q = seq ? tx("odaiForm.orderLead." + opts.stage.id) : pair ? real.question.replace(/[?？]\s*$/, "") + tx("odaiForm.which") : prev ? tx("odaiForm.next", { prev: prev.word + (hasKanji(prev.word) && prev.kana ? `（${prev.kana}）` : "") }) : (real.odaiQuestion || real.question);
     // 問題文を読む時間（10/25-16）: 文の長さに合わせる。1文字あたり odaiReadPerChar 秒＋odaiReadBase 秒（最短 odaiReadMin、最長 odaiReadMax）
     const read = Math.min(BATTLE.odaiReadMax, Math.max(BATTLE.odaiReadMin, Array.from(q).length * BATTLE.odaiReadPerChar + BATTLE.odaiReadBase));
-    odai = { real, boss: isBoss, t: 0, intro: read, firstHit: null, q, wrongRun: 0, mode: seq ? "order" : "pick", step: 0, show: 0, slip: false, seq: seq || null, cols: pair ? 2 : 3 };
+    odai = { real, boss: isBoss, t: 0, intro: read, firstHit: null, q, wrongRun: 0, mode: seq ? "order" : "pick", step: 0, show: 0, slip: false, seq: seq || null, cols: pair || after ? 2 : 3 };
     // 案内: 最初のお題は、問題文の下に1行そえて、読む時間を少しのばす（順番待ちにはのせない。お題がいちばん大事なため）
     if (hintOpts && !hintShown.odai && (hintOpts.all || !(hintOpts.seen && hintOpts.seen.odai))) {
       hintShown.odai = true; if (hintOpts.mark) hintOpts.mark("odai");
@@ -2406,8 +2451,8 @@ const Battle = (() => {
     } else {
       scoreAtMain = score;   // 探検中に3機失ったら、探検はそこまで
     }
-    combo = 0; gauge = 0; level = POWER_LEVELS[0];
-    loadout = null; powerBonus = 0; shield = 0; gaugeMul = 1;
+    combo = 0; gauge = 0; level = POWER_LEVELS[basePower()];
+    loadout = null; powerBonus = basePower(); shield = 0; gaugeMul = 1;
     retryMain = true;
     state = "sortie"; sortieNo = 2; choiceT = BATTLE.choiceTime; sortieStep = "say"; drag = null;
     player.x = W / 2; player.y = H * 0.8;
@@ -2438,6 +2483,8 @@ const Battle = (() => {
 
     // 障害物
     for (const o of obs) drawObstacle(o);
+    // 救出の旅の出来事「照明が落ちる」（10/31-13）: 地面と地上のものだけ暗く（空中のことば・虫・弾・ふわりは、その上に明るく出る）
+    if (evActive("dark")) { ctx.fillStyle = `rgba(6,10,24,${BATTLE.darkRescue})`; ctx.fillRect(0, 0, W, H); }
 
     // 空中のものの影（右下にずらして、浮いているように見せる）
     ctx.fillStyle = "rgba(60,80,40,0.16)";
@@ -2855,7 +2902,15 @@ const Battle = (() => {
     ctx.fillStyle = theme.treeShadow;   // 影（夜は濃く、夕暮れは長く）
     const sl = theme.treeShadowScale;
     ctx.beginPath(); ctx.ellipse(10 * sl, 14 * sl, o.r * (0.98 + 0.06 * sl), o.r * 0.95, 0, 0, Math.PI * 2); ctx.fill();
-    if (o.kind === "rock") {
+    if (o.kind === "pillar") {   // 機械の柱（世界2。10/31-13 決定。上から見た丸い鉄の柱。仮の図形）
+      ctx.fillStyle = "#7d8798"; ctx.beginPath(); ctx.arc(0, 0, o.r, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#a9b2c0"; ctx.beginPath(); ctx.arc(0, 0, o.r * 0.78, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#c9d0da"; ctx.beginPath(); ctx.arc(-o.r * 0.18, -o.r * 0.18, o.r * 0.42, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#4f5868";
+      for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; ctx.beginPath(); ctx.arc(Math.cos(a) * o.r * 0.89, Math.sin(a) * o.r * 0.89, Math.max(2.5, o.r * 0.06), 0, Math.PI * 2); ctx.fill(); }   // ボルト
+      ctx.strokeStyle = "#e0b03a"; ctx.lineWidth = 4; ctx.setLineDash([8, 6]);   // 黄色と黒の注意の帯
+      ctx.beginPath(); ctx.arc(0, 0, o.r * 0.62, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+    } else if (o.kind === "rock") {
       ctx.fillStyle = "#b9b3a6"; ctx.beginPath(); ctx.arc(0, 0, o.r, 0, Math.PI * 2); ctx.fill();
     } else {
       // 大きな木: 幹のまわりに、重なった葉のかたまり
@@ -3293,12 +3348,19 @@ const Battle = (() => {
     if (worldDef.id >= 2) {   // 世界2・3（10/31-12 決定）: 地面に貼りついた見た目。下に濃い影、殻は地面らしい形（世界2 木箱・世界3 歯車。仮の図形）、文字は少し平たく
       const k = e.maxHp > 0 ? Math.max(0, e.hp / e.maxHp) : 0;   // 殻は残りの硬さでうすくなる
       const bw = e.w + 30, bh = e.size * 1.15;
+      if (gMoves(e)) drawBelt(e.y, bh + 14, e.vx * (evActive("reverse") ? -1 : 1));   // 動く: コンベアの帯（10/31-13）
+      if (gHides(e)) {   // 隠れる: 隠れているあいだは隠れ場所だけ。顔を出すときは、隠れ場所から「ぴょこ」と出る（10/31-13）
+        drawHatch(e.x, e.y + (gHidden(e) ? 0 : bh * 0.42), bw, gHidden(e) ? bh * 0.85 : bh * 0.4);
+        if (gHidden(e)) return;
+      }
+      const pop = gHides(e) && e.popT !== undefined && e.popT < 0.3 ? Math.min(1.15, e.popT / 0.15) - Math.max(0, e.popT - 0.15) : 1;   // 出てくる瞬間に少しのびる
       ctx.save();
+      if (pop !== 1) { ctx.translate(e.x, e.y + bh / 2); ctx.scale(1, pop); ctx.translate(-e.x, -e.y - bh / 2); }
       ctx.fillStyle = "rgba(15,20,35,0.6)";
       ctx.beginPath(); ctx.ellipse(e.x + 5, e.y + bh * 0.45, bw * 0.56, bh * 0.4, 0, 0, Math.PI * 2); ctx.fill();
       if (k > 0) { ctx.globalAlpha = 0.35 + 0.65 * k; if (worldDef.id === 2) drawCrate(e.x, e.y, bw, bh); else drawGear(e.x, e.y, bw, bh); }
       ctx.restore();
-      ctx.save(); ctx.translate(e.x + wob, e.y); ctx.scale(1, BATTLE.groundTextScale); drawWordText(e, 0, 0, 1); ctx.restore();
+      ctx.save(); ctx.translate(e.x + wob, e.y); ctx.scale(1, BATTLE.groundTextScale * pop); drawWordText(e, 0, 0, 1); ctx.restore();
       drawHpDots(e);
       return;
     }
@@ -3324,6 +3386,29 @@ const Battle = (() => {
     }
   }
 
+  // 動く地上のことばのコンベア（10/31-13 仮の図形）: 画面の横いっぱいの帯。すじが動く向きに流れる
+  function drawBelt(y, h, vx) {
+    const x0 = stripRight();
+    ctx.save();
+    ctx.fillStyle = worldDef.id === 3 ? "rgba(70,60,110,0.75)" : "rgba(60,70,88,0.75)";
+    ctx.fillRect(x0, y - h / 2, W - x0, h);
+    ctx.strokeStyle = "rgba(255,255,255,0.18)"; ctx.lineWidth = 3;
+    const off = ((t * vx) % 24 + 24) % 24;
+    for (let x = x0 - 24 + off; x < W + 24; x += 24) { ctx.beginPath(); ctx.moveTo(x, y - h / 2 + 3); ctx.lineTo(x + (vx >= 0 ? 8 : -8), y); ctx.lineTo(x, y + h / 2 - 3); ctx.stroke(); }
+    ctx.fillStyle = "rgba(20,24,36,0.6)"; ctx.fillRect(x0, y - h / 2 - 3, W - x0, 3); ctx.fillRect(x0, y + h / 2, W - x0, 3);
+    ctx.restore();
+  }
+  // 隠れ場所（10/31-13 仮の図形）: 機械のふた（世界2は鉄色、世界3は紫）。注意の黄色い線
+  function drawHatch(x, y, w, h) {
+    ctx.save();
+    ctx.fillStyle = "rgba(15,20,35,0.55)"; ctx.beginPath(); ctx.ellipse(x + 4, y + h * 0.55, w * 0.55, h * 0.45, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = worldDef.id === 3 ? "#6c6390" : "#6b7486"; roundRect(x - w / 2, y - h / 2, w, h, 8); ctx.fill();
+    ctx.strokeStyle = worldDef.id === 3 ? "#3f3760" : "#3f4656"; ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.25)"; ctx.lineWidth = 2;
+    for (const f of [-0.15, 0.15]) { ctx.beginPath(); ctx.moveTo(x - w / 2 + 8, y + h * f); ctx.lineTo(x + w / 2 - 8, y + h * f); ctx.stroke(); }
+    ctx.fillStyle = "#e0b03a"; ctx.fillRect(x - w / 2 + 6, y - h / 2 + 3, w - 12, 3);
+    ctx.restore();
+  }
   // 地上のことばの殻（10/31-12 仮の図形）: 世界2 木箱（板の線とくぎ）／世界3 歯車（平たい楕円のまわりに歯）
   function drawCrate(x, y, w, h) {
     ctx.fillStyle = "#c39a62"; roundRect(x - w / 2, y - h / 2, w, h, 6); ctx.fill();
@@ -3446,7 +3531,7 @@ const Battle = (() => {
       ctx.fillStyle = "rgba(255,253,245,0.97)"; ctx.strokeStyle = "#e0b03a"; ctx.lineWidth = 3;
       roundRect(20, y, W - 40, h, 18); ctx.fill(); ctx.stroke();
       ctx.font = font(14); ctx.fillStyle = "#b0801a";
-      ctx.fillText(tx("rescue.odaiPanel"), 34, y + 12);
+      ctx.fillText(tx(odai.cols === 2 ? "rescue.odaiPanel2" : "rescue.odaiPanel"), 34, y + 12);   // 2択（「どっち？」「次は？」）は「2つから」
       ctx.font = font(fs); ctx.fillStyle = "#3e4a34";
       lines.forEach((l, i) => ctx.fillText(l, 32, y + 36 + i * lh));
       if (hl.length) {
