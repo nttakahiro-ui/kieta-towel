@@ -84,6 +84,12 @@ function runOnce(skill, seed) { HUDLOG.rows.push(["--", skill]); HUDLOG.lastK = 
         const alive = ex.boxes.filter(b => !b.open && !b.out && b.x > 40 && b.x < 365 && !(b.lock && !ex.keyFound && exNoticed.has(b)));
         if (exTarget && !alive.includes(exTarget)) exTarget = null;
         if (exTarget && exTarget.hold > 0 && rnd() < skill.quit) { exTarget = null; exQuitT = now / 1000 + 1; }   // にがて: 開ききる前に指をはなす
+        // 世界3の無重力（10/31-14）: 光っている（向きのずれが判定の中の）ことばを先に。なければ近いことば
+        if (!exTarget && now / 1000 >= exQuitT && ex.boxes.some(d => d.spin !== undefined)) {
+          const off = d => Math.abs(((d.ang % (Math.PI * 2)) + Math.PI * 3) % (Math.PI * 2) - Math.PI);
+          const lit = alive.filter(d => d.spin !== undefined && off(d) < Math.PI / 3);
+          if (lit.length) exTarget = lit.sort((a, q) => Math.hypot(a.x - fx, a.y - fy) - Math.hypot(q.x - fx, q.y - fy))[0];
+        }
         if (!exTarget && now / 1000 >= exQuitT) exTarget = alive.sort((a, q) => Math.hypot(a.x - fx, a.y - fy) - Math.hypot(q.x - fx, q.y - fy))[0] || null;
       }
       if (exTarget && exTarget.lock && !ex.keyFound && exTarget.warnT > 0) { exNoticed.add(exTarget); exTarget = null; }
