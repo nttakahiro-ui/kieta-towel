@@ -37,7 +37,8 @@ function runOnce(skill, seed) { HUDLOG.rows.push(["--", skill]); HUDLOG.lastK = 
   let ended = null, stats = null;
   sb.Battle.start(words, { stage: sb.window.STAGES.find(s => s.id === STAGE), stageName: "x", fuwariCount: 0, hints: process.env.TUT ? { seen: {}, mark() {}, all: true } : null, skills: process.env.SKILL ? ["clear", process.env.SKILL] : null, skill: process.env.SKILL || null, onEnd: (ids, st) => { ended = ids; stats = st; } });
   const pe = (px, py, id) => ({ pointerId: id || 1, clientX: px, clientY: py, preventDefault() {} });
-  let groundMode = false, targetY = 560; let orderKnow = false;
+  let orderKnow = false;   // 大ボス「3つを順に」で、正しい順を知っているか
+  // 地上のことば（世界2から）は、空中と同じく真上（左右）に合わせるだけ（10/31-12 決定 B。前は◎を合わせるように上下にも動いた）
   let fx = 187, fy = 520, dragging = false, targetX = 187, nextThink = 0, bombWait = 0;
   let seenGuide = false, curOdai = null, odaiPick = null, tried = new Set();
   // 1回目の旅（双眼鏡）: 見えるのは円の中と、きらっと光ったときだけ。気づいた語句を追いかけて見つめる。なければジグザグに見回す
@@ -131,7 +132,6 @@ function runOnce(skill, seed) { HUDLOG.rows.push(["--", skill]); HUDLOG.lastK = 
         }
         const tgt = ws[0] || S.fillers.filter(f => f.y > 0).sort((a, b) => b.y - a.y)[0];
         targetX = tgt ? tgt.x + (rnd() - 0.5) * 2 * skill.aim : 187 + (rnd() - 0.5) * 120;
-        if (tgt && tgt.ground) { groundMode = true; targetY = Math.max(B.bombRange + 60, Math.min(560, tgt.y + B.bombRange)); } else targetY = 560;   // 地上のことば（世界2から）: ◎を合わせるように上下にも動かす
         // 近くの弾に気づいたら、ときどきよける
         const near = S.ebullets.find(b => b.y < p.y && p.y - b.y < 140 && Math.abs(b.x - p.x) < 40);
         if (near && rnd() < skill.dodge) {
@@ -151,7 +151,6 @@ function runOnce(skill, seed) { HUDLOG.rows.push(["--", skill]); HUDLOG.lastK = 
       // 指を動かす（指の速さには限りがある）
       const dx = Math.max(-skill.speed / 60, Math.min(skill.speed / 60, targetX - p.x));
       fx += dx / 1.15;
-      if (groundMode) fy += Math.max(-skill.speed / 60, Math.min(skill.speed / 60, targetY - p.y)) / 1.15;   // （世界1は上下に動かさない。前と同じ結果）
       canvas.onpointermove(pe(fx, fy));
       // 記憶の光: たまったら、ときどき思い出して押す
       if (S.gauge >= 100) {
