@@ -572,26 +572,38 @@ const Main = (() => {
   const opSrc = i => `assets/op_${String(i + 1).padStart(2, "0")}.jpg`;
   const opPre = [];
   function opPreload(i) { if (i < window.TEXTS.opening.screens.length && !opPre[i]) opPre[i] = Object.assign(new Image(), { src: opSrc(i) }); }
-  let opIdx = 0;
+  let opIdx = 0, opPart = 0, opParts = [];
+  // 1回に出す文（10/31-8）: 3段落・80字まで。こえるときは段落の切れ目で分ける（文は削らない）。字数にふりがなの「（よみ）」は数えない
+  const OP_MAX = { lines: 3, chars: 80 };
+  function opChunks(lines) {
+    const len = l => [...l.replace(/（[ぁ-ゖー]+）/g, "")].length;
+    const out = []; let cur = [], n = 0;
+    for (const l of lines) {
+      if (cur.length && (cur.length >= OP_MAX.lines || n + len(l) > OP_MAX.chars)) { out.push(cur); cur = []; n = 0; }
+      cur.push(l); n += len(l);
+    }
+    if (cur.length) out.push(cur);
+    return out;
+  }
   // 1行の文: 「男の子「…」」の形なら、話す人の名前を小さく色つきに。改行はことばのかたまりの途中でしない
   function opLineHTML(l) {
     const ph = t => Cards.phraseHTML(t).replace(/([\u4e00-\u9fff々])<wbr>(?=[ぁ-ん（])/g, "$1");   // 漢字と、そのあとの送りがな・ふりがなのあいだでは折り返さない
     const m = l.match(/^([^「」、。！？\s]{1,6})(「[\s\S]*」)$/);
     return m ? `<p><span class="op-who">${ph(m[1])}</span>${ph(m[2])}</p>` : `<p>${ph(l)}</p>`;
   }
-  // 絵と文の置き方: 文がクリーム色の場所から下に入るように、文字の大きさ（17〜12px）と絵の大きさを決める
+  // 絵と文の置き方: 文がクリーム色の場所から下に入るように、絵の大きさを決める。文字は17px（10/31-8。前は17〜12px）
   function layoutOpening() {
     const sc = $("screen-opening"), W = sc.clientWidth, H = sc.clientHeight, img = $("op-img"), txt = $("op-text");
     if (!W || !H) return;
     const tw = Math.min(W, 520) - 36, foot = 40;
     txt.style.width = `${tw}px`;
-    let ih = 0;
-    for (let fs = 17; fs >= 12; fs--) {
-      txt.style.fontSize = `${fs}px`;
-      ih = Math.min(W * OP_ART, (H - txt.scrollHeight - foot - 10) / OP_CREAM);
-      if (ih >= H * 0.6) break;
-    }
-    ih = Math.max(ih, H * 0.4);
+    txt.style.fontSize = "17px";
+    // 同じ絵のあいだは絵の大きさを変えない: その画面でいちばん長い回の文に合わせる
+    const now = txt.innerHTML;
+    let th = 0;
+    for (const part of opParts) { txt.innerHTML = part.map(opLineHTML).join(""); th = Math.max(th, txt.scrollHeight); }
+    txt.innerHTML = now;
+    const ih = Math.max(Math.min(W * OP_ART, (H - th - foot - 10) / OP_CREAM), H * 0.4);
     const iw = ih / OP_ART;
     Object.assign(img.style, { width: `${iw}px`, height: `${ih}px`, left: `${(W - iw) / 2}px` });
     $("op-blur").style.height = `${ih * OP_CREAM}px`;
@@ -608,13 +620,21 @@ const Main = (() => {
     img.onerror = () => { img.style.visibility = "hidden"; };   // 絵が読めなくても、文は読める
     img.src = opSrc(i);
     $("op-blur").style.backgroundImage = `url(${opSrc(i)})`;
-    $("op-text").innerHTML = list[i].map(opLineHTML).join("");
-    $("op-page").textContent = `${i + 1}/${list.length}`;
+    opParts = opChunks(list[i]);
+    $("op-page").textContent = `${i + 1}/${list.length}`;   // 数字は絵の枚数のまま
+    showOpeningPart(0);
+  }
+  // 同じ絵のまま、文だけ切りかえる（10/31-8）
+  function showOpeningPart(k) {
+    opPart = k;
+    const txt = $("op-text");
+    txt.innerHTML = opParts[k].map(opLineHTML).join("");
+    txt.classList.remove("in"); void txt.offsetWidth; txt.classList.add("in");
+    $("op-tap").textContent = tx(k + 1 < opParts.length ? "opening.more" : "opening.tap");
     layoutOpening();
   }
   function toOpening() {
     $("op-skip").textContent = tx("opening.skip");
-    $("op-tap").textContent = tx("opening.tap");
     showScreen("opening");
     showOpeningPage(0);
   }
@@ -753,7 +773,7 @@ const Main = (() => {
     $("rbook-back").addEventListener("click", toStages);
     $("ending-next").addEventListener("click", toStages);
     // 目的の画面の台座（空）と一言
-    RecipeBook.render($("intro-book"), { lit: new Set(), small: true });
+    RecipeBook.renderBook($("intro-book"), { lit: new Set() });   // 3世界の本の空の枠（10/31-8。前は扇形の円い台座）
     $("intro-book-caption").innerHTML = tx("intro.bookCaption").replace(/\n/g, "<br>");
     // デバッグ: すべてのカードをそろえる（12個の宝石の演出を確かめる用。宝石がはまる演出は、まだ見ていないステージで出る）
     $("dbg-all-cards").addEventListener("click", () => {
@@ -765,7 +785,8 @@ const Main = (() => {
     $("btn-zukan-back").addEventListener("click", toStages);
     // オープニング（10/31-6）
     $("screen-opening").addEventListener("click", () => {
-      if (opIdx + 1 < window.TEXTS.opening.screens.length) showOpeningPage(opIdx + 1); else endOpening();
+      if (opPart + 1 < opParts.length) showOpeningPart(opPart + 1);   // 同じ絵で文の続き
+      else if (opIdx + 1 < window.TEXTS.opening.screens.length) showOpeningPage(opIdx + 1); else endOpening();
     });
     $("op-skip").addEventListener("click", e => { e.stopPropagation(); endOpening(); });
     $("btn-opening").textContent = tx("opening.link");
