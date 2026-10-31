@@ -3381,9 +3381,11 @@ const Battle = (() => {
     drawArtFit(choiceBg, "#fcf6ea");   // 下にそろえ、上の余りは紙の地の色
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     const hs = Math.min(34, a.w * 0.085);
-    drawHeading(window.TEXTS.trips[2].name, window.TEXTS.trips[2].kana, W / 2, a.y + a.h * 0.12, hs, "#9a6418");
+    // 見出しと「3つのうち1つを選んでね」は、上の余り（紙の地）が広いときはそこへ移す（10/31-6）。狭いときは見本の位置（絵の高さの12%・18%）
+    const up = a.y >= 120, hy = up ? a.y / 2 - 12 : a.y + a.h * 0.12, sy = up ? hy + 46 : a.y + a.h * 0.182;
+    drawHeading(window.TEXTS.trips[2].name, window.TEXTS.trips[2].kana, W / 2, hy, hs, "#9a6418");
     ctx.font = font(Math.min(16, a.w * 0.042)); ctx.fillStyle = "#3e4a34";
-    ctx.fillText(tx("choice.title", { trip: window.TEXTS.trips[2].name }), W / 2, a.y + a.h * 0.182);
+    ctx.fillText(tx("choice.title", { trip: window.TEXTS.trips[2].name }), W / 2, sy);
     // 門の手前の小道に主人公（足もとは絵の高さの 44%）、その左にゆれるふわり
     const hi = heroThinkImg();
     const hh = a.h * 0.23, hb = a.y + a.h * 0.44;

@@ -27,7 +27,8 @@ const Save = (() => {
   // world: ステージ一覧で今いる世界（10/22-1。ワープで進む）
   // gemsSeen: レシピブックの宝石がはまる演出を見たステージ（10/25-4。初めてそろったときだけ演出する）
   // found: ステージごとの、発見の旅で見つけたことばの id（10/25-15。「救出の旅をもう一度」で使う。救出で10のことばすべて助けたら消す）
-  let data = { cards: {}, cleared: {}, retake: {}, best: {}, hero: null, introSeen: false, world: 1, gemsSeen: {}, found: {}, glowHint: false, warpSeen: {} };
+  // openingSeen: オープニングを見たか（10/31-6。記録がない最初の起動のときだけ自動で出す）
+  let data = { cards: {}, cleared: {}, retake: {}, best: {}, hero: null, introSeen: false, openingSeen: false, world: 1, gemsSeen: {}, found: {}, glowHint: false, warpSeen: {} };
   // localStorage が使えなくても落ちないようにする
   function load() {
     try {
@@ -43,6 +44,7 @@ const Save = (() => {
         data.warpSeen = d.warpSeen || {};
         data.hero = d.hero || null;
         data.introSeen = !!d.introSeen;
+        data.openingSeen = !!d.openingSeen;
         data.world = d.world || 1;
         data.gemsSeen = d.gemsSeen || {};
         data.found = d.found || {};
@@ -456,6 +458,20 @@ const Main = (() => {
   // ステージ一覧（10/22-1）: 世界ごとのページ。今いる世界だけ出す。世界のカード（40枚）がそろうとワープのボタン
   const worldStages = id => window.STAGES.filter(s => s.world === id);
   const worldDone = id => worldStages(id).every(s => window.WORDS.filter(w => w.stage === s.id).every(w => Save.data.cards[w.id]));
+  // ステージの札の「難易度○　ベスト○点　カード○/10」は1行に（10/31-6）。入らないときだけ字を小さくする（いちばん小さくて9.5px）。
+  // 4つの札で字の大きさをそろえる（いちばん小さくした札に合わせる）
+  function fitStageSubs() {
+    const els = [...document.querySelectorAll("#stages-list .stage-row .sub")];
+    let min = Infinity;
+    els.forEach(el => {
+      el.style.fontSize = "";
+      if (!el.clientWidth) return;
+      let fs = parseFloat(getComputedStyle(el).fontSize);
+      while (el.scrollWidth > el.clientWidth + 0.5 && fs > 9.5) { fs -= 0.5; el.style.fontSize = `${fs}px`; }
+      min = Math.min(min, fs);
+    });
+    if (min < Infinity) els.forEach(el => { el.style.fontSize = `${min}px`; });
+  }
   function toStages() {
     Battle.stop();
     Sound.play("title");
@@ -507,6 +523,7 @@ const Main = (() => {
     warp.textContent = tx("worlds.warp", { id: wid + 1 });
     warp.onclick = () => warpTo(wid + 1);
     showScreen("stages");
+    fitStageSubs();
     $("screen-stages").scrollTop = 0;
   }
   // ワープの会話の演出（10/25-18）: その世界へ初めてワープするときだけ。約10秒、画面のどこをタップしても最後に飛ぶ。2回目からは下の短い光
@@ -561,6 +578,63 @@ const Main = (() => {
     Sound.se("power");
     setTimeout(() => { Save.data.world = id; Save.store(); toStages(); }, 700);
     setTimeout(() => fx.classList.remove("on"), 1700);
+  }
+
+  // ===== オープニング（10/31-6）: 絵1枚＋その下の文の11画面。タップで次へ、右上の「とばす」、最後のあとはタイトルへ =====
+  const OP_ART = 1672 / 941;   // 絵の縦横比
+  const OP_CREAM = 0.785;      // 絵の上からこの割合より下は、文を置くクリーム色の場所
+  const opSrc = i => `assets/op_${String(i + 1).padStart(2, "0")}.jpg`;
+  const opPre = [];
+  function opPreload(i) { if (i < window.TEXTS.opening.screens.length && !opPre[i]) opPre[i] = Object.assign(new Image(), { src: opSrc(i) }); }
+  let opIdx = 0;
+  // 1行の文: 「男の子「…」」の形なら、話す人の名前を小さく色つきに。改行はことばのかたまりの途中でしない
+  function opLineHTML(l) {
+    const ph = t => Cards.phraseHTML(t).replace(/([\u4e00-\u9fff々])<wbr>(?=[ぁ-ん（])/g, "$1");   // 漢字と、そのあとの送りがな・ふりがなのあいだでは折り返さない
+    const m = l.match(/^([^「」、。！？\s]{1,6})(「[\s\S]*」)$/);
+    return m ? `<p><span class="op-who">${ph(m[1])}</span>${ph(m[2])}</p>` : `<p>${ph(l)}</p>`;
+  }
+  // 絵と文の置き方: 文がクリーム色の場所から下に入るように、文字の大きさ（17〜12px）と絵の大きさを決める
+  function layoutOpening() {
+    const sc = $("screen-opening"), W = sc.clientWidth, H = sc.clientHeight, img = $("op-img"), txt = $("op-text");
+    if (!W || !H) return;
+    const tw = Math.min(W, 520) - 36, foot = 40;
+    txt.style.width = `${tw}px`;
+    let ih = 0;
+    for (let fs = 17; fs >= 12; fs--) {
+      txt.style.fontSize = `${fs}px`;
+      ih = Math.min(W * OP_ART, (H - txt.scrollHeight - foot - 10) / OP_CREAM);
+      if (ih >= H * 0.6) break;
+    }
+    ih = Math.max(ih, H * 0.4);
+    const iw = ih / OP_ART;
+    Object.assign(img.style, { width: `${iw}px`, height: `${ih}px`, left: `${(W - iw) / 2}px` });
+    $("op-blur").style.height = `${ih * OP_CREAM}px`;
+    $("op-blur").style.display = iw < W - 2 ? "" : "none";   // 絵が画面の幅より細いときだけ、左右をぼかした絵で埋める
+    txt.style.top = `${ih * OP_CREAM + 6}px`;
+  }
+  function showOpeningPage(i) {
+    const list = window.TEXTS.opening.screens;
+    opIdx = i;
+    opPreload(i); opPreload(i + 1); opPreload(i + 2);   // 見ているあいだに次の絵を先に読む
+    const img = $("op-img");
+    img.classList.remove("in"); void img.offsetWidth; img.classList.add("in");
+    img.style.visibility = "";
+    img.onerror = () => { img.style.visibility = "hidden"; };   // 絵が読めなくても、文は読める
+    img.src = opSrc(i);
+    $("op-blur").style.backgroundImage = `url(${opSrc(i)})`;
+    $("op-text").innerHTML = list[i].map(opLineHTML).join("");
+    $("op-page").textContent = `${i + 1}/${list.length}`;
+    layoutOpening();
+  }
+  function toOpening() {
+    $("op-skip").textContent = tx("opening.skip");
+    $("op-tap").textContent = tx("opening.tap");
+    showScreen("opening");
+    showOpeningPage(0);
+  }
+  function endOpening() {
+    Save.data.openingSeen = true; Save.store();
+    if (Save.data.introSeen) toTitle(); else showScreen("intro");   // 最初の起動では、このあと目的の画面と主人公選び（終わるとタイトルへ）
   }
 
   // カード図鑑（10/22-1）: 今いる世界の、ステージごとの10枚。持っているカードは語句と一言メモ、ないものは「？」
@@ -703,6 +777,15 @@ const Main = (() => {
       $("dbg-all-cards").textContent = "すべてのカードをそろえた";
     });
     $("btn-zukan-back").addEventListener("click", toStages);
+    // オープニング（10/31-6）
+    $("screen-opening").addEventListener("click", () => {
+      if (opIdx + 1 < window.TEXTS.opening.screens.length) showOpeningPage(opIdx + 1); else endOpening();
+    });
+    $("op-skip").addEventListener("click", e => { e.stopPropagation(); endOpening(); });
+    $("btn-opening").textContent = tx("opening.link");
+    $("btn-opening").addEventListener("click", toOpening);
+    window.addEventListener("resize", () => { if ($("screen-opening").classList.contains("active")) layoutOpening(); });
+    opPreload(0);   // 1枚目はタイトルといっしょに読む
     $("btn-hero").textContent = window.TEXTS.intro.rechoose;
     $("btn-hero").addEventListener("click", () => showScreen("hero"));
     $("pm-retry").addEventListener("click", () => quitBattle(toBattle));
@@ -776,7 +859,9 @@ const Main = (() => {
     $("title-stage").textContent = stage.name;
     titleCounts();
     showTuneTag();
-    showScreen(Save.data.introSeen ? "title" : "intro");   // 初めて開いたときは、目的の画面から
+    // 記録がない最初の起動のときは、オープニングから（10/31-6）→ 目的の画面 → 主人公選び → タイトル
+    if (!Save.data.openingSeen && !Save.data.introSeen && !Save.cardCount()) toOpening();
+    else showScreen(Save.data.introSeen ? "title" : "intro");   // 初めて開いたときは、目的の画面から
   }
 
   return { init };
