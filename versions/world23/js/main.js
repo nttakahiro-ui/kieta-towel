@@ -365,13 +365,14 @@ const Main = (() => {
         onBombHint: () => TutSave.mark("bombReady"),
         onFirstChoice: () => TutSave.mark("choice"),
         foundIds: rescueAgain === true ? (Save.data.found[stage.id] || []) : null,
+        showFps: tuneMode,   // 調整パネルのとき、1秒あたりの描画回数を右下に（10/31-14）
         onEnd: (ids, stats) => {
           lastStats = stats; lastIds = ids;
           // 発見の記録はブラウザに保存（10/25-15）。10のことばすべて助けたら、もういらないので消す
           if (ids.length >= words.length) delete Save.data.found[stage.id]; else Save.data.found[stage.id] = stats.found;
           Save.store();
           const m = Math.floor(stats.time / 60), sec = String(Math.floor(stats.time % 60)).padStart(2, "0");
-          Tune.setInfo(`前回のバトル（${stage.name}）: ${m}分${sec}秒　回収 ${ids.length}語　被弾 ${stats.hits}回　失った機体 ${stats.downs}機　本番やり直し ${stats.gameOvers}回　${stats.score}点`);
+          Tune.setInfo(`前回のバトル（${stage.name}）: ${m}分${sec}秒　回収 ${ids.length}語　被弾 ${stats.hits}回　失った機体 ${stats.downs}機　本番やり直し ${stats.gameOvers}回　${stats.score}点　fps 最低 ${Math.round(Battle.fps().min)}（救出の旅と大ボス）`);
           reviewNext = false;
           toQuiz(ids);
         }
