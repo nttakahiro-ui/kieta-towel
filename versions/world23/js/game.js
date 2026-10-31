@@ -1,7 +1,7 @@
 // バトル（縦スクロールのシューティング）
 // 空中と地上の2つの層がある
 //   空中の敵 … 自機の弾（自動で連射）で倒す
-//   地上の敵 … 自機の前にある照準◎に入ると、自動で「たね」を落として倒す
+//   地上の敵 … 自機の真上の列に来ると、自動で光が落ちて倒す（世界2から。10/31-12 決定。前は照準◎とたね）
 // 主役は語句の敵。バトルは「1周目 → 2周目 → 大ボス」の台本で進む（出る順番・出方・時刻はデータで固定）
 //   1周目「出撃1 探検（たんけん）」… 大ボス以外の語句が決まった順に出る。倒すと、ふわりが反応して光って消えるだけ（吸い込まない）
 //   2周目「出撃2 本番（あつめる）」… 同じ語句が同じ順番・同じ出方で出る。倒すと、糸のようにほどけて吸い込まれる（クイズに出る）
@@ -70,11 +70,15 @@ const BATTLE = {
 
   // --- 地上 ---
   scrollTime: 11.5,            // 地面が画面の高さぶん流れる秒数（大きいほどゆっくり）
-  bombRange: 170,              // 照準◎の位置（自機からどれだけ前か、px）
-  lockRadius: 26,              // 照準◎の大きさ（この中に地上の敵が入ると、たねを落とす）
-  bombInterval: 0.15,          // たねを落とす間隔（秒）。ザコの語句が硬くなるたびに短くしている（0.3 → 0.22 → 0.15）
-  bombFlight: 0.4,             // たねが地面に届くまでの秒数
-  bombRadius: 36,              // たねが当たる広さ（px）
+  // 地上の攻撃（10/31-12 決定 B）: 地上の敵が自機の真上の列に来たら、自動で光が落ちる（左右に合わせるだけ。照準◎はやめた）
+  bombRange: 170,              // 自機の真上の地面に置く薄い丸の位置（自機からどれだけ前か、px）
+  lockRadius: 26,              // 薄い丸の大きさ（px）
+  groundColumn: 12,            // 「真上の列」の幅のゆとり（地上のことばの幅の半分＋この px まで、真上とみなす）
+  bombInterval: 0.15,          // 光が落ちる間隔（秒）
+  bombFlight: 0.4,             // （10/31-12 から使っていない。たねが地面に届くまでの秒数）
+  bombRadius: 36,              // 光が当たる広さ（px）
+  groundTextScale: 0.78,       // 地上のことばの文字の高さの倍率（少し平たくして、地面に貼りついて見えるように）
+  groundHold: false,           // 救出の旅の最初の地上のことばを、中ほどで止めて待つ（stages.js の override.battle でステージ5だけ true）
 
   // --- 強さ（1945型） ---
   powerEvery: 3,               // 語句を何語吸い込むごとに1段階強くなるか
@@ -181,7 +185,9 @@ const BATTLE = {
     fillerDensity: [[1, 0.6], [12, 1.6]],     // 救出の旅の虫の濃さ（数と間隔。虫1匹の弾の量は変えない）
     zakoHp:        [[1, 9], [12, 8]],         // ザコの語句の硬さ（弾1本あたり。0.1きざみ）。10/25-1: 4〜5、10/25-8: 10〜11（中央あたり）、10/25-11: 9〜8（中央より少し手前、高さ30〜50%でほどけるように。ステージ1〜4で1〜2割下げ。速いステージほど少しやわらかく）
     fillerHp:      [[1, 1], [12, 3]],         // 虫の硬さの倍率（四捨五入）。10/25-1: 耐久は主に虫で上げる
-    bossHpScale:   [[1, 1.1], [12, 2]],       // 中ボス・大ボスの1文字あたりの耐久の倍率
+    bossHpScale:   [[1, 1.1], [4, 1.3454545454545455], [5, 1.43], [6, 1.51], [7, 1.2], [8, 1.67], [9, 1.2], [10, 1.2], [11, 1.92], [12, 1]],   // 中ボス・大ボスの1文字あたりの耐久の倍率
+    //   10/31-12 決定: 中ボス・大ボスの硬さの線は、ステージ5〜12を実測で通る値に引き直す（世界1は変えない）。1〜4 は前の線（1.1 と 12 で 2 を結ぶ線）のまま（4 の値はその線の上）。
+    //   5〜12 は自動プレイヤーで大ボス戦が終わる値（7・9・10 は 1.2、12 は 1.0。前は stages.js の override。5・6・8・11 は前の線の値）
     tricky:        [[1, 0], [12, 6.2]],       // 意地の悪い語句の数（四捨五入。patterns が "auto" のステージだけ）
   },
 
@@ -219,7 +225,7 @@ const BATTLE = {
   stripWidth: 24,              // 左端の「集めたことば」の縦の帯の幅（px。縦書き1文字分ほど）
 
   // --- 世界2・3の試作（10/31-10。docs/世界2・3の構想メモ.md）。数は仮 ---
-  groundMark: false,           // 帯の「地」の印（試作では出さない。地上のことばは影を濃くするだけ）
+  groundMark: true,            // 左の帯で、地上に出ることばの枠に小さな地面の絵のマーク（10/31-12 決定。文字の「地」ではない）
   skillStopTime: 4,            // 必殺ワザ「時間止め」の秒数（敵も弾もことばも止まる。ふわりの光は出る）
   skillGuardTime: 10,          // 必殺ワザ「無敵タイム」の秒数（ぶつかっても元気が減らない）
   skillShowerShell: 0.5,
@@ -266,8 +272,10 @@ const EXPLORE_MOVES = {
   //   open ＝ true で「OPEN」の面が上のときだけ開く（openTime ＝ OPEN の面が上にある秒数、faceTime ＝ ほかの面の秒数）、lock ＝ 鍵つきの箱の数（先に鍵の箱を開ける）
   box:     { box: true, boxW: 88, boxH: 64, speed: 32, gap: 2.6, wait: 2, empty: 2, hold: 1, lanes: [0.3, 0.52, 0.74], open: false, openTime: 2.4, faceTime: 0.6, lock: 0 },
   // 世界3「無重力」（10/31-10 試作。構想メモ 3 の、いちばん単純な形）: ことばが回りながら漂う。向きがまっすぐにそろっているあいだ（align ＝ ずれてよい角度）だけ、指で押さえて hold 秒で見つかる
-  //   speed ＝ 漂う速さ（px/秒）、spin ＝ 回る速さ（ラジアン/秒）、maxOn ＝ 同時に漂う数、gap ＝ 次のことばが出てくる間隔（秒）。くっつき・照らすは入れていない
-  space:   { box: true, space: true, speed: 24, spin: 1.1, align: 0.8, hold: 1, maxOn: 6, gap: 1.2 },
+  //   speed ＝ 漂う速さ（px/秒）、spin ＝ 回る速さ（ラジアン/秒）、maxOn ＝ 同時に漂う数の上限、gap ＝ 次のことばが出てくる間隔（秒）。くっつき・照らすは入れていない
+  //   chars ＝ 同時に漂う数を「chars ÷ そのステージのことばの平均の文字数」（切り捨て、minOn〜maxOn）にする（10/31-12 決定: 長いことばのステージほど少なく。ステージ9・10 は5つ、11・12 は4つ）
+  //   dim ＝ まっすぐでないことばの濃さ（10/31-12 決定: 薄くして、まっすぐになった金色のことばだけ浮き出るように）
+  space:   { box: true, space: true, speed: 24, spin: 1.1, align: 0.8, hold: 1, maxOn: 6, minOn: 3, chars: 26, gap: 1.2, dim: 0.35 },
 };
 
 // ===== 必殺ワザ（10/31-10 試作。構想メモ 6）: 4つ。名前と説明は texts.js の skills。持っているワザは main.js が宝石の数で決める
@@ -275,9 +283,12 @@ const SKILL_IDS = ["clear", "stop", "guard", "shower"];   // clear ぜんぶ消�
 const LOADOUT_VARS = { skill: "" };   // 持ち物「必殺ワザ」の説明の {skill}（選んでいるワザの名前）
 
 // ===== 世界ごとの殻・弾の色（10/31-10 試作。絵が来るまでの仮: 世界1の絵の色を変えただけ）。書いていない世界は世界1のまま
+//   thornWidth・thornAlpha ＝ いばらの太さ・濃さ（[k が 0 のとき, k による増え分]）。書いていない世界は世界1のまま
+//   textOver ＝ 1文字ずつの殻（いばら・霧）を描いたあと、文字をもう一度縁取りして上に描く（文字が殻にうもれないように）
 const WORLD_LOOK = {
   2: { cocoon: "rgba(214,232,255,0.8)", fuzz: "#e4f0ff", mid: "#3f6a8f", boss: "#a8bcd8", bullet: { zako: "#1f5f8a", mid: "#2a3f9a", boss: "#2a2a6a", rim: "#bfe6ff" } },
-  3: { cocoon: "rgba(238,226,255,0.8)", fuzz: "#f1e8ff", mid: "#6a4a8f", boss: "#c4aee4", bullet: { zako: "#6a2a8a", mid: "#8a1f5a", boss: "#2a1a5a", rim: "#ffd6f6" } },
+  3: { cocoon: "rgba(238,226,255,0.8)", fuzz: "#f1e8ff", mid: "#8a70b0", boss: "#c4aee4", bullet: { zako: "#6a2a8a", mid: "#8a1f5a", boss: "#2a1a5a", rim: "#ffd6f6" },
+       thornWidth: 1.1, thornAlpha: [0.2, 0.3], textOver: 5 },   // 10/31-12 決定: 紫のいばらを細く薄く、文字はいばらの上にもう一度縁取りして描く（textOver ＝ その縁取りの太さ px）
 };
 
 // ===== ぜんぶ消しのボタンの色（10/25-9）: ゲージがたまったら赤橙（画面のほかの場所に使っていない色）。たまっていないときは薄い色のまま
@@ -440,6 +451,7 @@ const Battle = (() => {
   let moved = false;         // 一度でもドラッグしたか（操作のヒント用）
   let rearHinted = false;    // うしろから来る敵の案内を出したか（世界3。10/31-10 試作）
   let groundHinted = false;  // 地上の敵のヒントを出したか
+  let groundHeld = false;    // 最初の地上のことばを止めたか（BATTLE.groundHold）
   let banner = null;         // 「大ボス あらわる！」などの帯
   let shake = 0;             // 画面のゆれ（被弾したとき）
   let level = POWER_LEVELS[0];
@@ -451,7 +463,7 @@ const Battle = (() => {
   let scoreAtMain = 0;       // 本番が始まったときの点数（やり直しでここに戻す）
   let retryMain = false;     // 本番のやり直しの画面か
   let lastPX = 0, lastPY = 0;   // いちばん最近の指の位置
-  let lock = false;          // 照準に地上の敵が入っているか
+  let lock = null;           // 自機の真上の列にいる地上の敵（いなければ null。10/31-12）
   let slow = 0;              // ゆっくりの残り時間（秒）
   let gauge = 0;             // 「ぜんぶ消し」ボムのゲージ（0〜100）
   let fsay = null;           // ふわりの一言（吹き出し）
@@ -649,7 +661,7 @@ const Battle = (() => {
     level = POWER_LEVELS[0];
     score = 0; combo = 0; maxCombo = 0; floats = [];
     hits = 0; downs = 0; lives = BATTLE.lives; gameOvers = 0; scoreAtMain = 0; retryMain = false;
-    paused = false; moved = false; groundHinted = false; rearHinted = false; banner = null; shake = 0; showWord = null; threads = []; pops = [];
+    paused = false; moved = false; groundHinted = false; groundHeld = false; rearHinted = false; banner = null; shake = 0; showWord = null; threads = []; pops = [];
     slow = 0; wave = null; gauge = 0; bombsUsed = 0; fsay = null; odai = null; bounces = [];
     msgQ = []; msgGap = 0; msgWasBusy = false;
     choiceFree = !!opts.firstChoice;
@@ -725,10 +737,10 @@ const Battle = (() => {
   }
   const seedName = () => tx(`byWorld.${worldDef.id || 1}.seed`);
   // 世界2・3の新しい仕組み（地上など）は、その世界の最初のステージでだけ案内を出す（難しさは下げない。10/21-2）
-  function newInWorld(kind) {
+  function newInWorld(kind, held) {
     const ids = (window.STAGES || []).filter(s => s.world === worldDef.id).map(s => s.id);
     if (!opts.stage || opts.stage.id !== Math.min(...ids)) return;
-    if (kind === "ground") groundHint();
+    if (kind === "ground" && (!BATTLE.groundHold || held)) groundHint();   // 止まって待つ地上のことばがあるステージ（5）は、そのことばが出たときに案内する（地上の虫では出さない）
     if (kind === "rear" && !rearHinted) { rearHinted = true; post("banner", () => { banner = { text: tx("newInWorld.rear"), t: 2.4, color: "rgba(110,80,170,0.9)" }; }); }
   }
   const wrapTextFont = (text, size, w) => { ctx.font = font(size); return wrapText(text, w); };
@@ -1022,7 +1034,8 @@ const Battle = (() => {
     const hp = BATTLE.hpOverride[role] || (role === "zako" ? Math.max(1, Math.max(word.hp, P.zakoHp) * (ground ? 1 : (BATTLE.zakoPatternHp[pattern] || 1))) : Math.max(1, Math.round(word.hp * P.bossHpScale)));
     if (od) { x = W / 2; y = -size - od.slot * 40; }
     const e = {
-      hold: BATTLE.firstHold && phase === "round2" && !od && !extraRound && word === script[0],   // ステージ1の救出の旅の1語目
+      hold: (BATTLE.firstHold && phase === "round2" && !od && !extraRound && word === script[0])   // ステージ1の救出の旅の1語目
+        || (BATTLE.groundHold && ground && phase === "round2" && !extraRound && !groundHeld && (groundHeld = true)),   // ステージ5の救出の旅の、最初の地上のことば（10/31-12）
       word, role, size, w, h: size * 1.2, ground, pattern, lane,
       slot: od ? od.slot : 0, dummy: od ? !od.real : false, odaiReal: od ? od.real : false, penaltyAt: -9,
       last: phase !== "round1",                    // 2周目と大ボスは、倒せば吸い込む
@@ -1085,7 +1098,8 @@ const Battle = (() => {
   function groundHint() {
     if (groundHinted) return;
     groundHinted = true;
-    post("banner", () => { banner = { text: tx("newInWorld.ground"), t: 2.4, color: "rgba(111,154,74,0.9)" }; });
+    const text = tx("newInWorld.ground");
+    post("tutorial", () => { hintCard = { text, t: BATTLE.hintTime }; slow = Math.max(slow, BATTLE.hintSlow); });   // 10/31-12: 帯ではなく、ほかの案内と同じ形
   }
 
   // ===== 雑魚の群れを出す =====
@@ -1346,12 +1360,11 @@ const Battle = (() => {
     for (const s of shots) { s.y -= BATTLE.shotSpeed * dt; s.x += s.vx * dt; }
     shots = shots.filter(s => s.y > -20);
 
-    // 地上の攻撃: 照準に地上の敵が入ったら、自動でたねを落とす
-    const rx = player.x, ry = player.y - BATTLE.bombRange;
-    lock = groundTargets().some(g => inReach(g, rx, ry, BATTLE.lockRadius));
+    // 地上の攻撃（10/31-12 決定 B）: 地上の敵が自機の真上の列に来たら、自動で光が落ちる（いちばん近いものに）
+    lock = groundTargets().filter(g => g.y < player.y - 30 && Math.abs(player.x - g.x) < (g.word ? g.w / 2 : g.r) + BATTLE.groundColumn).sort((a, b) => b.y - a.y)[0] || null;
     bombTimer -= dt;
     if (lock && bombTimer <= 0) {
-      bombs.push({ sx: player.x, sy: player.y - 10, tx: rx, ty: ry, age: 0 });
+      landBomb(lock.word ? Math.min(lock.x + lock.w / 2 - 4, Math.max(lock.x - lock.w / 2 + 4, player.x)) : lock.x, lock.y);
       bombTimer = BATTLE.bombInterval;
       Sound.se("bomb");
     }
@@ -1366,7 +1379,7 @@ const Battle = (() => {
     for (const e of enemies) {
       if (frozen()) { e.flash = Math.max(0, e.flash - dt); if (e.parts) for (const p of e.parts) p.flash = Math.max(0, p.flash - dt); continue; }   // 時間止め: ことばは止まって撃たない
       // ザコの語句: 画面に全部入ったら1秒止まって光る（この間は撃てない）
-      if (e.role === "zako" && e.pattern !== "odai" && !e.appeared && onScreen(e)) { e.appeared = true; e.appearT = BATTLE.zakoAppearTime; if (!e.ground) hint("shell"); else if (worldDef.id > 1) newInWorld("ground"); }   // 案内: 最初の殻
+      if (e.role === "zako" && e.pattern !== "odai" && !e.appeared && onScreen(e)) { e.appeared = true; e.appearT = BATTLE.zakoAppearTime; if (!e.ground) hint("shell"); else if (worldDef.id > 1 && !e.hold) newInWorld("ground"); }   // 案内: 最初の殻
       if (e.appearT > 0 && !(odai && e.pattern !== "odai")) { e.appearT -= dt; e.flash = Math.max(0, e.flash - dt); continue; }
       e.age += dt;
       e.flash = Math.max(0, e.flash - dt);
@@ -1386,6 +1399,10 @@ const Battle = (() => {
         e.x = W / 2 + Math.sin(e.age * 0.7) * range;
       } else if (e.ground) {
         e.y += sc * dt;     // 地上の語句は地面といっしょに流れる
+        if (e.hold && e.y >= H * BATTLE.firstHoldY) {   // ステージ5の最初の地上のことば: 中ほどで止まって待つ。止まったところで案内
+          e.y = H * BATTLE.firstHoldY;
+          if (!e.holdHinted) { e.holdHinted = true; newInWorld("ground", true); }
+        }
       } else if (e.pattern === "edge") {
         // 端にかくれる: 半分だけ顔を出して、出たり引っこんだりしながら降りる
         e.y += (H + e.size * 2) / BATTLE.edgeFallTime * dt * e.spd;
@@ -1716,18 +1733,17 @@ const Battle = (() => {
   }
   function odaiTop() { const p = odaiPanel(); return p.y + p.h; }
 
-  // 「次は？」にする中ボスと、その1つ前の工程（stages.js の nextAsk に書いた中ボスだけ。1つ前は words.js の order が1つ前のことば）
+  // 「次は？」にする中ボスと、その1つ前の工程（stages.js の nextAsk に書いた中ボスだけ。10/31-12 決定: 1つ前の工程は nextAsk に書く）
+  const nextAskOf = real => { const a = opts.stage && opts.stage.nextAsk && opts.stage.nextAsk[real.word]; return a ? (typeof a === "string" ? { prev: a } : a) : null; };
   function nextPrev(real) {
-    const list = (opts.stage && opts.stage.nextAsk) || [];
-    if (!list.includes(real.word)) return null;
-    return opts.words.find(w => w.order === real.order - 1) || null;
+    const a = nextAskOf(real);
+    return a ? opts.words.find(w => w.word === a.prev) || { id: -120, stage: real.stage, word: a.prev, kana: "", hp: 1, role: "zako", order: 0 } : null;
   }
-  // 大ボス「3つを順に」（世界2。10/31-10 試作。構想メモ 5）: stages.js の bossOrder: true のステージで、大ボスの choices の1つ目が「A→B→C」の3つで、
-  //   その中に大ボスのことばがあるときだけ。3つのことばに正しい順に光を当てる（当てたことばに 1・2・3）。順をまちがえたら3つとも最初にもどり、正しい順を一度だけ見せる
-  //   3つそろったら、ほかの2つは消えて、大ボスのことばの殻を世界1と同じようにほどく
+  // 大ボス「3つを順に」（世界2。10/31-10 試作。構想メモ 5）: stages.js の bossOrder に書いた3つのことば（正しい順。その中に大ボスのことばがあるときだけ。10/31-12 決定）
+  //   3つのことばに正しい順に光を当てる（当てたことばに 1・2・3）。順をまちがえたら3つとも最初にもどり、正しい順を一度だけ見せる
+  //   3つそろったら、ほかの2つは消えて、大ボスのことばの殻を世界1と同じようにほどく。問題文は texts.js の odaiForm.orderLead（ステージごと）
   function orderSet(real) {
-    if (!(opts.stage && opts.stage.bossOrder)) return null;
-    const toks = String((real.choices || [])[0] || "").split("→").map(x => x.trim());
+    const toks = (opts.stage && opts.stage.bossOrder) || [];
     if (toks.length !== 3 || !toks.includes(baseChars(real).join(""))) return null;
     return toks.map((tk, i) => tk === baseChars(real).join("") ? real : (opts.words.find(w => w.word === tk) || { id: -100 - i, stage: real.stage, word: tk, kana: "", hp: 1, role: "zako", order: 0 }));
   }
@@ -1746,10 +1762,11 @@ const Battle = (() => {
     const seq = isBoss && orderSet(real);   // 大ボス「3つを順に」
     const prev = !isBoss && nextPrev(real);   // 中ボス「次は？」（世界2。10/31-10 試作）: 1つ前の工程
     const pair = !seq && !prev && whichPair(real);   // 世界3「どっち？」
-    const cands = seq ? shuffle(seq.slice()) : pair ? shuffle([real, pair]) : shuffle([real, ...odaiDummies(real, prev)]);   // ならびは毎回入れかえ
+    const fixed = prev && (nextAskOf(real).choices || []).map(c => opts.words.find(w => w.word === c)).filter(Boolean);   // 「次は？」の選ぶことばを nextAsk に書いたとき（10/31-12）
+    const cands = seq ? shuffle(seq.slice()) : pair ? shuffle([real, pair]) : shuffle([real, ...(fixed && fixed.length === 2 ? fixed : odaiDummies(real, prev))]);   // ならびは毎回入れかえ
     // 3つとも同じ大きさ（いちばん長い語句が、縦書きで画面に入る大きさ。24px より小さくしない）
     clearMsgs(9); msgQ = [];   // お題が始まるときは、出ているメッセージと待っているものを、すべて消してから問題文を出す
-    const q = seq ? tx("odaiForm.order", { lead: (real.question.split(/[。]/)[0] || "") + "。" }) : pair ? real.question.replace(/[?？]\s*$/, "") + tx("odaiForm.which") : prev ? tx("odaiForm.next", { prev: prev.word + (hasKanji(prev.word) && prev.kana ? `（${prev.kana}）` : "") }) : (real.odaiQuestion || real.question);
+    const q = seq ? tx("odaiForm.orderLead." + opts.stage.id) : pair ? real.question.replace(/[?？]\s*$/, "") + tx("odaiForm.which") : prev ? tx("odaiForm.next", { prev: prev.word + (hasKanji(prev.word) && prev.kana ? `（${prev.kana}）` : "") }) : (real.odaiQuestion || real.question);
     // 問題文を読む時間（10/25-16）: 文の長さに合わせる。1文字あたり odaiReadPerChar 秒＋odaiReadBase 秒（最短 odaiReadMin、最長 odaiReadMax）
     const read = Math.min(BATTLE.odaiReadMax, Math.max(BATTLE.odaiReadMin, Array.from(q).length * BATTLE.odaiReadPerChar + BATTLE.odaiReadBase));
     odai = { real, boss: isBoss, t: 0, intro: read, firstHit: null, q, wrongRun: 0, mode: seq ? "order" : "pick", step: 0, show: 0, slip: false, seq: seq || null, cols: pair ? 2 : 3 };
@@ -2229,6 +2246,7 @@ const Battle = (() => {
   // 2周目・大ボス: 糸がほどけるように散って、自機へ吸い込まれる
   function absorb(e) {
     absorbed.push(e.word);
+    if (e.hold && e.ground) post("banner", () => { banner = { text: tx("newInWorld.groundDone"), t: 2.4, color: "rgba(111,154,74,0.9)" }; });   // ステージ5の最初の地上のことばを助けた（10/31-12）
     if (e.odaiReal && odai) endOdai(true);
     const lv = POWER_LEVELS[Math.min(Math.floor(absorbed.length / BATTLE.powerEvery) + powerBonus, POWER_LEVELS.length - 1)];
     if (lv !== level && absorbed.length < opts.total) {
@@ -2412,7 +2430,7 @@ const Battle = (() => {
     // 落ちていくたね
     for (const b of bombs) drawBomb(b);
     // 照準
-    if (state === "play" && groundOn) drawReticle();   // 照準◎は地上のある世界だけ
+    if (state === "play" && groundOn) drawGroundSpot();   // 真上の薄い丸と光の筋は、地上のある世界だけ
 
     // 雲の影（地面の上を流れる）
     ctx.fillStyle = theme.cloudShadow;
@@ -2857,25 +2875,28 @@ const Battle = (() => {
     ctx.restore();
   }
 
-  // 照準◎（自機の前の地面）。地上の敵が入ると色が変わる
-  function drawReticle() {
-    const x = player.x, y = player.y - BATTLE.bombRange, r = BATTLE.lockRadius;
+  // 地上の攻撃（10/31-12 決定 B）: 自機の真上の地面に薄い丸。真上の列に地上の敵がいるあいだは、自機からそこへ光の筋が落ちる
+  function drawGroundSpot() {
+    const tg = lock && lock.hp > 0 ? lock : null;
+    const x = tg && tg.word ? Math.min(tg.x + tg.w / 2 - 4, Math.max(tg.x - tg.w / 2 + 4, player.x)) : tg ? tg.x : player.x;
+    const y = tg ? tg.y : player.y - BATTLE.bombRange, r = BATTLE.lockRadius;
     ctx.save();
-    if (lock) {   // 地上の敵に重なったら、照準が光る
-      const pulse = 0.6 + Math.sin(t * 12) * 0.4;
-      const g = ctx.createRadialGradient(x, y, 2, x, y, r * 1.8);
-      g.addColorStop(0, `rgba(255,245,170,${0.75 * pulse})`); g.addColorStop(1, "rgba(255,245,170,0)");
-      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r * 1.8, 0, Math.PI * 2); ctx.fill();
-      ctx.shadowColor = "rgba(255,220,90,1)"; ctx.shadowBlur = 12;
+    if (tg) {   // 光の筋（ふわりから地面へ）
+      const pulse = 0.75 + Math.sin(t * 30) * 0.25;
+      const g = ctx.createLinearGradient(0, player.y - 24, 0, y);
+      g.addColorStop(0, `rgba(255,250,215,${0.2 * pulse})`); g.addColorStop(1, `rgba(255,236,150,${0.85 * pulse})`);
+      ctx.strokeStyle = g; ctx.lineCap = "round";
+      ctx.shadowColor = "rgba(255,220,110,0.9)"; ctx.shadowBlur = 14;
+      ctx.lineWidth = 9; ctx.beginPath(); ctx.moveTo(player.x, player.y - 24); ctx.lineTo(x, y); ctx.stroke();
+      ctx.lineWidth = 3; ctx.strokeStyle = `rgba(255,255,255,${0.9 * pulse})`; ctx.stroke();
+      ctx.shadowBlur = 0;
     }
-    ctx.globalAlpha = lock ? 1 : 0.55;
-    ctx.strokeStyle = lock ? "#e09a1e" : "#6f9a4a";
-    ctx.lineWidth = lock ? 3.5 : 2.5;
-    ctx.setLineDash([6, 5]);
-    ctx.lineDashOffset = -t * 20;
-    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.stroke();
+    // 薄い丸（地面に置いた形なので、少し平たい）
+    ctx.globalAlpha = tg ? 0.8 : 0.4;
+    ctx.fillStyle = tg ? "rgba(255,240,170,0.35)" : "rgba(255,255,255,0.18)";
+    ctx.strokeStyle = tg ? "rgba(255,236,150,0.9)" : "rgba(255,255,255,0.7)";
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.55, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.restore();
   }
 
@@ -3083,7 +3104,7 @@ const Battle = (() => {
       ctx.strokeText(ch, x + wob, py);
       ctx.shadowBlur = 0;
       ctx.fillStyle = fillColor; ctx.fillText(ch, x + wob, py);
-      if (hasShell(e) && p.maxHp) drawCharShell(e.role, x + wob, py, e.size, p.hp / p.maxHp);
+      if (hasShell(e) && p.maxHp) { drawCharShell(e.role, x + wob, py, e.size, p.hp / p.maxHp); textOverShell(ch, x + wob, py, fillColor, alpha); }
       if (p.maxHp && p.hp < p.maxHp) {   // 文字ごとの残りの耐久（右に小さな帯）
         const bh = e.charH * 0.7;
         ctx.fillStyle = "rgba(0,0,0,0.12)"; ctx.fillRect(x + e.w / 2 + 2, py - bh / 2, 3, bh);
@@ -3156,6 +3177,16 @@ const Battle = (() => {
     }
     ctx.restore();
   }
+  // 殻を描いたあと、文字をもう一度縁取りして上に描く（WORLD_LOOK の textOver がある世界だけ。10/31-12 世界3）
+  function textOverShell(ch, x, y, fillColor, alpha) {
+    const w = (WORLD_LOOK[worldDef.id] || {}).textOver;
+    if (!w) return;
+    ctx.save();
+    ctx.globalAlpha = alpha; ctx.lineJoin = "round";
+    ctx.lineWidth = w; ctx.strokeStyle = theme.wordStroke || "#ffffff"; ctx.strokeText(ch, x, y);
+    ctx.fillStyle = fillColor; ctx.fillText(ch, x, y);
+    ctx.restore();
+  }
   // 1文字ずつの殻（中ボス＝いばら、大ボス＝霧）。k ＝ その文字の殻の残り（1〜0）
   function drawCharShell(role, cx, cy, sz, k) {
     if (k <= 0) return;
@@ -3176,8 +3207,9 @@ const Battle = (() => {
       ctx.fillStyle = SHELL.boss.color;
       ctx.beginPath(); ctx.ellipse(cx, cy, sz * 0.55, sz * 0.5, 0, 0, Math.PI * 2); ctx.fill();
     } else {                 // いばら: 文字にからむ、とげのあるつる
-      ctx.globalAlpha = 0.45 + 0.5 * k;
-      ctx.strokeStyle = (WORLD_LOOK[worldDef.id] || {}).mid || SHELL.mid.color; ctx.lineWidth = 2; ctx.lineCap = "round";
+      const lk = WORLD_LOOK[worldDef.id] || {}, ta = lk.thornAlpha || [0.45, 0.5];
+      ctx.globalAlpha = ta[0] + ta[1] * k;
+      ctx.strokeStyle = lk.mid || SHELL.mid.color; ctx.lineWidth = lk.thornWidth || 2; ctx.lineCap = "round";
       const n = k > 0.5 ? 2 : 1;
       for (let i = 0; i < n; i++) {
         const s0 = i ? -1 : 1;
@@ -3197,7 +3229,7 @@ const Battle = (() => {
   function drawWordText(e, x, y, alpha) {
     if (e.vertical) { drawVerticalWord(e, x, y, alpha); return; }
     const word = e.word;
-    const cocoon = hasShell(e) && !e.parts && e.maxHp > 0 ? e.hp / e.maxHp : 0;   // ザコの語句: 綿毛のまゆ（残りの硬さで、うすくなる）
+    const cocoon = hasShell(e) && !e.parts && !e.ground && e.maxHp > 0 ? e.hp / e.maxHp : 0;   // ザコの語句: 綿毛のまゆ（残りの硬さで、うすくなる）。地上のことばは木箱・歯車（drawGroundWord）
     if (cocoon > 0) { ctx.save(); ctx.globalAlpha = alpha; drawCocoon(e, x, y, cocoon, false); ctx.restore(); }
     if (!e.last && !e.explore) alpha *= 0.55;   // （1回目の旅の双眼鏡の語句は、半透明にしない）
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
@@ -3232,7 +3264,7 @@ const Battle = (() => {
         }
         const wob = p.flash > 0 ? (Math.random() - 0.5) * 3 : 0;
         ctx.fillText(p.ch, px + wob, y);
-        if (hasShell(e) && p.maxHp) { drawCharShell(e.role, px, y, e.size, p.hp / p.maxHp); ctx.fillStyle = fillColor; }
+        if (hasShell(e) && p.maxHp) { drawCharShell(e.role, px, y, e.size, p.hp / p.maxHp); textOverShell(p.ch, px + wob, y, fillColor, alpha); ctx.fillStyle = fillColor; }
         // 文字ごとの残りの耐久（小さな帯）
         if (p.hp < p.maxHp) {
           const bw = p.cw * 0.7;
@@ -3258,10 +3290,15 @@ const Battle = (() => {
 
   function drawGroundWord(e) {
     const wob = e.flash > 0 ? (Math.random() - 0.5) * 4 : 0;
-    if (worldDef.id >= 2) {   // 世界2・3（10/31-10 試作）: 地面のことばは、影を濃くするだけ（帯の「地」の印は出さない）
-      ctx.fillStyle = "rgba(20,25,40,0.55)";
-      ctx.beginPath(); ctx.ellipse(e.x + 4, e.y + e.size * 0.45, e.w * 0.62 + 18, e.size * 0.55, 0, 0, Math.PI * 2); ctx.fill();
-      drawWordText(e, e.x + wob, e.y, 1);
+    if (worldDef.id >= 2) {   // 世界2・3（10/31-12 決定）: 地面に貼りついた見た目。下に濃い影、殻は地面らしい形（世界2 木箱・世界3 歯車。仮の図形）、文字は少し平たく
+      const k = e.maxHp > 0 ? Math.max(0, e.hp / e.maxHp) : 0;   // 殻は残りの硬さでうすくなる
+      const bw = e.w + 30, bh = e.size * 1.15;
+      ctx.save();
+      ctx.fillStyle = "rgba(15,20,35,0.6)";
+      ctx.beginPath(); ctx.ellipse(e.x + 5, e.y + bh * 0.45, bw * 0.56, bh * 0.4, 0, 0, Math.PI * 2); ctx.fill();
+      if (k > 0) { ctx.globalAlpha = 0.35 + 0.65 * k; if (worldDef.id === 2) drawCrate(e.x, e.y, bw, bh); else drawGear(e.x, e.y, bw, bh); }
+      ctx.restore();
+      ctx.save(); ctx.translate(e.x + wob, e.y); ctx.scale(1, BATTLE.groundTextScale); drawWordText(e, 0, 0, 1); ctx.restore();
       drawHpDots(e);
       return;
     }
@@ -3285,6 +3322,27 @@ const Battle = (() => {
     for (const [dx, dy, r] of [[-0.45, -0.7, 0.22], [-0.15, -0.95, 0.26], [0.15, -0.75, 0.2], [-0.6, -0.25, 0.18]]) {
       ctx.beginPath(); ctx.arc(cx + dx * e.w * 0.6, cy + dy * e.h, r * e.w * 0.5, 0, Math.PI * 2); ctx.fill();
     }
+  }
+
+  // 地上のことばの殻（10/31-12 仮の図形）: 世界2 木箱（板の線とくぎ）／世界3 歯車（平たい楕円のまわりに歯）
+  function drawCrate(x, y, w, h) {
+    ctx.fillStyle = "#c39a62"; roundRect(x - w / 2, y - h / 2, w, h, 6); ctx.fill();
+    ctx.strokeStyle = "#7a5530"; ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.lineWidth = 1.2; ctx.strokeStyle = "rgba(122,85,48,0.55)";
+    for (const f of [-0.17, 0.17]) { ctx.beginPath(); ctx.moveTo(x - w / 2 + 4, y + h * f); ctx.lineTo(x + w / 2 - 4, y + h * f); ctx.stroke(); }
+    ctx.fillStyle = "#6a4a2a";
+    for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { ctx.beginPath(); ctx.arc(x + sx * (w / 2 - 6), y + sy * (h / 2 - 6), 2, 0, Math.PI * 2); ctx.fill(); }
+  }
+  function drawGear(x, y, w, h) {
+    const rx = w / 2, ry = h / 2, n = Math.max(10, Math.round(w / 14));
+    ctx.fillStyle = "#77739c";
+    for (let i = 0; i < n; i++) {
+      const a = i / n * Math.PI * 2;
+      ctx.save(); ctx.translate(x + Math.cos(a) * rx, y + Math.sin(a) * ry); ctx.rotate(Math.atan2(Math.sin(a) * rx, Math.cos(a) * ry));
+      ctx.fillRect(-5, -4, 10, 8); ctx.restore();
+    }
+    ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#a9a5cc"; ctx.beginPath(); ctx.ellipse(x, y, rx - 5, ry - 4, 0, 0, Math.PI * 2); ctx.fill();
   }
 
   // 中ボス・大ボスは硬さを小さな丸で表示
@@ -3587,18 +3645,20 @@ const Battle = (() => {
         d: { word: w, role: "zako", size, w: tw, h: size * 1.2, x: 0, y: 0, phase: Math.random() * 6, explore: true, last: true, found: false, flash: 0 } };
     });
     ex.boxes = []; ex.nextBoxAt = BATTLE.exploreFirst; ex.keyFound = true;
+    const avg = ex.queue.reduce((a, b) => a + baseChars(b.word).length, 0) / Math.max(1, ex.queue.length);
+    ex.maxOn = exMove.chars ? Math.max(exMove.minOn || 1, Math.min(exMove.maxOn, Math.floor(exMove.chars / avg))) : exMove.maxOn;   // 同時に漂う数（長いことばのステージほど少なく）
   }
   function updateSpace(dt) {
     const ex = explore, mv = exMove, words = exploreWords();
     if (!ex.queue) spaceSetup();
     const minX = stripRight() + 8, maxX = W - 8, minY = 96, maxY = H * 0.78;
-    while (ex.queue.length && ex.t >= ex.nextBoxAt && ex.boxes.filter(b => !b.open).length < mv.maxOn) {
+    while (ex.queue.length && ex.t >= ex.nextBoxAt && ex.boxes.filter(b => !b.open).length < ex.maxOn) {
       const b = ex.queue.shift(), a = Math.random() * Math.PI * 2;
       Object.assign(b, { x: rand(minX + b.w / 2, maxX - b.w / 2), y: rand(minY + b.h, maxY - b.h), vx: Math.cos(a) * mv.speed, vy: Math.sin(a) * mv.speed });
       ex.boxes.push(b);
       ex.nextBoxAt = ex.t + mv.gap;
     }
-    if (ex.queue.length && ex.boxes.filter(b => !b.open).length >= mv.maxOn) ex.nextBoxAt = Math.max(ex.nextBoxAt, ex.t);
+    if (ex.queue.length && ex.boxes.filter(b => !b.open).length >= ex.maxOn) ex.nextBoxAt = Math.max(ex.nextBoxAt, ex.t);
     let pressed = null;
     for (const b of ex.boxes) {
       if (b.open) { b.openT += dt; continue; }
@@ -3641,7 +3701,7 @@ const Battle = (() => {
       }
       ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.ang);
       ctx.font = font(b.d.size);
-      drawWordText(Object.assign(b.d, { last: al }), 0, 0, al ? 1 : 0.8);
+      drawWordText(Object.assign(b.d, { last: al }), 0, 0, al ? 1 : exMove.dim);
       ctx.restore(); ctx.globalAlpha = 1;
       if (b.hold > 0) {
         const rr = Math.max(b.w, b.h) * 0.6;
@@ -4189,13 +4249,13 @@ const Battle = (() => {
         chars.forEach((ch, kk) => ctx.fillText(VERTICAL_GLYPH[ch] || ch, x + cw / 2, top + kk * fs));
         ctx.restore();
       }
-      // 地上に出る語句の枠: 小さく「地」の印（帯の右に出す）
-      if (BATTLE.groundMark && groundIds.has(w.id)) {   // （10/31-10 試作: 出さない）
-        ctx.font = font(9);
-        ctx.fillStyle = "#9a7650";
-        roundRect(x + cw + 2, y + sh / 2 - 7, 14, 14, 4); ctx.fill();
-        ctx.fillStyle = "#ffffff";
-        ctx.fillText(tx("rescue.groundMark"), x + cw + 9, y + sh / 2);
+      // 地上に出る語句の枠: 小さな地面の絵のマーク（帯の右に出す。10/31-12 決定。文字の「地」ではない）
+      if (BATTLE.groundMark && groundIds.has(w.id)) {
+        const mx = x + cw + 9, my = y + sh / 2;
+        ctx.fillStyle = "rgba(255,255,255,0.9)"; roundRect(mx - 7, my - 7, 14, 14, 4); ctx.fill();
+        ctx.fillStyle = "#9a7650"; ctx.beginPath(); ctx.ellipse(mx, my + 4, 6, 3.2, 0, Math.PI, 0); ctx.fill(); ctx.fillRect(mx - 6, my + 4, 12, 2);   // 土の盛り上がり
+        ctx.strokeStyle = "#5f9a3e"; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(mx, my + 1); ctx.lineTo(mx, my - 3); ctx.stroke();   // 小さな芽
+        ctx.fillStyle = "#5f9a3e"; ctx.beginPath(); ctx.ellipse(mx + 2, my - 4, 2.4, 1.2, -0.5, 0, Math.PI * 2); ctx.fill();
       }
       // （大ボスの枠の「さいごに出る」の印は、10/25-1 に廃止。発見の旅で10語すべてを探すため）
     });
