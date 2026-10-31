@@ -276,11 +276,12 @@ const EXPLORE_MOVES = {
   //   boxW・boxH ＝ 箱の大きさ（px）、speed ＝ 流れる速さ（px/秒）、gap ＝ 箱が出てくる間隔（秒）、wait ＝ 流れきった箱が戻ってくるまで（秒）、empty ＝ 空箱の数
   //   open ＝ true で「OPEN」の面が上のときだけ開く（openTime ＝ OPEN の面が上にある秒数、faceTime ＝ ほかの面の秒数）、lock ＝ 鍵つきの箱の数（先に鍵の箱を開ける）
   box:     { box: true, boxW: 88, boxH: 64, speed: 32, gap: 2.6, wait: 2, empty: 2, hold: 1, lanes: [0.3, 0.52, 0.74], open: false, openTime: 4, faceTime: 0.5, lock: 0 },   // 10/31-13 決定: OPEN の面は4秒、ほかの面は0.5秒×3（前は2.4秒・0.6秒）
-  // 世界3「無重力」（10/31-10 試作。構想メモ 3 の、いちばん単純な形）: ことばが回りながら漂う。向きがまっすぐにそろっているあいだ（align ＝ ずれてよい角度）だけ、指で押さえて hold 秒で見つかる
+  // 世界3「無重力」（10/31-10 試作。構想メモ 3 の、いちばん単純な形）: ことばが回りながら漂う。向きのずれが align（ラジアン）までのときに指で押さえると、
+  //   turn 秒でまっすぐに向き直り、そこから hold 秒で見つかる（押さえているあいだは回らない。はなすとまた回り出す。10/31-14）
   //   speed ＝ 漂う速さ（px/秒）、spin ＝ 回る速さ（ラジアン/秒）、maxOn ＝ 同時に漂う数の上限、gap ＝ 次のことばが出てくる間隔（秒）。くっつき・照らすは入れていない
   //   chars ＝ 同時に漂う数を「chars ÷ そのステージのことばの平均の文字数」（切り捨て、minOn〜maxOn）にする（10/31-12 決定: 長いことばのステージほど少なく。ステージ9・10 は5つ、11・12 は4つ）
   //   dim ＝ まっすぐでないことばの濃さ（10/31-12 決定: 薄くして、まっすぐになった金色のことばだけ浮き出るように）
-  space:   { box: true, space: true, speed: 24, spin: 1.1, align: 0.8, hold: 1, maxOn: 6, minOn: 3, chars: 26, gap: 1.2, dim: 0.35 },
+  space:   { box: true, space: true, speed: 24, spin: 0.55, align: Math.PI / 3, turn: 0.5, hold: 1, maxOn: 6, minOn: 3, chars: 26, gap: 1.2, dim: 0.35 },   // 10/31-14 決定: 易しく（回る速さ半分・判定60度・押さえると0.5秒で向き直る。前は spin 1.1・align 0.8）
 };
 
 // ===== 必殺ワザ（10/31-10 試作。構想メモ 6）: 4つ。名前と説明は texts.js の skills。持っているワザは main.js が宝石の数で決める
@@ -3785,7 +3786,7 @@ const Battle = (() => {
 
   // ===== 世界3の発見の旅「無重力」（10/31-10 試作。構想メモ 3 のうち「回転」だけ） =====
   // 星空を、ことばが回りながら漂う（画面のはしで はね返る）。向きがまっすぐのあいだに指で押さえ続けて hold 秒で見つかる（世界2の箱と同じ「押さえて1秒」）
-  // 押さえているあいだに向きがずれたら、たまった輪はそのまま止まる（はなすと0にもどる）。時間切れなし
+  // 10/31-14 決定: 押さえると、そのことばは回るのをやめて turn 秒でまっすぐに向き直り、向き直ってから輪がたまる。はなすと0にもどり、また回り出す。時間切れなし
   const angOff = a => Math.abs(((a % (Math.PI * 2)) + Math.PI * 3) % (Math.PI * 2) - Math.PI);   // まっすぐからのずれ（0〜π）
   const spaceAligned = b => angOff(b.ang) < exMove.align;
   function spaceSetup() {
@@ -3812,21 +3813,35 @@ const Battle = (() => {
       ex.nextBoxAt = ex.t + mv.gap;
     }
     if (ex.queue.length && ex.boxes.filter(b => !b.open).length >= ex.maxOn) ex.nextBoxAt = Math.max(ex.nextBoxAt, ex.t);
-    let pressed = null;
+    let pressed = null, pressedD = 0;
     for (const b of ex.boxes) {
       if (b.open) { b.openT += dt; continue; }
-      b.x += b.vx * dt; b.y += b.vy * dt; b.ang += b.spin * dt;
+      b.x += b.vx * dt; b.y += b.vy * dt; if (!b.grab) b.ang += b.spin * dt;   // 押さえているあいだは回らない
       if (b.x - b.w / 2 < minX) { b.x = minX + b.w / 2; b.vx = Math.abs(b.vx); }
       if (b.x + b.w / 2 > maxX) { b.x = maxX - b.w / 2; b.vx = -Math.abs(b.vx); }
       if (b.y - b.h / 2 < minY) { b.y = minY + b.h / 2; b.vy = Math.abs(b.vy); }
       if (b.y + b.h / 2 > maxY) { b.y = maxY - b.h / 2; b.vy = -Math.abs(b.vy); }
-      const r = Math.max(b.w, b.h) / 2;
-      if (press && !pressed && Math.hypot(press.x - b.x, press.y - b.y) < r + 8) pressed = b;
+      if (press) {   // 当たりは、ことばの向きに回した長方形（10/31-14。前は丸で、長いことばが近くのことばの上まで取っていた）。重なったら中心の近いほう
+        const dx = press.x - b.x, dy = press.y - b.y, c = Math.cos(b.ang), s = Math.sin(b.ang);
+        const lx = dx * c + dy * s, ly = -dx * s + dy * c, d = Math.hypot(dx, dy);
+        if (Math.abs(lx) < b.w / 2 + 8 && Math.abs(ly) < b.h / 2 + 12 && (!pressed || d < pressedD)) { pressed = b; pressedD = d; }
+      }
     }
     for (const b of ex.boxes) {
       if (b.open) continue;
-      if (b !== pressed) { b.hold = 0; continue; }
-      if (!spaceAligned(b)) continue;   // 向きがずれているあいだは、たまらない（0にはもどらない）
+      if (b !== pressed) { b.hold = 0; b.grab = null; continue; }
+      if (!b.grab) {
+        if (!spaceAligned(b)) continue;   // ずれが大きいあいだは、押さえても向き直らない（回ってきて判定に入ったら向き直る）
+        const sd = ((b.ang % (Math.PI * 2)) + Math.PI * 3) % (Math.PI * 2) - Math.PI;   // まっすぐからのずれ（向きつき）
+        b.grab = { a0: b.ang, a1: b.ang - sd, t: 0 };
+      }
+      const gr = b.grab;
+      if (gr.t < mv.turn) {   // 向き直るあいだ（少しずつゆっくりに）
+        gr.t = Math.min(mv.turn, gr.t + dt);
+        const k = gr.t / mv.turn;
+        b.ang = gr.a0 + (gr.a1 - gr.a0) * (1 - (1 - k) * (1 - k));
+        continue;
+      }
       b.hold += dt;
       if (b.hold >= mv.hold) {
         b.open = true; b.openT = 0; moved = true;
