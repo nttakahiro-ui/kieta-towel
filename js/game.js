@@ -218,7 +218,9 @@ const BATTLE = {
   groundMark: false,           // 帯の「地」の印（試作では出さない。地上のことばは影を濃くするだけ）
   skillStopTime: 4,            // 必殺ワザ「時間止め」の秒数（敵も弾もことばも止まる。ふわりの光は出る）
   skillGuardTime: 10,          // 必殺ワザ「無敵タイム」の秒数（ぶつかっても元気が減らない）
-  skillShowerShell: 0.5,       // 必殺ワザ「光のシャワー」: 画面じゅうのことばの殻の硬さを何倍にするか（0.5 ＝ 半分けずる）
+  skillShowerShell: 0.5,
+  orderHits: 3,                // 大ボス「3つを順に」: 同じことばに続けて何発当てたら「当てた」にするか（横切っただけでは数えない）
+  orderHitGap: 0.35,           //   この秒数あいだがあくと、続けて当てた数は0にもどる       // 必殺ワザ「光のシャワー」: 画面じゅうのことばの殻の硬さを何倍にするか（0.5 ＝ 半分けずる）
 };
 
 // ===== 雑魚の種類 =====
@@ -258,7 +260,7 @@ const EXPLORE_MOVES = {
   // 世界2「箱」（10/31-10 試作。構想メモ 2）: 双眼鏡と暗闇は使わない。コンベア（lanes ＝ 画面の高さに対する割合）の上を箱が流れ、指で押さえ続けて hold 秒で開く
   //   boxW・boxH ＝ 箱の大きさ（px）、speed ＝ 流れる速さ（px/秒）、gap ＝ 箱が出てくる間隔（秒）、wait ＝ 流れきった箱が戻ってくるまで（秒）、empty ＝ 空箱の数
   //   open ＝ true で「OPEN」の面が上のときだけ開く（openTime ＝ OPEN の面が上にある秒数、faceTime ＝ ほかの面の秒数）、lock ＝ 鍵つきの箱の数（先に鍵の箱を開ける）
-  box:     { box: true, boxW: 88, boxH: 64, speed: 32, gap: 2.6, wait: 2, empty: 2, hold: 1, lanes: [0.3, 0.52, 0.74], open: false, openTime: 1.8, faceTime: 1.1, lock: 0 },
+  box:     { box: true, boxW: 88, boxH: 64, speed: 32, gap: 2.6, wait: 2, empty: 2, hold: 1, lanes: [0.3, 0.52, 0.74], open: false, openTime: 2.4, faceTime: 0.6, lock: 0 },
 };
 
 // ===== 必殺ワザ（10/31-10 試作。構想メモ 6）: 4つ。名前と説明は texts.js の skills。持っているワザは main.js が宝石の数で決める
@@ -1195,6 +1197,7 @@ const Battle = (() => {
     if (wrongFx) { wrongFx.age += realDt; if (wrongFx.age > BATTLE.odaiWrongTime) wrongFx = null; }
     if (powerFx) { powerFx.age += realDt; if (powerFx.age > BATTLE.powerFxTime) powerFx = null; }
     if (odai && odai.intro > 0) odai.intro -= realDt;
+    if (odai && odai.show > 0) odai.show -= realDt;   // 「3つを順に」の正しい順を見せている残り
     for (const b of bounces) { b.age += realDt; b.x += b.vx * realDt; b.y += b.vy * realDt; }
     bounces = bounces.filter(b => b.age < 0.5);
     t += dt;
@@ -1696,16 +1699,26 @@ const Battle = (() => {
     if (!list.includes(real.word)) return null;
     return opts.words.find(w => w.order === real.order - 1) || null;
   }
+  // 大ボス「3つを順に」（世界2。10/31-10 試作。構想メモ 5）: stages.js の bossOrder: true のステージで、大ボスの choices の1つ目が「A→B→C」の3つで、
+  //   その中に大ボスのことばがあるときだけ。3つのことばに正しい順に光を当てる（当てたことばに 1・2・3）。順をまちがえたら3つとも最初にもどり、正しい順を一度だけ見せる
+  //   3つそろったら、ほかの2つは消えて、大ボスのことばの殻を世界1と同じようにほどく
+  function orderSet(real) {
+    if (!(opts.stage && opts.stage.bossOrder)) return null;
+    const toks = String((real.choices || [])[0] || "").split("→").map(x => x.trim());
+    if (toks.length !== 3 || !toks.includes(baseChars(real).join(""))) return null;
+    return toks.map((tk, i) => tk === baseChars(real).join("") ? real : (opts.words.find(w => w.word === tk) || { id: -100 - i, stage: real.stage, word: tk, kana: "", hp: 1, role: "zako", order: 0 }));
+  }
   function startOdai(real, isBoss) {
     const role = isBoss ? "boss" : "mid";
+    const seq = isBoss && orderSet(real);   // 大ボス「3つを順に」
     const prev = !isBoss && nextPrev(real);   // 中ボス「次は？」（世界2。10/31-10 試作）: 1つ前の工程
-    const cands = shuffle([real, ...odaiDummies(real, prev)]);   // ならびは毎回入れかえ
+    const cands = seq ? shuffle(seq.slice()) : shuffle([real, ...odaiDummies(real, prev)]);   // ならびは毎回入れかえ
     // 3つとも同じ大きさ（いちばん長い語句が、縦書きで画面に入る大きさ。24px より小さくしない）
     clearMsgs(9); msgQ = [];   // お題が始まるときは、出ているメッセージと待っているものを、すべて消してから問題文を出す
-    const q = prev ? tx("odaiForm.next", { prev: prev.word + (hasKanji(prev.word) && prev.kana ? `（${prev.kana}）` : "") }) : (real.odaiQuestion || real.question);
+    const q = seq ? tx("odaiForm.order", { lead: (real.question.split(/[。]/)[0] || "") + "。" }) : prev ? tx("odaiForm.next", { prev: prev.word + (hasKanji(prev.word) && prev.kana ? `（${prev.kana}）` : "") }) : (real.odaiQuestion || real.question);
     // 問題文を読む時間（10/25-16）: 文の長さに合わせる。1文字あたり odaiReadPerChar 秒＋odaiReadBase 秒（最短 odaiReadMin、最長 odaiReadMax）
     const read = Math.min(BATTLE.odaiReadMax, Math.max(BATTLE.odaiReadMin, Array.from(q).length * BATTLE.odaiReadPerChar + BATTLE.odaiReadBase));
-    odai = { real, boss: isBoss, t: 0, intro: read, firstHit: null, q, wrongRun: 0 };
+    odai = { real, boss: isBoss, t: 0, intro: read, firstHit: null, q, wrongRun: 0, mode: seq ? "order" : "pick", step: 0, show: 0, slip: false, seq: seq || null };
     // 案内: 最初のお題は、問題文の下に1行そえて、読む時間を少しのばす（順番待ちにはのせない。お題がいちばん大事なため）
     if (hintOpts && !hintShown.odai && (hintOpts.all || !(hintOpts.seen && hintOpts.seen.odai))) {
       hintShown.odai = true; if (hintOpts.mark) hintOpts.mark("odai");
@@ -1715,6 +1728,7 @@ const Battle = (() => {
     const room = H * 0.66 - odaiTop() - 30;   // 問題文の帯の下から、自機の上まで
     const size = Math.max(24, Math.min(BATTLE.fontSize[role], Math.floor(room / (longest * 1.12))));
     cands.forEach((w, i) => spawn(w, { role, size, slot: i, real: w === real }));
+    if (seq) for (const e of enemies) if (e.pattern === "odai") { e.seqNo = seq.indexOf(e.word); e.dummy = true; e.num = 0; }   // 3つを順に: そろうまでは3つとも、当てても削れない
     // お題のあいだは、雑魚と雑魚の弾を出さない（10/3-12）。始まる瞬間に画面の雑魚と弾を消す（殻から飛ぶ弾は、読む時間が終わってから）
     fillers.forEach(f => addPop(f.x, f.y, "#fff8d8", 0.8, f.layer === "ground"));
     fillers = []; ebullets = [];
@@ -1725,6 +1739,7 @@ const Battle = (() => {
 
   // お題の語句に弾が当たった
   function odaiHit(e, s) {
+    if (odai.mode === "order") { orderHit(e, s); return; }
     if (odai.firstHit === null) {
       odai.firstHit = e.dummy ? "dummy" : "real";
       if (!e.dummy) {   // 最初から本物: ひらめき
@@ -1747,6 +1762,43 @@ const Battle = (() => {
       odai.wrongRun++;
       if (odai.wrongRun >= BATTLE.odaiWrongRun) { odai.wrongRun = 0; fsay = { text: tx("rescue.odaiReread"), t: BATTLE.fuwariSayTime }; }   // お題のあいだは順番待ちが止まるので、直接出す
     }
+  }
+
+  // 大ボス「3つを順に」で、ことばに光が当たった
+  function orderHit(e, s) {
+    const list = enemies.filter(q => q.pattern === "odai" && q.hp > 0);
+    if (e.num || odai.show > 0) { bounces.push({ x: s.x, y: e.y + e.h / 2, vx: (Math.random() - 0.5) * 120, vy: 320, age: 0 }); return; }   // もう番号がついている・正しい順を見せているあいだ
+    // 光は自動で出るので、となりの列へ動くとちゅうに、まん中のことばを横切ってしまう。同じことばに続けて orderHits 発当てたときだけ「当てた」にする
+    if (t - (e.hitT || -9) > BATTLE.orderHitGap) e.hitN = 0;
+    e.hitT = t; e.hitN = (e.hitN || 0) + 1; e.flash = 0.12;
+    if (e.hitN < BATTLE.orderHits) { Sound.se("hit"); return; }
+    e.hitN = 0;
+    if (e.seqNo === odai.step) {   // 正しい順
+      odai.step++; e.num = odai.step; e.flash = 0.3;
+      floats.push({ x: e.x, y: e.y - e.h / 2 - 16, text: String(e.num), big: true, age: 0 });
+      Sound.se("shine");
+      if (odai.step >= 3) {   // そろった: ほかの2つは消えて、大ボスの殻をほどく
+        if (!odai.slip) { score += BATTLE.odaiBonus; floats.push({ x: W / 2, y: H * 0.45, text: `ひらめき！ +${BATTLE.odaiBonus}`, big: true, age: 0 }); Sound.se("hirameki"); }
+        for (const q of list) {
+          if (q.word === odai.real) { q.dummy = false; q.num = 0; continue; }
+          vanish.push({ word: q.word, x: q.x, y: q.y, size: q.size, w: q.w, ground: false, age: 0 }); q.hp = 0;
+        }
+        enemies = enemies.filter(q => q.hp > 0);
+        odai.mode = "pick"; odai.firstHit = "done";
+      }
+      return;
+    }
+    // 順がちがう: 3つとも最初にもどして、正しい順を一度だけ見せる。減点は世界1のダミーと同じ
+    odai.slip = true;
+    if (t - e.penaltyAt >= BATTLE.odaiPenaltyCool) {
+      e.penaltyAt = t;
+      score = Math.max(0, score - BATTLE.odaiPenalty);
+      floats.push({ x: e.x, y: e.y - e.size, text: `−${BATTLE.odaiPenalty}`, big: true, wrong: true, age: 0 });
+      Sound.se("boing");
+      wrongFx = { age: 0, text: tx("odaiForm.orderWrong") }; e.wrongT = BATTLE.odaiWrongTime;
+    }
+    for (const q of list) q.num = 0;
+    odai.step = 0; odai.show = 1.8;
   }
 
   // お題バトルの終わり。ok: 本物を吸い込んだ／false: 時間切れ（取り逃がし）
@@ -2644,8 +2696,9 @@ const Battle = (() => {
     ctx.globalAlpha = Math.min(1, (1 - k) * 2.5);
     ctx.translate(W / 2 + Math.sin(wrongFx.age * 40) * 4 * (1 - k), H * 0.5);
     ctx.font = font(40); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
-    ctx.lineWidth = 10; ctx.strokeStyle = "#ffffff"; ctx.strokeText(tx("rescue.odaiWrong"), 0, 0);
-    ctx.fillStyle = "#d8413a"; ctx.fillText(tx("rescue.odaiWrong"), 0, 0);
+    const wt = wrongFx.text || tx("rescue.odaiWrong");   // 「3つを順に」では「順番がちがうよ」（10/31-10 試作）
+    ctx.lineWidth = 10; ctx.strokeStyle = "#ffffff"; ctx.strokeText(wt, 0, 0);
+    ctx.fillStyle = "#d8413a"; ctx.fillText(wt, 0, 0);
     ctx.restore();
   }
   const wrongBlink = e => e.wrongT > 0 && Math.floor(e.wrongT * 10) % 2 === 0;   // ちがうことば: 赤く点滅
@@ -3008,6 +3061,16 @@ const Battle = (() => {
         const c = VERTICAL_GLYPH[ch] || ch, ky = y - e.h / 2 + ks / 2 + i * ks;
         ctx.strokeText(c, kx, ky); ctx.fillText(c, kx, ky);
       });
+    }
+    // 大ボス「3つを順に」（10/31-10 試作）: 当てたことばの上に 1・2・3。まちがえた直後は、正しい順を青い数字で一度だけ見せる
+    if (odai && odai.mode === "order" && e.seqNo !== undefined) {
+      const n = e.num || (odai.show > 0 ? e.seqNo + 1 : 0);
+      if (n) {
+        const cy = y - e.h / 2 - 18;
+        ctx.globalAlpha = 1; ctx.fillStyle = e.num ? "#e07a3a" : "rgba(60,110,200,0.9)"; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(x, cy, 14, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.font = font(17); ctx.fillStyle = "#ffffff"; ctx.fillText(String(n), x, cy + 1);
+      }
     }
     ctx.restore();
   }
@@ -3561,7 +3624,8 @@ const Battle = (() => {
       ctx.font = font(16); ctx.lineWidth = 5; ctx.strokeStyle = "#ffffff";
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
       const hy = H * 0.14;
-      if (!hintCard) { ctx.strokeText(tx("box.moveHint"), W / 2, hy); ctx.fillStyle = "#3f4f6a"; ctx.fillText(tx("box.moveHint"), W / 2, hy); }
+      const ht = tx(exMove.space ? "space.moveHint" : exMove.open ? "box.openHint" : exMove.lock ? "box.lockHint" : "box.moveHint");   // ステージごとの1行（6 OPEN／7 鍵。10/31-10 試作）
+      if (!hintCard) { ctx.strokeText(ht, W / 2, hy); ctx.fillStyle = "#3f4f6a"; ctx.fillText(ht, W / 2, hy); }
       ctx.globalAlpha = 1;
     }
     if (banner) drawBanner();

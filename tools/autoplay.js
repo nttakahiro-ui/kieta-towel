@@ -37,7 +37,7 @@ function runOnce(skill, seed) { HUDLOG.rows.push(["--", skill]); HUDLOG.lastK = 
   let ended = null, stats = null;
   sb.Battle.start(words, { stage: sb.window.STAGES.find(s => s.id === STAGE), stageName: "x", fuwariCount: 0, hints: process.env.TUT ? { seen: {}, mark() {}, all: true } : null, skills: process.env.SKILL ? ["clear", process.env.SKILL] : null, skill: process.env.SKILL || null, onEnd: (ids, st) => { ended = ids; stats = st; } });
   const pe = (px, py, id) => ({ pointerId: id || 1, clientX: px, clientY: py, preventDefault() {} });
-  let groundMode = false, targetY = 560;
+  let groundMode = false, targetY = 560; let orderKnow = false;
   let fx = 187, fy = 520, dragging = false, targetX = 187, nextThink = 0, bombWait = 0;
   let seenGuide = false, curOdai = null, odaiPick = null, tried = new Set();
   // 1回目の旅（双眼鏡）: 見えるのは円の中と、きらっと光ったときだけ。気づいた語句を追いかけて見つめる。なければジグザグに見回す
@@ -111,7 +111,14 @@ function runOnce(skill, seed) { HUDLOG.rows.push(["--", skill]); HUDLOG.lastK = 
         let ws = S.enemies.filter(e => e.y > fogY && e.x > -40 && e.x < 415).sort((a, b) => b.y - a.y);
         // お題: 本物をわかる確率（know）でえらぶ。「ちがうよ」が出たら、まだ試していないものからえらびなおす
         const cands = S.enemies.filter(e => e.pattern === "odai" && e.hp > 0);
-        if (S.odai && cands.length) {
+        if (S.odai && S.odai.mode === "order" && cands.length) {   // 大ボス「3つを順に」（10/31-10 試作）: 順を知っている確率（know）で正しいことば。まちがえて正しい順を見たあとは、正しい順に
+          if (S.odai !== curOdai) { curOdai = S.odai; orderKnow = rnd() < skill.know; odaiPick = null; }
+          if (S.odai.show > 0) orderKnow = true;
+          const next = cands.find(e => !e.num && e.seqNo === S.odai.step), left = cands.filter(e => !e.num);
+          if (orderKnow) odaiPick = next;
+          else if (!odaiPick || odaiPick.num || !cands.includes(odaiPick)) odaiPick = left[Math.floor(rnd() * left.length)];
+          ws = [odaiPick];
+        } else if (S.odai && cands.length) {
           if (S.odai !== curOdai) { curOdai = S.odai; tried = new Set(); odaiPick = null; }
           if (odaiPick && odaiPick.dummy && odaiPick.penaltyAt > 0) { tried.add(odaiPick); odaiPick = null; }
           if (!odaiPick || !cands.includes(odaiPick)) {
