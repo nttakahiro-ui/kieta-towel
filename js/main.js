@@ -1,5 +1,5 @@
 // 画面の切り替えとセーブ
-const SAVE_KEY = "kietaTowel.save.v1";
+const SAVE_KEY = "kietaTowel.save.w23";   // 世界2・3の試作（10/31-10）: 公開版（kietaTowel.save.v1）と同じサイトなので、記録を別の名前で保存する
 
 // チュートリアルを「見た」の記録（10/7-1）。版（versions/ のフォルダ）ごとに分けて保存する
 // 置き場所（URL のパス）を名前に入れるので、別の版を開くと、チュートリアルがもう一度出る
@@ -28,7 +28,8 @@ const Save = (() => {
   // gemsSeen: レシピブックの宝石がはまる演出を見たステージ（10/25-4。初めてそろったときだけ演出する）
   // found: ステージごとの、発見の旅で見つけたことばの id（10/25-15。「救出の旅をもう一度」で使う。救出で10のことばすべて助けたら消す）
   // openingSeen: オープニングを見たか（10/31-6。記録がない最初の起動のときだけ自動で出す）
-  let data = { cards: {}, cleared: {}, retake: {}, best: {}, hero: null, introSeen: false, openingSeen: false, world: 1, gemsSeen: {}, found: {}, glowHint: false, warpSeen: {} };
+  // skill: 選んでいる必殺ワザ、skillsSeen: 「手に入れた！」の画面を見たワザ（10/31-10 試作）
+  let data = { cards: {}, cleared: {}, retake: {}, best: {}, hero: null, introSeen: false, openingSeen: false, world: 1, gemsSeen: {}, found: {}, glowHint: false, warpSeen: {}, skill: "clear", skillsSeen: {} };
   // localStorage が使えなくても落ちないようにする
   function load() {
     try {
@@ -48,6 +49,8 @@ const Save = (() => {
         data.world = d.world || 1;
         data.gemsSeen = d.gemsSeen || {};
         data.found = d.found || {};
+        data.skill = d.skill || "clear";
+        data.skillsSeen = d.skillsSeen || {};
       }
     } catch (e) { /* 読めないときは空のまま */ }
   }
@@ -317,6 +320,31 @@ const Main = (() => {
   }
   let reviewing = false;     // 今のステージ1がおさらいか
 
+  // 必殺ワザ（10/31-10 試作。構想メモ 6・10.5）: 宝石の数で手に入る。ぜんぶ消し＝最初から、時間止め＝世界1の4つ目の宝石、
+  //   無敵タイム＝世界2の2つ目の宝石、光のシャワー＝世界2の4つ目の宝石
+  const SKILL_GET = [["stop", 1, 4], ["guard", 2, 2], ["shower", 2, 4]];   // [ワザ, 世界, 宝石の数]
+  function ownedSkills() {
+    const lit = RecipeBook.litIds(Save.data.cards);
+    const gems = wid => window.STAGES.filter(s => s.world === wid && lit.has(s.id)).length;
+    return ["clear"].concat(SKILL_GET.filter(([, wid, n]) => gems(wid) >= n).map(([id]) => id));
+  }
+  // 「新しい必殺ワザ『○○』を手に入れた！」の1画面。まだ見ていないワザがあれば出して、タップで next へ（なければすぐ next）
+  function showNewSkill(next) {
+    const id = ownedSkills().find(k => k !== "clear" && !Save.data.skillsSeen[k]);
+    if (!id) { next(); return; }
+    Save.data.skillsSeen[id] = true;
+    Save.data.skill = id;   // 手に入れたワザを選んだ状態にする（持ち物選択の画面で選びなおせる）
+    Save.store();
+    const sk = window.TEXTS.skills;
+    $("skill-got").textContent = sk.got.replace("{name}", sk[id].name);
+    $("skill-desc").textContent = sk[id].desc;
+    $("skill-hint").textContent = sk.gotHint;
+    $("skill-tap").textContent = sk.tap;
+    Sound.se("power");
+    showScreen("skill");
+    $("screen-skill").onclick = () => { $("screen-skill").onclick = null; showNewSkill(next); };
+  }
+
   // rescueAgain: 結果画面の「救出の旅をもう一度」（10/25-14）。発見の旅をとばして持ち物選択から（前の発見の記録を使う）
   function toBattle(rescueAgain) {
     reviewing = reviewNext && stage.id === 1;
@@ -330,6 +358,8 @@ const Main = (() => {
         fuwariCount: Save.cardCount(),
         hints: stage.id === 1 ? { seen: TutSave.load(), mark: TutSave.mark, all: reviewNext } : null,   // 案内はステージ1だけ（初めての瞬間に。おさらいのときは全部）
         hero: Save.data.hero || "boy",
+        skills: ownedSkills(), skill: Save.data.skill,   // 必殺ワザ（10/31-10 試作）
+        onSkill: id => { Save.data.skill = id; Save.store(); },
         firstChoice: !TutSave.load().choice,          // 持ち物選択: 初めては時間制限なし（記録は版ごと）
         bombHintSeen: !!TutSave.load().bombReady,     // ぜんぶ消しの案内（初めての1回だけ。記録は版ごと）
         onBombHint: () => TutSave.mark("bombReady"),
@@ -429,7 +459,7 @@ const Main = (() => {
     Save.store();
     showScreen("recipe");
     Cards.showRecipe({ stage, words, lit, isNew, heroSrc: heroSrc("joy"), hint: "",
-      onNext: () => (isNew && lit.size >= 12 ? toEnding() : toStages()) });
+      onNext: () => showNewSkill(() => (isNew && lit.size >= 12 ? toEnding() : toStages())) });   // 新しい必殺ワザは、宝石ができた画面のすぐあと（10/31-10 試作）
   }
   // レシピブック（ステージ一覧から）: 宝石をタップすると、どのステージか・レシピ名が出る
   function toRecipeBook() {
@@ -715,8 +745,21 @@ const Main = (() => {
   }
   function openDebug() { refreshDebugButtons(); $("debug-menu").classList.remove("hidden"); }
 
+  // ?debug（10/31-10 試作だけ）: 世界1の宝石4つ・カード40枚から始める（時間止めの「手に入れた！」は見たことにする）
+  function debugStart() {
+    if (!/[?&]debug/.test(window.location.search)) return;
+    const d = Save.data;
+    window.WORDS.filter(w => w.stage <= 4).forEach(w => { d.cards[w.id] = true; delete d.retake[w.id]; });
+    [1, 2, 3, 4].forEach(id => { d.cleared[id] = true; d.gemsSeen[id] = true; if (!d.best[id]) d.best[id] = { score: 0 }; });
+    if (!d.hero) d.hero = "boy";
+    d.introSeen = true; d.openingSeen = true;
+    if (!d.skillsSeen.stop) { d.skillsSeen.stop = true; d.skill = "stop"; }
+    Save.store();
+  }
+
   function init() {
     Save.load();
+    debugStart();
     Tune.load();
     selectStage(1);
 
@@ -840,6 +883,7 @@ const Main = (() => {
       Save.data.glowHint = false;
       Save.data.warpSeen = {};   // ワープの会話の演出も、もう一度見られるように（10/25-18）
       Save.data.gemsSeen = {};   // レシピの演出を見た記録も消す（もう一度演出が見られるように）
+      Save.data.skillsSeen = {}; Save.data.skill = "clear";   // 必殺ワザの「手に入れた！」も、もう一度（10/31-10 試作）
       Save.store();
       TutSave.reset();   // チュートリアルを見た記録も消す（この版の分）
       titleCounts();

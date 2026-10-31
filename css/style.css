@@ -545,6 +545,14 @@ body { position: fixed; inset: 0; }
 
 /* クイズの前の1画面（10/25-1） */
 #screen-quizintro { background: #fff8e2; }
+/* 新しい必殺ワザを手に入れた（10/31-10 試作） */
+#screen-skill { background: #fff3dc; }
+.skill-box { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; text-align: center; }
+.skill-fuwari { width: 46%; max-width: 220px; animation: skill-pop 0.6s ease-out; }
+.skill-got { font-size: 22px; line-height: 1.5; font-weight: bold; color: #b8400f; margin: 16px 0 10px; }
+.skill-desc { font-size: 17px; line-height: 1.6; color: #4b3a1a; margin: 0 0 8px; }
+.skill-hint { font-size: 14px; line-height: 1.5; color: #7a6a40; margin: 0 0 22px; }
+@keyframes skill-pop { from { transform: scale(0.4) rotate(-20deg); opacity: 0; } to { transform: none; opacity: 1; } }
 .quizintro-box { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; text-align: center; }
 .quizintro-text { font-size: 24px; line-height: 1.6; font-weight: bold; color: #8a5a10; margin: 0 0 24px; }
 
