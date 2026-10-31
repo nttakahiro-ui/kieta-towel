@@ -100,6 +100,10 @@ const BATTLE = {
   odaiPenaltyCool: 1,          // 同じダミーで続けて減点しない秒数（連射で何度も減らないように）
   odaiBonus: 2000,             // 最初に当てたのが本物なら「ひらめき」ボーナス
   odaiColumns: [0.2, 0.5, 0.8], // 3つの語句をならべる列の位置（画面の幅に対する割合）。縦書きで動かさない
+  odaiColumns2: [0.3, 0.7],     // 世界3「どっち？」の2つの列（10/31-10 試作）
+  rearRate: 0.35,
+  gravityDrift: 46,             // 出来事「重力が変わる」: ことばが横に流される速さ（px/秒）（10/31-10 試作）
+  meteorGap: 0.45, meteorSpeed: 300,   // 出来事「流星雨」: 上から流れ星の弾が落ちてくる間隔（秒）と速さ（px/秒）（10/31-10 試作）               // 世界3: 雑魚の群れのうち、うしろ（画面の下）から来る割合（10/31-10 試作）
 
   // --- バトルの中の坂（探検 → 本番 → 大ボスで、だんだん濃くなる） ---
   // filler: 雑魚の量の倍率（大きいほど多い）、fire: 敵の弾の量の倍率（大きいほど多い）
@@ -261,6 +265,9 @@ const EXPLORE_MOVES = {
   //   boxW・boxH ＝ 箱の大きさ（px）、speed ＝ 流れる速さ（px/秒）、gap ＝ 箱が出てくる間隔（秒）、wait ＝ 流れきった箱が戻ってくるまで（秒）、empty ＝ 空箱の数
   //   open ＝ true で「OPEN」の面が上のときだけ開く（openTime ＝ OPEN の面が上にある秒数、faceTime ＝ ほかの面の秒数）、lock ＝ 鍵つきの箱の数（先に鍵の箱を開ける）
   box:     { box: true, boxW: 88, boxH: 64, speed: 32, gap: 2.6, wait: 2, empty: 2, hold: 1, lanes: [0.3, 0.52, 0.74], open: false, openTime: 2.4, faceTime: 0.6, lock: 0 },
+  // 世界3「無重力」（10/31-10 試作。構想メモ 3 の、いちばん単純な形）: ことばが回りながら漂う。向きがまっすぐにそろっているあいだ（align ＝ ずれてよい角度）だけ、指で押さえて hold 秒で見つかる
+  //   speed ＝ 漂う速さ（px/秒）、spin ＝ 回る速さ（ラジアン/秒）、maxOn ＝ 同時に漂う数、gap ＝ 次のことばが出てくる間隔（秒）。くっつき・照らすは入れていない
+  space:   { box: true, space: true, speed: 24, spin: 1.1, align: 0.8, hold: 1, maxOn: 6, gap: 1.2 },
 };
 
 // ===== 必殺ワザ（10/31-10 試作。構想メモ 6）: 4つ。名前と説明は texts.js の skills。持っているワザは main.js が宝石の数で決める
@@ -431,6 +438,7 @@ const Battle = (() => {
   let drag = null;
   let paused = false;        // アプリが裏に回ったときなど
   let moved = false;         // 一度でもドラッグしたか（操作のヒント用）
+  let rearHinted = false;    // うしろから来る敵の案内を出したか（世界3。10/31-10 試作）
   let groundHinted = false;  // 地上の敵のヒントを出したか
   let banner = null;         // 「大ボス あらわる！」などの帯
   let shake = 0;             // 画面のゆれ（被弾したとき）
@@ -495,6 +503,7 @@ const Battle = (() => {
   // 世界2・3の試作（10/31-10）
   let skill = "clear", skills = ["clear"];   // 選んでいる必殺ワザと、持っているワザ（main.js の opts.skill・opts.skills）
   let stopT = 0, guardT = 0, showerFx = null;   // 時間止め・無敵タイムの残り秒、光のシャワーの演出
+  let meteorT = 0;   // 流星雨の次の1つまで（世界3。10/31-10 試作）
   let events = [], rescueT = 0, evShown = {};   // このステージの出来事（stages.js の event）、救出の旅の経過秒、出来事の帯を出したか
   let press = null;          // 世界2の箱の発見の旅: 指が押さえている場所 { x, y }
 
@@ -640,7 +649,7 @@ const Battle = (() => {
     level = POWER_LEVELS[0];
     score = 0; combo = 0; maxCombo = 0; floats = [];
     hits = 0; downs = 0; lives = BATTLE.lives; gameOvers = 0; scoreAtMain = 0; retryMain = false;
-    paused = false; moved = false; groundHinted = false; banner = null; shake = 0; showWord = null; threads = []; pops = [];
+    paused = false; moved = false; groundHinted = false; rearHinted = false; banner = null; shake = 0; showWord = null; threads = []; pops = [];
     slow = 0; wave = null; gauge = 0; bombsUsed = 0; fsay = null; odai = null; bounces = [];
     msgQ = []; msgGap = 0; msgWasBusy = false;
     choiceFree = !!opts.firstChoice;
@@ -720,6 +729,7 @@ const Battle = (() => {
     const ids = (window.STAGES || []).filter(s => s.world === worldDef.id).map(s => s.id);
     if (!opts.stage || opts.stage.id !== Math.min(...ids)) return;
     if (kind === "ground") groundHint();
+    if (kind === "rear" && !rearHinted) { rearHinted = true; post("banner", () => { banner = { text: tx("newInWorld.rear"), t: 2.4, color: "rgba(110,80,170,0.9)" }; }); }
   }
   const wrapTextFont = (text, size, w) => { ctx.font = font(size); return wrapText(text, w); };
   function closeTut() {
@@ -1108,6 +1118,12 @@ const Battle = (() => {
   }
 
   function spawnWave() {
+    // 世界3: うしろ（画面の下）から綿毛おばけが2匹（10/31-10 試作。WORLDS の rear）。出る前に下のはしに「！」
+    if (worldDef.rear && Math.random() < BATTLE.rearRate) {
+      for (let i = 0; i < 2; i++) { const x = freeX(H, "air", 40); if (x !== null) spawnFiller("ghost", x, H + 30 + i * 50, { bx: 0, rear: true, delay: 0.9 }); }
+      newInWorld("rear");
+      return;
+    }
     // 時間帯の虫（theme.bugs.kinds）: どれか1種類を、その動き方の群れで出す
     const kinds = theme.bugs && theme.bugs.kinds;
     if (kinds && kinds.length) {
@@ -1248,6 +1264,11 @@ const Battle = (() => {
     if (phase === "round1") { updateExplore(dt); return; }   // 1回目の旅（双眼鏡）。雑魚・弾・木・天気は出さない
     if (!frozen()) rescueT += dt;   // 救出の旅の経過（出来事の時刻。10/31-10 試作）
     evBanners();
+    // 出来事「流星雨」（世界3。10/31-10 試作）: 上から、少しななめに流れ星の弾が落ちてくる（お題のあいだと時間止めのあいだは出ない）
+    if (evActive("meteor") && !odai && !frozen()) {
+      meteorT -= dt;
+      if (meteorT <= 0) { meteorT = BATTLE.meteorGap * rand(0.7, 1.3); ebullets.push({ x: rand(stripRight() + 10, W + 40), y: -10, vx: -BATTLE.meteorSpeed * 0.25, vy: BATTLE.meteorSpeed, kind: "zako" }); }
+    }
 
     // ===== 台本: 決まった時刻に、決まった順番で語句を出す（倒したかどうかには関係しない） =====
     if (gapT > 0) {
@@ -1356,7 +1377,8 @@ const Battle = (() => {
         // お題の語句: 縦書きで左・中・右の列にならび、動かない（上から降りてきて止まる）
         const ty = odaiTop() + 30 + e.h / 2;
         e.y += (ty - e.y) * Math.min(1, dt * 4);
-        e.x = W * BATTLE.odaiColumns[e.slot % BATTLE.odaiColumns.length];
+        const cols = odai && odai.cols === 2 ? BATTLE.odaiColumns2 : BATTLE.odaiColumns;
+        e.x = W * cols[e.slot % cols.length];
       } else if (e.role === "boss") {
         const enter = Math.min(e.age / BATTLE.bossEnterTime, 1);
         e.y = -e.size + (H * BATTLE.bossStopY + e.size) * (1 - Math.pow(1 - enter, 2));
@@ -1385,6 +1407,7 @@ const Battle = (() => {
       } else {
         e.y += (H + e.size * 2) / BATTLE.fallTime[e.role] * dt * e.spd;
         if (e.hold) e.y = Math.min(e.y, H * BATTLE.firstHoldY);   // ステージ1の救出の旅の1語目: 中ほどで止まって待つ
+        if (evActive("gravity")) e.bx = Math.min(W - e.w / 2 - 20, Math.max(stripRight() + e.w / 2 + 20, e.bx + BATTLE.gravityDrift * dt));   // 出来事「重力が変わる」（世界3）: 右へ流される
         e.x = e.bx + Math.sin(e.age * BATTLE.swaySpeed + e.phase) * BATTLE.sway;
       }
       // 弾を撃つ（画面の上のほうにいる間だけ）。1語目を待っているあいだと、ステージ1のお題では撃たない
@@ -1430,7 +1453,7 @@ const Battle = (() => {
         else if (!f.leave) { f.stayT -= dt; f.x += Math.sin(f.age * 1.2) * 30 * dt; if (f.stayT <= 0) f.leave = true; }
         else f.y -= 120 * dt;
       } else if (moveOf(f.type) === "ghost") {
-        f.y += H / 11 * BATTLE.fillerSpeed * (def.speed || 1) * dt;
+        f.y += (f.rear ? -1 : 1) * H / 11 * BATTLE.fillerSpeed * (def.speed || 1) * dt;   // うしろから来たものは上へ
         f.x += Math.sin(f.age * 1.3) * 40 * dt;
       } else {
         f.y += sc * dt;     // 地上の雑魚は地面といっしょに流れる
@@ -1708,17 +1731,28 @@ const Battle = (() => {
     if (toks.length !== 3 || !toks.includes(baseChars(real).join(""))) return null;
     return toks.map((tk, i) => tk === baseChars(real).join("") ? real : (opts.words.find(w => w.word === tk) || { id: -100 - i, stage: real.stage, word: tk, kana: "", hp: 1, role: "zako", order: 0 }));
   }
+  // 世界3「どっち？」（10/31-10 試作）: stages.js の which: true のステージで、choices が2つ、1つ目が本物のことば（かっこの中をのぞいて同じ）のときだけ。
+  //   2つ目のことばを、もう1つの候補にする（同じステージにあることばなら、それを使う）。そうでないときは世界1と同じ「どれ？」
+  const plainWord = c => String(c).replace(/[（(][^）)]*[）)]/g, "").trim();
+  function whichPair(real) {
+    if (!(opts.stage && opts.stage.which)) return null;
+    const ch = real.choices || [];
+    if (ch.length !== 2 || plainWord(ch[0]) !== real.word || !/[?？]\s*$/.test(real.question || "")) return null;
+    const other = plainWord(ch[1]);
+    return opts.words.find(w => w.word === other) || { id: -110, stage: real.stage, word: other, kana: "", hp: 1, role: "zako", order: 0 };
+  }
   function startOdai(real, isBoss) {
     const role = isBoss ? "boss" : "mid";
     const seq = isBoss && orderSet(real);   // 大ボス「3つを順に」
     const prev = !isBoss && nextPrev(real);   // 中ボス「次は？」（世界2。10/31-10 試作）: 1つ前の工程
-    const cands = seq ? shuffle(seq.slice()) : shuffle([real, ...odaiDummies(real, prev)]);   // ならびは毎回入れかえ
+    const pair = !seq && !prev && whichPair(real);   // 世界3「どっち？」
+    const cands = seq ? shuffle(seq.slice()) : pair ? shuffle([real, pair]) : shuffle([real, ...odaiDummies(real, prev)]);   // ならびは毎回入れかえ
     // 3つとも同じ大きさ（いちばん長い語句が、縦書きで画面に入る大きさ。24px より小さくしない）
     clearMsgs(9); msgQ = [];   // お題が始まるときは、出ているメッセージと待っているものを、すべて消してから問題文を出す
-    const q = seq ? tx("odaiForm.order", { lead: (real.question.split(/[。]/)[0] || "") + "。" }) : prev ? tx("odaiForm.next", { prev: prev.word + (hasKanji(prev.word) && prev.kana ? `（${prev.kana}）` : "") }) : (real.odaiQuestion || real.question);
+    const q = seq ? tx("odaiForm.order", { lead: (real.question.split(/[。]/)[0] || "") + "。" }) : pair ? real.question.replace(/[?？]\s*$/, "") + tx("odaiForm.which") : prev ? tx("odaiForm.next", { prev: prev.word + (hasKanji(prev.word) && prev.kana ? `（${prev.kana}）` : "") }) : (real.odaiQuestion || real.question);
     // 問題文を読む時間（10/25-16）: 文の長さに合わせる。1文字あたり odaiReadPerChar 秒＋odaiReadBase 秒（最短 odaiReadMin、最長 odaiReadMax）
     const read = Math.min(BATTLE.odaiReadMax, Math.max(BATTLE.odaiReadMin, Array.from(q).length * BATTLE.odaiReadPerChar + BATTLE.odaiReadBase));
-    odai = { real, boss: isBoss, t: 0, intro: read, firstHit: null, q, wrongRun: 0, mode: seq ? "order" : "pick", step: 0, show: 0, slip: false, seq: seq || null };
+    odai = { real, boss: isBoss, t: 0, intro: read, firstHit: null, q, wrongRun: 0, mode: seq ? "order" : "pick", step: 0, show: 0, slip: false, seq: seq || null, cols: pair ? 2 : 3 };
     // 案内: 最初のお題は、問題文の下に1行そえて、読む時間を少しのばす（順番待ちにはのせない。お題がいちばん大事なため）
     if (hintOpts && !hintShown.odai && (hintOpts.all || !(hintOpts.seen && hintOpts.seen.odai))) {
       hintShown.odai = true; if (hintOpts.mark) hintOpts.mark("odai");
@@ -1971,6 +2005,7 @@ const Battle = (() => {
       return;
     }
     ex.t += dt;
+    if (exMove.space) { updateSpace(dt); return; }   // 世界3の無重力（10/31-10 試作）
     if (exMove.box) { updateBoxes(dt); return; }   // 世界2の箱（10/31-10 試作）
     const words = exploreWords();
     // 出す順: はじめの10のことば → 見つけられずに消えたことば（時間切れがないので、見つかるまで出直す。10/25-17）
@@ -2407,6 +2442,10 @@ const Battle = (() => {
 
     // 空中の雑魚
     for (const f of fillers) if (f.layer === "air") drawFiller(f);
+    for (const f of fillers) if (f.rear && f.delay > 0) {   // うしろから来る敵（世界3）: 出てくる前に、下のはしに「！」（10/31-10 試作）
+      ctx.save(); ctx.globalAlpha = 0.6 + 0.4 * Math.sin(t * 14); ctx.font = font(26); ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.lineWidth = 5; ctx.strokeStyle = "#ffffff"; ctx.strokeText("！", f.x, H - 34); ctx.fillStyle = "#c23a6a"; ctx.fillText("！", f.x, H - 34); ctx.restore();
+    }
 
     // 空中の語句の敵
     ctx.textAlign = "center";
@@ -3533,6 +3572,87 @@ const Battle = (() => {
     if (paused) drawSleep();
   }
 
+  // ===== 世界3の発見の旅「無重力」（10/31-10 試作。構想メモ 3 のうち「回転」だけ） =====
+  // 星空を、ことばが回りながら漂う（画面のはしで はね返る）。向きがまっすぐのあいだに指で押さえ続けて hold 秒で見つかる（世界2の箱と同じ「押さえて1秒」）
+  // 押さえているあいだに向きがずれたら、たまった輪はそのまま止まる（はなすと0にもどる）。時間切れなし
+  const angOff = a => Math.abs(((a % (Math.PI * 2)) + Math.PI * 3) % (Math.PI * 2) - Math.PI);   // まっすぐからのずれ（0〜π）
+  const spaceAligned = b => angOff(b.ang) < exMove.align;
+  function spaceSetup() {
+    const ex = explore;
+    ex.queue = shuffle(exploreWords().slice()).map(w => {
+      const size = isShortWord(w) ? Math.round(BATTLE.fontSize.zako * BATTLE.shortScale) : BATTLE.fontSize.zako;
+      ctx.font = font(size);
+      const tw = ctx.measureText(w.word).width;
+      return { word: w, w: tw + 20, h: size * 1.6, hold: 0, open: false, openT: 0, out: false, ang: rand(1.2, 5.1), spin: exMove.spin * rand(0.8, 1.2) * (Math.random() < 0.5 ? 1 : -1),
+        d: { word: w, role: "zako", size, w: tw, h: size * 1.2, x: 0, y: 0, phase: Math.random() * 6, explore: true, last: true, found: false, flash: 0 } };
+    });
+    ex.boxes = []; ex.nextBoxAt = BATTLE.exploreFirst; ex.keyFound = true;
+  }
+  function updateSpace(dt) {
+    const ex = explore, mv = exMove, words = exploreWords();
+    if (!ex.queue) spaceSetup();
+    const minX = stripRight() + 8, maxX = W - 8, minY = 96, maxY = H * 0.78;
+    while (ex.queue.length && ex.t >= ex.nextBoxAt && ex.boxes.filter(b => !b.open).length < mv.maxOn) {
+      const b = ex.queue.shift(), a = Math.random() * Math.PI * 2;
+      Object.assign(b, { x: rand(minX + b.w / 2, maxX - b.w / 2), y: rand(minY + b.h, maxY - b.h), vx: Math.cos(a) * mv.speed, vy: Math.sin(a) * mv.speed });
+      ex.boxes.push(b);
+      ex.nextBoxAt = ex.t + mv.gap;
+    }
+    if (ex.queue.length && ex.boxes.filter(b => !b.open).length >= mv.maxOn) ex.nextBoxAt = Math.max(ex.nextBoxAt, ex.t);
+    let pressed = null;
+    for (const b of ex.boxes) {
+      if (b.open) { b.openT += dt; continue; }
+      b.x += b.vx * dt; b.y += b.vy * dt; b.ang += b.spin * dt;
+      if (b.x - b.w / 2 < minX) { b.x = minX + b.w / 2; b.vx = Math.abs(b.vx); }
+      if (b.x + b.w / 2 > maxX) { b.x = maxX - b.w / 2; b.vx = -Math.abs(b.vx); }
+      if (b.y - b.h / 2 < minY) { b.y = minY + b.h / 2; b.vy = Math.abs(b.vy); }
+      if (b.y + b.h / 2 > maxY) { b.y = maxY - b.h / 2; b.vy = -Math.abs(b.vy); }
+      const r = Math.max(b.w, b.h) / 2;
+      if (press && !pressed && Math.hypot(press.x - b.x, press.y - b.y) < r + 8) pressed = b;
+    }
+    for (const b of ex.boxes) {
+      if (b.open) continue;
+      if (b !== pressed) { b.hold = 0; continue; }
+      if (!spaceAligned(b)) continue;   // 向きがずれているあいだは、たまらない（0にはもどらない）
+      b.hold += dt;
+      if (b.hold >= mv.hold) {
+        b.open = true; b.openT = 0; moved = true;
+        Object.assign(b.d, { x: b.x, y: b.y });
+        findWord(b.d);
+      }
+    }
+    ex.boxes = ex.boxes.filter(b => !(b.open && b.openT > 1.2));
+    exploreOverCheck(words, dt);
+    exploreEndCheck(words, !ex.boxes.some(b => b.open));
+  }
+  function drawSpaceExplore() {
+    const ex = explore;
+    if (ex.boxes) for (const b of ex.boxes) {
+      if (b.open) {   // 見つかった: まっすぐになって、上へのぼって消える
+        const k = Math.min(1, b.openT / 1.2);
+        ctx.font = font(b.d.size);
+        drawWordText(b.d, b.x, b.y - k * 40, Math.max(0, 1 - Math.max(0, k - 0.6) / 0.4));
+        ctx.globalAlpha = 1;
+        continue;
+      }
+      const al = spaceAligned(b);
+      if (al) {   // 向きがそろっている: うすい光の輪
+        ctx.save(); ctx.fillStyle = "rgba(255,240,180,0.22)"; ctx.beginPath(); ctx.ellipse(b.x, b.y, b.w * 0.62, b.h * 0.75, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      }
+      ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.ang);
+      ctx.font = font(b.d.size);
+      drawWordText(Object.assign(b.d, { last: al }), 0, 0, al ? 1 : 0.8);
+      ctx.restore(); ctx.globalAlpha = 1;
+      if (b.hold > 0) {
+        const rr = Math.max(b.w, b.h) * 0.6;
+        ctx.save(); ctx.lineWidth = 5; ctx.lineCap = "round";
+        ctx.strokeStyle = "rgba(255,255,255,0.7)"; ctx.beginPath(); ctx.arc(b.x, b.y, rr, 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = "#e0b03a"; ctx.beginPath(); ctx.arc(b.x, b.y, rr, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, b.hold / exMove.hold)); ctx.stroke();
+        ctx.restore();
+      }
+    }
+  }
+
   // ===== 世界2の発見の旅「箱」の画面（10/31-10 試作。箱とコンベアは仮の図形） =====
   function drawBox(b) {
     const ex = explore, x = b.x + (b.shake > 0 ? Math.sin(b.shake * 60) * 3 : 0), y = b.y, w = b.w, h = b.h;
@@ -3582,7 +3702,7 @@ const Battle = (() => {
   function drawBoxExplore() {
     const ex = explore;
     // コンベア（仮の図形）: レーンごとに横の帯。ローラーの線が流れる
-    if (ex.boxes) for (let i = 0; i < exMove.lanes.length; i++) {
+    if (ex.boxes && !exMove.space) for (let i = 0; i < exMove.lanes.length; i++) {
       const y = laneY(i), bh = exMove.boxH + 18;
       ctx.fillStyle = "rgba(70,84,100,0.92)"; ctx.fillRect(0, y - bh / 2, W, bh);
       ctx.fillStyle = "rgba(150,165,180,0.9)"; ctx.fillRect(0, y - bh / 2, W, 4); ctx.fillRect(0, y + bh / 2 - 4, W, 4);
@@ -3590,7 +3710,8 @@ const Battle = (() => {
       const off = ((ex.belt % 22) + 22) % 22;
       for (let x = -22 + off; x < W + 22; x += 22) { ctx.beginPath(); ctx.moveTo(x, y - bh / 2 + 6); ctx.lineTo(x, y + bh / 2 - 6); ctx.stroke(); }
     }
-    if (ex.boxes) for (const b of ex.boxes) if (!b.out) drawBox(b);
+    if (exMove.space) drawSpaceExplore();   // 世界3の無重力（10/31-10 試作）。コンベアはない
+    else if (ex.boxes) for (const b of ex.boxes) if (!b.out) drawBox(b);
     for (const th of threads) {   // 光の粒
       ctx.globalAlpha = Math.max(0, 1 - th.age / 0.7);
       ctx.fillStyle = th.color; ctx.beginPath(); ctx.arc(th.x, th.y, 2, 0, Math.PI * 2); ctx.fill();
