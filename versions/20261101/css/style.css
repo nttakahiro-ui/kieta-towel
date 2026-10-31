@@ -153,8 +153,8 @@ body { position: fixed; inset: 0; }
 #screen-title.art #btn-start:active { transform: none; background: rgba(30,60,20,0.18); }
 #screen-title.art .title-note { position: absolute; left: 0; right: 0; top: 86.9%; margin: 0; font-size: 10px; font-size: max(10px, 2.7cqw); color: #5b6650; text-shadow: 0 0 3px #fffbe8; }
 /* いちばん下の1行（音・主人公を選びなおす・記録を消す）: 見本より一段小さく薄く、絵のじゃまをしない */
-#screen-title.art .title-links { position: absolute; left: 0; right: 0; top: 93.2%; display: flex; flex-wrap: wrap; justify-content: center; gap: 0 4cqw; white-space: nowrap; }   /* 4つ（10/31-6「オープニングを見る」）が入らない細い画面では2行に */
-#screen-title.art .title-links .link-btn { margin: 0; padding: 4px 2px; font-size: 10px; font-size: max(10px, 2.6cqw); color: rgba(70,80,60,0.6); text-decoration-color: rgba(70,80,60,0.35); text-shadow: 0 0 3px rgba(255,251,232,0.9); }
+#screen-title.art .title-links { position: absolute; left: 0; right: 0; top: min(calc(86.9% + 16px), calc(100% - 40px - env(safe-area-inset-bottom))); display: grid; grid-template-columns: auto auto; justify-content: center; gap: 0 6cqw; white-space: nowrap; }   /* 10/31-7: 4つを2つずつ2行に。Safari の下のバーに隠れないよう「音が出ます」のすぐ下（safe-area より上）に置く */
+#screen-title.art .title-links .link-btn { margin: 0; padding: 2px 2px; font-size: 10px; font-size: max(10px, 2.6cqw); color: rgba(70,80,60,0.6); text-decoration-color: rgba(70,80,60,0.35); text-shadow: 0 0 3px rgba(255,251,232,0.9); }
 #screen-title.art #btn-tune { position: absolute; right: 2%; top: 1%; margin: 0; font-size: 11px; background: rgba(255,255,255,0.75); border-radius: 8px; padding: 2px 6px; }
 
 /* バトル */
@@ -181,9 +181,10 @@ body { position: fixed; inset: 0; }
 
 /* クイズ */
 .quiz-box { max-width: 440px; margin: 0 auto; }
-.quiz-head { display: flex; justify-content: space-between; align-items: center; font-size: 18px; color: var(--green-dark); margin-bottom: 12px; }
-.quiz-dots { display: flex; gap: 5px; }
-.quiz-dots i { width: 12px; height: 12px; border-radius: 50%; background: var(--cream-dark); display: block; }
+.quiz-head { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-size: 18px; color: var(--green-dark); margin-bottom: 12px; }
+#quiz-count { white-space: nowrap; flex-shrink: 0; font-size: 16px; }   /* 「クイズ 1 / 10」は横に1行（10/31-7。細い画面で縦に割れていた） */
+.quiz-dots { display: flex; gap: 4px; min-width: 0; }
+.quiz-dots i { flex-shrink: 0; width: 11px; height: 11px; border-radius: 50%; background: var(--cream-dark); display: block; }
 .quiz-dots i.ok { background: var(--green); }
 .quiz-dots i.ng { background: var(--rose); }
 .quiz-dots i.now { box-shadow: 0 0 0 2px var(--green-dark); }
@@ -255,10 +256,13 @@ body { position: fixed; inset: 0; }
 .stage-row .no { width: 30px; height: 30px; border-radius: 50%; background: var(--green-light); display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0; }
 .stage-row .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 .stage-row .nm { font-size: 17px; font-weight: bold; }
-.stage-row .sub { font-size: 12px; color: #7a8a68; white-space: nowrap; overflow: hidden; }   /* 1行に（10/31-6。入らないときは main.js の fitStageSubs で小さく） */
-.stage-row .marks { display: flex; flex-direction: column; gap: 3px; }
+.stage-row .sub { font-size: 12px; color: #7a8a68; line-height: 1.45; }   /* 10/31-7: 「難易度」「ベスト」「カード」のかたまりごとに折り返す（かたまりの途中では割れない・消えない） */
+.stage-row .sub .si { white-space: nowrap; }
+.stage-row .sub .si + .si { margin-left: 0.9em; }
+.stage-row .marks { display: flex; flex-direction: row; flex-wrap: wrap; gap: 4px; margin-top: 3px; }   /* 印は下の段に横に並べる（10/31-7） */
+.stage-row .marks:empty { display: none; }
 .stage-row.cleared { background: #fffbe6; box-shadow: 0 0 0 3px #f2d27a, 0 0 16px rgba(255, 210, 90, 0.75); }   /* クリアしたステージは枠が光る（10/25-17） */
-.stage-row .row-gem { width: 24px; height: 24px; display: block; margin: 0 auto; }   /* カードが10枚そろったステージの宝石 */
+.stage-row .row-gem { width: 18px; height: 18px; display: block; }   /* カードが10枚そろったステージの宝石 */
 .stage-row .marks { align-items: center; }
 .stage-row .row-tag { display: block; font-size: 9.5px; line-height: 1.3; padding: 1px 6px; border-radius: 999px; white-space: nowrap; text-align: center; }
 .stage-row .row-tag.clear { background: #f3c64e; color: #5e4612; }   /* 「ステージクリア」（10/25-19） */
@@ -266,7 +270,6 @@ body { position: fixed; inset: 0; }
 .world-gems { width: min(calc(100vw - 60px), 300px); margin: 4px auto 0; cursor: pointer; }   /* ステージ一覧のいちばん上: 今いる世界の4つの宝石 */
 .world-gems .rb-svg.world { max-height: 22vh; }
 .stage-row .main { min-width: 0; }
-.stage-row .marks { flex-shrink: 0; gap: 2px; }
 .mark { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 999px; background: #e9e4d4; color: #a8a08a; margin: 0 2px; }
 .mark.on { background: #f3c64e; color: #5e4612; }
 .best-new { font-size: 18px; color: var(--rose); font-weight: bold; margin-top: 6px; }
@@ -442,7 +445,7 @@ body { position: fixed; inset: 0; }
 .sound-btn.muted { opacity: 0.6; }
 
 /* 主人公の絵（10/21-2）。絵の地は紙の色（#fff7ea）なので、「暗いほうを残す」重ね方で画面の色に溶けこませる（切り抜きは本番の絵で） */
-.hero-img { mix-blend-mode: darken; display: block; object-fit: contain; }
+.hero-img { display: block; object-fit: contain; }   /* 10/31-7: 制作側の地が透明な絵（b01〜03・g01〜03） */
 .hero-img.hidden { display: none; }
 .hero-small { width: 54px; height: 96px; flex: none; }
 .hero-mid { width: 110px; height: 196px; margin: 0 auto -8px; }
@@ -555,7 +558,7 @@ body { position: fixed; inset: 0; }
   40% { transform: scale(1.12) rotate(2deg); box-shadow: 0 0 34px 10px rgba(255,220,110,0.95); }
   100% { transform: scale(1); box-shadow: 0 0 16px 4px rgba(255,220,110,0.6); }
 }
-.cards-main { font-size: 22px; padding: 16px 36px; min-width: 240px; }
+.cards-main { font-size: 19px; padding: 14px 12px; width: min(100%, 250px); white-space: nowrap; }   /* 10/31-7: 「救出の旅をもう一度」「クイズをもう一度」を同じ幅で1行に */
 .quiz-get { min-width: 210px; }
 .quiz-get .get-label { white-space: nowrap; }
 /* 10/25-19: 「カードゲット！」は問題文と選択肢のあいだ（選択肢の上）に出す。「とちゅうでやめる」は右上（正解数のそば）に小さく */
@@ -565,7 +568,7 @@ body { position: fixed; inset: 0; }
 .quiz-get .get-label { font-size: 18px; margin-bottom: 4px; }
 .quiz-get .get-card { min-width: 110px; padding: 6px 12px; }
 .quiz-get .get-card .w { font-size: 18px; }
-.quiz-head .quiz-quit { font-size: 11px; opacity: 0.8; margin-left: 8px; white-space: nowrap; }
+.quiz-head .quiz-quit { font-size: 11px; opacity: 0.8; margin: 0 0 0 4px; white-space: nowrap; flex-shrink: 0; }
 
 /* 結果画面の2ページ（10/25-3）: どちらもスクロールなしで画面の高さに収める。横スワイプでも行き来できる */
 #screen-cards { overflow: hidden; }
@@ -579,7 +582,11 @@ body { position: fixed; inset: 0; }
 #cards-p1 .hero-mid { height: min(196px, 26vh); width: auto; }
 #cards-p1 .cards-tiers { margin: 4px auto 6px; }
 #cards-p1 .tier.total { padding: 12px 16px; }
-#cards-p1 .tier.total .vl { font-size: 34px; }
+#cards-p1 .tier.total { flex-direction: column; align-items: center; gap: 2px; }   /* 10/31-7: 1行目「このステージのカード」、2行目に大きく「1 / 10 枚」 */
+#cards-p1 .tier.total { padding: 8px 16px; }
+#cards-p1 .tier.total .vl { font-size: 34px; line-height: 1.15; white-space: nowrap; }
+#cards-p1 .btn-row { margin: 14px 0 0; }   /* 低い画面でも「やめる」まで入るように（10/31-7） */
+#cards-p1 .tier.total .vl small { font-size: 26px; font-weight: bold; }
 #cards-p2 .cards-title { font-size: 20px; margin: 2px 0 8px; }
 .cards-list.compact { gap: 6px; }
 .cards-list.compact .card { padding: 6px 8px; animation: none; min-height: 0; }
@@ -626,7 +633,7 @@ body { position: fixed; inset: 0; }
 .recipe-cheer { display: flex; align-items: center; justify-content: center; gap: 4px; }
 .recipe-fuwari { width: min(78px, 10vh); height: auto; animation: fuwariFlap 0.5s ease-in-out infinite alternate; }
 @keyframes fuwariFlap { from { transform: translateY(2px) rotate(-6deg) scale(0.95); } to { transform: translateY(-8px) rotate(6deg) scale(1.05); } }
-.recipe-remain { margin: 6px 0 0; font-size: 16px; font-weight: bold; color: #8a5a10; min-height: 1.4em; }
+.recipe-remain { white-space: pre-line; margin: 6px 0 0; font-size: 16px; font-weight: bold; color: #8a5a10; min-height: 1.4em; }
 .fx-hide { opacity: 0; pointer-events: none; }
 .fx-show { opacity: 1; transition: opacity .5s; }
 .fx-card { position: absolute; left: 0; top: 0; width: 56px; height: 74px; margin: -37px 0 0 -28px; border-radius: 8px; background: #fffdf7; border: 2px solid #e0b03a;
@@ -655,6 +662,7 @@ body { position: fixed; inset: 0; }
 .ending-box { height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 16px; box-sizing: border-box; text-align: center; }
 .ending-title { font-size: 28px; color: #b0801a; margin: 0 0 8px; }
 .ending-line { font-size: 17px; color: #6b5a3a; margin: 6px 0 14px; }
+.ending-box .btn-main { white-space: nowrap; font-size: 22px; padding: 14px 32px; }   /* 「ステージ一覧へ」は1行（10/31-7） */
 .recipe-box .recipe-name { white-space: pre-line; }
 
 /* ===== 制作側の絵: 世界の帯と3世界の本（11/1） ===== */
@@ -663,7 +671,7 @@ body { position: fixed; inset: 0; }
 .art-slot { position: absolute; transform: translate(-50%, -50%); aspect-ratio: 1; cursor: pointer; }
 .art-slot svg { width: 100%; height: 100%; display: block; overflow: visible; }
 .world-gems:has(.art-band) { width: 100%; margin: 4px 0 0; }   /* ステージ一覧の上の帯は、画面の幅いっぱい */
-.stages-lead { margin: 0 0 2px; text-align: center; font-size: 13px; color: #6b5a3a; }   /* 帯の上の一言（見本 sample_wt01） */
+.stages-lead { margin: 0 0 2px; text-align: center; white-space: pre-line; word-break: keep-all; font-size: 13px; color: #6b5a3a; }   /* 帯の上の一言（見本 sample_wt01） */
 .rb-box:has(.art-book), #screen-recipe .rb-box:has(.art-book) { width: 100%; max-width: 440px; }   /* 本の絵は横長なので幅いっぱい */
 #screen-recipebook:has(.art-book), #screen-recipe:has(.art-book) { background: var(--cream); }   /* 本の絵の地（生成り）と画面の地をそろえる */
 .btn-row.stages-bottom { justify-content: flex-end; }   /* 下の（カード図鑑）（タイトルへ）は見本どおり右寄せ */

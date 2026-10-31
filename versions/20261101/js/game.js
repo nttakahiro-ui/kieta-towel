@@ -2146,9 +2146,9 @@ const Battle = (() => {
       ctx.font = font(e.size);
       const alpha = e.role === "boss" && e.age < BATTLE.bossEnterTime ? 0.55 : 1;   // 降りてくる間はうすく（まだ当たらない）
       const wob = e.flash > 0 ? (Math.random() - 0.5) * 4 : 0;
-      // 影
+      // 影: だ円（10/31-7。前は同じ文字を右下にうすく描いていて、殻が黄色く光ると二重の文字に見えた）
       ctx.fillStyle = "rgba(60,80,40,0.16)";
-      if (!e.vertical) ctx.fillText(e.word.word, e.x + 14, e.y + 22);
+      if (!e.vertical) { ctx.beginPath(); ctx.ellipse(e.x + 14, e.y + 22, e.w * 0.5, e.size * 0.35, 0, 0, Math.PI * 2); ctx.fill(); }
       drawWordText(e, e.x + wob, e.y, alpha);
       ctx.globalAlpha = alpha;
       drawHpDots(e);
@@ -3255,14 +3255,14 @@ const Battle = (() => {
     }
     ctx.restore();
   }
-  // 主人公の絵（assets/hero_男女_ポーズ.jpg）。絵の地は紙の色なので、「暗いほうを残す」重ね方で画面の色に溶けこませる
+  // 主人公の絵（assets/hero_男女_ポーズ.png。10/31-7: 制作側の地が透明な絵）
   const heroImgs = {};
   function drawHero(pose, x, y, h) {
-    const src = `assets/hero_${opts.hero || "boy"}_${pose}.jpg`;
+    const src = `assets/hero_${opts.hero || "boy"}_${pose}.png`;
     const img = heroImgs[src] || (heroImgs[src] = Object.assign(new Image(), { src }));
     if (!img.complete || !img.naturalWidth) return;
     const w = h * img.naturalWidth / img.naturalHeight;
-    ctx.save(); ctx.globalCompositeOperation = "darken"; ctx.drawImage(img, x, y, w, h); ctx.restore();   // 紙の地が消える（画面のほうが暗いので）
+    ctx.drawImage(img, x, y, w, h);
   }
 
   // 旅の表紙（仮の見た目）: 大きく旅の名前と見出し、ふわりの一言。タップで 3・2・1・「○○の旅へ、出発！」
