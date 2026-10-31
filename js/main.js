@@ -308,7 +308,7 @@ const Main = (() => {
   }
 
   let reviewNext = false;    // 「ステージ1でおさらい」: 次のステージ1は、見た記録に関係なく案内を全部出す
-  const heroSrc = pose => `assets/hero_${Save.data.hero || "boy"}_${pose}.jpg`;   // 主人公の絵（point 指さす／think 考える／joy 喜ぶ）
+  const heroSrc = pose => `assets/hero_${Save.data.hero || "boy"}_${pose}.png`;   // 主人公の絵（10/31-7: 制作側の地が透明な絵）（point 指さす／think 考える／joy 喜ぶ）
   // 案内（ステージ1）を結果画面とレシピ完成で出すか。出すなら見た記録をつける
   function screenHint(id) {
     if (stage.id !== 1 || (!reviewing && TutSave.load()[id])) return "";
@@ -450,7 +450,7 @@ const Main = (() => {
     $("ending-title").textContent = tx("ending.title");
     $("ending-line").textContent = tx("ending.line");
     $("ending-next").textContent = tx("ending.next");
-    RecipeBook.render($("ending-book"), { lit: RecipeBook.litIds(Save.data.cards), small: true });
+    RecipeBook.renderBook($("ending-book"), { lit: RecipeBook.litIds(Save.data.cards) });   // 3世界の本（10/31-7。前は扇形の円い台座）
     showScreen("ending");
   }
 
@@ -458,20 +458,6 @@ const Main = (() => {
   // ステージ一覧（10/22-1）: 世界ごとのページ。今いる世界だけ出す。世界のカード（40枚）がそろうとワープのボタン
   const worldStages = id => window.STAGES.filter(s => s.world === id);
   const worldDone = id => worldStages(id).every(s => window.WORDS.filter(w => w.stage === s.id).every(w => Save.data.cards[w.id]));
-  // ステージの札の「難易度○　ベスト○点　カード○/10」は1行に（10/31-6）。入らないときだけ字を小さくする（いちばん小さくて9.5px）。
-  // 4つの札で字の大きさをそろえる（いちばん小さくした札に合わせる）
-  function fitStageSubs() {
-    const els = [...document.querySelectorAll("#stages-list .stage-row .sub")];
-    let min = Infinity;
-    els.forEach(el => {
-      el.style.fontSize = "";
-      if (!el.clientWidth) return;
-      let fs = parseFloat(getComputedStyle(el).fontSize);
-      while (el.scrollWidth > el.clientWidth + 0.5 && fs > 9.5) { fs -= 0.5; el.style.fontSize = `${fs}px`; }
-      min = Math.min(min, fs);
-    });
-    if (min < Infinity) els.forEach(el => { el.style.fontSize = `${min}px`; });
-  }
   function toStages() {
     Battle.stop();
     Sound.play("title");
@@ -503,15 +489,16 @@ const Main = (() => {
       const main = document.createElement("span"); main.className = "main";
       const nm = document.createElement("span"); nm.className = "nm"; nm.textContent = s.name;
       const sub = document.createElement("span"); sub.className = "sub";
-      sub.textContent = open ? `難易度 ${s.difficulty || 1}　ベスト ${b ? b.score : 0}点　カード ${got}/10` : tx("worlds.notReady");
+      if (open) sub.innerHTML = [`難易度 ${s.difficulty || 1}`, `ベスト ${b ? b.score : 0}点`, `カード ${got}/10`].map(t => `<span class="si">${t}</span> `).join("");   // かたまりごとに折り返す（10/31-7）
+      else sub.textContent = tx("worlds.notReady");
       // 10/25-17: 印はやめた。クリアした（救出の旅を最後まで終えた）ステージは枠が光り「ステージクリア」。カードが10枚そろったステージは「10のことば」と宝石の絵（10/25-19）
       if (b) row.classList.add("cleared");
       const marks = document.createElement("span"); marks.className = "marks";
       if (litSet.has(s.id)) marks.innerHTML += `<svg class="row-gem" viewBox="-22 -22 44 44">${GEM_ART(s.gem, true, 19, s.id)}</svg><span class="row-tag full">${tx("stagesTag.full")}</span>`;
       if (b) marks.innerHTML += `<span class="row-tag clear">${tx("stagesTag.clear")}</span>`;
       main.append(nm, sub);
+      if (open) main.appendChild(marks);   // 印は名前と数字の下の段に（10/31-7）
       row.append(no, main);
-      if (open) row.appendChild(marks);
       if (open) row.addEventListener("click", () => { Sound.se("start"); selectStage(s.id); toBattle(); });
       box.appendChild(row);
     });
@@ -523,7 +510,6 @@ const Main = (() => {
     warp.textContent = tx("worlds.warp", { id: wid + 1 });
     warp.onclick = () => warpTo(wid + 1);
     showScreen("stages");
-    fitStageSubs();
     $("screen-stages").scrollTop = 0;
   }
   // ワープの会話の演出（10/25-18）: その世界へ初めてワープするときだけ。約10秒、画面のどこをタップしても最後に飛ぶ。2回目からは下の短い光
