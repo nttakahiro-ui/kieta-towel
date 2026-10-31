@@ -647,6 +647,7 @@ const Battle = (() => {
     layout = opts.stage && opts.stage.patterns === "auto" ? autoLayout(words, P, opts.stage.obstacles, groundOn) : null;
     obsDef = (opts.stage && opts.stage.obstacles) || null;
     theme = Object.assign({}, DEFAULT_THEME, (opts.stage && opts.stage.theme) || {});
+    bugSprites = worldDef.id >= 2 && typeof document.createElement === "function" ? {} : null;   // 世界2・3の虫は、色を変えた絵を前もって作って使い回す（10/31-14）
     weatherDef = (opts.stage && opts.stage.weather) || null;
     fogLevel = 0;
     streaks = Array.from({ length: 22 }, () => ({ x: Math.random() * W, y: Math.random() * H, s: 0.6 + Math.random() * 0.8 }));
@@ -669,6 +670,7 @@ const Battle = (() => {
     hits = 0; downs = 0; lives = BATTLE.lives; gameOvers = 0; scoreAtMain = 0; retryMain = false;
     paused = false; moved = false; groundHinted = false; groundHeld = false; groundIntroShown = false; rearHinted = false; banner = null; shake = 0; showWord = null; threads = []; pops = [];
     slow = 0; wave = null; gauge = 0; bombsUsed = 0; fsay = null; odai = null; bounces = [];
+    fpsT0 = 0; fpsN = 0; fpsNow = 0; fpsMin = 0;
     msgQ = []; msgGap = 0; msgWasBusy = false;
     choiceFree = !!opts.firstChoice;
     tut = null; hintOpts = opts.hints || null; hintShown = {}; hintCard = null; bombHinted = false; bombFlash = 0; powerFx = null; wrongFx = null; extraUsed = false; extraRound = false;
@@ -1193,8 +1195,27 @@ const Battle = (() => {
     update(dt);
     frameNo++;
     draw();
+    countFps(ts);
     syncPauseBtn();
     rafId = requestAnimationFrame(loop);
+  }
+  function countFps(ts) {
+    fpsN++;
+    if (!fpsT0) fpsT0 = ts;
+    const span = ts - fpsT0;
+    if (span >= 500) {
+      if (span < 2000) {   // 画面を切りかえて止まっていたあいだは数えない
+        fpsNow = fpsN * 1000 / span;
+        if (state === "play" && phase !== "round1" && !paused && (!fpsMin || fpsNow < fpsMin)) fpsMin = fpsNow;
+      }
+      fpsT0 = ts; fpsN = 0;
+    }
+    if (opts.showFps && fpsNow) {   // ?tune のときだけ、右下に小さく
+      ctx.save(); ctx.font = font(11); ctx.textAlign = "right"; ctx.textBaseline = "top";
+      ctx.fillStyle = "rgba(0,0,0,0.55)"; ctx.fillRect(W - 92, H - 18, 92, 18);
+      ctx.fillStyle = "#fff"; ctx.fillText(`fps ${Math.round(fpsNow)} 最低 ${Math.round(fpsMin)}`, W - 4, H - 15);
+      ctx.restore();
+    }
   }
   // ひと休み中の絵には右下に「Ⅱ」が描いてあるので、そのあいだは本物の「Ⅱ」のボタンを隠す（11/1。二重にしない）
   let pauseBtnHidden = false;
@@ -3056,16 +3077,45 @@ const Battle = (() => {
     if (f.delay > 0) return;
     const { x, y } = f;
     const r = FILLER_TYPES[f.type].r;
+    const hasFilter = "filter" in ctx;
+    if (bugSprites && hasFilter) {   // 世界2・3: 前もって作った絵を置くだけ（毎フレームの filter と輪郭のぼかしをやめる。10/31-14）
+      const sp = bugSprite(f, f.flash > 0);
+      ctx.save();
+      ctx.translate(x, y);
+      if (f.flash > 0) ctx.translate((Math.random() - 0.5) * 3 * BATTLE.fillerDrawScale, 0);
+      if (f.type === "ladybug") ctx.rotate(f.ang || 0);
+      ctx.drawImage(sp.c, -sp.half, -sp.half, sp.half * 2, sp.half * 2);
+      ctx.restore();
+      fillerHpDots(f);
+      return;
+    }
     ctx.save();
     ctx.globalAlpha = BATTLE.fillerAlpha;
-    const hasFilter = "filter" in ctx;
     if (hasFilter) ctx.filter = [theme.fillerFilter !== "none" ? theme.fillerFilter : "", BATTLE.fillerDark].join(" ").trim() || "none";   // 時間帯の色味＋暗い色
     ctx.shadowColor = BATTLE.fillerOutline; ctx.shadowBlur = 3;   // 濃い輪郭（背景の飾りと見分けやすく。10/21-1）
     ctx.translate(x, y);
     ctx.scale(BATTLE.fillerDrawScale, BATTLE.fillerDrawScale);
     if (!hasFilter) f._darkFallback = true;
     if (f.flash > 0) ctx.translate((Math.random() - 0.5) * 3, 0);
-    const lit = f.flash > 0;
+    fillerShape(f, f.flash > 0);
+    ctx.restore();
+    if (f._darkFallback) {   // filter が使えない端末: 上にうすく暗い色を重ねる
+      ctx.fillStyle = "rgba(30,25,40,0.4)";
+      ctx.beginPath(); ctx.arc(x, y, r * BATTLE.fillerDrawScale * 0.9, 0, Math.PI * 2); ctx.fill();
+    }
+    fillerHpDots(f);
+  }
+  // 硬い雑魚は、のこりの硬さを小さな点で
+  function fillerHpDots(f) {
+    const { x, y } = f;
+    if ((f.maxHp || 1) > 1 && f.hp < f.maxHp) {
+      ctx.fillStyle = "rgba(0,0,0,0.25)";
+      for (let i = 0; i < f.hp; i++) { ctx.beginPath(); ctx.arc(x - (f.hp - 1) * 4 + i * 8, y - f.r - 6, 2.5, 0, Math.PI * 2); ctx.fill(); }
+    }
+  }
+  // 虫の形（drawFiller と、世界2・3の前もって作る絵で使う）
+  function fillerShape(f, lit) {
+    const r = FILLER_TYPES[f.type].r;
     if (drawBug(f, lit)) { /* 時間帯の虫（仮の図形） */ }
     else if (f.type === "ladybug") {
       ctx.rotate((f.ang || 0) + (f.dir > 0 ? Math.PI / 2 : -Math.PI / 2));
@@ -3123,16 +3173,34 @@ const Battle = (() => {
       ctx.fillStyle = "#f2a7bd";
       for (const [dx, dy] of [[-5, -4], [6, 2], [-1, 7]]) { ctx.beginPath(); ctx.arc(dx, dy, 3, 0, Math.PI * 2); ctx.fill(); }
     }
-    ctx.restore();
-    if (f._darkFallback) {   // filter が使えない端末: 上にうすく暗い色を重ねる
-      ctx.fillStyle = "rgba(30,25,40,0.4)";
-      ctx.beginPath(); ctx.arc(x, y, r * BATTLE.fillerDrawScale * 0.9, 0, Math.PI * 2); ctx.fill();
-    }
-    // 硬い雑魚は、のこりの硬さを小さな点で
-    if ((f.maxHp || 1) > 1 && f.hp < f.maxHp) {
-      ctx.fillStyle = "rgba(0,0,0,0.25)";
-      for (let i = 0; i < f.hp; i++) { ctx.beginPath(); ctx.arc(x - (f.hp - 1) * 4 + i * 8, y - f.r - 6, 2.5, 0, Math.PI * 2); ctx.fill(); }
-    }
+  }
+  // 世界2・3の虫の絵: 種類・光っているか・向き・羽ばたきの段（12段）ごとに、色を変えて輪郭をつけた絵を1回だけ作る（10/31-14）
+  // 作り方は drawFiller とまったく同じ（同じ filter・輪郭・濃さで、別の小さな canvas に描く）。てんとう虫の向き（ang）だけは置くときに回す
+  let bugSprites = null;
+  const BUG_STEPS = 12;
+  const BUG_CYCLE = { butterfly: [Math.PI / 14, "age"], moth: [Math.PI / 14, "age"], bat: [Math.PI / 14, "age"], dragonfly: [Math.PI / 14, "age"],
+    ladybug: [Math.PI * 2 / 40, "t"], bee: [Math.PI * 2 / 45, "t"], ghost: [Math.PI * 2 / 7, "t"], weed: [Math.PI, "t"] };   // 羽ばたき・ゆれの1回りの秒数と、もとにする時間
+  function bugSprite(f, lit) {
+    const cy = BUG_CYCLE[f.type];
+    const step = cy ? Math.floor((((cy[1] === "age" ? f.age : t) % cy[0]) + cy[0]) % cy[0] / cy[0] * BUG_STEPS) % BUG_STEPS : 0;
+    const dir = f.type === "dragonfly" || f.type === "ladybug" ? ((f.dir || 1) > 0 ? 1 : -1) : 1;
+    const key = f.type + (lit ? "+" : "-") + dir + ":" + step + "@" + dpr;
+    if (bugSprites[key]) return bugSprites[key];
+    const half = (Math.max(24, FILLER_TYPES[f.type].r * 1.35) + 4) * BATTLE.fillerDrawScale + 4;   // 絵の半分の大きさ（CSS px。羽・輪郭のぼかしが入るように）
+    const c = document.createElement("canvas");
+    c.width = c.height = Math.ceil(half * 2 * dpr);
+    const g = c.getContext("2d"), keepCtx = ctx, keepT = t;
+    const ph = cy ? (step + 0.5) / BUG_STEPS * cy[0] : 0;
+    try {
+      ctx = g; if (cy && cy[1] === "t") t = ph;
+      ctx.setTransform(dpr, 0, 0, dpr, c.width / 2, c.height / 2);
+      ctx.globalAlpha = BATTLE.fillerAlpha;
+      ctx.filter = [theme.fillerFilter !== "none" ? theme.fillerFilter : "", BATTLE.fillerDark].join(" ").trim() || "none";
+      ctx.shadowColor = BATTLE.fillerOutline; ctx.shadowBlur = 3;
+      ctx.scale(BATTLE.fillerDrawScale, BATTLE.fillerDrawScale);
+      fillerShape({ type: f.type, age: cy && cy[1] === "age" ? ph : 0, dir, ang: 0 }, lit);
+    } finally { ctx = keepCtx; t = keepT; }
+    return (bugSprites[key] = { c, half });
   }
 
   // 地上の語句: 畑にうまった土の盛り上がりの上に文字
@@ -4170,6 +4238,8 @@ const Battle = (() => {
 
   // 操作のヒント（「指で双眼鏡を動かそう」など）は点滅させず、出るときに0.6秒かけてふわっと現れる（10/25-12）
   let moveHintAt = null, moveHintFrame = -1, frameNo = 0;
+  // 1秒あたりの描画回数（fps。調整パネルで見る。10/31-14）: 0.5秒ごとの今の値と、バトルが始まってからの最低値（救出の旅と大ボスのあいだ）
+  let fpsT0 = 0, fpsN = 0, fpsNow = 0, fpsMin = 0;
   function hintFadeIn() {
     if (moveHintAt === null || frameNo - moveHintFrame > 2) moveHintAt = t;   // しばらく出ていなかったら、もう一度ふわっと（時間はゲームの時間）
     moveHintFrame = frameNo;
@@ -4457,5 +4527,5 @@ const Battle = (() => {
     },
   };
 
-  return { start, stop, resize, pause, resume, choiceRects, tutorialSlides, debug };   // （自動プレイヤーで確かめるときは、ここで中の状態を外に出している）
+  return { start, stop, resize, pause, resume, choiceRects, tutorialSlides, debug, fps: () => ({ now: fpsNow, min: fpsMin }) };   // （自動プレイヤーで確かめるときは、ここで中の状態を外に出している）
 })();

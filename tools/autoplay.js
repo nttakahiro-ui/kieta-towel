@@ -25,9 +25,21 @@ function runOnce(skill, seed) { HUDLOG.rows.push(["--", skill]); HUDLOG.lastK = 
   vm.runInContext(fs.readFileSync(P + "data/stages.js", "utf8"), sb);
   vm.runInContext(fs.readFileSync(P + "data/texts.js", "utf8"), sb);
   let src = fs.readFileSync(P + "js/game.js", "utf8");
-  src = src.replace(/return \{ start, stop, resize, pause[^}]*\};.*/, "return { start, stop, resize, pause, peek: () => ({ extraButtons, player, enemies, ebullets, fillers, gauge, state, phase, bombButton, odai, sortieNo, choiceRects, loadout, obs, guide, fsay, fogLevel, explore, bino, reacted, t, tut, rest }) };");
+  src = src.replace(/return \{ start, stop, resize, pause.*/, "return { start, stop, resize, pause, peek: () => ({ extraButtons, player, enemies, ebullets, fillers, gauge, state, phase, bombButton, odai, sortieNo, choiceRects, loadout, obs, guide, fsay, fogLevel, explore, bino, reacted, t, tut, rest }) };");
   // ザコの語句の殻がほどけた高さ（画面の高さに対する割合）と、そのときのパワーの段階（10/25-8）
   src = src.replace("function absorb(e) {", "function absorb(e) { if (e.role === 'zako' && !e.ground) if (e.pattern !== 'odai') ABSY.push([e.y / H, POWER_LEVELS.indexOf(level), e.pattern]);");
+  // わざとのスローを数える（SLOWLOG=1。救出の旅と大ボスのあいだだけ。10/31-14）
+  if (process.env.SLOWLOG) {
+    const R = (tag, v) => `(phase !== "round1" && SLOWREC(${JSON.stringify(tag)}, ${v}))`;
+    src = src.replace("slow = BATTLE.slowTime;", R("助けた瞬間", "BATTLE.slowTime") + "; slow = BATTLE.slowTime;")
+      .split("slow = Math.max(slow, BATTLE.hintSlow)").join("slow = Math.max(slow, " + R("初めての案内", "BATTLE.hintSlow") + " || BATTLE.hintSlow)")
+      .replace("slow = Math.max(slow, BATTLE.guideSlow);", R("木・柱の案内", "BATTLE.guideSlow") + "; slow = Math.max(slow, BATTLE.guideSlow);")
+      .split("slow = odai.intro;").join(R("お題を読む", "odai.intro") + "; slow = odai.intro;")
+      .replace("odai.step = 0; odai.show = 1.8;", "odai.step = 0; odai.show = 1.8; " + R("順のまちがい", "1.8") + ";")
+      .split("banner = {").join("banner = " + R("出来事などの帯", "0") + " || {")
+      .replace("if (slow > 0) { slow -= realDt;", "if (slow > 0) { if (phase !== \"round1\") SLOWREC(\"ゆっくりの秒数\", realDt); slow -= realDt;");
+  }
+  sb.SLOWREC = (tag, v) => { const c = SLOW_ALL[curSkill] = SLOW_ALL[curSkill] || {}; c[tag] = c[tag] || [0, 0]; if (tag !== "ゆっくりの秒数") c[tag][0]++; c[tag][1] += v; return false; };
   sb.HUDLOG = HUDLOG;
   sb.ABSY = ABSY_ALL[curSkill] = ABSY_ALL[curSkill] || [];
   vm.runInContext(src + ";this.Battle=Battle;", sb);
@@ -169,7 +181,7 @@ function runOnce(skill, seed) { HUDLOG.rows.push(["--", skill]); HUDLOG.lastK = 
   }
   return { ids: ended || [], stats, words, foundN, baseN, exploreSec, bossSec, loadout: sb.Battle.peek().loadout, odaiMiss: (stats && stats.missed || []).filter(id => words.find(w => w.id === id && w.role !== "zako")).length };
 }
-const ABSY_ALL = {}, PAT = {}; let curSkill = "";
+const ABSY_ALL = {}, PAT = {}, SLOW_ALL = {}; let curSkill = "";
 const out = {};
 for (const [name, sk] of Object.entries(SKILLS).filter(([n]) => !process.env.ONLY || n === process.env.ONLY)) {
   const n = Math.round(RUNS / 3);
@@ -202,4 +214,5 @@ const miss = {};
 for (const r of all) for (const id of r.stats.missed) miss[id] = (miss[id] || 0) + 1;
 { const byP = {}; for (const w of words) if (PAT[w.id]) { const k = PAT[w.id]; byP[k] = byP[k] || [0, 0]; byP[k][0] += all.length; byP[k][1] += miss[w.id] || 0; }
   console.log("ザコの取り逃がし（動きの型ごと）: " + Object.entries(byP).map(([k, v]) => `${k} ${Math.round(100 * v[1] / v[0])}%`).join(" ")); }
+if (process.env.SLOWLOG) for (const [name, c] of Object.entries(SLOW_ALL)) { const n = out[name].length; console.log(`わざとのスロー ${name}（1回あたり）: ` + Object.entries(c).map(([k, v]) => k === "ゆっくりの秒数" ? `${k} ${(v[1] / n).toFixed(1)}秒` : `${k} ${(v[0] / n).toFixed(1)}回`).join(" ／ ")); }
 console.log("取り逃がし率: " + words.filter(w => w.role !== "boss").map(w => `${w.word}${Math.round(100 * (miss[w.id] || 0) / all.length)}%`).join(" "));
