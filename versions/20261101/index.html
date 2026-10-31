@@ -12,10 +12,18 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap">
-  <link rel="stylesheet" href="css/style.css?v=72">
+  <link rel="stylesheet" href="css/style.css?v=74">
 </head>
 <body>
   <div id="app">
+    <!-- オープニング（10/31-6）: 絵1枚＋その下の文の11画面。記録がない最初の起動のときと、タイトルの「オープニングを見る」から -->
+    <section id="screen-opening" class="screen">
+      <div id="op-blur" class="op-blur"></div>
+      <img id="op-img" class="op-img" alt="">
+      <div id="op-text" class="op-text"></div>
+      <div id="op-foot" class="op-foot"><span id="op-tap"></span><span id="op-page"></span></div>
+      <button id="op-skip" class="op-skip"></button>
+    </section>
     <!-- 目的の画面（ゲームを初めて開いたときだけ。10/21-2） -->
     <section id="screen-intro" class="screen">
       <div class="intro-box">
@@ -58,6 +66,7 @@
           <button id="btn-sound" class="link-btn sound-btn"></button>
           <button id="btn-hero" class="link-btn"></button>
           <button id="btn-reset" class="link-btn">記録を消す</button>
+          <button id="btn-opening" class="link-btn"></button>
         </div>
         <button id="btn-tune" class="link-btn hidden">調整パネル</button>
       </div>
@@ -257,14 +266,14 @@
   <!-- 横向きのとき -->
   <div id="rotate"><div><div class="rotate-icon"></div><p>縦にしてね</p></div></div>
 
-  <script src="data/words.js?v=72"></script>
-  <script src="data/stages.js?v=72"></script>
-  <script src="data/texts.js?v=72"></script>
-  <script src="js/audio.js?v=72"></script>
-  <script src="js/game.js?v=72"></script>
-  <script src="js/quiz.js?v=72"></script>
-  <script src="js/cards.js?v=72"></script>
-  <script src="js/recipebook.js?v=72"></script>
-  <script src="js/main.js?v=72"></script>
+  <script src="data/words.js?v=74"></script>
+  <script src="data/stages.js?v=74"></script>
+  <script src="data/texts.js?v=74"></script>
+  <script src="js/audio.js?v=74"></script>
+  <script src="js/game.js?v=74"></script>
+  <script src="js/quiz.js?v=74"></script>
+  <script src="js/cards.js?v=74"></script>
+  <script src="js/recipebook.js?v=74"></script>
+  <script src="js/main.js?v=74"></script>
 </body>
 </html>
