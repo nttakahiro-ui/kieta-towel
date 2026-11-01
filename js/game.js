@@ -106,11 +106,11 @@ const BATTLE = {
   odaiMaxLines: 3,             // 問題文の行数の上限
   odaiFitFont: 14,             // 問題文の文字の大きさのいちばん下（px。10/25-3）
   odaiMinFont: 12,             // （3行にしても14pxで入らないときだけ、ここまで小さくする）
-  odaiTimeLimit: 20,           // 中ボスのお題の制限時間（秒）。時間切れは取り逃がし。大ボスは制限なし
+  odaiTimeLimit: 30,           // 中ボスのお題の制限時間（秒。11/1-2 決定で20→30。人は自動の1.5倍かかるため）。時間切れは取り逃がし。大ボスは制限なし
   odaiPenalty: 300,            // ダミーに当てたときの減点（コンボは切らない）
   odaiPenaltyCool: 1,          // 同じダミーで続けて減点しない秒数（連射で何度も減らないように）
   odaiBonus: 2000,             // 最初に当てたのが本物なら「ひらめき」ボーナス
-  odaiHpByShots: true,   // お題の殻の硬さを、出たときの光の本数に比例させる（11/1。パワーを保つと、1つ目の中ボスと2つ目で秒数が大きく変わるため。ザコと同じ考え）
+  odaiHpByShots: 0.25,   // お題の殻の硬さを、出たときの光の本数に半分だけ比例させる（1本で1.0倍、2本で1.25倍、3本で1.5倍。11/1-2 決定。前は本数に比例）
   odaiColumns: [0.15, 0.5, 0.85], // 3つの語句をならべる列の位置（画面の幅に対する割合）。縦書きで動かさない（11/1 決定: 前は 0.2・0.5・0.8。パワーを保つので外側へ）
   odaiColumns2: [0.2, 0.8],     // 2つのとき（「どっち？」「次は？」）の列（11/1 決定: 前は 0.3・0.7）
   odaiTextScale: 0.8,           // お題のことばの文字の大きさの倍率（11/1 決定: よけるすきまを広げる。読む時間は変えない）
@@ -121,6 +121,10 @@ const BATTLE = {
   odaiShots: { aimGap: 0.18, sweepCols: 7, sweepGap: 0.12, ringN: 6, rainSlant: 0.45, speed: { aim: 1, sweep: 1, ring: 0.85, rain: 1 }, gap: { fan: 1.4, aim: 1.4, sweep: 1.4, ring: 1.4, rain: 1.4 } },
   rearRate: 0.35,
   gravityDrift: 46,             // 出来事「重力が変わる」: ことばが横に流される速さ（px/秒）（10/31-10 試作）
+  // 出来事「ねじが飛んでくる」（世界2）と「星がはじける」（世界3）（11/1-2 決定）。warn ＝ 先に出す印の秒数
+  screwEvent: { n: [3, 5], warn: 1.5, gap: 0.35, vx: 210, vy: 120 },
+  burstEvent: { every: 3, warn: 2, n: 8, speed: 140 },
+  fastConveyor: 2,              // 出来事「コンベアが急に速くなる」: 地面と動く地上のことば・地上の雑魚の速さの倍率（11/1-2 決定）
   meteorGap: 0.45, meteorSpeed: 300,   // 出来事「流星雨」: 上から流れ星の弾が落ちてくる間隔（秒）と速さ（px/秒）（10/31-10 試作）               // 世界3: 雑魚の群れのうち、うしろ（画面の下）から来る割合（10/31-10 試作）
 
   // --- バトルの中の坂（探検 → 本番 → 大ボスで、だんだん濃くなる） ---
@@ -199,11 +203,11 @@ const BATTLE = {
     fillerDensity: [[1, 0.6], [12, 1.6]],     // 救出の旅の虫の濃さ（数と間隔。虫1匹の弾の量は変えない）
     zakoHp:        [[1, 9], [12, 8]],         // ザコの語句の硬さ（弾1本あたり。0.1きざみ）。10/25-1: 4〜5、10/25-8: 10〜11（中央あたり）、10/25-11: 9〜8（中央より少し手前、高さ30〜50%でほどけるように。ステージ1〜4で1〜2割下げ。速いステージほど少しやわらかく）
     fillerHp:      [[1, 1], [12, 3]],         // 虫の硬さの倍率（四捨五入）。10/25-1: 耐久は主に虫で上げる
-    bossHpScale:   [[1, 2.27], [2, 1.85], [3, 1.8], [4, 1.53], [5, 1.79], [6, 1.89], [7, 1.71], [8, 2.03], [9, 1.77], [10, 1.83], [11, 1.95], [12, 1.66]],   // 大ボスの1文字あたりの耐久の倍率（11/1 から中ボスは midHpScale）
+    bossHpScale:   [[1, 4.54], [2, 4.28], [3, 4.17], [4, 3.54], [5, 3.58], [6, 3.62], [7, 3.58], [8, 4.06], [9, 3.89], [10, 3.6], [11, 3.73], [12, 3.38]],   // 大ボスの1文字あたりの耐久の倍率（11/1 から中ボスは midHpScale）
     //   11/1 決定: お題のあいだもパワーを保つので、ステージ1〜12の線を引き直した。自動のふつうで大ボス戦が30〜35秒になる値。お題の殻は、出たときの光の本数をかけた硬さ（odaiHpByShots）
     //   10/31-12 決定: 中ボス・大ボスの硬さの線は、ステージ5〜12を実測で通る値に引き直す（世界1は変えない）。1〜4 は前の線（1.1 と 12 で 2 を結ぶ線）のまま（4 の値はその線の上）。
     //   5〜12 は自動プレイヤーで大ボス戦が終わる値（7・9・10 は 1.2、12 は 1.0。前は stages.js の override。5・6・8・11 は前の線の値）
-    midHpScale:    [[1, 3.79], [2, 3.18], [3, 3.31], [4, 2.8], [5, 5.18], [6, 4.66], [7, 3.07], [8, 3.37], [9, 4.67], [10, 4.7], [11, 4.29], [12, 4.57]],   // 中ボスの硬さの倍率（11/1 決定で大ボスと分けた。自動のふつうで中ボスのお題が12〜15秒になる値）
+    midHpScale:    [[1, 4.97], [2, 4.0], [3, 5.02], [4, 3.74], [5, 8.8], [6, 7.5], [7, 5.3], [8, 5.6], [9, 8.27], [10, 8.64], [11, 7.98], [12, 8.19]],   // 中ボスの硬さの倍率（11/1 決定で大ボスと分けた。自動のふつうで中ボスのお題が12〜15秒になる値）
     tricky:        [[1, 0], [12, 6.2]],       // 意地の悪い語句の数（四捨五入。patterns が "auto" のステージだけ）
   },
 
@@ -286,7 +290,8 @@ const EXPLORE_MOVES = {
   // 世界2「箱」（10/31-10 試作。構想メモ 2）: 双眼鏡と暗闇は使わない。コンベア（lanes ＝ 画面の高さに対する割合）の上を箱が流れ、指で押さえ続けて hold 秒で開く
   //   boxW・boxH ＝ 箱の大きさ（px）、speed ＝ 流れる速さ（px/秒）、gap ＝ 箱が出てくる間隔（秒）、wait ＝ 流れきった箱が戻ってくるまで（秒）、empty ＝ 空箱の数
   //   open ＝ true で「OPEN」の面が上のときだけ開く（openTime ＝ OPEN の面が上にある秒数、faceTime ＝ ほかの面の秒数）、lock ＝ 鍵つきの箱の数（先に鍵の箱を開ける）
-  box:     { box: true, boxW: 88, boxH: 64, speed: 32, gap: 2.6, wait: 2, empty: 2, hold: 1, lanes: [0.3, 0.52, 0.74], open: false, openTime: 4, faceTime: 0.5, lock: 0 },   // 10/31-13 決定: OPEN の面は4秒、ほかの面は0.5秒×3（前は2.4秒・0.6秒）
+  box:     { box: true, boxW: 88, boxH: 64, speed: 32, gap: 1.82, wait: 2, empty: 4, hold: 0.5, lanes: [0.3, 0.52, 0.74], open: false, openTime: 4, faceTime: 0.5, lock: 0, fake: 0 },   // 11/1-2 決定: 押さえる時間1→0.5秒、空箱2→4個、出てくる間隔0.7倍（2.6→1.82秒）。fake ＝ にせOPEN の箱の数（OPEN と書いてあるが空）
+    // 10/31-13 決定: OPEN の面は4秒、ほかの面は0.5秒×3（前は2.4秒・0.6秒）
   // 世界3「無重力」（10/31-10 試作。構想メモ 3 の、いちばん単純な形）: ことばが回りながら漂う。向きのずれが align（ラジアン）までのときに指で押さえると、
   //   turn 秒でまっすぐに向き直り、そこから hold 秒で見つかる（押さえているあいだは回らない。はなすとまた回り出す。10/31-14）
   //   speed ＝ 漂う速さ（px/秒）、spin ＝ 回る速さ（ラジアン/秒）、maxOn ＝ 同時に漂う数の上限、gap ＝ 次のことばが出てくる間隔（秒）。くっつき・照らすは入れていない
@@ -534,6 +539,8 @@ const Battle = (() => {
   let skill = "clear", skills = ["clear"];   // 選んでいる必殺ワザと、持っているワザ（main.js の opts.skill・opts.skills）
   let stopT = 0, guardT = 0, showerFx = null;   // 時間止め・無敵タイムの残り秒、光のシャワーの演出
   let meteorT = 0;   // 流星雨の次の1つまで（世界3。10/31-10 試作）
+  let bgOff = 0, bgGo = false;   // 救出の旅の背景の絵の流れた量と、流しはじめたか（1語目が出てから。11/1-2 決定）
+  let evPlans = {};   // 出来事「ねじ」「星がはじける」の段取り（11/1-2）
   let events = [], rescueT = 0, evShown = {};   // このステージの出来事（stages.js の event）、救出の旅の経過秒、出来事の帯を出したか
   let press = null;          // 世界2の箱の発見の旅: 指が押さえている場所 { x, y }
 
@@ -698,7 +705,7 @@ const Battle = (() => {
     skills = (opts.skills && opts.skills.length ? opts.skills : ["clear"]).filter(id => SKILL_IDS.includes(id));
     skill = skills.includes(opts.skill) ? opts.skill : skills[0];
     LOADOUT_VARS.skill = skillName(skill);
-    stopT = 0; guardT = 0; showerFx = null; rescueT = 0; evShown = {}; press = null;
+    stopT = 0; guardT = 0; showerFx = null; rescueT = 0; evShown = {}; evPlans = {}; bgOff = 0; bgGo = false; press = null;
     events = (opts.stage && opts.stage.event) ? [].concat(opts.stage.event) : [];
     // 救出の旅をもう一度（10/25-14。結果画面のボタン）: 発見の旅をとばして、持ち物選択から。発見で見つけたことばの記録（opts.foundIds）は残す
     if (opts.foundIds) {
@@ -873,6 +880,66 @@ const Battle = (() => {
   const evOn = e => { const tt = e.sortie === 1 ? (phase === "round1" && explore ? explore.t : -1) : (phase !== "round1" && !odai ? rescueT : -1); return tt >= e.at && tt < e.at + e.dur; };
   function evActive(kind) {
     return events.some(e => e.kind === kind && evOn(e));
+  }
+  const convFast = () => evActive("fast") ? BATTLE.fastConveyor : 1;   // 出来事「コンベアが急に速くなる」（11/1-2）
+  // 出来事「ねじが飛んでくる」「星がはじける」の段取り（11/1-2 決定）。時刻は出来事が始まってからの秒（救出の旅の時計。お題のあいだは進まない）
+  //   ねじ: 3〜5個。横のはし（左右どちらか）に warn 秒「！」を出してから、ななめに飛んでくる。地上の雑魚と同じ金属の色
+  //   星: every 秒ごとに1か所が warn 秒光り、そのあと小さな弾が輪で広がる
+  function evPlan(e) {
+    const key = e.kind + e.at;
+    if (evPlans[key]) return evPlans[key];
+    const list = [];
+    if (e.kind === "screw") {
+      const C = BATTLE.screwEvent, n = C.n[0] + Math.floor(Math.random() * (C.n[1] - C.n[0] + 1)), side = Math.random() < 0.5 ? -1 : 1;
+      for (let i = 0; i < n; i++) list.push({ t: C.warn + i * C.gap, side, y: rand(H * 0.12, H * 0.5) });
+    } else {
+      const C = BATTLE.burstEvent;
+      for (let t0 = 0; t0 + C.warn < e.dur; t0 += C.every) list.push({ t0, t: t0 + C.warn, x: rand(stripRight() + 40, W - 40), y: rand(H * 0.18, H * 0.5) });
+    }
+    return (evPlans[key] = list);
+  }
+  function evShots() {
+    for (const e of events) {
+      if (e.sortie !== 2 || (e.kind !== "screw" && e.kind !== "burst") || !evOn(e)) continue;
+      const tt = rescueT - e.at;
+      for (const q of evPlan(e)) {
+        if (q.done || tt < q.t) continue;
+        q.done = true;
+        if (e.kind === "screw") {
+          const C = BATTLE.screwEvent;
+          ebullets.push({ x: q.side < 0 ? stripRight() + 6 : W + 10, y: q.y, vx: -q.side * C.vx, vy: C.vy, kind: "screw" });
+          Sound.se("boing");
+        } else {
+          const C = BATTLE.burstEvent;
+          for (let i = 0; i < C.n; i++) { const a = i * Math.PI * 2 / C.n; ebullets.push({ x: q.x, y: q.y, vx: Math.cos(a) * C.speed, vy: Math.sin(a) * C.speed, kind: "spark" }); }
+          addPop(q.x, q.y, "#ffffff", 0.8, false);
+          Sound.se("pop");
+        }
+      }
+    }
+  }
+  // 「！」と光る星（先に出す印）
+  function drawEvWarn() {
+    for (const e of events) {
+      if (e.sortie !== 2 || (e.kind !== "screw" && e.kind !== "burst") || !evOn(e)) continue;
+      const tt = rescueT - e.at;
+      for (const q of evPlan(e)) {
+        if (q.done || tt < (e.kind === "screw" ? q.t - BATTLE.screwEvent.warn : q.t0)) continue;
+        const blink = 0.55 + 0.45 * Math.sin(t * 14);
+        ctx.save();
+        if (e.kind === "screw") {
+          const x = q.side < 0 ? stripRight() + 16 : W - 16;
+          ctx.globalAlpha = blink; ctx.fillStyle = "#e0402a"; ctx.font = font(30); ctx.textAlign = "center"; ctx.textBaseline = "middle";
+          ctx.fillText("！", x, q.y);
+        } else {
+          const k = 1 - (q.t - tt) / BATTLE.burstEvent.warn, r = 8 + 18 * k;
+          const g = ctx.createRadialGradient(q.x, q.y, 0, q.x, q.y, r * 2);
+          g.addColorStop(0, `rgba(255,255,240,${0.5 + 0.5 * blink})`); g.addColorStop(1, "rgba(255,240,160,0)");
+          ctx.fillStyle = g; ctx.beginPath(); ctx.arc(q.x, q.y, r * 2, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.restore();
+      }
+    }
   }
   // 出来事が始まった瞬間に帯を1回（発見の旅と救出の旅で、それぞれ1回）
   function evBanners() {
@@ -1077,7 +1144,7 @@ const Battle = (() => {
       const n = Math.max(1, deco.filter(d => !d).length);
       const lim = BATTLE.perCharHp[role];
       const per = BATTLE.hpOverride[role] ||
-        Math.min(lim.max, Math.max(lim.min, Math.round(BATTLE.wordTotalHp[role] * (role === "mid" ? P.midHpScale : P.bossHpScale) * (od && BATTLE.odaiHpByShots ? level.spread.length : 1) / n)));
+        Math.min(lim.max, Math.max(lim.min, Math.round(BATTLE.wordTotalHp[role] * (role === "mid" ? P.midHpScale : P.bossHpScale) * (od && BATTLE.odaiHpByShots ? 1 + BATTLE.odaiHpByShots * (level.spread.length - 1) : 1) / n)));
       const ws = chars.map(ch => ctx.measureText(ch).width);
       const total = ws.reduce((a, b) => a + b, 0);
       let ox = -total / 2, k = 0;
@@ -1279,10 +1346,11 @@ const Battle = (() => {
     player.glow = Math.max(0, player.glow - dt);
     player.hurt = Math.max(0, player.hurt - dt);
     if (banner) { banner.t -= dt; if (banner.t <= 0) banner = null; }
-    const sc = frozen() ? 0 : scrollSpeed() * (evActive("reverse") ? -1 : 1);   // 時間止めのあいだは地面も止まる。救出の旅の出来事「コンベアが逆」では、地面の流れが逆（上へ。10/31-13）
+    const sc = frozen() ? 0 : scrollSpeed() * (evActive("reverse") ? -1 : 1) * convFast();   // 時間止めのあいだは地面も止まる。救出の旅の出来事「コンベアが逆」では、地面の流れが逆（上へ。10/31-13）
 
     // 地面・雲の影・綿毛（奥行きのために、速さを変えて流す）
     for (const s of terrain) s.y += sc * dt;
+    if (bgGo && !odai && state === "play" && phase !== "round1") bgOff += sc * dt;   // 背景の絵: 1語目が出るまでと、お題のあいだ・終わりは止める（11/1-2 決定）
     fillTerrain();
     for (const c of cloudShadows) { c.y += sc * 1.5 * dt; c.x += 8 * dt; if (c.y - c.ry > H) { c.y = -c.ry - rand(0, 200); c.x = rand(0, W); } }
     for (const f of fluff) { f.y += f.v * dt; f.x += Math.sin(t + f.p) * 8 * dt; if (f.y > H + 10) { f.y = -10; f.x = Math.random() * W; } }
@@ -1321,6 +1389,7 @@ const Battle = (() => {
     if (!frozen() && !odai) rescueT += dt;   // 救出の旅の経過（出来事の時刻。10/31-10 試作）。お題のあいだは進めない（10/31-13）
     evBanners();
     // 出来事「流星雨」（世界3。10/31-10 試作）: 上から、少しななめに流れ星の弾が落ちてくる（お題のあいだと時間止めのあいだは出ない）
+    if (!odai && !frozen()) evShots();
     if (evActive("meteor") && !odai && !frozen()) {
       meteorT -= dt;
       if (meteorT <= 0) { meteorT = BATTLE.meteorGap * rand(0.7, 1.3); ebullets.push({ x: rand(stripRight() + 10, W + 40), y: -10, vx: -BATTLE.meteorSpeed * 0.25, vy: BATTLE.meteorSpeed, kind: "zako" }); }
@@ -1366,6 +1435,7 @@ const Battle = (() => {
           // 横切る語句は、通る高さに木があるあいだは出さない（木をよけながら横に追えないので。10/25-9）
           if (patOf(w).pattern === "cross" && !isShortWord(w) && obs.some(o => Math.abs(o.y - H * BATTLE.crossY) < o.r + H * 0.2)) { nextAt = roundT; break; }
           nextIdx++;
+          if (phase !== "round1") bgGo = true;
           nextAt += roundInterval();
           if (phase === "round2" && BATTLE.odai && w.role === "mid") { startOdai(w, false); break; }
           spawn(w);
@@ -1449,7 +1519,7 @@ const Battle = (() => {
         if (e.popT !== undefined) e.popT += dt;
         if (gMoves(e)) {   // 動く: コンベアに乗って横に動き、はしで折り返す。出来事「コンベアが逆」では逆向き
           const d = evActive("reverse") ? -1 : 1, lo = stripRight() + e.w / 2 + 16, hi = W - e.w / 2 - 16;
-          e.x += e.vx * d * dt;
+          e.x += e.vx * d * convFast() * dt;
           if (e.x < lo) { e.x = lo; e.vx = Math.abs(e.vx) * d; }
           if (e.x > hi) { e.x = hi; e.vx = -Math.abs(e.vx) * d; }
         }
@@ -1537,7 +1607,7 @@ const Battle = (() => {
         f.y += sc * dt;     // 地上の雑魚は地面といっしょに流れる
         if (worldDef.id === 2) {   // 世界2の地上の雑魚（11/1 決定）: コンベアに乗って横にすべる。はしで折り返す。「コンベアが逆」では逆向き
           if (!f.slide) f.slide = f.x < W / 2 ? 1 : -1;
-          f.x += f.slide * BATTLE.groundSlide * (evActive("reverse") ? -1 : 1) * dt;
+          f.x += f.slide * BATTLE.groundSlide * (evActive("reverse") ? -1 : 1) * convFast() * dt;
           const lo = stripRight() + f.r + 6, hi = W - f.r - 6;
           if (f.x < lo) { f.x = lo; f.slide = -f.slide; } else if (f.x > hi) { f.x = hi; f.slide = -f.slide; }
         }
@@ -2270,7 +2340,7 @@ const Battle = (() => {
   const convDir = () => evActive("reverse") ? -1 : 1;   // コンベアの向き（ステージ6の出来事「コンベアが逆」で左へ）
   function boxSetup() {
     const mv = exMove, ex = explore;
-    let list = shuffle(exploreWords().map(w => ({ word: w })).concat(Array.from({ length: mv.empty || 0 }, () => ({ word: null }))));
+    let list = shuffle(exploreWords().map(w => ({ word: w })).concat(Array.from({ length: mv.empty || 0 }, () => ({ word: null })), Array.from({ length: mv.fake || 0 }, () => ({ word: null, fake: true }))));   // にせOPEN（11/1-2）: 空箱で、いつも OPEN の面
     if (mv.lock > 0) {   // 鍵つきの箱: ことばの箱から lock 個（いちばん前のものはのぞく）。鍵の箱は2番目に出す
       shuffle(list.slice(1).filter(b => b.word)).slice(0, mv.lock).forEach(b => (b.lock = true));
       list.splice(1, 0, { word: null, key: true });
@@ -2286,7 +2356,7 @@ const Battle = (() => {
     const mv = exMove, cyc = mv.openTime + 3 * mv.faceTime, ph = (explore.t + b.phase * cyc / 3) % cyc;
     return ph < mv.openTime ? 0 : 1 + Math.min(2, Math.floor((ph - mv.openTime) / mv.faceTime));
   }
-  const boxCanOpen = b => !(b.lock && !explore.keyFound) && (!exMove.open || boxFace(b) === 0);
+  const boxCanOpen = b => b.fake || (!(b.lock && !explore.keyFound) && (!exMove.open || boxFace(b) === 0));
   function updateBoxes(dt) {
     const ex = explore, mv = exMove, words = exploreWords();
     if (!ex.queue) boxSetup();
@@ -2645,6 +2715,7 @@ const Battle = (() => {
 
     // 敵の弾
     for (const b of ebullets) drawEnemyBullet(b);
+    drawEvWarn();
 
     // ほどけた糸
     ctx.lineCap = "round";
@@ -2763,11 +2834,16 @@ const Battle = (() => {
   }
 
   const exploreBgImgs = {};
-  function drawExploreBg() {
+  // 世界の繰り返し背景の絵（stages.js の WORLDS の exploreBg。制作側の world01_02〜03_02。上下がつながる）。読み込めないときは null
+  function worldBgImg() {
     const wd = (window.WORLDS || []).find(w => opts.stage && w.id === opts.stage.world), src = wd && wd.exploreBg;
-    if (!src) return false;
+    if (!src) return null;
     const img = exploreBgImgs[src] || (exploreBgImgs[src] = Object.assign(new Image(), { src }));
-    if (!img.complete || !img.naturalWidth) return false;   // 読み込めないときは、今までの背景
+    return img.complete && img.naturalWidth ? img : null;
+  }
+  function drawExploreBg() {
+    const img = worldBgImg();
+    if (!img) return false;   // 読み込めないときは、今までの背景
     const sc = W / img.naturalWidth, ih = img.naturalHeight * sc;
     const off = exMove.box ? 0 : (explore ? explore.t : 0) * BATTLE.exploreBgSpeed % ih;   // 下へ流す（世界2の箱のときは工場の床なので止める。10/31-10 試作）
     for (let y = off - ih; y < H; y += ih) ctx.drawImage(img, 0, y, W, ih + 1);
@@ -2786,8 +2862,14 @@ const Battle = (() => {
       if (!theme._img || theme._imgSrc !== theme.image) { theme._img = new Image(); theme._img.src = theme.image; theme._imgSrc = theme.image; }
       const img = theme._img;
       if (img.complete && img.naturalWidth) {
-        const sc = Math.max(W / img.naturalWidth, H / img.naturalHeight), iw = img.naturalWidth * sc, ih = img.naturalHeight * sc;
-        ctx.drawImage(img, (W - iw) / 2, (H - ih) / 2, iw, ih);
+        const wbg = worldBgImg();
+        if (wbg) {   // 11/1-2 決定: 救出の旅は、世界の繰り返し背景を絵ごと縦に流す（幅いっぱい。速さは地面と同じ。1語目が出るまでと、お題のあいだ・終わりは止まる）
+          const ih = wbg.naturalHeight * W / wbg.naturalWidth, off = ((bgOff % ih) + ih) % ih;
+          for (let y = off - ih; y < H; y += ih) ctx.drawImage(wbg, 0, y, W, ih + 1);
+        } else {   // 読み込めないときは、今までの止まった絵
+          const sc = Math.max(W / img.naturalWidth, H / img.naturalHeight), iw = img.naturalWidth * sc, ih = img.naturalHeight * sc;
+          ctx.drawImage(img, (W - iw) / 2, (H - ih) / 2, iw, ih);
+        }
         ctx.save();
         ctx.globalAlpha = theme.deco === false ? 0 : BATTLE.imageDecoAlpha;   // deco: false ＝ 綿の実などの飾りを流さない（世界2の工場。10/31-10 試作）
         for (const s of terrain) {
@@ -3651,6 +3733,18 @@ const Battle = (() => {
 
   // 敵の弾（10/25-7）: 単純な球。色は BULLET_COLORS（虫の弾はザコと同じ赤紫）
   function drawEnemyBullet(b) {
+    if (b.kind === "screw") {   // 出来事のねじ（11/1-2）: 回りながら飛ぶ、金属の灰色のねじ（仮の図形）
+      ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(t * 9); ctx.scale(1.4, 1.4);
+      ctx.fillStyle = "#6f6a64"; ctx.fillRect(-3, 2, 6, 12);
+      ctx.beginPath(); ctx.arc(0, 0, 9, 0, Math.PI * 2); ctx.fillStyle = "#9a958e"; ctx.fill();
+      ctx.lineWidth = 2; ctx.strokeStyle = "#4a4640"; ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-6, 0); ctx.lineTo(6, 0); ctx.stroke();
+      ctx.restore(); return;
+    }
+    if (b.kind === "spark") {   // 星がはじけた小さな弾（11/1-2）
+      ctx.beginPath(); ctx.arc(b.x, b.y, 6, 0, Math.PI * 2); ctx.fillStyle = "#fff6c8"; ctx.fill();
+      ctx.lineWidth = 2; ctx.strokeStyle = "#b08a20"; ctx.stroke(); return;
+    }
     const lb = (WORLD_LOOK[worldDef.id] || {}).bullet, C = lb ? Object.assign({}, BULLET_COLORS, lb) : BULLET_COLORS, r = BATTLE.enemyBulletSize * (1 + C.pulse * Math.sin(t * C.pulseSpeed + b.x * 0.05));
     ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, Math.PI * 2);
     ctx.fillStyle = C[b.kind] || C.zako; ctx.fill();
@@ -3918,7 +4012,7 @@ const Battle = (() => {
     });
     ex.boxes = []; ex.nextBoxAt = BATTLE.exploreFirst; ex.keyFound = true;
     const avg = ex.queue.reduce((a, b) => a + baseChars(b.word).length, 0) / Math.max(1, ex.queue.length);
-    ex.maxOn = exMove.chars ? Math.max(exMove.minOn || 1, Math.min(exMove.maxOn, Math.floor(exMove.chars / avg))) : exMove.maxOn;   // 同時に漂う数（長いことばのステージほど少なく）
+    ex.maxOn = exMove.on || (exMove.chars ? Math.max(exMove.minOn || 1, Math.min(exMove.maxOn, Math.floor(exMove.chars / avg))) : exMove.maxOn);   // 同時に漂う数（長いことばのステージほど少なく）。11/1-2 決定: stages.js の explore.on で決める（9・10 は4つ、11・12 は3つ）
   }
   function updateSpace(dt) {
     const ex = explore, mv = exMove, words = exploreWords();
@@ -3930,7 +4024,7 @@ const Battle = (() => {
       ex.boxes.push(b);
       ex.nextBoxAt = ex.t + mv.gap;
     }
-    if (ex.queue.length && ex.boxes.filter(b => !b.open).length >= ex.maxOn) ex.nextBoxAt = Math.max(ex.nextBoxAt, ex.t);
+    if (ex.queue.length && ex.boxes.filter(b => !b.open).length >= ex.maxOn) ex.nextBoxAt = Math.max(ex.nextBoxAt, ex.t);   // いっぱいのあいだは、1つ見つかったらすぐ次を出す
     let pressed = null, pressedD = 0;
     for (const b of ex.boxes) {
       if (b.open) { b.openT += dt; continue; }
@@ -4002,7 +4096,7 @@ const Battle = (() => {
   // ===== 世界2の発見の旅「箱」の画面（10/31-10 試作。箱とコンベアは仮の図形） =====
   function drawBox(b) {
     const ex = explore, x = b.x + (b.shake > 0 ? Math.sin(b.shake * 60) * 3 : 0), y = b.y, w = b.w, h = b.h;
-    const face = exMove.open ? boxFace(b) : -1;
+    const face = b.fake ? 0 : exMove.open ? boxFace(b) : -1;   // にせOPEN は、いつも OPEN の面
     const squash = exMove.open && !b.open ? 1 - 0.12 * Math.abs(Math.sin(((explore.t + b.phase) % 1) * Math.PI)) * (face > 0 ? 1 : 0) : 1;
     ctx.save(); ctx.translate(x, y); ctx.scale(1, squash);
     ctx.fillStyle = "rgba(30,30,40,0.25)"; roundRect(-w / 2 + 4, -h / 2 + 8, w, h, 8); ctx.fill();   // 影
