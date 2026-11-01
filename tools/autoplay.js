@@ -25,7 +25,7 @@ function runOnce(skill, seed) { HUDLOG.rows.push(["--", skill]); HUDLOG.lastK = 
   vm.runInContext(fs.readFileSync(P + "data/stages.js", "utf8"), sb);
   vm.runInContext(fs.readFileSync(P + "data/texts.js", "utf8"), sb);
   let src = fs.readFileSync(P + "js/game.js", "utf8");
-  src = src.replace(/return \{ start, stop, resize, pause.*/, "return { start, stop, resize, pause, peek: () => ({ extraButtons, player, enemies, ebullets, fillers, gauge, state, phase, bombButton, odai, sortieNo, choiceRects, loadout, obs, guide, fsay, fogLevel, explore, bino, reacted, t, tut, rest }) };");
+  src = src.replace(/return \{ start, stop, resize, pause.*/, "return { start, stop, resize, pause, peek: () => ({ extraButtons, player, enemies, ebullets, fillers, gauge, state, phase, bombButton, odai, sortieNo, choiceRects, loadout, obs, guide, fsay, fogLevel, explore, bino, reacted, t, tut, rest, hits }) };");
   // ザコの語句の殻がほどけた高さ（画面の高さに対する割合）と、そのときのパワーの段階（10/25-8）
   src = src.replace("function absorb(e) {", "function absorb(e) { if (e.role === 'zako' && !e.ground) if (e.pattern !== 'odai') ABSY.push([e.y / H, POWER_LEVELS.indexOf(level), e.pattern]);");
   // わざとのスローを数える（SLOWLOG=1。救出の旅と大ボスのあいだだけ。10/31-14）
@@ -56,6 +56,7 @@ function runOnce(skill, seed) { HUDLOG.rows.push(["--", skill]); HUDLOG.lastK = 
   // 1回目の旅（双眼鏡）: 見えるのは円の中と、きらっと光ったときだけ。気づいた語句を追いかけて見つめる。なければジグザグに見回す
   const B = vm.runInContext("BATTLE", sb);
   let bossSec = null;
+  let odaiNow = null, odaiT0 = 0, odaiH0 = 0, odaiHits = 0; const midSecs = [];
   let extraAsked = 0; let exTarget = null, exWay = 0, exNoticed = new Set(), exQuitT = 0, foundN = null, exploreSec = null, baseN = null;
   const WAYS = [[110, 160], [300, 160], [300, 300], [110, 300], [110, 440], [300, 440], [300, 300], [110, 300]];
   for (let i = 0; i < 60 * 600 && !ended; i++) {
@@ -75,6 +76,9 @@ function runOnce(skill, seed) { HUDLOG.rows.push(["--", skill]); HUDLOG.lastK = 
     if (S.explore && baseN === null && S.explore.t >= B.exploreTime) baseN = S.reacted;   // 基準の時間までに見つけた数（10/25-17）
     if (S.phase !== "round1" && foundN === null && S.explore) { foundN = S.reacted; exploreSec = S.t; if (baseN === null) baseN = S.reacted; }
     if (S.phase === "boss" && bossSec === null) bossSec = S.t;
+    // お題のあいだ（11/1）: 中ボスのお題の秒数（問題文が出てから殻がほどけるまで）と、お題のあいだの被弾
+    if (S.odai && S.odai !== odaiNow) { odaiNow = S.odai; odaiT0 = S.t; odaiH0 = S.hits; }
+    if (odaiNow && S.odai !== odaiNow) { if (!odaiNow.boss) midSecs.push(S.t - odaiT0); odaiHits += S.hits - odaiH0; odaiNow = S.odai || null; if (odaiNow) { odaiT0 = S.t; odaiH0 = S.hits; } }
     if (process.env.ODAILOG && S.odai && S.odai !== globalThis.__lastOdai) { globalThis.__lastOdai = S.odai; console.log("ODAI", S.odai.real.word, "→", S.odai.q); }
     if (S.player && S.state === "play" && S.phase === "round1" && S.explore && S.explore.queue) {
       // 世界2の箱（10/31-10 試作）: 箱はぜんぶ見えている。近い箱へ指を動かして押さえる（空箱かどうかはわからない）。鍵の箱に一度はじかれたら、鍵が見つかるまでさわらない
@@ -185,7 +189,7 @@ function runOnce(skill, seed) { HUDLOG.rows.push(["--", skill]); HUDLOG.lastK = 
     if (process.env.OBSLOG && i % 300 === 0) { const S3 = sb.Battle.peek(); if (S3.obs && S3.obs.length) console.log("OBSLOG", S3.phase, Math.round(now/1000), S3.obs.map(o => Math.round(o.x) + "," + Math.round(o.y) + " r" + Math.round(o.r)).join(" | "), "木のかげ:", S3.enemies.filter(e => e.pattern === "treeshade").map(e => e.word.word + "@" + Math.round(e.y)).join(",")); }
     if (process.env.DBG && i === 60 * 400) { const S2 = sb.Battle.peek(); console.log("止まっている:", S2.state, S2.phase, "odai", !!S2.odai, S2.odai && S2.odai.intro, "敵", S2.enemies.map(e => e.word.word + (e.dummy ? "(ダミー)" : "") + "@" + Math.round(e.x) + "," + Math.round(e.y) + " hp" + e.hp).join(" "), "自機", Math.round(S2.player.x), Math.round(S2.player.y), "体力", S2.player.hp); }
   }
-  return { ids: ended || [], stats, words, foundN, baseN, exploreSec, bossSec, loadout: sb.Battle.peek().loadout, odaiMiss: (stats && stats.missed || []).filter(id => words.find(w => w.id === id && w.role !== "zako")).length };
+  return { ids: ended || [], stats, words, foundN, baseN, exploreSec, bossSec, midSecs, odaiHits: odaiHits + (odaiNow ? (sb.Battle.peek().hits - odaiH0) : 0), loadout: sb.Battle.peek().loadout, odaiMiss: (stats && stats.missed || []).filter(id => words.find(w => w.id === id && w.role !== "zako")).length };
 }
 const ABSY_ALL = {}, PAT = {}, SLOW_ALL = {}; let curSkill = "";
 const out = {};
@@ -205,6 +209,7 @@ for (const [name, rs] of Object.entries(out)) {
   const rc = {}; ok.forEach(r => { const k = rk(r.stats.score); rc[k] = (rc[k] || 0) + 1; });
   const lc = {}; ok.forEach(r => lc[r.loadout] = (lc[r.loadout] || 0) + 1);
   console.log(`${name}(${rs.length}回): 持ちもの${JSON.stringify(lc)} 中ボス取り逃がし${avg(r => r.odaiMiss).toFixed(2)} 時間${avg(r => r.stats.time).toFixed(0)}秒 回収${avg(r => r.ids.length).toFixed(1)}語 被弾${avg(r => r.stats.hits).toFixed(1)} 失った機体${avg(r => r.stats.downs).toFixed(2)} 本番やり直し${avg(r => r.stats.gameOvers).toFixed(2)}回(${ok.filter(r => r.stats.gameOvers > 0).length}/${ok.length}回で発生) 点${avg(r => r.stats.score).toFixed(0)} 光${avg(r => r.stats.bombsUsed).toFixed(1)} 10語${ok.filter(r => r.ids.length >= 10).length} 無事${ok.filter(r => r.stats.downs === 0).length} 無傷${ok.filter(r => r.stats.hits === 0).length} ランク${JSON.stringify(rc)} 終わらない${rs.length - ok.length} 見つけた${avg(r => r.foundN || 0).toFixed(1)}語 基準内${avg(r => r.baseN || 0).toFixed(1)}語 発見${avg(r => r.exploreSec || 0).toFixed(0)}秒 救出${avg(r => (r.bossSec || r.stats.time) - (r.exploreSec || 0)).toFixed(0)}秒 さいご${avg(r => r.bossSec ? r.stats.time - r.bossSec : 0).toFixed(0)}秒`);
+  { const ms = rs.flatMap(r => r.midSecs || []); console.log(`  お題 ${name}: 中ボスのお題 ${ms.length ? (ms.reduce((a, b) => a + b, 0) / ms.length).toFixed(1) : '-'}秒（${ms.length}回） お題のあいだの被弾 ${avg(r => r.odaiHits || 0).toFixed(2)}`); }
 }
 // 殻がほどけた高さ（10/25-8）: 平均、上3分の1で消えた割合。パワー★1（段階0）と★2以上（段階1〜）に分けて
 for (const [name, a] of Object.entries(ABSY_ALL)) {
