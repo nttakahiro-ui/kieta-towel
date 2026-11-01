@@ -225,6 +225,10 @@ const Sound = (() => {
       ["C5", "E5", "G5", "C6", "E6", "G6", "C7"].forEach((n, i) => tone(freq(n), t + i * 0.05, 0.9, "sine", 0.16));
     } else if (name === "power") {   // パワーアップ
       ["C6", "E6", "G6", "C7"].forEach((n, i) => tone(freq(n), t + i * 0.06, 0.25, "triangle", 0.2));
+    } else if (name === "powerTop") {   // パワー4段目（11/1-4）: 長く高く上がって、和音で終わる
+      sweep(300, 1800, 0.35, "sawtooth", 0.08);
+      ["C6", "E6", "G6", "C7", "E7", "G7"].forEach((n, i) => tone(freq(n), t + i * 0.05, 0.35, "triangle", 0.2));
+      ["C6", "E6", "G6", "C7"].forEach(n => tone(freq(n), t + 0.32, 0.9, "sine", 0.12));
     } else if (name === "crack") {   // 文字が砕ける（ぱりん、でもやわらかく）
       sweep(1800, 900, 0.12, "triangle", 0.16);
       tone(freq("A6"), t + 0.04, 0.2, "sine", 0.1);
