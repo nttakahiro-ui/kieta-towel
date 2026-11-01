@@ -124,6 +124,10 @@ const BATTLE = {
   // 出来事「ねじが飛んでくる」（世界2）と「星がはじける」（世界3）（11/1-2 決定）。warn ＝ 先に出す印の秒数
   screwEvent: { n: [3, 5], warn: 1.5, gap: 0.35, vx: 210, vy: 120 },
   burstEvent: { every: 3, warn: 2, n: 8, speed: 140 },
+  // 出来事「うしろから虫の群れ」「はさまれる」「風」「風が逆」「霧」（11/1-3 決定。全世界）
+  rearSwarm: { n: 4, warn: 1.5 },   // うしろ（画面の下）から上がってくる虫の数と、先に下のはしに「！」を出す秒数
+  pinchGap: 0.3,                // はさまれる: 左右の障害物のあいだの道の幅（画面の幅に対する割合）
+  fogTopEvent: 0.45,            // 出来事「霧」: 画面の上からこの割合までが霧（ふだんの霧は fogTop）
   fastConveyor: 2,              // 出来事「コンベアが急に速くなる」: 地面と動く地上のことば・地上の雑魚の速さの倍率（11/1-2 決定）
   meteorGap: 0.45, meteorSpeed: 300,   // 出来事「流星雨」: 上から流れ星の弾が落ちてくる間隔（秒）と速さ（px/秒）（10/31-10 試作）               // 世界3: 雑魚の群れのうち、うしろ（画面の下）から来る割合（10/31-10 試作）
 
@@ -504,7 +508,7 @@ const Battle = (() => {
   let guide = null;          // 木のよけ方の案内（矢印）
   let theme = DEFAULT_THEME; // このステージの時間帯の色
   let weatherDef = null;     // このステージの天気（data/stages.js の weather）
-  let fogLevel = 0;          // 霧の濃さ（0〜1。お題バトルと大ボスのときはうすくなる）
+  let fogLevel = 0, fogTopNow = BATTLE.fogTop;          // 霧の濃さ（0〜1。お題バトルと大ボスのときはうすくなる）
   let streaks = [];          // 風・雨・雪の見た目
   let found = new Set();     // 探検で見つけた語句の id
   let foundAt = {};          // 見つけた時刻（id → t。左の枠の名前をきらっと光らせる。10/25-17）
@@ -668,7 +672,7 @@ const Battle = (() => {
     theme = Object.assign({}, DEFAULT_THEME, (opts.stage && opts.stage.theme) || {});
     bugSprites = worldDef.id >= 2 && typeof document.createElement === "function" ? {} : null;   // 世界2・3の虫は、色を変えた絵を前もって作って使い回す（10/31-14）
     weatherDef = (opts.stage && opts.stage.weather) || null;
-    fogLevel = 0;
+    fogLevel = 0; fogTopNow = BATTLE.fogTop;
     streaks = Array.from({ length: 22 }, () => ({ x: Math.random() * W, y: Math.random() * H, s: 0.6 + Math.random() * 0.8 }));
     groundIds = new Set(groundOn ? words.filter(w => patOf(w).pattern === "ground" && w !== bossWord).map(w => w.id) : []);
     // 台本: 大ボス以外の語句を、データの順番（order）でならべる
@@ -723,8 +727,11 @@ const Battle = (() => {
   // 障害物を出す（この出撃で出すステージだけ）
   // 天気が今の出撃で出ているか
   const weatherOn = kind => !!weatherDef && weatherDef.kind === kind && (weatherDef.sortie === 1 ? phase === "round1" : phase !== "round1");   // sortie 2 ＝ 本番と大ボス
+  // 風（11/1-3）: 天気の風か、出来事「風」のあいだ。出来事「風が逆」のあいだは向きが逆
+  const windOn = () => weatherOn("wind") || evActive("wind");
+  const windDirNow = () => BATTLE.windDir * (evActive("windRev") ? -1 : 1);
   const obsActive = () => obsDef && phase === (obsDef.sortie === 1 ? "round1" : "round2");
-  function addObstacle(x, r) { const o = { kind: obsDef ? obsDef.kind : "tree", x, y: -r, r }; obs.push(o); return o; }
+  function addObstacle(x, r, kind) { const o = { kind: kind || (obsDef ? obsDef.kind : "tree"), x, y: -r, r }; obs.push(o); return o; }
   function spawnObstacle(it) {
     if (it.gate !== undefined) {   // 木と木のあいだを通る場所: すきまの左右に1本ずつ
       const gx = W * it.gate, half = W * (it.gap || 0.35) / 2;
@@ -868,7 +875,7 @@ const Battle = (() => {
   // カウントの今の段階（0〜2 ＝「3」「2」「1」、3 ＝「出撃！」）
   const holdOn = () => enemies.some(e => e.hold && e.hp > 0);   // 1語目を待っているあいだ（弾も虫も出さない。台本も進めない）
   const countStepNo = () => Math.min(3, Math.floor(countT / BATTLE.countStep));
-  const roundInterval = () => phase === "round1" ? BATTLE.roundInterval1 : BATTLE.roundInterval2;
+  const roundInterval = () => phase === "round1" ? BATTLE.roundInterval1 : BATTLE.roundInterval2 * ((opts.stage && opts.stage.rescueLen) || 1);   // rescueLen ＝ 救出の旅の長さの倍率（11/1-3 決定: 3つ目 1.25、4つ目 1.5。ことばの出る間隔を広げる）
   // 坂: 今の出撃の弾の量の倍率（大きいほど撃つ間隔が短い）
   const fireRamp = () => Math.max(0.1, (BATTLE.ramp[phase] || BATTLE.ramp.round2).fire);
   // ===== 世界2・3の試作（10/31-10） =====
@@ -898,8 +905,25 @@ const Battle = (() => {
     }
     return (evPlans[key] = list);
   }
+  // 出来事「うしろから虫の群れ」「はさまれる」（11/1-3 決定）: 始まった瞬間に1回
+  //   うしろから: 画面の下から虫（綿毛おばけ）の群れが上がってくる。warn 秒、下のはしに「！」（世界3のうしろから来る敵と同じ作り）
+  //   はさまれる: 障害物が2つ、画面の左右から同時に。あいだの細い道（pinchGap）だけ通れる。世界1 木、世界2 機械の柱、世界3 星のかたまり
+  function evStart(e) {
+    if (e.kind === "rear") {
+      const C = BATTLE.rearSwarm;
+      for (let i = 0; i < C.n; i++) { const x = stripRight() + 30 + (W - stripRight() - 60) * (i + 0.5) / C.n + rand(-14, 14); spawnFiller("ghost", x, H + 30 + (i % 2) * 40, { bx: 0, rear: true, delay: C.warn }); }
+    } else if (e.kind === "pinch") {
+      const L = stripRight(), gx = L + (W - L) * rand(0.35, 0.65), half = W * BATTLE.pinchGap / 2;
+      const rl = Math.max(30, (gx - half) / 2), rr = Math.max(30, (W - gx - half) / 2);
+      const kind = worldDef.id === 2 ? "pillar" : worldDef.id === 3 ? "star" : "tree";
+      addObstacle(gx - half - rl, rl + 6, kind).pinch = true;
+      addObstacle(gx + half + rr, rr + 6, kind).pinch = true;
+      Sound.se("odai");
+    }
+  }
   function evShots() {
     for (const e of events) {
+      if (e.sortie === 2 && (e.kind === "rear" || e.kind === "pinch") && evOn(e) && !evPlans[e.kind + e.at]) { evPlans[e.kind + e.at] = true; evStart(e); }
       if (e.sortie !== 2 || (e.kind !== "screw" && e.kind !== "burst") || !evOn(e)) continue;
       const tt = rescueT - e.at;
       for (const q of evPlan(e)) {
@@ -943,8 +967,8 @@ const Battle = (() => {
   }
   // 出来事が始まった瞬間に帯を1回（発見の旅と救出の旅で、それぞれ1回）
   function evBanners() {
-    for (const e of events) if (!evShown[e.kind + e.sortie] && evOn(e)) {
-      evShown[e.kind + e.sortie] = true;
+    for (const e of events) if (!evShown[e.kind + e.sortie + "@" + e.at] && evOn(e)) {   // 同じ出来事が2回あれば、2回とも知らせる（11/1-3）
+      evShown[e.kind + e.sortie + "@" + e.at] = true;
       Sound.se("odai");
       const text = tx("events." + e.kind);
       post("banner", () => { banner = { text, t: 2.2, color: "rgba(60,80,130,0.92)" }; });
@@ -1194,7 +1218,7 @@ const Battle = (() => {
 
   // ===== 雑魚の群れを出す =====
   // 本番と大ボスだけ雑魚を濃くする（難しさは雑魚の弾でなく数で作る）
-  const fillerDense = () => phase === "round1" ? 1 : P.fillerDensity * ((theme.bugs && theme.bugs.density) || 1);   // 難易度の線（fillerDensity）× 時間帯の虫の数
+  const fillerDense = () => phase === "round1" ? 1 : P.fillerDensity * ((theme.bugs && theme.bugs.density) || 1) * ((opts.stage && opts.stage.bugMul) || 1);   // bugMul ＝ 虫の数の倍率（11/1-3 決定: 3つ目 1.25、4つ目 1.5）   // 難易度の線（fillerDensity）× 時間帯の虫の数
   function spawnFiller(type, x, y, extra) {
     const def = FILLER_TYPES[type];
     const fhp = Math.max(1, Math.round(def.hp * (P.fillerHp || 1)));   // 虫の硬さ（難易度の線）
@@ -1422,7 +1446,7 @@ const Battle = (() => {
         roundT += dt;
         if (obsActive()) {
           const list = (obsDef.items || []).filter(it => it.at !== undefined);   // 時刻で出す木
-          while (obsNext < list.length && roundT >= list[obsNext].at) spawnObstacle(list[obsNext++]);
+          while (obsNext < list.length && roundT >= list[obsNext].at * ((opts.stage && opts.stage.rescueLen) || 1)) spawnObstacle(list[obsNext++]);   // 救出の旅を長くしたステージは、木・柱の時刻も同じ倍率でのばす（11/1-3）
           // 休みつきの木（afterWord: その数の語句を出したあと）: 画面の語句がいなくなる → 3秒 → 木と案内 → 案内のあと3秒 → 次の語句
           const rl = (obsDef.items || []).find(it => it.afterWord !== undefined && !restDone.has(it) && nextIdx >= it.afterWord);
           if (rl && !rest) rest = { it: rl, step: "wait", t: 0 };
@@ -1612,7 +1636,7 @@ const Battle = (() => {
           if (f.x < lo) { f.x = lo; f.slide = -f.slide; } else if (f.x > hi) { f.x = hi; f.slide = -f.slide; }
         }
       }
-      if (def.wind && weatherOn("wind")) f.x += BATTLE.windDir * BATTLE.windStrength * 1.6 * dt;   // 夕暮れの虫は風に流される
+      if (def.wind && windOn()) f.x += windDirNow() * BATTLE.windStrength * 1.6 * dt;   // 夕暮れの虫は風に流される
       if (def.fire) {
         f.fire -= dt;
         if (f.fire <= 0 && f.y > 0 && f.y < H * 0.68) {
@@ -1624,17 +1648,18 @@ const Battle = (() => {
 
     // 自機の弾が空中の敵に当たったか（地上の敵には当たらない）
     // 天気: 風（自機が横に流される。指で動かしていても流される）
-    if (weatherOn("wind") && !(player.rising > 0) && !(odai && odai.intro > 0)) {
-      const dx = BATTLE.windDir * BATTLE.windStrength * dt;
+    if (windOn() && !(player.rising > 0) && !(odai && odai.intro > 0)) {
+      const dx = windDirNow() * BATTLE.windStrength * dt;
       const nx = Math.min(Math.max(player.x + dx, 24), W - 24);
       if (drag) drag.px += nx - player.x;
       player.x = nx;
     }
     // 霧: お題バトルと大ボスのときは晴れる（語句が見えないと選べないため）
-    const fogWant = weatherOn("fog") && !odai && phase !== "boss" ? 1 : 0;
+    const fogWant = (weatherOn("fog") || evActive("fog")) && !odai && phase !== "boss" ? 1 : 0;
     fogLevel += (fogWant - fogLevel) * Math.min(1, dt * 2);
+    fogTopNow += ((evActive("fog") ? BATTLE.fogTopEvent : BATTLE.fogTop) - fogTopNow) * Math.min(1, dt * 1.5);   // 出来事「霧」: 霧が下まで濃くなる（11/1-3）
     for (const p of streaks) {   // 風・雨・雪の粒
-      if (weatherOn("wind")) { p.x += BATTLE.windDir * 260 * p.s * dt; p.y += 20 * dt; }
+      if (windOn()) { p.x += windDirNow() * 260 * p.s * dt; p.y += 20 * dt; }
       else if (weatherOn("rain")) { p.y += 520 * p.s * dt; p.x -= 40 * dt; }
       else if (weatherOn("snow")) { p.y += 50 * p.s * dt; p.x += Math.sin(t + p.s * 9) * 20 * dt; }
       if (p.x > W + 40) p.x = -40; if (p.x < -40) p.x = W + 40; if (p.y > H + 20) { p.y = -20; p.x = Math.random() * W; }
@@ -1652,7 +1677,7 @@ const Battle = (() => {
       }
     }
     obs = obs.filter(o => o.y - o.r < H + 20);
-    const inObstacle = (x, y) => obs.some(o => Math.hypot(x - o.x, y - o.y) < o.r);
+    const inObstacle = (x, y) => obs.some(o => !o.pinch && Math.hypot(x - o.x, y - o.y) < o.r);   // 出来事「はさまれる」の障害物は、通る道をせまくするだけ（光と弾はさえぎらない。11/1-3）
 
     // 雑魚に先に当たる（「雑魚のうしろ」の語句は、前の雑魚をどけないと弾が届かない）
     for (const s of shots) {
@@ -2188,7 +2213,7 @@ const Battle = (() => {
     score += pts;
     floats.push({ x: e.x, y: e.y - e.size, text: `+${pts}` + (mul > 1 ? ` ×${mul}` : ""), big: true, age: 0 });
     const before = gauge;
-    if (!bombing) gauge = Math.min(100, gauge + BATTLE.bombGain * mul * gaugeMul);
+    if (!bombing) gauge = Math.min(100, gauge + BATTLE.bombGain * mul * gaugeMul * (phase !== "round1" && opts.stage && opts.stage.gaugeRate || 1));   // gaugeRate ＝ 救出の旅のゲージのたまる速さ（11/1-3 決定: 3つ目 1.5、4つ目 2）
     if (before < 100 && gauge >= 100) bombReady();
     if (!e.last) { firstPass(e); return; }
     absorb(e);
@@ -2930,7 +2955,7 @@ const Battle = (() => {
 
   // 霧: 画面の上のほうをかくす（fogTop まではほぼ見えず、その下でうすれていく）
   function drawFog() {
-    const y1 = H * BATTLE.fogTop, y2 = y1 + 70;
+    const y1 = H * fogTopNow, y2 = y1 + 70;
     ctx.save();
     ctx.globalAlpha = fogLevel;
     ctx.fillStyle = BATTLE.fogColor;
@@ -2960,9 +2985,9 @@ const Battle = (() => {
   function drawWeather() {
     if (!weatherDef) return;
     ctx.save();
-    if (weatherOn("wind")) {
+    if (windOn()) {
       ctx.strokeStyle = "rgba(255,255,255,0.45)"; ctx.lineWidth = 2; ctx.lineCap = "round";
-      for (const p of streaks) { ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - BATTLE.windDir * 26 * p.s, p.y - 2); ctx.stroke(); }
+      for (const p of streaks) { ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - windDirNow() * 26 * p.s, p.y - 2); ctx.stroke(); }
     } else if (weatherOn("rain")) {
       ctx.strokeStyle = "rgba(200,220,255,0.55)"; ctx.lineWidth = 1.5;
       for (const p of streaks) { ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + 4, p.y - 14 * p.s); ctx.stroke(); }
@@ -3090,6 +3115,13 @@ const Battle = (() => {
       for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; ctx.beginPath(); ctx.arc(Math.cos(a) * o.r * 0.89, Math.sin(a) * o.r * 0.89, Math.max(2.5, o.r * 0.06), 0, Math.PI * 2); ctx.fill(); }   // ボルト
       ctx.strokeStyle = "#e0b03a"; ctx.lineWidth = 4; ctx.setLineDash([8, 6]);   // 黄色と黒の注意の帯
       ctx.beginPath(); ctx.arc(0, 0, o.r * 0.62, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+    } else if (o.kind === "star") {   // 星のかたまり（世界3。11/1-3。仮の図形）: 白と灰色の岩に、光る小さな星
+      ctx.fillStyle = "#8d8aa6"; ctx.beginPath(); ctx.arc(0, 0, o.r, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#b9b6cf"; ctx.beginPath(); ctx.arc(-o.r * 0.15, -o.r * 0.15, o.r * 0.75, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#e4e2f2"; ctx.beginPath(); ctx.arc(-o.r * 0.3, -o.r * 0.3, o.r * 0.35, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#fff6c8";
+      for (let i = 0; i < 6; i++) { const a = i * 2.4, rr = o.r * (0.3 + 0.1 * (i % 3)), x = Math.cos(a) * rr * 1.6, y = Math.sin(a) * rr * 1.6, k = 3 + (i % 2) * 2;
+        ctx.beginPath(); ctx.moveTo(x, y - k); ctx.lineTo(x + k * 0.35, y - k * 0.35); ctx.lineTo(x + k, y); ctx.lineTo(x + k * 0.35, y + k * 0.35); ctx.lineTo(x, y + k); ctx.lineTo(x - k * 0.35, y + k * 0.35); ctx.lineTo(x - k, y); ctx.lineTo(x - k * 0.35, y - k * 0.35); ctx.closePath(); ctx.fill(); }
     } else if (o.kind === "rock") {
       ctx.fillStyle = "#b9b3a6"; ctx.beginPath(); ctx.arc(0, 0, o.r, 0, Math.PI * 2); ctx.fill();
     } else {
