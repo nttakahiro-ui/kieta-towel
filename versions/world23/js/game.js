@@ -1,7 +1,7 @@
 // バトル（縦スクロールのシューティング）
 // 空中と地上の2つの層がある
 //   空中の敵 … 自機の弾（自動で連射）で倒す
-//   地上の敵 … 自機の真上の列に来ると、自動で光が落ちて倒す（世界2から。10/31-12 決定。前は照準◎とたね）
+//   地上の敵 … 自機の真上の列に来ると、自動で光のたねを投げて倒す（世界2から。10/31-12・11/1-4 決定。前は照準◎とたね）
 // 主役は語句の敵。バトルは「1周目 → 2周目 → 大ボス」の台本で進む（出る順番・出方・時刻はデータで固定）
 //   1周目「出撃1 探検（たんけん）」… 大ボス以外の語句が決まった順に出る。倒すと、ふわりが反応して光って消えるだけ（吸い込まない）
 //   2周目「出撃2 本番（あつめる）」… 同じ語句が同じ順番・同じ出方で出る。倒すと、糸のようにほどけて吸い込まれる（クイズに出る）
@@ -74,8 +74,10 @@ const BATTLE = {
   bombRange: 170,              // 自機の真上の地面に置く薄い丸の位置（自機からどれだけ前か、px）
   lockRadius: 26,              // 薄い丸の大きさ（px）
   groundColumn: 12,            // 「真上の列」の幅のゆとり（地上のことばの幅の半分＋この px まで、真上とみなす）
-  bombInterval: 0.15,          // 光が落ちる間隔（秒）
-  bombFlight: 0.4,             // （10/31-12 から使っていない。たねが地面に届くまでの秒数）
+  bombInterval: 0.6,           // 光のたねを投げる間隔（秒。11/1-4 決定。前は光が0.15秒ごとに落ちていた）
+  bombFlight: 0.4,             // 光のたねが地面に届くまでの秒数（放物線。着地で光がはじける）
+  seedPower: 4,                // 光のたね1個で削る量（前の「0.15秒ごとに1」と同じ速さで削れるように 0.6÷0.15）
+  seedArc: 46,                 // 放物線の高さ（px。画面の上へふくらむ）
   bombRadius: 36,              // 光が当たる広さ（px）
   groundTextScale: 0.78,       // 地上のことばの文字の高さの倍率（少し平たくして、地面に貼りついて見えるように）
   darkRescue: 0.6,             // 救出の旅の出来事「照明が落ちる」の暗さ（地面と地上のものだけ。発見の旅は0.84）
@@ -110,7 +112,7 @@ const BATTLE = {
   odaiPenalty: 300,            // ダミーに当てたときの減点（コンボは切らない）
   odaiPenaltyCool: 1,          // 同じダミーで続けて減点しない秒数（連射で何度も減らないように）
   odaiBonus: 2000,             // 最初に当てたのが本物なら「ひらめき」ボーナス
-  odaiHpByShots: 0.25,   // お題の殻の硬さを、出たときの光の本数に半分だけ比例させる（1本で1.0倍、2本で1.25倍、3本で1.5倍。11/1-2 決定。前は本数に比例）
+  odaiHpByLevel: [1, 1.25, 1.5, 1.6],   // お題の殻の硬さの倍率（出たときのパワーの段ごと）。光の本数に半分だけ比例（1本 1.0、2本 1.25、3本 1.5。11/1-2 決定）、4本は1.6（11/1-4 決定）
   odaiColumns: [0.15, 0.5, 0.85], // 3つの語句をならべる列の位置（画面の幅に対する割合）。縦書きで動かさない（11/1 決定: 前は 0.2・0.5・0.8。パワーを保つので外側へ）
   odaiColumns2: [0.2, 0.8],     // 2つのとき（「どっち？」「次は？」）の列（11/1 決定: 前は 0.3・0.7）
   odaiTextScale: 0.8,           // お題のことばの文字の大きさの倍率（11/1 決定: よけるすきまを広げる。読む時間は変えない）
@@ -234,6 +236,7 @@ const BATTLE = {
   fuwariSayTime: 3,
   bombShell: 0.5,              // ぜんぶ消しで、画面のことばの殻の硬さを何倍にするか（0.5 ＝ 半分減る。ほどけはしない。10/25-17）
   powerFxTime: 1.3,
+  boss2: { hp: 0.7, shape: "ring", fxTime: 1.6 },   // 大ボス2段階（stages.js の bossTwoStep。11/1-4 決定 ステージ12）: 2段階目の殻の硬さ（1段階目の倍率）・弾の形・「まだだ！」の秒数
   timeBarH: 6,                 // 発見の旅の残り時間の帯の太さ（px。画面のいちばん上。10/25-12）
   timeBarWarn: 10,             // 残り何秒で帯の色が変わるか
   exploreTimeScore: 100,       // 発見の旅: 基準の時間より早く終われば残り1秒につき＋、おそければ1秒につき−（10/25-17）
@@ -364,6 +367,7 @@ const POWER_LEVELS = [
   { spread: [0],               thick: [],  rate: 1 },
   { spread: [-0.35, 0.35],     thick: [],  rate: 1 },
   { spread: [-0.55, 0, 0.55],  thick: [0], rate: 1 },
+  { spread: [-0.85, -0.28, 0.28, 0.85], thick: [-0.28, 0.28], rate: 1, top: true },   // 4段目（11/1-4 決定）: 4本（内側の2本が太い）。上がれるのは stages.js の power4 のステージ（8・12）だけ
 ];
 // 画面の言葉は data/texts.js（window.TEXTS）から読む。tx("rescue.start") や tx("explore.endSome", { n: 3 }) のように使う
 function tx(path, vars) {
@@ -482,6 +486,7 @@ const Battle = (() => {
   let banner = null;         // 「大ボス あらわる！」などの帯
   let shake = 0;             // 画面のゆれ（被弾したとき）
   let level = POWER_LEVELS[0];
+  const topLevel = () => opts.stage && opts.stage.power4 ? 3 : 2;   // 上がれる段のいちばん上（0 から数える。4段目は power4 のステージだけ。11/1-4）
   let score = 0, combo = 0, maxCombo = 0;
   let floats = [];           // 点数が浮かぶ表示
   let hits = 0, downs = 0;   // 被弾した回数、失った機体の数
@@ -535,6 +540,7 @@ const Battle = (() => {
   let typhoon = null;        // ぜんぶ消しの演出（タオルをくるっと振り回す）
   let extraUsed = false;     // 延長戦をしたか（1回だけ。10/25-19）
   let extraRound = false;    // いま延長戦か
+  let againFx = null;        // 大ボス2段階目の「まだだ！ もう一度！」（11/1-4）{ age }
   let wrongFx = null;        // お題で「ちがうよ」を大きく出している（10/25-16）{ age }
   let powerFx = null;        // 「パワーアップ！」の大きな文字（10/25-9）{ age }
   let bombing = false;       // 「ぜんぶ消し」で反応させている最中（ゲージをためない）
@@ -696,7 +702,7 @@ const Battle = (() => {
     fpsT0 = 0; fpsN = 0; fpsNow = 0; fpsMin = 0;
     msgQ = []; msgGap = 0; msgWasBusy = false;
     choiceFree = !!opts.firstChoice;
-    tut = null; hintOpts = opts.hints || null; hintShown = {}; hintCard = null; bombHinted = false; bombFlash = 0; powerFx = null; wrongFx = null; extraUsed = false; extraRound = false;
+    tut = null; hintOpts = opts.hints || null; hintShown = {}; hintCard = null; bombHinted = false; bombFlash = 0; powerFx = null; wrongFx = null; againFx = null; extraUsed = false; extraRound = false;
     stripFlash = 0; sortieStep = "choice"; freed = [];
     explore = { t: 0, next: 0, nextAt: BATTLE.exploreFirst, again: [], list: [], bugs: [], bugT: 2, endT: 0, flies: [], streaks: [] };
     {
@@ -1003,7 +1009,7 @@ const Battle = (() => {
     if (id === "power") powerBonus = basePower() + 1;
     if (id === "shield") shield = 1;
     if (id === "bomb") gauge = 100;   // 必殺ワザ: ぜんぶ消しがすぐ使える（救出の旅の最初からゲージ満タン。10/25-1）
-    level = POWER_LEVELS[Math.min(Math.floor(absorbed.length / BATTLE.powerEvery) + powerBonus, POWER_LEVELS.length - 1)];
+    level = POWER_LEVELS[Math.min(Math.floor(absorbed.length / BATTLE.powerEvery) + powerBonus, topLevel())];
     Sound.se("item");
   }
   // 出撃2の画面の、3つの選ぶボタンの場所
@@ -1168,7 +1174,7 @@ const Battle = (() => {
       const n = Math.max(1, deco.filter(d => !d).length);
       const lim = BATTLE.perCharHp[role];
       const per = BATTLE.hpOverride[role] ||
-        Math.min(lim.max, Math.max(lim.min, Math.round(BATTLE.wordTotalHp[role] * (role === "mid" ? P.midHpScale : P.bossHpScale) * (od && BATTLE.odaiHpByShots ? 1 + BATTLE.odaiHpByShots * (level.spread.length - 1) : 1) / n)));
+        Math.min(lim.max, Math.max(lim.min, Math.round(BATTLE.wordTotalHp[role] * (role === "mid" ? P.midHpScale : P.bossHpScale) * (od ? BATTLE.odaiHpByLevel[POWER_LEVELS.indexOf(level)] || 1 : 1) / n)));
       const ws = chars.map(ch => ctx.measureText(ch).width);
       const total = ws.reduce((a, b) => a + b, 0);
       let ox = -total / 2, k = 0;
@@ -1357,6 +1363,7 @@ const Battle = (() => {
     updateMsgs(realDt);
     if (guide) { guide.t -= realDt; if (guide.t <= 0) guide = null; }
     if (typhoon) { typhoon.age += realDt; if (typhoon.age > 0.9) typhoon = null; }
+    if (againFx) { againFx.age += realDt; if (againFx.age > BATTLE.boss2.fxTime) againFx = null; }
     if (wrongFx) { wrongFx.age += realDt; if (wrongFx.age > BATTLE.odaiWrongTime) wrongFx = null; }
     if (powerFx) { powerFx.age += realDt; if (powerFx.age > BATTLE.powerFxTime) powerFx = null; }
     if (odai && odai.intro > 0) odai.intro -= realDt;
@@ -1496,18 +1503,20 @@ const Battle = (() => {
     for (const s of shots) { s.y -= BATTLE.shotSpeed * dt; s.x += s.vx * dt; }
     shots = shots.filter(s => s.y > -20);
 
-    // 地上の攻撃（10/31-12 決定 B）: 地上の敵が自機の真上の列に来たら、自動で光が落ちる（いちばん近いものに）
+    // 地上の攻撃（10/31-12 決定 B、11/1-4 決定で光のたねを投げる形に）: 地上の敵が自機の真上の列に来たら、自動で光のたねを投げる（いちばん近いものに）
+    //   たねは放物線で飛び、着地で光がはじける。着地したときに隠れていることばには効かない
     lock = groundTargets().filter(g => g.y < player.y - 30 && Math.abs(player.x - g.x) < (g.word ? g.w / 2 : g.r) + BATTLE.groundColumn).sort((a, b) => b.y - a.y)[0] || null;
     bombTimer -= dt;
     if (lock && bombTimer <= 0) {
-      landBomb(lock.word ? Math.min(lock.x + lock.w / 2 - 4, Math.max(lock.x - lock.w / 2 + 4, player.x)) : lock.x, lock.y);
+      bombs.push({ sx: player.x, sy: player.y - 24, tx: lock.word ? Math.min(lock.x + lock.w / 2 - 4, Math.max(lock.x - lock.w / 2 + 4, player.x)) : lock.x, ty: lock.y, age: 0, tg: lock });
       bombTimer = BATTLE.bombInterval;
       Sound.se("bomb");
     }
     for (const b of bombs) {
       b.age += dt;
       b.ty += sc * dt;   // 落ちる先も地面といっしょに流れる
-      if (b.age >= BATTLE.bombFlight && !b.done) { b.done = true; landBomb(b.tx, b.ty); }
+      if (b.tg && b.tg.hp > 0 && b.tg.word && gMoves(b.tg)) b.tx = Math.min(b.tg.x + b.tg.w / 2 - 4, Math.max(b.tg.x - b.tg.w / 2 + 4, b.tx));   // 動くことばは、ことばの幅の中に落ちる先を保つ
+      if (b.age >= BATTLE.bombFlight && !b.done) { b.done = true; landBomb(b.tx, b.ty, BATTLE.seedPower); }
     }
     bombs = bombs.filter(b => !b.done);
 
@@ -1519,6 +1528,10 @@ const Battle = (() => {
       if (e.appearT > 0 && !(odai && e.pattern !== "odai")) { e.appearT -= dt; e.flash = Math.max(0, e.flash - dt); continue; }
       e.age += dt;
       e.flash = Math.max(0, e.flash - dt);
+      if (e.againT > 0) {   // 大ボス2段階目: 殻が少しずつ戻る（11/1-4）
+        e.againT = Math.max(0, e.againT - dt); e.flash = Math.max(e.flash, 0.1);
+        for (const p of e.parts) if (!p.deco) p.hp = Math.max(1, Math.round(p.maxHp * (1 - e.againT / BATTLE.boss2.fxTime)));
+      }
       if (e.wrongT > 0) e.wrongT = Math.max(0, e.wrongT - dt);
       if (e.parts) for (const p of e.parts) p.flash = Math.max(0, p.flash - dt);
       if (odai && e.pattern !== "odai") continue;   // お題バトルの間は、画面のほかの語句も止める（動かない・撃たない）
@@ -1764,7 +1777,7 @@ const Battle = (() => {
   let odaiLater = [];   // 少しあとに出る弾（ねらいの2発目・横ながしなど）
   function odaiFire(dt) {
     if (!odai || !BATTLE.odaiShellFire || holdOn() || frozen() || odai.intro > 0) return;
-    const list = enemies.filter(e => e.pattern === "odai" && e.hp > 0 && e.y > 0 && e.y < H * 0.62).sort((a, b) => a.slot - b.slot);
+    const list = enemies.filter(e => e.pattern === "odai" && e.hp > 0 && e.y > 0 && e.y < H * 0.62 && !(e.againT > 0)).sort((a, b) => a.slot - b.slot);
     if (!list.length) return;
     odai.fireT = (odai.fireT === undefined ? 0.5 : odai.fireT) - dt;   // 読む時間のあと0.5秒で撃ち始める（前と同じ）
     if (odai.fireT > 0) return;
@@ -1772,12 +1785,12 @@ const Battle = (() => {
     odai.fireNo = (odai.fireNo || 0) + 1;
     const shape = odaiShape(e);
     odai.fireT = BATTLE.enemyFireInterval[e.role] / P.fireRate / fireRamp() * 3 * (0.8 + Math.random() * 0.4) / list.length
-      * (BATTLE.odaiShots.gap[shape] || 1) * ((opts.stage && opts.stage.odaiGap) || 1);   // 形ごとの間隔の倍率と、ステージごとの倍率（11/1）
+      * (BATTLE.odaiShots.gap[shape] || 1) * ((opts.stage && opts.stage.odaiGap) || 1) * (e.role === "boss" && opts.stage && opts.stage.bossGap || 1);   // bossGap ＝ 大ボスだけの倍率（11/1-4。ステージ12）   // 形ごとの間隔の倍率と、ステージごとの倍率（11/1）
   }
   // 弾の形（stages.js の odaiShot: { mid: "aim", boss: "sweep" } など。配列なら順に交互）。扇 fan／ねらい aim／横ながし sweep／輪 ring／ななめ雨 rain
   function odaiShape(e) {
     const os = (opts.stage && opts.stage.odaiShot) || {}, S = BATTLE.odaiShots;
-    let shape = os[e.role] || "fan";
+    let shape = (e.phase2 && BATTLE.boss2.shape) || os[e.role] || "fan";   // 大ボス2段階目は輪（11/1-4）
     if (Array.isArray(shape)) { odai.shapeNo = (odai.shapeNo || 0) + 1; shape = shape[odai.shapeNo % shape.length]; }
     const pat = BATTLE.shotPattern[e.role] || [0], n = pat.length, y = e.y + e.h / 2;
     const sp = BATTLE.enemyBulletSpeed * P.bulletSpeed * (S.speed[shape] || 1);
@@ -1834,12 +1847,12 @@ const Battle = (() => {
     return Math.hypot(x - g.x, y - g.y) < g.r + r;
   }
   // たねが地面に届いた: ぽんっと花が咲いて、まわりの地上の敵に当たる
-  function landBomb(x, y) {
-    addPop(x, y, "#ffffff", 1.1, true);
+  function landBomb(x, y, n = 1) {
+    addPop(x, y, "#fff6c8", 1.4, true);   // 光がはじける
     Sound.se("pop");
-    for (const g of groundTargets()) {
+    for (const g of groundTargets()) {   // （隠れていることばは groundTargets に入らない）
       if (!inReach(g, x, y, BATTLE.bombRadius * 0.6)) continue;
-      if (g.word) damageWord(g, x); else damageFiller(g);
+      if (g.word) { for (let i = 0; i < n && g.hp > 0; i++) damageWord(g, x); } else damageFiller(g);
     }
   }
 
@@ -1864,6 +1877,7 @@ const Battle = (() => {
   const shotDamage = e => (e.role === "zako" && !e.ground && BATTLE.zakoHpByShots) ? BATTLE.shotPower / shotUnits() : 1;   // 1発で削る量（パワーの初期値はここで2割下げる）
 
   function damageWord(e, hitX, amt = 1) {
+    if (e.againT > 0) return;   // 大ボス2段階目の殻が戻っているところ（11/1-4）
     e.flash = 0.12;
     if (e.parts) {
       // 当たった文字（なければ、いちばん近い文字）を削る。縦書きは、いちばん下の文字
@@ -1882,6 +1896,7 @@ const Battle = (() => {
       p.broken = true;
       breakPart(e, p);
       e.hp--;
+      if (e.hp <= 0 && e.role === "boss" && !e.dummy && (e.pattern !== "odai" || e.odaiReal) && opts.stage && opts.stage.bossTwoStep && !e.phase2) { bossAgain(e); return; }
       if (e.hp <= 0) defeat(e);
       return;
     }
@@ -1895,6 +1910,27 @@ const Battle = (() => {
     if (e.hp <= 0) defeat(e);
   }
 
+  // 大ボス2段階（11/1-4 決定 ステージ12）: 1段階目の殻がほどけたら、ことばが光って殻が戻る（硬さ0.7倍）。弾の形が変わる
+  function bossAgain(e) {
+    e.phase2 = true; e.flash = 0.8; e.againT = BATTLE.boss2.fxTime;   // 殻が戻るあいだ（fxTime 秒）は、光が効かず、撃たない
+    for (const p of e.parts) if (!p.deco) { p.maxHp = Math.max(1, Math.round(p.maxHp * BATTLE.boss2.hp)); p.hp = 1; p.broken = false; p.flash = 0.6; }
+    e.hp = e.maxHp;
+    e.ringStock = 0;
+    for (let i = 0; i < 3; i++) addPop(e.x + rand(-20, 20), e.y + rand(-e.h / 2, e.h / 2), "#fff6c8", 1.6, true);
+    againFx = { age: 0 };
+    Sound.se("odai");
+  }
+  function drawAgainFx() {
+    const k = againFx.age / BATTLE.boss2.fxTime, pop = k < 0.12 ? 0.6 + k / 0.12 * 0.5 : 1.1 - Math.min(1, (k - 0.12) / 0.2) * 0.1;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, (1 - k) * 3);
+    ctx.font = font(40); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
+    const fit = Math.min(1, (W - 24) / ((ctx.measureText(tx("rescue.bossAgain")).width + 20) * 1.1));   // 画面の幅に収める
+    ctx.translate(W / 2, H * 0.5); ctx.scale(pop * fit, pop * fit);
+    ctx.lineWidth = 10; ctx.strokeStyle = "#ffffff"; ctx.strokeText(tx("rescue.bossAgain"), 0, 0);
+    ctx.fillStyle = "#7a3cc0"; ctx.fillText(tx("rescue.bossAgain"), 0, 0);
+    ctx.restore();
+  }
   function breakPart(e, p) {
     const px = e.x + p.ox, py = e.y + (p.oy || 0);
     for (let i = 0; i < 12; i++) {
@@ -2486,11 +2522,11 @@ const Battle = (() => {
     absorbed.push(e.word);
     if (e.hold && e.ground) post("banner", () => { banner = { text: tx("newInWorld.groundDone"), t: 2.4, color: "rgba(111,154,74,0.9)" }; });   // ステージ5の最初の地上のことばを助けた（10/31-12）
     if (e.odaiReal && odai) endOdai(true);
-    const lv = POWER_LEVELS[Math.min(Math.floor(absorbed.length / BATTLE.powerEvery) + powerBonus, POWER_LEVELS.length - 1)];
+    const lv = POWER_LEVELS[Math.min(Math.floor(absorbed.length / BATTLE.powerEvery) + powerBonus, topLevel())];
     if (lv !== level && absorbed.length < opts.total) {
       level = lv;
-      powerFx = { age: 0 };   // その瞬間に、画面に大きく「パワーアップ！」と音（順番待ちはしない。10/25-9）
-      Sound.se("power");
+      powerFx = { age: 0, top: !!lv.top };   // その瞬間に、画面に大きく「パワーアップ！」と音（順番待ちはしない。10/25-9）。4段目は大きく金色に（11/1-4）
+      Sound.se(lv.top ? "powerTop" : "power");
     }
     const n = Math.min(60, 14 + e.word.word.length * 5);
     for (let i = 0; i < n; i++) {
@@ -2784,6 +2820,7 @@ const Battle = (() => {
     if (typhoon) drawTyphoon();
     if (powerFx) drawPowerFx();
     if (wrongFx) drawWrongFx();
+    if (againFx) drawAgainFx();
 
     // 吸い込んだときに広がる光
     if (wave) {
@@ -3020,6 +3057,17 @@ const Battle = (() => {
     ctx.globalAlpha = Math.min(1, (1 - k) * 3);
     ctx.translate(W / 2, Math.min(player.y, H - 80) - 110 - k * 30); ctx.scale(pop, pop);
     ctx.font = font(44); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
+    if (powerFx.top) {   // 4段目（11/1-4）: ふつうより大きく（画面の幅に収まるまで）、金色、光の輪
+      const big = Math.min(1.35, (W - 24) / ((ctx.measureText(tx("rescue.powerUp")).width + 20) * pop));
+      ctx.scale(big, big);
+      ctx.strokeStyle = `rgba(255,226,120,${0.8 * (1 - k)})`; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(0, 0, 60 + k * 120, 0, Math.PI * 2); ctx.stroke();
+      const g = ctx.createLinearGradient(0, -22, 0, 22); g.addColorStop(0, "#fff3a6"); g.addColorStop(0.5, "#ffc928"); g.addColorStop(1, "#d08a00");
+      ctx.shadowColor = "rgba(255,200,40,0.95)"; ctx.shadowBlur = 18;
+      ctx.lineWidth = 10; ctx.strokeStyle = "#7a4a00"; ctx.strokeText(tx("rescue.powerUp"), 0, 0);
+      ctx.shadowBlur = 0; ctx.fillStyle = g; ctx.fillText(tx("rescue.powerUp"), 0, 0);
+      ctx.restore(); return;
+    }
     ctx.lineWidth = 10; ctx.strokeStyle = "#ffffff"; ctx.strokeText(tx("rescue.powerUp"), 0, 0);
     ctx.fillStyle = "#d39a12"; ctx.fillText(tx("rescue.powerUp"), 0, 0);
     ctx.restore();
@@ -3148,7 +3196,7 @@ const Battle = (() => {
     const x = tg && tg.word ? Math.min(tg.x + tg.w / 2 - 4, Math.max(tg.x - tg.w / 2 + 4, player.x)) : tg ? tg.x : player.x;
     const y = tg ? tg.y : player.y - BATTLE.bombRange, r = BATTLE.lockRadius;
     ctx.save();
-    if (tg) {   // 光の筋（ふわりから地面へ）
+    if (tg && !BATTLE.bombInterval) {   // （11/1-4 から光のたねを投げるので、光の筋は描かない）
       const pulse = 0.75 + Math.sin(t * 30) * 0.25;
       const g = ctx.createLinearGradient(0, player.y - 24, 0, y);
       g.addColorStop(0, `rgba(255,250,215,${0.2 * pulse})`); g.addColorStop(1, `rgba(255,236,150,${0.85 * pulse})`);
@@ -3167,13 +3215,15 @@ const Battle = (() => {
     ctx.restore();
   }
 
-  function drawBomb(b) {
-    const k = Math.min(1, b.age / BATTLE.bombFlight);
-    const x = b.sx + (b.tx - b.sx) * k, y = b.sy + (b.ty - b.sy) * k;
-    const r = 7 - k * 3;   // 地面に近づくほど小さく（落ちていく感じ）
-    ctx.fillStyle = "rgba(60,80,40,0.18)";
-    ctx.beginPath(); ctx.arc(b.tx, b.ty, 4 + k * 3, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "#9a7650";
+  function drawBomb(b) {   // 光のたね（11/1-4）: 放物線で飛ぶ。地面には影が、まっすぐ進む
+    const k = Math.min(1, b.age / BATTLE.bombFlight), lift = Math.sin(Math.PI * k);
+    const x = b.sx + (b.tx - b.sx) * k, y = b.sy + (b.ty - b.sy) * k - lift * BATTLE.seedArc;
+    const r = 5 + lift * 4;   // 高いところほど大きく
+    ctx.fillStyle = "rgba(30,30,40,0.22)";   // 地面の影（落ちる先へまっすぐ）
+    ctx.beginPath(); ctx.ellipse(x, y + lift * BATTLE.seedArc, 4 + k * 2, 2.5 + k, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.save(); ctx.fillStyle = "rgba(255,240,160,0.35)"; ctx.shadowColor = "rgba(255,220,110,0.9)"; ctx.shadowBlur = 10;
+    ctx.beginPath(); ctx.arc(x, y, r + 4, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    ctx.fillStyle = "#f2c53d";
     ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.75, k * 6, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = "#ffffff";
     ctx.beginPath(); ctx.arc(x - r * 0.3, y - r * 0.3, r * 0.3, 0, Math.PI * 2); ctx.fill();
