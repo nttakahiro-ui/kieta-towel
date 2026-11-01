@@ -36,7 +36,7 @@ const BATTLE = {
   fontSize: { zako: 26, mid: 30, boss: 36 },   // 敵の文字の大きさ（px）。24以上
   shortScale: 1.3,             // 1〜2文字の短い語句は、文字をこの倍率で大きく出す
   wordTotalHp: { mid: 12, boss: 60 },          // 中ボス・大ボスの「語句全体の硬さ」。文字数で割って1文字あたりの耐久にする（難易度の倍率もかかる）
-  perCharHp: { mid: { min: 2, max: 6 }, boss: { min: 6, max: 30 } },   // 1文字あたりの耐久の下限と上限
+  perCharHp: { mid: { min: 2, max: 200 }, boss: { min: 6, max: 600 } },   // 1文字あたりの耐久の下限と上限（11/1: 上限を 6・30 から上げた。お題のあいだもパワーを保つため）   // 1文字あたりの耐久の下限と上限
   enemyFireInterval: { zako: 3.4, mid: 2.4, boss: 1.4 },  // 語句の敵が弾を撃つ間隔（秒）
   enemyBulletSpeed: 95,        // 敵の弾の速さ（px/秒）。難易度の線 bulletSpeed をかける（ステージ1はゆっくり）
   enemyBulletSize: 11,         // 敵の弾の見た目の大きさ（半径 px）。大きく見やすく
@@ -83,6 +83,8 @@ const BATTLE = {
   groundHold: false,           // 救出の旅の最初の地上のことばを、中ほどで止めて待つ（stages.js の override.battle でステージ5だけ true）
   hideOut: 2.5,                // 地上のことば「隠れる」（10/31-13 決定 B改）: 顔を出している秒数（このあいだだけ光が届く）
   hideIn: 1.5,                 //   隠れている秒数（隠れ場所だけが見える）
+  groundSlide: 26,             // 世界2の地上の雑魚（歯車・ねじ・糸くずの玉）がコンベアで横にすべる速さ（px/秒。11/1 決定）
+  groundHop: 9,                // 世界3の地上の雑魚（星のかけら・隕石）が跳ねる高さ（px。見た目だけ。当たりは地面のまま）
   groundMoveSpeed: 40,         // 地上のことば「動く」: コンベアに乗って横に動く速さ（px/秒。はしで折り返す）
 
   // --- 強さ（1945型） ---
@@ -108,8 +110,15 @@ const BATTLE = {
   odaiPenalty: 300,            // ダミーに当てたときの減点（コンボは切らない）
   odaiPenaltyCool: 1,          // 同じダミーで続けて減点しない秒数（連射で何度も減らないように）
   odaiBonus: 2000,             // 最初に当てたのが本物なら「ひらめき」ボーナス
-  odaiColumns: [0.2, 0.5, 0.8], // 3つの語句をならべる列の位置（画面の幅に対する割合）。縦書きで動かさない
-  odaiColumns2: [0.3, 0.7],     // 世界3「どっち？」の2つの列（10/31-10 試作）
+  odaiHpByShots: true,   // お題の殻の硬さを、出たときの光の本数に比例させる（11/1。パワーを保つと、1つ目の中ボスと2つ目で秒数が大きく変わるため。ザコと同じ考え）
+  odaiColumns: [0.15, 0.5, 0.85], // 3つの語句をならべる列の位置（画面の幅に対する割合）。縦書きで動かさない（11/1 決定: 前は 0.2・0.5・0.8。パワーを保つので外側へ）
+  odaiColumns2: [0.2, 0.8],     // 2つのとき（「どっち？」「次は？」）の列（11/1 決定: 前は 0.3・0.7）
+  odaiTextScale: 0.8,           // お題のことばの文字の大きさの倍率（11/1 決定: よけるすきまを広げる。読む時間は変えない）
+  odaiSpread: 0.35,             // お題のあいだの光の広がりの倍率（11/1 決定: パワーの段は保ち、正面寄りに。1 で救出の旅と同じ）
+  // お題の殻の弾の形（11/1 決定。stages.js の odaiShot で役ごとにえらぶ。ないときは扇）。1回に撃つ数は扇と同じ（中ボス2・大ボス3）で、弾の総数は変えない
+  //   aimGap ＝ ねらいの1発ずつの間隔（秒）、sweepCols ＝ 横ながしの列の数、sweepGap ＝ 横ながしの1発ずつの間隔（秒）、ringN ＝ 輪1つの弾の数（たまったら撃つ）、
+  //   rainSlant ＝ ななめ雨の傾き（横の速さ ÷ 縦の速さ）、speed ＝ 形ごとの速さの倍率
+  odaiShots: { aimGap: 0.18, sweepCols: 7, sweepGap: 0.12, ringN: 6, rainSlant: 0.45, speed: { aim: 1, sweep: 1, ring: 0.85, rain: 1 }, gap: { fan: 1.4, aim: 1.4, sweep: 1.4, ring: 1.4, rain: 1.4 } },
   rearRate: 0.35,
   gravityDrift: 46,             // 出来事「重力が変わる」: ことばが横に流される速さ（px/秒）（10/31-10 試作）
   meteorGap: 0.45, meteorSpeed: 300,   // 出来事「流星雨」: 上から流れ星の弾が落ちてくる間隔（秒）と速さ（px/秒）（10/31-10 試作）               // 世界3: 雑魚の群れのうち、うしろ（画面の下）から来る割合（10/31-10 試作）
@@ -190,9 +199,11 @@ const BATTLE = {
     fillerDensity: [[1, 0.6], [12, 1.6]],     // 救出の旅の虫の濃さ（数と間隔。虫1匹の弾の量は変えない）
     zakoHp:        [[1, 9], [12, 8]],         // ザコの語句の硬さ（弾1本あたり。0.1きざみ）。10/25-1: 4〜5、10/25-8: 10〜11（中央あたり）、10/25-11: 9〜8（中央より少し手前、高さ30〜50%でほどけるように。ステージ1〜4で1〜2割下げ。速いステージほど少しやわらかく）
     fillerHp:      [[1, 1], [12, 3]],         // 虫の硬さの倍率（四捨五入）。10/25-1: 耐久は主に虫で上げる
-    bossHpScale:   [[1, 1.1], [4, 1.3454545454545455], [5, 1.43], [6, 1.51], [7, 1.2], [8, 1.67], [9, 1.2], [10, 1.2], [11, 1.92], [12, 1]],   // 中ボス・大ボスの1文字あたりの耐久の倍率
+    bossHpScale:   [[1, 2.27], [2, 1.85], [3, 1.8], [4, 1.53], [5, 1.79], [6, 1.89], [7, 1.71], [8, 2.03], [9, 1.77], [10, 1.83], [11, 1.95], [12, 1.66]],   // 大ボスの1文字あたりの耐久の倍率（11/1 から中ボスは midHpScale）
+    //   11/1 決定: お題のあいだもパワーを保つので、ステージ1〜12の線を引き直した。自動のふつうで大ボス戦が30〜35秒になる値。お題の殻は、出たときの光の本数をかけた硬さ（odaiHpByShots）
     //   10/31-12 決定: 中ボス・大ボスの硬さの線は、ステージ5〜12を実測で通る値に引き直す（世界1は変えない）。1〜4 は前の線（1.1 と 12 で 2 を結ぶ線）のまま（4 の値はその線の上）。
     //   5〜12 は自動プレイヤーで大ボス戦が終わる値（7・9・10 は 1.2、12 は 1.0。前は stages.js の override。5・6・8・11 は前の線の値）
+    midHpScale:    [[1, 3.79], [2, 3.18], [3, 3.31], [4, 2.8], [5, 5.18], [6, 4.66], [7, 3.07], [8, 3.37], [9, 4.67], [10, 4.7], [11, 4.29], [12, 4.57]],   // 中ボスの硬さの倍率（11/1 決定で大ボスと分けた。自動のふつうで中ボスのお題が12〜15秒になる値）
     tricky:        [[1, 0], [12, 6.2]],       // 意地の悪い語句の数（四捨五入。patterns が "auto" のステージだけ）
   },
 
@@ -670,7 +681,7 @@ const Battle = (() => {
     score = 0; combo = 0; maxCombo = 0; floats = [];
     hits = 0; downs = 0; lives = BATTLE.lives; gameOvers = 0; scoreAtMain = 0; retryMain = false;
     paused = false; moved = false; groundHinted = false; groundHeld = false; groundIntroShown = false; rearHinted = false; banner = null; shake = 0; showWord = null; threads = []; pops = [];
-    slow = 0; wave = null; gauge = 0; bombsUsed = 0; fsay = null; odai = null; bounces = [];
+    slow = 0; wave = null; gauge = 0; bombsUsed = 0; fsay = null; odai = null; bounces = []; odaiLater = [];
     fpsT0 = 0; fpsN = 0; fpsNow = 0; fpsMin = 0;
     msgQ = []; msgGap = 0; msgWasBusy = false;
     choiceFree = !!opts.firstChoice;
@@ -1040,7 +1051,7 @@ const Battle = (() => {
     }
     // 硬さ: ザコは難易度で決まる硬さ、中ボス・大ボスは文字1つあたりの耐久 × 難易度の倍率
     //   横切る・端にかくれる語句は、画面にいる（当てられる）時間が短いので、BATTLE.zakoPatternHp の倍率でやわらかくする（10/25-8）
-    const hp = BATTLE.hpOverride[role] || (role === "zako" ? Math.max(1, Math.max(word.hp, P.zakoHp) * (ground ? 1 : (BATTLE.zakoPatternHp[pattern] || 1))) : Math.max(1, Math.round(word.hp * P.bossHpScale)));
+    const hp = BATTLE.hpOverride[role] || (role === "zako" ? Math.max(1, Math.max(word.hp, P.zakoHp) * (ground ? 1 : (BATTLE.zakoPatternHp[pattern] || 1))) : Math.max(1, Math.round(word.hp * (role === "mid" ? P.midHpScale : P.bossHpScale))));
     if (od) { x = W / 2; y = -size - od.slot * 40; }
     const e = {
       hold: (BATTLE.firstHold && phase === "round2" && !od && !extraRound && word === script[0])   // ステージ1の救出の旅の1語目
@@ -1066,7 +1077,7 @@ const Battle = (() => {
       const n = Math.max(1, deco.filter(d => !d).length);
       const lim = BATTLE.perCharHp[role];
       const per = BATTLE.hpOverride[role] ||
-        Math.min(lim.max, Math.max(lim.min, Math.round(BATTLE.wordTotalHp[role] * P.bossHpScale / n)));
+        Math.min(lim.max, Math.max(lim.min, Math.round(BATTLE.wordTotalHp[role] * (role === "mid" ? P.midHpScale : P.bossHpScale) * (od && BATTLE.odaiHpByShots ? level.spread.length : 1) / n)));
       const ws = chars.map(ch => ctx.measureText(ch).width);
       const total = ws.reduce((a, b) => a + b, 0);
       let ox = -total / 2, k = 0;
@@ -1383,9 +1394,9 @@ const Battle = (() => {
     shotTimer -= dt;
     if (shotTimer <= 0) {
       // ふわりの段階で弾の数が増える
-      // お題バトルの間は正面1本だけ（強化は一時休止。広がる弾がダミーに当たらないように）
-      const spread = odai ? [0] : level.spread;
-      for (const k of spread) shots.push({ x: player.x + k * 9, y: player.y - 22, vx: k * 55, thick: !odai && level.thick.includes(k) });
+      // お題バトルの間もパワーの段は保つ（11/1 決定。前は正面1本だけ）。広がる角度だけ狭くして、正面寄りに
+      const nk = odai ? BATTLE.odaiSpread : 1;
+      for (const k of level.spread) shots.push({ x: player.x + k * 9 * nk, y: player.y - 22, vx: k * 55 * nk, thick: level.thick.includes(k) });
       shotTimer = BATTLE.shotInterval * level.rate;
     }
     for (const s of shots) { s.y -= BATTLE.shotSpeed * dt; s.x += s.vx * dt; }
@@ -1471,14 +1482,21 @@ const Battle = (() => {
         e.x = e.bx + Math.sin(e.age * BATTLE.swaySpeed + e.phase) * BATTLE.sway;
       }
       // 弾を撃つ（画面の上のほうにいる間だけ）。1語目を待っているあいだと、ステージ1のお題では撃たない
-      if (holdOn() || (e.pattern === "odai" && !BATTLE.odaiShellFire)) continue;
+      if (holdOn() || e.pattern === "odai") continue;   // お題の殻は odaiFire で順番に撃つ（11/1 決定）
       e.fire -= dt;
-      if (e.pattern === "odai" && odai && odai.intro > 0) e.fire = Math.max(e.fire, 0.5);
       if (e.fire <= 0 && e.y > 0 && e.y < H * 0.62) {
         e.fire = BATTLE.enemyFireInterval[e.role] / P.fireRate / fireRamp() * (e.pattern === "odai" ? 3 : 1) * (0.8 + Math.random() * 0.4);
         fireAt(e.x, e.y + (e.ground ? 0 : e.h / 2), BATTLE.shotPattern[e.role] || [0], e.role);   // 殻から飛ぶ弾の色: ザコ＝赤紫、中ボス＝赤、大ボス＝濃い紫（10/25-7）
       }
     }
+
+    odaiFire(dt);
+    for (const b of odaiLater) b.t -= frozen() ? 0 : dt;
+    for (const b of odaiLater.filter(b => b.t <= 0)) {
+      if (b.aim) fireAt(b.x, b.y, [0], b.kind, false, b.speed);
+      else ebullets.push({ x: b.x, y: b.y, vx: b.vx, vy: b.vy, kind: b.kind });
+    }
+    odaiLater = odai ? odaiLater.filter(b => b.t > 0) : [];
 
     // 雑魚の動き
     for (const f of fillers) {
@@ -1517,6 +1535,12 @@ const Battle = (() => {
         f.x += Math.sin(f.age * 1.3) * 40 * dt;
       } else {
         f.y += sc * dt;     // 地上の雑魚は地面といっしょに流れる
+        if (worldDef.id === 2) {   // 世界2の地上の雑魚（11/1 決定）: コンベアに乗って横にすべる。はしで折り返す。「コンベアが逆」では逆向き
+          if (!f.slide) f.slide = f.x < W / 2 ? 1 : -1;
+          f.x += f.slide * BATTLE.groundSlide * (evActive("reverse") ? -1 : 1) * dt;
+          const lo = stripRight() + f.r + 6, hi = W - f.r - 6;
+          if (f.x < lo) { f.x = lo; f.slide = -f.slide; } else if (f.x > hi) { f.x = hi; f.slide = -f.slide; }
+        }
       }
       if (def.wind && weatherOn("wind")) f.x += BATTLE.windDir * BATTLE.windStrength * 1.6 * dt;   // 夕暮れの虫は風に流される
       if (def.fire) {
@@ -1633,12 +1657,57 @@ const Battle = (() => {
     ebullets = ebullets.filter(b => b.y < H + 20 && b.y > -20 && b.x > -20 && b.x < W + 20);
   }
 
-  function fireAt(x, y, pattern, kind, keep) {
+  function fireAt(x, y, pattern, kind, keep, speedMul) {
     const ang = Math.atan2(player.y - y, player.x - x);
     for (const da of pattern) {
-      const sp = BATTLE.enemyBulletSpeed * P.bulletSpeed;   // 難易度の線（bulletSpeed）。世界1のはじめはゆっくり
+      const sp = BATTLE.enemyBulletSpeed * P.bulletSpeed * (speedMul || 1);   // 難易度の線（bulletSpeed）。世界1のはじめはゆっくり
       ebullets.push({ x, y, vx: Math.cos(ang + da) * sp, vy: Math.sin(ang + da) * sp, kind, keep });
     }
+  }
+
+  // お題バトルの殻の弾（11/1 決定）: 3つ（2つ）の殻が順番に撃つ。1つの殻が撃つ間隔は前と同じなので、弾の総数は変えない
+  let odaiLater = [];   // 少しあとに出る弾（ねらいの2発目・横ながしなど）
+  function odaiFire(dt) {
+    if (!odai || !BATTLE.odaiShellFire || holdOn() || frozen() || odai.intro > 0) return;
+    const list = enemies.filter(e => e.pattern === "odai" && e.hp > 0 && e.y > 0 && e.y < H * 0.62).sort((a, b) => a.slot - b.slot);
+    if (!list.length) return;
+    odai.fireT = (odai.fireT === undefined ? 0.5 : odai.fireT) - dt;   // 読む時間のあと0.5秒で撃ち始める（前と同じ）
+    if (odai.fireT > 0) return;
+    const e = list[(odai.fireNo || 0) % list.length];
+    odai.fireNo = (odai.fireNo || 0) + 1;
+    const shape = odaiShape(e);
+    odai.fireT = BATTLE.enemyFireInterval[e.role] / P.fireRate / fireRamp() * 3 * (0.8 + Math.random() * 0.4) / list.length
+      * (BATTLE.odaiShots.gap[shape] || 1) * ((opts.stage && opts.stage.odaiGap) || 1);   // 形ごとの間隔の倍率と、ステージごとの倍率（11/1）
+  }
+  // 弾の形（stages.js の odaiShot: { mid: "aim", boss: "sweep" } など。配列なら順に交互）。扇 fan／ねらい aim／横ながし sweep／輪 ring／ななめ雨 rain
+  function odaiShape(e) {
+    const os = (opts.stage && opts.stage.odaiShot) || {}, S = BATTLE.odaiShots;
+    let shape = os[e.role] || "fan";
+    if (Array.isArray(shape)) { odai.shapeNo = (odai.shapeNo || 0) + 1; shape = shape[odai.shapeNo % shape.length]; }
+    const pat = BATTLE.shotPattern[e.role] || [0], n = pat.length, y = e.y + e.h / 2;
+    const sp = BATTLE.enemyBulletSpeed * P.bulletSpeed * (S.speed[shape] || 1);
+    if (shape === "fan") { fireAt(e.x, y, pat, e.role); return shape; }
+    if (shape === "ring") {   // 輪: 撃つ数をためて、ringN 発の輪にして広げる（総数は同じ）
+      e.ringStock = (e.ringStock || 0) + n;
+      if (e.ringStock < S.ringN) return shape;
+      e.ringStock -= S.ringN;
+      odai.ringA = (odai.ringA || 0) + Math.PI / S.ringN;   // 輪ごとに少し回す
+      for (let i = 0; i < S.ringN; i++) { const a = odai.ringA + i * Math.PI * 2 / S.ringN; ebullets.push({ x: e.x, y: e.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, kind: e.role }); }
+      return shape;
+    }
+    for (let i = 0; i < n; i++) {
+      if (shape === "aim") odaiLater.push({ t: i * S.aimGap, aim: true, x: e.x, y, kind: e.role, speed: S.speed.aim });   // ねらい: ふわりに向けて1発ずつ
+      else if (shape === "sweep") {   // 横ながし: 左から右へ、列を1つずつずらして、まっすぐ落ちる
+        const L = stripRight() + 20, R = W - 20, c = (odai.sweepNo = ((odai.sweepNo || 0) + 1)) % S.sweepCols;
+        odaiLater.push({ t: i * S.sweepGap, x: L + (R - L) * c / (S.sweepCols - 1), y, vx: 0, vy: sp, kind: e.role });
+      } else if (shape === "rain") {   // ななめ雨: 問題文の帯のすぐ下から、ななめに降る（向きは交互）
+        odai.rainNo = (odai.rainNo || 0) + 1;
+        const dir = odai.rainNo % 2 ? 1 : -1, x = stripRight() + 10 + Math.random() * (W - stripRight() - 20);
+        const vy = sp / Math.hypot(1, S.rainSlant);
+        odaiLater.push({ t: i * S.sweepGap, x, y: odaiTop() + 8, vx: dir * vy * S.rainSlant, vy, kind: e.role });
+      }
+    }
+    return shape;
   }
 
   // 地上の的（地上の語句と、地上の雑魚）
@@ -1695,7 +1764,6 @@ const Battle = (() => {
   // 硬さを本数倍にするかわりに、1発で削る量を「1 ÷ 本数」にしている。こうすると、とちゅうで強くなっても弱くなっても
   // 「何回の連射でこわれるか」が変わらない（強くなっても手ごたえが同じ）。地上の語句（たねで倒す）は今のまま
   function shotUnits() {
-    if (odai) return 1;   // お題バトルの間は正面1本だけ
     return level.spread.length + level.thick.length;   // 太い光は2本分
   }
   const shotDamage = e => (e.role === "zako" && !e.ground && BATTLE.zakoHpByShots) ? BATTLE.shotPower / shotUnits() : 1;   // 1発で削る量（パワーの初期値はここで2割下げる）
@@ -1844,12 +1912,12 @@ const Battle = (() => {
     }
     const longest = Math.max(...cands.map(w => Array.from(w.word).length));
     const room = H * 0.66 - odaiTop() - 30;   // 問題文の帯の下から、自機の上まで
-    const size = Math.max(24, Math.min(BATTLE.fontSize[role], Math.floor(room / (longest * 1.12))));
+    const size = Math.round(Math.max(24, Math.min(BATTLE.fontSize[role], Math.floor(room / (longest * 1.12)))) * BATTLE.odaiTextScale);   // 11/1 決定: 0.8倍
     cands.forEach((w, i) => spawn(w, { role, size, slot: i, real: w === real }));
     if (seq) for (const e of enemies) if (e.pattern === "odai") { e.seqNo = seq.indexOf(e.word); e.dummy = true; e.num = 0; }   // 3つを順に: そろうまでは3つとも、当てても削れない
     // お題のあいだは、雑魚と雑魚の弾を出さない（10/3-12）。始まる瞬間に画面の雑魚と弾を消す（殻から飛ぶ弾は、読む時間が終わってから）
     fillers.forEach(f => addPop(f.x, f.y, "#fff8d8", 0.8, f.layer === "ground"));
-    fillers = []; ebullets = [];
+    fillers = []; ebullets = []; odaiLater = [];
     slow = odai.intro;   // 吸い込みと同じスロー。読む時間をつくる（10/25-16: 読む時間の長さに合わせる。前は最初のお題の案内でのばした分が消えていた）
     // （「お題だよ！」の一言は、問題文と重なるので出さない。説明はチュートリアルで。10/7-1）
     Sound.se("odai");
@@ -1858,6 +1926,13 @@ const Battle = (() => {
   // お題の語句に弾が当たった
   function odaiHit(e, s) {
     if (odai.mode === "order") { orderHit(e, s); return; }
+    // 11/1 決定: 「どれ？」「次は？」「どっち？」も、同じことばに orderHitGap 秒以内に続けて orderHits 発当たってから数える（横切った光では、まちがいにならない）。
+    // 同じ瞬間に当たった光（パワーの2本・3本）は1発と数える。続けて当てているあいだは、そのあとの光はみな数える
+    if (e.hitT !== t) {
+      if (t - (e.hitT || -9) > BATTLE.orderHitGap) e.hitN = 0;
+      e.hitT = t; e.hitN = (e.hitN || 0) + 1;
+    }
+    if (e.hitN < BATTLE.orderHits) { e.flash = 0.12; Sound.se("hit"); return; }
     if (odai.firstHit === null) {
       odai.firstHit = e.dummy ? "dummy" : "real";
       if (!e.dummy) {   // 最初から本物: ひらめき
@@ -1887,6 +1962,7 @@ const Battle = (() => {
     const list = enemies.filter(q => q.pattern === "odai" && q.hp > 0);
     if (e.num || odai.show > 0) { bounces.push({ x: s.x, y: e.y + e.h / 2, vx: (Math.random() - 0.5) * 120, vy: 320, age: 0 }); return; }   // もう番号がついている・正しい順を見せているあいだ
     // 光は自動で出るので、となりの列へ動くとちゅうに、まん中のことばを横切ってしまう。同じことばに続けて orderHits 発当てたときだけ「当てた」にする
+    if (e.hitT === t && e.hitN) return;   // 同じ瞬間に当たった光（パワーの2本・3本）は1発と数える（11/1）
     if (t - (e.hitT || -9) > BATTLE.orderHitGap) e.hitN = 0;
     e.hitT = t; e.hitN = (e.hitN || 0) + 1; e.flash = 0.12;
     if (e.hitN < BATTLE.orderHits) { Sound.se("hit"); return; }
@@ -3079,6 +3155,7 @@ const Battle = (() => {
     const { x, y } = f;
     const r = FILLER_TYPES[f.type].r;
     const hasFilter = "filter" in ctx;
+    if (f.layer === "ground" && worldDef.id >= 2) { drawGroundJunk(f); fillerHpDots(f); return; }   // 世界2・3の地上の雑魚は、虫とは別の種類（11/1 決定）
     if (bugSprites && hasFilter) {   // 世界2・3: 前もって作った絵を置くだけ（毎フレームの filter と輪郭のぼかしをやめる。10/31-14）
       const sp = bugSprite(f, f.flash > 0);
       ctx.save();
@@ -3105,6 +3182,47 @@ const Battle = (() => {
       ctx.beginPath(); ctx.arc(x, y, r * BATTLE.fillerDrawScale * 0.9, 0, Math.PI * 2); ctx.fill();
     }
     fillerHpDots(f);
+  }
+  // 世界2・3の地上の雑魚（11/1 決定。仮の図形）: 色は灰・茶（空中の虫は青・紫）。硬さ・数・弾は世界1の からまり草（weed）・いばらの株（thorn）と同じ
+  //   世界2: 歯車・ねじ・糸くずの玉（weed の3種を x で決める）、大きい歯車（thorn）。床に貼りついて影が濃い
+  //   世界3: 星のかけら（weed）・小さな隕石（thorn）。ふわっと跳ねる（影は地面に残る）
+  function drawGroundJunk(f) {
+    const r = f.r * 0.95, lit = f.flash > 0, w2 = worldDef.id === 2, big = f.type === "thorn";
+    const kind = big ? 0 : (Math.floor(f.x0 === undefined ? (f.x0 = f.x) : f.x0) % 3 + 3) % 3;   // 出たときの位置で3種
+    const hop = w2 ? 0 : Math.abs(Math.sin(f.age * 2.6 + f.x0 * 0.05)) * BATTLE.groundHop;
+    ctx.save();
+    ctx.translate(f.x, f.y);
+    if (f.flash > 0) ctx.translate((Math.random() - 0.5) * 2, 0);
+    ctx.fillStyle = w2 ? "rgba(25,20,15,0.55)" : "rgba(20,15,40,0.35)";   // 影
+    ctx.beginPath(); ctx.ellipse(3, r * 0.45, r * (1 - hop / 40), r * 0.42 * (1 - hop / 40), 0, 0, Math.PI * 2); ctx.fill();
+    ctx.translate(0, -hop);
+    const c1 = lit ? "#e8e2d8" : w2 ? "#8a8580" : "#d8d6dc", c2 = lit ? "#cdb898" : w2 ? "#7a5a3a" : "#9a96a2", c3 = w2 ? "#4a443e" : "#6e6a78";
+    ctx.strokeStyle = c3; ctx.lineWidth = 1.5;
+    if (w2 && (big || kind === 0)) {   // 歯車（灰色）
+      const R = big ? r : r * 0.85, rot = f.age * (f.slide || 1) * 1.5;
+      ctx.rotate(rot); ctx.fillStyle = c1; ctx.beginPath();
+      for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2, rr = i % 2 ? R * 0.78 : R; ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); }
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = c2; ctx.beginPath(); ctx.arc(0, 0, R * 0.32, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    } else if (w2 && kind === 1) {   // ねじ（灰色の頭と茶色の軸）
+      ctx.rotate(0.5); ctx.fillStyle = c2; ctx.fillRect(-r * 0.18, -r * 0.1, r * 0.36, r * 0.95); ctx.strokeRect(-r * 0.18, -r * 0.1, r * 0.36, r * 0.95);
+      ctx.fillStyle = c1; ctx.beginPath(); ctx.arc(0, -r * 0.3, r * 0.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-r * 0.3, -r * 0.3); ctx.lineTo(r * 0.3, -r * 0.3); ctx.stroke();
+    } else if (w2) {   // 糸くずの玉（茶色。もしゃもしゃ）
+      ctx.fillStyle = c2; ctx.beginPath(); ctx.arc(0, 0, r * 0.7, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "#a88a62"; ctx.lineWidth = 1.2;
+      for (let i = 0; i < 6; i++) { const a = i * 1.1; ctx.beginPath(); ctx.arc(Math.cos(a) * r * 0.15, Math.sin(a) * r * 0.15, r * (0.35 + i * 0.05), a, a + 2.2); ctx.stroke(); }
+    } else if (big) {   // 小さな隕石（灰色のごつごつ）
+      ctx.fillStyle = c2; ctx.beginPath();
+      for (let i = 0; i < 9; i++) { const a = i / 9 * Math.PI * 2, rr = r * (0.8 + 0.2 * Math.sin(i * 2.7)); ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); }
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = c3; for (const [dx, dy, rr] of [[-5, -3, 3.5], [5, 4, 2.5], [2, -7, 2]]) { ctx.beginPath(); ctx.arc(dx, dy, rr, 0, Math.PI * 2); ctx.fill(); }
+    } else {   // 星のかけら（白）
+      ctx.rotate(f.age * 0.8); ctx.fillStyle = c1; ctx.beginPath();
+      for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2 - Math.PI / 2, rr = i % 2 ? r * 0.38 : r * 0.85; ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); }
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+    ctx.restore();
   }
   // 硬い雑魚は、のこりの硬さを小さな点で
   function fillerHpDots(f) {
