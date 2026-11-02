@@ -7,15 +7,25 @@
 // ===== 宝石の絵（ここだけ書きかえれば、宝石の見た目が変わる） =====
 // color: 宝石の色、lit: 光っているか。(0, 0) を中心に、半径およそ size の大きさで描く SVG の文字を返す
 // 画像にするときの例: return `<image href="assets/gem_${stageId}.png" x="${-size}" y="${-size}" width="${size * 2}" height="${size * 2}" opacity="${lit ? 1 : 0.25}"/>`;
+// 11/2: 制作側の見本（sample_bg_c01）の宝石に近い見た目に。盾の形（上が平ら、下がとがる）で、カットの面ごとに明るさを変え、白い光を足す（宝石の絵のファイルはまだないので図形）
+const gemShade = (hex, k) => {   // k > 0 で白に、k < 0 で黒に近づける
+  const n = parseInt(hex.slice(1), 16), c = [n >> 16, (n >> 8) & 255, n & 255].map(v => Math.round(k > 0 ? v + (255 - v) * k : v * (1 + k)));
+  return `rgb(${c.join(",")})`;
+};
 const GEM_ART = (color, lit, size, stageId) => {
-  const s = size;
-  // ひし形の宝石（上のカット面つき）
-  const outer = `0,${-s} ${s * 0.86},${-s * 0.25} ${s * 0.55},${s * 0.85} ${-s * 0.55},${s * 0.85} ${-s * 0.86},${-s * 0.25}`;
-  const table = `${-s * 0.42},${-s * 0.22} 0,${-s * 0.62} ${s * 0.42},${-s * 0.22} ${s * 0.25},${s * 0.3} ${-s * 0.25},${s * 0.3}`;
-  if (!lit) return `<polygon points="${outer}" fill="rgba(255,255,255,0.35)" stroke="#a9a69a" stroke-width="2" stroke-dasharray="4 3"/>`;
-  return `<polygon points="${outer}" fill="${color}" stroke="#ffffff" stroke-width="2"/>` +
-         `<polygon points="${table}" fill="rgba(255,255,255,0.35)"/>` +
-         `<polygon points="${-s * 0.55},${-s * 0.55} ${-s * 0.25},${-s * 0.62} ${-s * 0.45},${-s * 0.2}" fill="rgba(255,255,255,0.8)"/>`;
+  const s = size, P = pts => pts.map(([x, y]) => `${(x * s).toFixed(1)},${(y * s).toFixed(1)}`).join(" ");
+  const O = [[-0.62, -0.86], [0.62, -0.86], [0.96, -0.3], [0, 1], [-0.96, -0.3]];        // 外の形（盾）
+  const T = [[-0.34, -0.52], [0.34, -0.52], [0.52, -0.2], [0, 0.42], [-0.52, -0.2]];       // まん中の面
+  if (!lit) return `<polygon points="${P(O)}" fill="rgba(255,255,255,0.35)" stroke="#a9a69a" stroke-width="2" stroke-dasharray="4 3"/>`;
+  const id = `gm${stageId}_${Math.round(s)}`;
+  const face = (a, b, k) => `<polygon points="${P([O[a], O[b], T[b], T[a]])}" fill="${gemShade(color, k)}"/>`;
+  return `<defs><linearGradient id="${id}" x1="0" y1="0" x2="0.3" y2="1"><stop offset="0" stop-color="${gemShade(color, 0.55)}"/><stop offset="0.55" stop-color="${color}"/><stop offset="1" stop-color="${gemShade(color, -0.35)}"/></linearGradient></defs>` +
+    `<polygon points="${P(O)}" fill="${gemShade(color, -0.45)}" stroke="${gemShade(color, -0.6)}" stroke-width="${(s * 0.12).toFixed(1)}" stroke-linejoin="round"/>` +
+    face(0, 1, 0.45) + face(1, 2, 0.1) + face(2, 3, -0.3) + face(3, 4, -0.15) + face(4, 0, 0.25) +
+    `<polygon points="${P(T)}" fill="url(#${id})"/>` +
+    `<polygon points="${P([[-0.3, -0.48], [0.05, -0.48], [-0.32, 0.02], [-0.44, -0.2]])}" fill="rgba(255,255,255,0.55)"/>` +   // 白い光
+    `<polygon points="${P([[-0.55, -0.8], [-0.2, -0.8], [-0.42, -0.58]])}" fill="rgba(255,255,255,0.85)"/>` +
+    `<circle cx="${(s * 0.42).toFixed(1)}" cy="${(-s * 0.62).toFixed(1)}" r="${(s * 0.1).toFixed(1)}" fill="#ffffff" opacity="0.9"/>`;
 };
 
 // ===== レシピ完成の演出の秒数（10/25-15。初めてそろったときだけ。合計5秒以内、タップで最後に飛ぶ） =====
@@ -122,13 +132,14 @@ const RecipeBook = (() => {
       gem: 8.4,   // 宝石の大きさ（帯の幅の%）
     },
     book: {   // 3世界の本（world_gall）。ステージ1〜12の順
-      src: "assets/recipe_book.jpg", aspect: 1672 / 941,
+      src: "assets/recipe_book.webp", aspect: 1672 / 941,   // 11/2: 地を透明にした版（背景 bg_c01 の上に置くため。前は生成りの地の jpg）
       slots: [[55.5, 24.1], [63.2, 24.1], [70.6, 24.2], [78.1, 24.1], [55.4, 50.9], [63.2, 51.0], [70.6, 51.2], [78.1, 51.0], [55.4, 78.4], [63.2, 78.6], [70.6, 78.4], [78.1, 78.3]],
-      gem: 6.4,   // 宝石の大きさ（本の幅の%）
+      gem: 6.4,   // 宝石の場所の大きさ（本の幅の%）
+      gemR: 23,   // 宝石の絵の大きさ（場所の大きさ 52 に対して。11/2: 見本のように枠いっぱいに。帯は 17 のまま）
     },
   };
   // 絵の上に宝石をならべる。cls: 外側の class、list: [[stage, [x%, y%]]]、gemW: 宝石の幅（%）
-  function artHTML(cls, src, aspect, list, gemW, o) {
+  function artHTML(cls, src, aspect, list, gemW, o, gemR = 17) {
     const lit = o.lit || new Set();
     const gems = list.map(([s, [x, y]]) => {
       const on = lit.has(s.id) || o.drop === s.id;
@@ -136,7 +147,7 @@ const RecipeBook = (() => {
       const next = o.next === s.id ? `<circle r="24" class="rb-next"/>` : "";
       return `<div class="art-slot" style="left:${x}%;top:${y}%;width:${gemW}%">` +
         `<svg viewBox="-26 -26 52 52"><defs><radialGradient id="bkHalo${s.id}"><stop offset="0" stop-color="${s.gem}" stop-opacity="0.75"/><stop offset="1" stop-color="${s.gem}" stop-opacity="0"/></radialGradient></defs>` +
-        `<g class="rb-gem" data-stage="${s.id}">${next}${on ? `<g class="${o.drop === s.id ? (o.dropClass || "rb-drop") : ""}">${halo}${GEM_ART(s.gem || "#cccccc", true, 17, s.id)}</g>` : `<rect x="-20" y="-20" width="40" height="40" fill="transparent"/>`}</g></svg></div>`;
+        `<g class="rb-gem" data-stage="${s.id}">${next}${on ? `<g class="${o.drop === s.id ? (o.dropClass || "rb-drop") : ""}">${halo}${GEM_ART(s.gem || "#cccccc", true, gemR, s.id)}</g>` : `<rect x="-20" y="-20" width="40" height="40" fill="transparent"/>`}</g></svg></div>`;
     }).join("");
     return `<div class="${cls}" style="aspect-ratio:${aspect}"><img class="art-img" src="${src}" alt="">${gems}</div>`;
   }
@@ -156,7 +167,7 @@ const RecipeBook = (() => {
   // レシピブック・宝石ができた画面: 3世界の本。12の枠に宝石がはまる
   function renderBook(el, o) {
     const list = stages().map((s, i) => [s, ART.book.slots[i]]).filter(x => x[1]);
-    el.innerHTML = artHTML("art-book", ART.book.src, ART.book.aspect, list, ART.book.gem, o);
+    el.innerHTML = artHTML("art-book", ART.book.src, ART.book.aspect, list, ART.book.gem, o, ART.book.gemR);
     bindArt(el, o, () => render(el, o));
   }
 

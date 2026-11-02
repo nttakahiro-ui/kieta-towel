@@ -666,7 +666,7 @@ body { position: fixed; inset: 0; }
 .stages-nav #btn-zukan { margin-left: 0; }
 
 /* 12個そろったとき */
-#screen-ending { background: #f6ecd6; overflow: hidden; }   /* 主人公の絵の紙（#fff7ea）より少し暗くして、紙の地を消す */
+#screen-ending { overflow: hidden; }   /* 主人公の絵の紙（#fff7ea）より少し暗くして、紙の地を消す */
 .ending-box { height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 16px; box-sizing: border-box; text-align: center; }
 .ending-title { font-size: 28px; color: #b0801a; margin: 0 0 8px; }
 .ending-line { font-size: 17px; color: #6b5a3a; margin: 6px 0 14px; }
@@ -681,7 +681,9 @@ body { position: fixed; inset: 0; }
 .world-gems:has(.art-band) { width: 100%; margin: 4px 0 0; }   /* ステージ一覧の上の帯は、画面の幅いっぱい */
 .stages-lead { margin: 0 0 2px; text-align: center; white-space: pre-line; word-break: keep-all; font-size: 13px; color: #6b5a3a; }   /* 帯の上の一言（見本 sample_wt01） */
 .rb-box:has(.art-book), #screen-recipe .rb-box:has(.art-book) { width: 100%; max-width: 440px; }   /* 本の絵は横長なので幅いっぱい */
-#screen-recipebook:has(.art-book), #screen-recipe:has(.art-book) { background: var(--cream); }   /* 本の絵の地（生成り）と画面の地をそろえる */
+/* 宝石ができた画面・レシピブック・12個そろった画面の背景（11/2: 制作側の bg_c01。上に空、下に雲）。本の絵は地が透明 */
+#screen-recipe, #screen-recipebook, #screen-ending { background: #fbf4e2 url(../assets/recipe_bg.jpg) center / cover no-repeat; }
+#screen-ending .rb-box.small:has(.art-book) { width: 100%; max-width: 440px; }   /* 12個そろった画面も本は幅いっぱい近く（見本の大きさ） */
 .btn-row.stages-bottom { justify-content: flex-end; }   /* 下の（カード図鑑）（タイトルへ）は見本どおり右寄せ */
 .pause-btn.sleep-hide { visibility: hidden; }   /* ひと休み中の絵に「Ⅱ」が描いてあるあいだ（11/1） */
 
