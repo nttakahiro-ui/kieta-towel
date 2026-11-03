@@ -52,6 +52,7 @@ function runOnce(skill, seed) { HUDLOG.rows.push(["--", skill]); HUDLOG.lastK = 
   let orderKnow = false;   // 大ボス「3つを順に」で、正しい順を知っているか
   // 地上のことば（世界2から）は、空中と同じく真上（左右）に合わせるだけ（10/31-12 決定 B。前は◎を合わせるように上下にも動いた）
   let fx = 187, fy = 520, dragging = false, targetX = 187, nextThink = 0, bombWait = 0;
+  let trackE = null, trackOff = 0, trackX = 0;
   let seenGuide = false, curOdai = null, odaiPick = null, tried = new Set();
   // 1回目の旅（双眼鏡）: 見えるのは円の中と、きらっと光ったときだけ。気づいた語句を追いかけて見つめる。なければジグザグに見回す
   const B = vm.runInContext("BATTLE", sb);
@@ -157,15 +158,18 @@ function runOnce(skill, seed) { HUDLOG.rows.push(["--", skill]); HUDLOG.lastK = 
         }
         const tgt = ws[0] || S.fillers.filter(f => f.y > 0).sort((a, b) => b.y - a.y)[0];
         targetX = tgt ? tgt.x + (rnd() - 0.5) * 2 * skill.aim : 187 + (rnd() - 0.5) * 120;
+        // ゆれるお題のことば（11/3-3）: ねらったことばを、指で追いかけつづける（ずれの量は考えたときのまま）
+        trackE = tgt && tgt.pattern === "odai" ? tgt : null; trackOff = tgt ? targetX - tgt.x : 0;
         // 近くの弾に気づいたら、ときどきよける
         const near = S.ebullets.find(b => b.y < p.y && p.y - b.y < 140 && Math.abs(b.x - p.x) < 40);
         if (near && rnd() < skill.dodge) {
           let dir = near.x < p.x ? 1 : -1;
           if (p.x + dir * 70 < 30 || p.x + dir * 70 > 345) dir = -dir;   // 壁のほうへはよけない
-          targetX = p.x + dir * 70;
+          targetX = p.x + dir * 70; trackE = null;
         }
         targetX = Math.max(30, Math.min(345, targetX));
-      }
+      } else if (trackE && trackE.hp > 0 && Math.abs(trackE.x - trackX) > 0.01) targetX = Math.max(30, Math.min(345, trackE.x + trackOff));   // 動いたときだけ（世界1の動かないことばは前のまま）
+      if (trackE) trackX = trackE.x;
       // 木をよける: 前から来る木が自機の横の位置にかかっていたら、木の外へ
       for (const o of (S.obs || [])) {
         if (o.y + o.r > p.y - skill.look && o.y - o.r < p.y + 24 && Math.abs(o.x - p.x) < o.r + 24) {

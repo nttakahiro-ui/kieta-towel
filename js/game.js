@@ -84,6 +84,7 @@ const BATTLE = {
   groundTextScale: 0.78,       // 地上のことばの文字の高さの倍率（少し平たくして、地面に貼りついて見えるように）
   darkRescue: 0.6,             // 救出の旅の出来事「照明が落ちる」の暗さ（地面と地上のものだけ。発見の旅は0.84）
   powerStartW23: 1,            // 世界2・3のパワーの初期値の段（0 ＝ 1本、1 ＝ 2本。10/31-13 決定: 救出の旅を派手に。世界1は1本のまま）
+  powerStartW3: 2,             // 世界3のパワーの初期値の段（2 ＝ 3本。パワーUPで4本。11/3-3 決定: 世界3を最初から1段強く）
   groundHold: false,           // 救出の旅の最初の地上のことばを、中ほどで止めて待つ（stages.js の override.battle でステージ5だけ true）
   hideOut: 2.5,                // 地上のことば「隠れる」（10/31-13 決定 B改）: 顔を出している秒数（このあいだだけ光が届く）
   hideIn: 1.5,                 //   隠れている秒数（隠れ場所だけが見える）
@@ -117,6 +118,8 @@ const BATTLE = {
   odaiHpByLevel: [1, 1.25, 1.5, 1.6],   // お題の殻の硬さの倍率（出たときのパワーの段ごと）。光の本数に半分だけ比例（1本 1.0、2本 1.25、3本 1.5。11/1-2 決定）、4本は1.6（11/1-4 決定）
   odaiColumns: [0.15, 0.5, 0.85], // 3つの語句をならべる列の位置（画面の幅に対する割合）。縦書きで動かさない（11/1 決定: 前は 0.2・0.5・0.8。パワーを保つので外側へ）
   odaiColumns2: [0.2, 0.8],     // 2つのとき（「どっち？」「次は？」）の列（11/1 決定: 前は 0.3・0.7）
+  // お題のことばのゆれ（11/3-3 決定）は stages.js の WORLDS の odaiSway（幅px・周期秒）。読む時間のあとで少しずつゆれ始める。ことばごとに向きをずらす
+  odaiSwayIn: 0.8,             // ゆれ始めてから、幅いっぱいになるまでの秒数
   odaiTextScale: 0.8,           // お題のことばの文字の大きさの倍率（11/1 決定: よけるすきまを広げる。読む時間は変えない）
   odaiSpread: 0.35,             // お題のあいだの光の広がりの倍率（11/1 決定: パワーの段は保ち、正面寄りに。1 で救出の旅と同じ）
   // お題の殻の弾の形（11/1 決定。stages.js の odaiShot で役ごとにえらぶ。ないときは扇）。1回に撃つ数は扇と同じ（中ボス2・大ボス3）で、弾の総数は変えない
@@ -211,11 +214,12 @@ const BATTLE = {
     fillerDensity: [[1, 0.6], [12, 1.6]],     // 救出の旅の虫の濃さ（数と間隔。虫1匹の弾の量は変えない）
     zakoHp:        [[1, 9], [12, 8]],         // ザコの語句の硬さ（弾1本あたり。0.1きざみ）。10/25-1: 4〜5、10/25-8: 10〜11（中央あたり）、10/25-11: 9〜8（中央より少し手前、高さ30〜50%でほどけるように。ステージ1〜4で1〜2割下げ。速いステージほど少しやわらかく）
     fillerHp:      [[1, 1], [12, 3]],         // 虫の硬さの倍率（四捨五入）。10/25-1: 耐久は主に虫で上げる
-    bossHpScale:   [[1, 4.54], [2, 4.28], [3, 4.17], [4, 3.54], [5, 3.58], [6, 3.62], [7, 3.58], [8, 4.06], [9, 3.89], [10, 3.6], [11, 3.73], [12, 3.38]],   // 大ボスの1文字あたりの耐久の倍率（11/1 から中ボスは midHpScale）
+    bossHpScale:   [[1, 4.54], [2, 4.28], [3, 4.17], [4, 3.54], [5, 2.18], [6, 2.12], [7, 2.22], [8, 2.15], [9, 2.02], [10, 1.8], [11, 1.64], [12, 1.49]],   // 大ボスの1文字あたりの耐久の倍率（11/1 から中ボスは midHpScale）
     //   11/1 決定: お題のあいだもパワーを保つので、ステージ1〜12の線を引き直した。自動のふつうで大ボス戦が30〜35秒になる値。お題の殻は、出たときの光の本数をかけた硬さ（odaiHpByShots）
     //   10/31-12 決定: 中ボス・大ボスの硬さの線は、ステージ5〜12を実測で通る値に引き直す（世界1は変えない）。1〜4 は前の線（1.1 と 12 で 2 を結ぶ線）のまま（4 の値はその線の上）。
     //   5〜12 は自動プレイヤーで大ボス戦が終わる値（7・9・10 は 1.2、12 は 1.0。前は stages.js の override。5・6・8・11 は前の線の値）
-    midHpScale:    [[1, 4.97], [2, 4.0], [3, 5.02], [4, 3.74], [5, 8.8], [6, 7.5], [7, 5.3], [8, 5.6], [9, 8.27], [10, 8.64], [11, 7.98], [12, 8.19]],   // 中ボスの硬さの倍率（11/1 決定で大ボスと分けた。自動のふつうで中ボスのお題が12〜15秒になる値）
+    //   11/3-3 決定「硬さでなく弾とよけで攻略させる」: 5〜12 の大ボス・中ボスを下げた。自動のふつうで大ボス戦が 世界2 25秒前後・世界3 25〜30秒、中ボスのお題が10秒前後になる値（世界1は変えない）
+    midHpScale:    [[1, 4.97], [2, 4.0], [3, 5.02], [4, 3.74], [5, 3.43], [6, 4.35], [7, 3.44], [8, 3.3], [9, 2.98], [10, 3.11], [11, 2.71], [12, 3.03]],   // 中ボスの硬さの倍率（11/1 決定で大ボスと分けた。自動のふつうで中ボスのお題が12〜15秒になる値）
     tricky:        [[1, 0], [12, 6.2]],       // 意地の悪い語句の数（四捨五入。patterns が "auto" のステージだけ）
   },
 
@@ -893,7 +897,7 @@ const Battle = (() => {
   const fireRamp = () => Math.max(0.1, (BATTLE.ramp[phase] || BATTLE.ramp.round2).fire);
   // ===== 世界2・3の試作（10/31-10） =====
   const skillName = id => tx(`skills.${id}.name`);
-  const basePower = () => (worldDef.id >= 2 ? BATTLE.powerStartW23 : 0);   // パワーの初期値の段（10/31-13 決定: 世界2・3は1段上の2本から。パワーUPでさらに1段）
+  const basePower = () => (worldDef.id >= 3 ? BATTLE.powerStartW3 : worldDef.id >= 2 ? BATTLE.powerStartW23 : 0);   // パワーの初期値の段（10/31-13 決定: 世界2・3は1段上の2本から。パワーUPでさらに1段）
   const frozen = () => stopT > 0;   // 時間止めのあいだ（敵・弾・ことば・コンベアが止まる）
   // 出来事（stages.js の event: { kind, sortie, at, dur }）がいま起きているか。sortie 1 ＝ 発見の旅の時刻、2 ＝ 救出の旅の時刻
   //   同じ出来事を発見の旅と救出の旅の両方に書いてよい（10/31-13 決定: ステージ6〜8は救出の旅でも1回）。救出の旅の出来事は、お題のあいだは起こさない（時刻も進めない）
@@ -1549,6 +1553,13 @@ const Battle = (() => {
         e.y += (ty - e.y) * Math.min(1, dt * 4);
         const cols = odai && odai.cols === 2 ? BATTLE.odaiColumns2 : BATTLE.odaiColumns;
         e.x = W * cols[e.slot % cols.length];
+        const sw = worldDef.odaiSway;   // ゆっくり左右にゆれる（世界2・3。11/3-3）。2つは逆向き、3つは3分の1ずつずらす
+        if (sw && odai) {
+          if (!(odai.intro > 0) && !frozen()) e.swayT = (e.swayT || 0) + dt;   // 読む時間と時間止めのあいだは進めない
+          const n = cols.length, amp = sw.amp * Math.min(1, (e.swayT || 0) / BATTLE.odaiSwayIn);
+          e.x += amp * Math.sin((e.swayT || 0) * Math.PI * 2 / sw.period + e.slot * Math.PI * 2 / n + (n === 2 ? Math.PI / 2 : 0));
+          e.x = Math.max(stripRight() + e.w / 2 + 4, Math.min(W - e.w / 2 - 4, e.x));
+        }
       } else if (e.role === "boss") {
         const enter = Math.min(e.age / BATTLE.bossEnterTime, 1);
         e.y = -e.size + (H * BATTLE.bossStopY + e.size) * (1 - Math.pow(1 - enter, 2));
@@ -1793,12 +1804,22 @@ const Battle = (() => {
     odai.fireNo = (odai.fireNo || 0) + 1;
     const shape = odaiShape(e);
     odai.fireT = BATTLE.enemyFireInterval[e.role] / P.fireRate / fireRamp() * 3 * (0.8 + Math.random() * 0.4) / list.length
-      * (BATTLE.odaiShots.gap[shape] || 1) * ((opts.stage && opts.stage.odaiGap) || 1) * (e.role === "boss" && opts.stage && opts.stage.bossGap || 1);   // bossGap ＝ 大ボスだけの倍率（11/1-4。ステージ12）   // 形ごとの間隔の倍率と、ステージごとの倍率（11/1）
+      * (BATTLE.odaiShots.gap[shape] || 1) * ((opts.stage && opts.stage.odaiGap) || 1) * (e.role === "boss" && opts.stage && opts.stage.bossGap || 1) * (worldDef.odaiGapMul || 1);   // odaiGapMul ＝ 世界ごとの倍率（11/3-3 決定: 世界2 0.8、世界3 0.65）   // bossGap ＝ 大ボスだけの倍率（11/1-4。ステージ12）   // 形ごとの間隔の倍率と、ステージごとの倍率（11/1）
+  }
+  // 大ボスの殻の残り（0〜1）: 「3つを順に」は3つの合計、ほかは正解のことば（11/3-3）
+  function bossShellLeft() {
+    const order = odai && odai.mode === "order";
+    let hp = 0, max = 0;
+    for (const e of enemies) {
+      if (e.pattern !== "odai" || e.role !== "boss" || !e.parts || !(order || e.odaiReal)) continue;
+      for (const p of e.parts) if (!p.deco) { hp += p.broken || e.open ? 0 : Math.max(0, p.hp); max += p.maxHp; }
+    }
+    return max > 0 ? hp / max : 1;
   }
   // 弾の形（stages.js の odaiShot: { mid: "aim", boss: "sweep" } など。配列なら順に交互）。扇 fan／ねらい aim／横ながし sweep／輪 ring／ななめ雨 rain
   function odaiShape(e) {
     const os = (opts.stage && opts.stage.odaiShot) || {}, S = BATTLE.odaiShots;
-    let shape = (e.phase2 && BATTLE.boss2.shape) || os[e.role] || "fan";   // 大ボス2段階目は輪（11/1-4）
+    let shape = (e.phase2 && BATTLE.boss2.shape) || (e.role === "boss" && os.boss2 && bossShellLeft() <= 0.5 && os.boss2) || os[e.role] || "fan";   // 大ボス2段階目は輪（11/1-4）。boss2 ＝ 殻が半分まで削れたあとの形（11/3-3）
     if (Array.isArray(shape)) { odai.shapeNo = (odai.shapeNo || 0) + 1; shape = shape[odai.shapeNo % shape.length]; }
     const pat = BATTLE.shotPattern[e.role] || [0], n = pat.length, y = e.y + e.h / 2;
     const sp = BATTLE.enemyBulletSpeed * P.bulletSpeed * (S.speed[shape] || 1);
