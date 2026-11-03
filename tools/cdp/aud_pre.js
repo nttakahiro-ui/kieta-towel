@@ -1,0 +1,5 @@
+let __first=null; const __og=(window.AudioContext||window.webkitAudioContext).prototype.createGain;
+(window.AudioContext||window.webkitAudioContext).prototype.createGain=function(){const g=__og.call(this); if(!__first){__first=g; const an=this.createAnalyser(); an.fftSize=2048; g.connect(an); window.__an=an; window.__actx=this;} return g;};
+window.__log=[]; for (const k of ["play","fadeTo"]) { const f=Sound[k]; Sound[k]=function(...a){ window.__log.push([k,a[0],a[2]||a[1]||1,Math.round(performance.now()/100)/10]); return f.apply(this,a); }; }
+const __st={}; let __cur='?'; const __buf=new Float32Array(2048);
+window.__sample=()=>{ const l=window.__log[window.__log.length-1]; __cur=l?l[1]:'?'; if(!window.__an) return; window.__an.getFloatTimeDomainData(__buf); let pk=0,ss=0; for(const x of __buf){pk=Math.max(pk,Math.abs(x)); ss+=x*x;} const s=__st[__cur]=__st[__cur]||{pk:0,rms:0,n:0,v:0}; s.pk=Math.max(s.pk,pk); s.rms+=Math.sqrt(ss/__buf.length); s.n++; s.v=Math.max(s.v,Sound.voices||0); };

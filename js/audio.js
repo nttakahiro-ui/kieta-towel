@@ -19,11 +19,16 @@
 //   echo     響き（"mid" 世界1、"short" 世界2、"long" 世界3）
 //   swing    はねるリズム（裏の8分音符を、8分音符のこの割合だけ遅らせる。0.33 ＝ スウィング、0.5 ＝ 付点の「タッカ」）
 const SONGS = {
-  // 曲の方針（11/3-5 決定「うきうき」）: 全曲はねるリズム（swing）、長調だけ、メロディは上へ跳ぶ（4度・6度）、2小節の呼びかけ→2小節の答え、
-  // ベースは「ドッ・ドッ」と刻み、ハイハットは裏拍。お題バトルは明るいまま速く（テンポと打楽器で緊張を作る）
-  // 世界1 発見の旅「森の朝」: オルゴールのメロディ、木琴の分散和音、軽いベース、裏拍の小さなハイハット、4小節に1回の鳥
+  // 曲の方針（11/3-5 決定「うきうき」。11/3-6 の第2段階も同じ）: 全曲はねるリズム（swing）、長調だけ、メロディは上へ跳ぶ（4度・6度）、2小節の呼びかけ→2小節の答え、
+  // ベースは「ドッ・ドッ」と刻み、ハイハットは裏拍。お題バトルは明るいまま速く（入った瞬間に速くなったと分かるテンポ）
+  // 世界の楽器: 世界1＝オルゴール・木琴・リード（森）、世界2＝金属・リード・刻む打楽器、響き短め（工場）、世界3＝パッド＋オルゴールの分散和音・リード、打楽器少なめ、響き長め（宇宙）
+  // gain ＝ 曲全体の大きさ。ブラウザで測って、場面の同じ世界1の曲（発見＝森の朝、救出＝風の畑、お題＝きらきらバトル）とそろえた（11/3-6）。
+  //   共通の場面は タイトル・レシピブック＝森の朝、クイズ・宝石ができた＝風の畑 の大きさ（tools/cdp/songvol.mjs で測る）
+
+  // ---- 世界1（森） ----
+  // 発見の旅「森の朝」: オルゴールのメロディ、木琴の分散和音、軽いベース、裏拍の小さなハイハット、4小節に1回の鳥（11/3-6 にテンポ 104→116）
   "森の朝": {
-    bpm: 104, key: "C", echo: "mid", swing: 0.33,
+    bpm: 116, key: "C", echo: "mid", swing: 0.33,
     chords: "C F G C   Am F G C",
     melody: "C5 - E5 G5 - - C6 -   A5 - - F5 - - . -   F#5 - D6 - B5 - G5 -   E5 - G5 - C5 - . -  " +
             "E5 - A5 - C6 - - -    C6 - A5 - F5 - . -   G5 - D5 - B5 - G5 -     C6 - G5 E5 C5 - . -",
@@ -34,9 +39,9 @@ const SONGS = {
     inst:   { melody: "musicbox", chord: "xylo", bass: "bass", oct: { melody: 0, chord: 4, bass: 2 } },
     vol:    { chord: 0.9, bass: 0.6, drums: 0.6, orn: 0.6 }
   },
-  // 世界1 救出の旅「風の畑」: リードのメロディ、木琴の合いの手、付点の「タッカ」、ベース「ドッ・ドッ」（山場の回 3・4 は stages.js の musicTempo で1割速く）
+  // 救出の旅「風の畑」: リードのメロディ、木琴の合いの手、付点の「タッカ」、ベース「ドッ・ドッ」（11/3-6 にテンポ 124→138。山場の回 3・4 は stages.js の musicTempo で1割速く）
   "風の畑": {
-    bpm: 124, key: "G", echo: "mid", swing: 0.5,
+    bpm: 138, key: "G", echo: "mid", swing: 0.5,
     chords: "G C D G   Em C D G",
     melody: "D5 - G5 - B5 - D6 -   E6 - - C6 - - . -   F#5 - D6 - A5 - F#5 -   G5 - B5 - G5 - . -  " +
             "B4 - E5 - G5 - B5 -   E5 - C6 - B5 - G5 -   F#5 - A5 - D6 - C6 -    B5 - - - G5 - . -",
@@ -48,9 +53,9 @@ const SONGS = {
     inst:   { melody: "lead", fill: "xylo", chord: "xylo", bass: "bass", oct: { melody: 0, fill: 0, chord: 4, bass: 2 } },
     vol:    { fill: 0.8, chord: 0.55 }
   },
-  // 世界1 お題バトル「きらきらバトル」: 明るいまま速く。リード、強めのベース、しっかりした打楽器、2小節ごとにオルゴールの高いきらめき
+  // お題バトル「きらきらバトル」: 明るいまま速く。リード、強めのベース、しっかりした打楽器、2小節ごとにオルゴールの高いきらめき（11/3-6 にテンポ 144→160）
   "きらきらバトル": {
-    bpm: 144, key: "G", echo: "mid", swing: 0.3,
+    bpm: 160, key: "G", echo: "mid", swing: 0.3,
     chords: "G Em C D   G Bm C D",
     melody: "D5 - G5 - B5 - G5 -   G5 - E6 - B5 - G5 -   C5 - A5 - G5 - E5 -   F#5 - A5 - D6 - . -  " +
             "B5 - D6 - G6 - D6 -   F#6 - D6 - B5 - F#5 -   E5 - C6 - G5 - E5 -   D5 - F#5 - A5 - D6 -",
@@ -61,38 +66,129 @@ const SONGS = {
     inst:   { melody: "lead", chord: "pad", bass: "bass", oct: { melody: 0, chord: 4, bass: 2 } },
     vol:    { bass: 1.3, drums: 1.2, chord: 0.7, orn: 0.7 }
   },
-  // ここから前の形の仮の曲（世界2・3、タイトル・クイズなど）。melody / bass: 1つが8分音符ひとつ。"-" は休み。くり返し流れる
-  title: {
-    file: null, bpm: 84, wave: "triangle",
-    melody: "E5 G5 A5 G5 E5 - D5 - C5 D5 E5 G5 E5 - - - G5 A5 C6 A5 G5 - E5 - D5 E5 D5 C5 D5 - - -",
-    bass:   "C3 - - - G3 - - - A2 - - - E3 - - - F2 - - - C3 - - - G2 - - - G2 - - -"
+
+  // ---- 世界2（工場）: 金属・リード・刻む打楽器、響き短め（11/3-6） ----
+  // 発見の旅「箱のリズム」: 金属のメロディ、「タッ・タッ・ドン」の規則正しい刻み、軽いベース
+  "箱のリズム": {
+    bpm: 108, key: "D", echo: "short", swing: 0.33,
+    chords: "D G A D   Bm G A D",
+    melody: "A4 - D5 - F#5 - A5 -   B5 - - G5 - - . -   E5 - C#6 - A5 - E5 -   F#5 - D5 - A4 - . -  " +
+            "F#5 - B5 - D6 - - -    D6 - B5 - G5 - . -   A5 - E5 - C#6 - A5 -    D6 - A5 - F#5 D5 . -",
+    chord:  "- - t - - - t -",
+    bass:   "1 - - - 1 - - -",
+    drums:  { snare: "x - x - - - o -", kick: "- - - - x - - -", hat: "- o - o - o - o" },
+    inst:   { melody: "bell", chord: "bell", bass: "bass", oct: { melody: 0, chord: 4, bass: 2 } },
+    len:    { chord: 0.2 },
+    vol:    { chord: 0.6, bass: 0.6, drums: 0.8 }
   },
-  recon: {   // 探検（出撃1）の静かめの曲（10/3-9。仮）
-    file: null, bpm: 76, wave: "sine",
-    melody: "E5 - - - G5 - - - D5 - - - - - - - C5 - - - E5 - - - A4 - - - - - - -",
-    bass:   "A2 - - - - - - - F2 - - - - - - - C3 - - - - - - - G2 - - - - - - -"
+  // 救出の旅「コンベア」: リード＋金属の合いの手、付点の「タッカ」、刻む打楽器、ベース「ドッ・ドッ」
+  "コンベア": {
+    bpm: 128, key: "D", echo: "short", swing: 0.5,
+    chords: "D A Bm G   D G A D",
+    melody: "F#5 - D6 - A5 - F#5 -   E5 - C#6 - - - . -   B4 - F#5 - B5 - D6 -   D6 - B5 - G5 - . -  " +
+            "A4 - D5 - F#5 - A5 -    B5 - G5 - D6 - B5 -   C#6 - A5 - E5 - C#6 -   D6 - - - A5 - . -",
+    fill:   "- - - - - - - -   - - - - - - E6 C#6   - - - - - - - -   - - - - - - D6 F#6  " +
+            "- - - - - - - -   - - - - - - - -      - - - - - - - -   - - - - - - F#6 A6",
+    bass:   "1 - 1 - 1 - 1 -",
+    drums:  { kick: "x - - - x - - -", snare: "- - x - - - x -", hat: "o x o x o x o x" },
+    inst:   { melody: "lead", fill: "bell", bass: "bass", oct: { melody: 0, fill: 0, bass: 2 } },
+    vol:    { fill: 0.8 }
   },
-  battle: {
-    file: null, bpm: 132, wave: "triangle",
-    melody: "C5 E5 G5 E5 A5 G5 E5 D5 C5 D5 E5 G5 D5 - - - E5 G5 A5 C6 A5 G5 E5 G5 D5 E5 C5 D5 C5 - - -",
-    bass:   "C3 - G3 - A2 - E3 - F2 - C3 - G2 - D3 - C3 - G3 - A2 - E3 - F2 - G2 - C3 - - -"
+  // お題バトル「歯車」: 金属とリード、ベースと打楽器を前に
+  "歯車": {
+    gain: 1.12,
+    bpm: 148, key: "A", echo: "short", swing: 0.3,
+    chords: "A F#m D E   A D E A",
+    melody: "E5 - A5 - C#6 - A5 -   C#5 - A5 - F#5 - C#6 -   D5 - A5 - F#5 - D6 -   E5 - B5 - G#5 - . -  " +
+            "A5 - C#6 - E6 - C#6 -   F#5 - D6 - A5 - F#5 -   G#5 - E5 - B5 - E6 -    A5 - - - E5 - . -",
+    chord:  "- - t - - - t -",
+    bass:   "1 1 - 1 1 - 5 -",
+    drums:  { kick: "x - - x x - - -", snare: "- - x - - - x -", hat: "o x o x o x o x" },
+    orn:    { every: 2, bar: 1, at: 6, notes: "A6 E7", gap: 0.09, inst: "bell" },
+    inst:   { melody: "lead", chord: "bell", bass: "bass", oct: { melody: 0, chord: 4, bass: 2 } },
+    len:    { chord: 0.18 },
+    vol:    { chord: 0.6, bass: 1.4, drums: 1.4, orn: 0.6 }
   },
-  quiz: {
-    file: null, bpm: 100, wave: "sine",
-    melody: "G5 - E5 - C5 - E5 - F5 - D5 - B4 - - - E5 - C5 - A4 - C5 - D5 - G4 - - - -",
-    bass:   "C3 - - - C3 - - - G2 - - - G2 - - - A2 - - - A2 - - - G2 - - - G2 - - -"
+
+  // ---- 世界3（宇宙）: パッド＋オルゴールの分散和音・リード、打楽器少なめ、響き長め（11/3-6） ----
+  // 発見の旅「星の海」: パッドの上でオルゴールの分散和音（はねる）、オルゴールのメロディ、小さなハイハット
+  "星の海": {
+    gain: 0.5,
+    bpm: 96, key: "F", echo: "long", swing: 0.33,
+    chords: "Fmaj7 Cmaj7 Dm7 Bbmaj7   Fmaj7 Cmaj7 Dm7 Bbmaj7",
+    melody: "C5 - F5 - A5 - - -   G5 - - - E5 - - -   A4 - F5 - D5 - - -   D5 - - - - - . -  " +
+            "A5 - C6 - F6 - - -   E6 - - - B5 - G5 -   F5 - D6 - A5 - - -   A5 - - - F5 - . -",
+    chord:  "t - - - - - - -",
+    arp:    "1 3 5 7 8 7 5 3",
+    bass:   "1 - - - 1 - - -",
+    drums:  { hat: "- o - o - o - o" },
+    inst:   { melody: "musicbox", chord: "pad", arp: "musicbox", bass: "bass", oct: { melody: 0, chord: 3, arp: 4, bass: 2 } },
+    vol:    { arp: 0.7, chord: 0.8, bass: 0.5, drums: 0.5 }
   },
+  // 救出の旅「流れ星」: パッド、リード、ベース「ドッ・ドッ」、裏拍のハイハット、付点の「タッカ」
+  "流れ星": {
+    gain: 0.86,
+    bpm: 120, key: "F", echo: "long", swing: 0.5,
+    chords: "F C Dm Bb   Gm C F F",
+    melody: "C5 - F5 - A5 - C6 -   E6 - - C6 - - . -   A4 - F5 - D5 - A5 -   F5 - D5 - Bb4 - . -  " +
+            "D5 - Bb5 - G5 - D5 -   E5 - C6 - G5 - E5 -   F5 - A5 - C6 - F6 -   C6 - - - F5 - . -",
+    chord:  "t - - - - - - -",
+    bass:   "1 - 1 - 1 - 5 -",
+    drums:  { hat: "- x - x - x - x" },
+    inst:   { melody: "lead", chord: "pad", bass: "bass", oct: { melody: 0, chord: 4, bass: 2 } },
+    vol:    { chord: 0.9 }
+  },
+  // お題バトル「星の渦」: パッドにベースと打楽器、リードは高めで跳ぶ、2小節ごとにオルゴールのきらめき
+  "星の渦": {
+    bpm: 140, key: "F", echo: "long", swing: 0.3,
+    chords: "F Dm Bb C   F Am Bb C",
+    melody: "A5 - C6 - F6 - C6 -   D6 - A5 - F5 - D6 -   D5 - Bb5 - F5 - D6 -   E6 - C6 - G5 - . -  " +
+            "C6 - F6 - A5 - C6 -   E5 - C6 - A5 - E6 -   F5 - D6 - Bb5 - F5 -   G5 - C6 - E6 - G6 -",
+    chord:  "t - - - - - - -",
+    bass:   "1 - 1 1 - 1 5 -",
+    drums:  { kick: "x - - - x - - -", snare: "- - x - - - x -", hat: "- x - x - x - x" },
+    orn:    { every: 2, bar: 1, at: 6, notes: "A6 C7", gap: 0.09, inst: "musicbox" },
+    inst:   { melody: "lead", chord: "pad", bass: "bass", oct: { melody: 0, chord: 4, bass: 2 } },
+    vol:    { bass: 1.2, drums: 1.1, chord: 0.8, orn: 0.6 }
+  },
+
+  // ---- 共通の場面（11/3-6）。どの場面で鳴るかは下の SCENE ----
+  // クイズ: 戦闘曲の勢いで、音は少なく。リードは短い呼びかけだけ、ベース「ドッ・ドッ」、「ドン・タッ」を軽く、パッドなし（問題文を読む邪魔をしない）。
+  //   3問目と8問目でテンポを上げる（js/quiz.js の tempoUpAt。128→140→152）
+  "クイズ": {
+    gain: 2.7,
+    bpm: 128, key: "G", echo: "mid", swing: 0.33,
+    chords: "G C D G   Em C D G",
+    melody: "D5 G5 B5 - . - - -   - - - - - - - -   A4 D5 F#5 - . - - -   - - - - - - - -  " +
+            "B4 E5 G5 - . - - -   - - - - - - - -   F#5 A5 D6 - . - - -   B5 - G5 - . - - -",
+    bass:   "1 - 1 - 1 - 1 -",
+    drums:  { kick: "o - - - o - - -", snare: "- - o - - - o -" },
+    inst:   { melody: "lead", bass: "bass", oct: { melody: 0, bass: 2 } }
+  },
+  // 宝石ができた: 4小節の短い上がる曲。最後を長くのばす。ループしない
+  "宝石ができた": {
+    gain: 1.6,
+    bpm: 120, key: "C", echo: "mid", swing: 0.33, loop: false,
+    chords: "C F G C",
+    melody: "C5 - E5 - G5 - C6 -   A5 - C6 - F6 - - -   G5 - B5 - D6 - G6 -   C6 - - - - - - -",
+    chord:  "1 3 5 8 5 3 1 -",
+    bass:   "1 - - - 5 - - -",
+    inst:   { melody: "lead", chord: "xylo", bass: "bass", oct: { melody: 0, chord: 4, bass: 2 } },
+    vol:    { chord: 0.8, bass: 0.7 }
+  },
+  // ここから前の形の仮の曲（カードの画面だけ。11/3-6 の指示に入っていないので前のまま）。melody / bass: 1つが8分音符ひとつ。"-" は休み。くり返し流れる
   card: {
     file: null, bpm: 96, wave: "triangle",
     melody: "C5 E5 G5 C6 - - G5 - A5 G5 E5 G5 - - - - F5 A5 C6 A5 G5 E5 D5 E5 C5 - - - - - - -",
     bass:   "C3 - - - - - - - A2 - - - - - - - F2 - - - - - - - G2 - - - C3 - - -"
-  },
-  recipe: {
-    file: null, bpm: 108, wave: "triangle",
-    melody: "C5 C5 G5 G5 A5 A5 G5 - F5 F5 E5 E5 D5 D5 C5 - G5 A5 C6 - A5 G5 E5 - D5 E5 G5 C6 - - - -",
-    bass:   "C3 - - - F2 - C3 - F2 - C3 - G2 - C3 - E3 - A2 - F2 - C3 - G2 - - - C3 - - -"
   }
 };
+// 同じ素材の曲（11/3-6）: タイトルは「森の朝」をテンポ92で打楽器なし。レシピブックは「星の海」をパッドとオルゴールだけで静かに
+SONGS["タイトル"] = Object.assign({}, SONGS["森の朝"], { bpm: 92, drums: {}, gain: 1.1 });
+SONGS["レシピブック"] = Object.assign({}, SONGS["星の海"], { gain: 0.5, bass: null, drums: {}, inst: Object.assign({}, SONGS["星の海"].inst, { bass: null }) });
+// 共通の場面の曲（11/3-6）。js の Sound.play("title") などは、ここで曲の名前に替わる（ワープの会話・オープニング・ステージ一覧も title）。世界ごとの場面は stages.js の WORLDS の music
+const SCENE = { title: "タイトル", quiz: "クイズ", recipe: "宝石ができた", recipeBook: "レシピブック", ending: "レシピブック" };
+
 
 // 語句の読み上げ（仮）。端末の読み上げ機能を使う。本番で声のファイルに替えるときは speak() を書き換える
 const SPEECH = { enabled: true, lang: "ja-JP", rate: 0.95, pitch: 1.1, volume: 1 };
@@ -124,9 +220,9 @@ const Sound = (() => {
   const NOTE = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
   // "A4" → 周波数
   function freq(name) {
-    const m = /^([A-G])(#?)(\d)$/.exec(name);
+    const m = /^([A-G])(#|b)?(\d)$/.exec(name);   // "Bb4" のような ♭ も書ける
     if (!m) return 0;
-    const midi = NOTE[m[1]] + (m[2] ? 1 : 0) + (Number(m[3]) + 1) * 12;
+    const midi = NOTE[m[1]] + (m[2] === "#" ? 1 : m[2] === "b" ? -1 : 0) + (Number(m[3]) + 1) * 12;
     return 440 * Math.pow(2, (midi - 69) / 12);
   }
   const midiFreq = n => 440 * Math.pow(2, (n - 69) / 12);
@@ -247,7 +343,7 @@ const Sound = (() => {
     },
     // 金属（ベル）: 周波数の少しずれた正弦波を3本重ねて減衰
     bell(t, f, dur, v, send) {
-      const end = t + 1.6;
+      const end = t + Math.min(1.2, Math.max(0.3, dur * 1.5));   // 重なりすぎないように（同時に鳴らす音は8つまで）
       if (!takeVoice(t, end, "bell")) return;
       const g = out(t, send), h = ctx.createGain();
       h.gain.value = 0.35; h.connect(g);
@@ -302,29 +398,34 @@ const Sound = (() => {
   };
 
   // ---- 曲の仕組み（11/3-4）: メロディ／コード進行（和音は自動）／ベース（根音を自動）／打楽器 ----
-  const PART_VOL = { melody: 0.165, fill: 0.165, chord: 0.083, bass: 0.11, drums: 0.06, orn: 0.165 };   // メロディ ＞ 和音 ＞ ベース ＞ 打楽器。全体の大きさは前の仮の曲と同じくらい（ブラウザで測った平均の大きさ）
-  // "F#m" → { root: 6, minor: true }
+  const PART_VOL = { melody: 0.165, fill: 0.165, chord: 0.083, arp: 0.1, bass: 0.11, drums: 0.06, orn: 0.165 };   // メロディ ＞ 和音 ＞ ベース ＞ 打楽器。全体の大きさは前の仮の曲と同じくらい（ブラウザで測った平均の大きさ）
+  // "F#m" → { root: 6, minor: true }。"Fmaj7" "Dm7" "C7" の7の和音も（sev ＝ 7度の半音の位置）
   function chordOf(name) {
-    const m = /^([A-G])(#|b)?(m?)$/.exec(name) || [];
-    return { root: (NOTE[m[1]] || 0) + (m[2] === "#" ? 1 : m[2] === "b" ? -1 : 0), minor: m[3] === "m" };
+    const m = /^([A-G])(#|b)?(maj7|m7|m|7)?$/.exec(name) || [];
+    const q = m[3] || "";
+    return { root: (NOTE[m[1]] || 0) + (m[2] === "#" ? 1 : m[2] === "b" ? -1 : 0), minor: q === "m" || q === "m7", sev: q === "maj7" ? 11 : q === "m7" || q === "7" ? 10 : 0 };
   }
-  // 和音・ベースの記号 → 半音の位置（根音から）
-  const DEG = (c, d) => ({ 1: 0, 3: c.minor ? 3 : 4, 5: 7, 8: 12 })[d];
+  // 和音・ベースの記号 → 半音の位置（根音から）。7 ＝ 7度（7の和音でないときは1オクターブ上）、10・12 ＝ 1オクターブ上の3度・5度
+  const DEG = (c, d) => ({ 1: 0, 3: c.minor ? 3 : 4, 5: 7, 7: c.sev || 12, 8: 12, 10: c.minor ? 15 : 16, 12: 19 })[d];
+  // "c" ＝ 和音の音ぜんぶ（7の和音なら4つ）、"t" ＝ 根音のほか（根音はベースにまかせる）
+  const chordNotes = (c, d) => d === "c" ? [0, DEG(c, 3), 7].concat(c.sev ? [c.sev] : []) : d === "t" ? [DEG(c, 3), 7].concat(c.sev ? [c.sev] : []) : [DEG(c, d)];
   // 1マス先の、次の音までのマスの数（"-" は前の音をのばす）
   function holdOf(list, i) { let n = 1; while (n < 16 && list[(i + n) % list.length] === "-") n++; return n; }
   function prep(song) {
     if (song._p) return song._p;
     const ch = parse(song.chords).map(chordOf);
     const bar = s => s ? parse(s) : null;
-    song._p = { ch, mel: bar(song.melody), fill: bar(song.fill), chord: bar(song.chord), bass: bar(song.bass),
+    song._p = { ch, mel: bar(song.melody), fill: bar(song.fill), chord: bar(song.chord), arp: bar(song.arp), bass: bar(song.bass),
       drums: Object.fromEntries(Object.entries(song.drums || {}).map(([k, s]) => [k, parse(s)])), orn: song.orn ? parse(song.orn.notes) : null };
     return song._p;
   }
   function tickSong(song, sd) {
     const P = prep(song), I = song.inst || {}, oct = I.oct || {}, V = song.vol || {};
-    const pv = k => PART_VOL[k] * (V[k] || 1);
+    const pv = k => PART_VOL[k] * (V[k] || 1) * (song.gain || 1);   // gain ＝ 曲全体の大きさ（ほかの曲とそろえる）
+    const L = song.len || {}, len = (part, d) => L[part] ? Math.min(L[part], d) : d;   // len ＝ パートごとの音の長さの上限（秒）
     const steps = P.ch.length * 8;
     while (nextTime < ctx.currentTime + 0.15) {
+      if (song.loop === false && step >= steps) return;   // ループしない曲（宝石ができた）は1回で終わり
       const s = step % steps, b = Math.floor(s / 8), k = s % 8, c = P.ch[b], t = nextTime + (k % 2 ? (song.swing || 0) * sd : 0);   // 裏のマスは少し遅らせて、はねる
       const shift = n => n ? midiFreq(n) : 0;
       // メロディと合いの手（音の名前で書く。oct でオクターブを上げ下げ）
@@ -333,21 +434,21 @@ const Sound = (() => {
         if (!list) continue;
         const n = list[s % list.length];
         if (n === "-" || n === ".") continue;
-        INST[I[part] || "lead"](t, freq(n) * Math.pow(2, oct[part] || 0), holdOf(list, s) * sd, pv(part), true);
+        INST[I[part] || "lead"](t, freq(n) * Math.pow(2, oct[part] || 0), len(part, holdOf(list, s) * sd), pv(part), true);
       }
-      // 和音（コードから自動）
-      if (P.chord && I.chord) {
-        const d = P.chord[k % P.chord.length];
-        if (d !== "-") {
-          const base = 12 * ((oct.chord || 4) + 1) + c.root, dur = holdOf(P.chord, k) * sd;
-          const notes = d === "c" ? [0, DEG(c, 3), 7] : d === "t" ? [DEG(c, 3), 7] : [DEG(c, d)];
-          for (const x of notes) INST[I.chord](t, shift(base + x), dur, pv("chord") / (notes.length > 1 ? 1.6 : 1), true);
-        }
+      // 和音と分散和音（コードから自動。arp は和音と別の楽器で、和音の上を動く）
+      for (const part of ["chord", "arp"]) {
+        const list = P[part];
+        if (!list || !I[part]) continue;
+        const d = list[(list.length === 8 ? k : s) % list.length];
+        if (d === "-" || d === ".") continue;
+        const base = 12 * ((oct[part] || 4) + 1) + c.root, dur = len(part, holdOf(list, s) * sd), notes = chordNotes(c, d);
+        for (const x of notes) INST[I[part]](t, shift(base + x), dur, pv(part) / (notes.length > 1 ? 1.6 : 1), true);
       }
       // ベース（根音を自動）
       if (P.bass && I.bass) {
         const d = P.bass[k % P.bass.length];
-        if (d !== "-") INST.bass(t, shift(12 * ((oct.bass || 2) + 1) + c.root + DEG(c, d)), holdOf(P.bass, k) * sd, pv("bass"));
+        if (d !== "-") INST.bass(t, shift(12 * ((oct.bass || 2) + 1) + c.root + DEG(c, d)), len("bass", holdOf(P.bass, k) * sd), pv("bass"));
       }
       // かざりの音（鳥・きらめき）。打楽器より先に（音の数がいっぱいのときは打楽器を減らす）
       if (P.orn && b % song.orn.every === song.orn.bar && k === song.orn.at)
@@ -385,6 +486,7 @@ const Sound = (() => {
 
   // t ＝ 曲ごとのテンポの倍率（山場の回など。なければ 1）
   function play(name, t) {
+    name = SCENE[name] || name;
     if (current === name) return;
     stop();
     current = name;
@@ -413,6 +515,7 @@ const Sound = (() => {
 
   // 前の曲を少しずつ小さくしてから、次の曲に替える（場面の切り替え。11/3-4 から0.5秒。曲だけを小さくし、効果音は小さくしない）
   function fadeTo(name, sec = 0.5, t) {
+    name = SCENE[name] || name;
     if (current === name || current === "→" + name) return;
     if (!ctx || !musicBus) { play(name, t); return; }
     const now = ctx.currentTime;
