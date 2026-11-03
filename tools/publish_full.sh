@@ -13,17 +13,18 @@ git -C "$R" archive world23 index.html css data js assets "docs/世界2・3の�
 LABEL="$LABEL" python3 - "$M/versions/full/index.html" <<'PY'
 import os, sys
 p = sys.argv[1]; s = open(p, encoding="utf-8").read()
-a = '        <button id="btn-tune" class="link-btn hidden">調整パネル</button>\n'
+a = '          <button id="btn-opening" class="link-btn"></button>\n'   # 「音・主人公・記録を消す・オープニング」の2行の下に、3行目として
 assert s.count(a) == 1
-s = s.replace(a, a + '        <p class="title-note title-ver" style="font-size:11px;opacity:0.7;margin-top:6px">' + os.environ["LABEL"] + '</p>\n')
+s = s.replace(a, a + '          <span class="title-ver" style="grid-column: 1 / -1; font-size: 9px; color: rgba(70,80,60,0.6); text-shadow: 0 0 3px rgba(255,251,232,0.9)">' + os.environ["LABEL"] + '</span>\n')
 open(p, "w", encoding="utf-8").write(s)
 PY
 git -C "$M" add -A versions/full
 git -C "$M" commit -qm "11/5 の説明用の完全版（versions/full。$LABEL）
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
-git -C "$M" tag "$TAG"
-git -C "$M" push -q origin HEAD "$TAG"
+git -C "$M" tag -f "$TAG"   # 同じ日に出し直すときは、このタグを新しい commit へ（v20261101h などほかのタグは動かさない）
+git -C "$M" push -q origin HEAD
+git -C "$M" push -qf origin "refs/tags/$TAG"
 git -C "$M" log --oneline -1
 test "$W23" = "$(git -C "$M" rev-parse HEAD:versions/world23)" && echo "試作 versions/world23: 変わっていない"
 test -z "$(git -C "$M" diff --stat v20261101h HEAD -- index.html js css data assets)" && echo "親の公開版: 変わっていない"
