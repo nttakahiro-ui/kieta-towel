@@ -13,6 +13,8 @@ tools/cdp/chrome.sh                                # 消音の headless Chrome�
 node tools/cdp/songvol.mjs                         # 全曲の大きさと、同時に鳴った音の数
 tools/cdp/fps.sh "5 3" "9 3"                       # ステージの fps の最低値（"一覧の1行目の番号 何番目"。5 3 ＝ ステージ8）
 tools/cdp/shot.sh 9 1 out.jpg "S=>S.rescueT>10"     # 条件になった瞬間を撮影
+tools/cdp/screens.sh 5 <フォルダ> w2                 # 1つの世界の画面を順に撮る（ステージ一覧・カード図鑑・発見・持ち物選択・救出・お題・クイズ・結果・宝石。11/3-8）
+SITE=... node tools/cdp/mdpdf.mjs まとめ.md まとめ.pdf  # md を A4 の PDF に（はみ出した箱の数も出す。11/3-8）
 ```
 - run.mjs: ページで式を動かす（`node run.mjs '<式>' [撮影先.jpg]`、`node run.mjs RELOAD`）。CPU=4 で4倍遅く
 - pre.js: タップなどの小さな関数と、ページの読み込み待ち。play.js: 救出の旅から最後まで自動で遊んで fps を返す
