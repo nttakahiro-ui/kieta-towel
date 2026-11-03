@@ -687,7 +687,7 @@ const Battle = (() => {
     layout = opts.stage && opts.stage.patterns === "auto" ? autoLayout(words, P, opts.stage.obstacles, groundOn, opts.stage.groundCount) : null;
     obsDef = (opts.stage && opts.stage.obstacles) || null;
     theme = Object.assign({}, DEFAULT_THEME, (opts.stage && opts.stage.theme) || {});
-    bugSprites = worldDef.id >= 2 && typeof document.createElement === "function" ? {} : null;   // 世界2・3の虫は、色を変えた絵を前もって作って使い回す（10/31-14）
+    bugSprites = typeof document.createElement === "function" ? {} : null;   // 虫は、色を変えた絵を前もって作って使い回す（10/31-14 に世界2・3、11/3-8 に世界1も）
     weatherDef = (opts.stage && opts.stage.weather) || null;
     fogLevel = 0; fogTopNow = BATTLE.fogTop;
     streaks = Array.from({ length: 22 }, () => ({ x: Math.random() * W, y: Math.random() * H, s: 0.6 + Math.random() * 0.8 }));
@@ -3375,7 +3375,7 @@ const Battle = (() => {
     const r = FILLER_TYPES[f.type].r;
     const hasFilter = "filter" in ctx;
     if (f.layer === "ground" && worldDef.id >= 2) { drawGroundJunk(f); fillerHpDots(f); return; }   // 世界2・3の地上の雑魚は、虫とは別の種類（11/1 決定）
-    if (bugSprites && hasFilter) {   // 世界2・3: 前もって作った絵を置くだけ（毎フレームの filter と輪郭のぼかしをやめる。10/31-14）
+    if (bugSprites && hasFilter) {   // 前もって作った絵を置くだけ（毎フレームの filter と輪郭のぼかしをやめる。10/31-14、世界1も 11/3-8）
       const sp = bugSprite(f, f.flash > 0);
       ctx.save();
       ctx.translate(x, y);
@@ -3512,7 +3512,7 @@ const Battle = (() => {
       for (const [dx, dy] of [[-5, -4], [6, 2], [-1, 7]]) { ctx.beginPath(); ctx.arc(dx, dy, 3, 0, Math.PI * 2); ctx.fill(); }
     }
   }
-  // 世界2・3の虫の絵: 種類・光っているか・向き・羽ばたきの段（12段）ごとに、色を変えて輪郭をつけた絵を1回だけ作る（10/31-14）
+  // 虫の絵（世界1〜3。地上の雑魚の からまり草・いばらの株も）: 種類・光っているか・向き・羽ばたきの段（12段）ごとに、色を変えて輪郭をつけた絵を1回だけ作る（10/31-14）
   // 作り方は drawFiller とまったく同じ（同じ filter・輪郭・濃さで、別の小さな canvas に描く）。てんとう虫の向き（ang）だけは置くときに回す
   let bugSprites = null;
   const BUG_STEPS = 12;
