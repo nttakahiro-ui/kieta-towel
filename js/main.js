@@ -349,7 +349,7 @@ const Main = (() => {
   function toBattle(rescueAgain) {
     reviewing = reviewNext && stage.id === 1;
     showScreen("battle");
-    Sound.play(rescueAgain ? "battle" : "recon");   // 探検は静かめの曲。本番が始まると "battle" に替わる
+    { const m = window.musicOf(stage, rescueAgain ? "rescue" : "explore"); Sound.play(m.name, m.tempo); }   // 発見の旅の曲。救出の旅が始まると救出の曲に替わる（曲の名前は stages.js の WORLDS の music。11/3-4）
     // 画面が表示されてから大きさを測る
     requestAnimationFrame(() => {
       Battle.start(words, {

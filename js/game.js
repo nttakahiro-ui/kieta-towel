@@ -887,7 +887,7 @@ const Battle = (() => {
     roundT = 0;
     gapT = 0;
     nextAt = p === "round1" ? BATTLE.firstSpawnDelay : 0.8;
-    if (p !== "round1") Sound.fadeTo("battle");   // 本番の曲へ（探検は静かめの曲）
+    if (p !== "round1") music("rescue");   // 救出の旅の曲へ（発見の旅は静かめの曲）
   }
   // カウントの今の段階（0〜2 ＝「3」「2」「1」、3 ＝「出撃！」）
   const holdOn = () => enemies.some(e => e.hold && e.hp > 0);   // 1語目を待っているあいだ（弾も虫も出さない。台本も進めない）
@@ -2060,6 +2060,11 @@ const Battle = (() => {
     const other = plainWord(ch[1]);
     return opts.words.find(w => w.word === other) || { id: -110, stage: real.stage, word: other, kana: "", hp: 1, role: "zako", order: 0 };
   }
+  // 場面の曲へ0.5秒で替える（stages.js の WORLDS の music。11/3-4）
+  function music(scene) {
+    const m = window.musicOf ? window.musicOf(opts.stage, scene) : { name: scene === "explore" ? "recon" : "battle", tempo: 1 };
+    Sound.fadeTo(m.name, 0.5, m.tempo);
+  }
   function startOdai(real, isBoss) {
     const role = isBoss ? "boss" : "mid";
     const seq = isBoss && orderSet(real);   // 大ボス「3つを順に」
@@ -2073,6 +2078,7 @@ const Battle = (() => {
     // 問題文を読む時間（10/25-16）: 文の長さに合わせる。1文字あたり odaiReadPerChar 秒＋odaiReadBase 秒（最短 odaiReadMin、最長 odaiReadMax）
     const read = Math.min(BATTLE.odaiReadMax, Math.max(BATTLE.odaiReadMin, Array.from(q).length * BATTLE.odaiReadPerChar + BATTLE.odaiReadBase));
     odai = { real, boss: isBoss, t: 0, intro: read, firstHit: null, q, wrongRun: 0, mode: seq ? "order" : "pick", step: 0, show: 0, slip: false, seq: seq || null, cols: pair || after ? 2 : 3 };
+    music("odai");   // お題バトルの曲へ（11/3-4）
     // 案内: 最初のお題は、問題文の下に1行そえて、読む時間を少しのばす（順番待ちにはのせない。お題がいちばん大事なため）
     if (hintOpts && !hintShown.odai && (hintOpts.all || !(hintOpts.seen && hintOpts.seen.odai))) {
       hintShown.odai = true; if (hintOpts.mark) hintOpts.mark("odai");
@@ -2181,6 +2187,7 @@ const Battle = (() => {
       if (!e.odaiReal || !ok) e.hp = 0;
     }
     enemies = enemies.filter(e => e.hp > 0);
+    if (!odai.boss) music("rescue");   // 救出の旅の曲へもどる（大ボスのあとは結果の画面の曲）
     odai = null;
     if (!ok) post("say", () => { fsay = { text: tx("rescue.odaiLost"), t: 2 }; });
   }
