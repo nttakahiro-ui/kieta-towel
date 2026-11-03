@@ -668,6 +668,7 @@ const Main = (() => {
   function toOpening() {
     $("op-skip").textContent = tx("opening.skip");
     showScreen("opening");
+    Sound.play("opening");   // タイトルの曲の打楽器なし（11/3-7）
     showOpeningPage(0);
   }
   function endOpening() {

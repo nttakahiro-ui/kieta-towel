@@ -45,7 +45,7 @@ window.WORLDS = [
   { id: 1, name: "原材料の世界",     ground: false, rear: false, color: "#3a9a48", gems: ["#1f8a3c", "#52c23a", "#22b866", "#a8cf2a"], exploreBg: "assets/explore_bg1.jpg", music: { explore: "森の朝", rescue: "風の畑", odai: "きらきらバトル" } },   // exploreBg ＝ 発見の旅の背景（11/1。制作側の world01_02〜03_02。上下がつながる絵を縦に流す）。世界1: 地上なし・うしろからなし（10/21-1）。color ＝ レシピブックの扇形の色（10/25-13。森＝緑）。gems ＝ その世界の4つのステージの宝石の色（並びのとおり。11/2 決定で制作側の見本 sample_bg_c01 に合わせた。世界1 緑系・世界2 青系・世界3 紫系）。ステージ一覧の帯・本・ステージの札・宝石ができた演出は、すべて STAGES の gem（いちばん下で gems から入れる）を使う
   { id: 2, name: "製造工程の世界",   ground: true,  rear: false, color: "#2f86e0", gems: ["#2a6fe0", "#4aa6ee", "#2ec6ea", "#22a4dc"], exploreBg: "assets/explore_bg2.jpg", odaiSway: { amp: 30, period: 4 }, odaiGapMul: 0.8, music: { explore: "箱のリズム", rescue: "コンベア", odai: "歯車" } },   // 世界2: 地上の敵・地上の語句・照準◎が入る（工場＝青）
   { id: 3, name: "タオル進化の世界", ground: true,  rear: true,  color: "#8a3cc0", gems: ["#8a2fa0", "#c03cc8", "#6a3ee0", "#7c70e0"], exploreBg: "assets/explore_bg3.jpg", odaiSway: { amp: 50, period: 3 }, odaiGapMul: 0.65, music: { explore: "星の海", rescue: "流れ星", odai: "星の渦" } }  // 世界3: うしろ（下）からも敵が来る（rear。10/31-10 試作）（宇宙＝紫）
-  // music ＝ 場面ごとの曲の名前（発見 explore／救出 rescue／お題 odai。js/audio.js の SONGS。11/3-4 決定で世界1を新しい3曲に。11/3-6 に世界2・3も。山場の回（3つ目・4つ目）は musicTempo 1.1 で救出の曲を1割速く）
+  // music ＝ 場面ごとの曲の名前（発見 explore／救出 rescue／お題 odai。js/audio.js の SONGS。11/3-4 決定で世界1を新しい3曲に。11/3-6 に世界2・3も。山場の回（3つ目・4つ目）は musicTempo 1.1 で救出とお題の曲を1割速く。11/3-7 にお題も）
   // odaiSway ＝ お題のことばのゆれ（幅px・周期秒）、odaiGapMul ＝ お題のあいだの弾の間隔の倍率（11/3-3 決定「硬さでなく弾とよけで攻略させる」。世界1はなし）
 ];
 
@@ -101,8 +101,8 @@ window.STAGES = [
 // 宝石の色は WORLDS の gems から（11/2）。世界の中の何番目のステージかで決まる
 window.STAGES.forEach(s => { const wd = window.WORLDS.find(w => w.id === s.world); s.gem = wd.gems[window.STAGES.filter(t => t.world === s.world).indexOf(s)]; });
 
-// 場面の曲（11/3-4）: { name: 曲の名前, tempo: テンポの倍率 }。scene ＝ "explore"（発見）／"rescue"（救出）／"odai"（お題）。山場の回（musicTempo）は救出の旅だけ速く
+// 場面の曲（11/3-4）: { name: 曲の名前, tempo: テンポの倍率 }。scene ＝ "explore"（発見）／"rescue"（救出）／"odai"（お題）。山場の回（musicTempo）は救出の旅とお題バトルを速く（11/3-7 にお題も）
 window.musicOf = (stage, scene) => {
   const w = stage && window.WORLDS.find(w => w.id === stage.world), m = (w && w.music) || {};
-  return { name: m[scene] || (scene === "explore" ? "recon" : "battle"), tempo: (scene === "rescue" && stage && stage.musicTempo) || 1 };
+  return { name: m[scene] || (scene === "explore" ? "recon" : "battle"), tempo: ((scene === "rescue" || scene === "odai") && stage && stage.musicTempo) || 1 };
 };
