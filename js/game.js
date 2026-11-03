@@ -258,7 +258,9 @@ const BATTLE = {
   skillStopTime: 4,            // 必殺ワザ「時間止め」の秒数（敵も弾もことばも止まる。ふわりの光は出る）
   skillGuardTime: 10,          // 必殺ワザ「無敵タイム」の秒数（ぶつかっても元気が減らない）
   skillShowerShell: 0.5,
-  orderHits: 3,                // 大ボス「3つを順に」: 同じことばに続けて何発当てたら「当てた」にするか（横切っただけでは数えない）
+  orderHits: 3,                // 大ボス「3つを順に」: 順がちがうことばに続けて何発当てたら「まちがい」にするか（横切っただけでは数えない）
+  orderGoodHold: 1.2,          //   正しい順のことばに当てたあと、この秒数は、ほかのことばに当たってもまちがいにしない（よけたとき・広がった光。11/2-2）
+  orderShare: 1 / 3,           // 大ボス「3つを順に」（11/2-2 決定）: 1つのことばの殻の硬さを、大ボスの硬さの線の何倍にするか（3つで大ボス1つ分）
   orderHitGap: 0.35,           //   この秒数あいだがあくと、続けて当てた数は0にもどる       // 必殺ワザ「光のシャワー」: 画面じゅうのことばの殻の硬さを何倍にするか（0.5 ＝ 半分けずる）
 };
 
@@ -1159,7 +1161,7 @@ const Battle = (() => {
       hold: (BATTLE.firstHold && phase === "round2" && !od && !extraRound && word === script[0])   // ステージ1の救出の旅の1語目
         || (BATTLE.groundHold && ground && phase === "round2" && !extraRound && !groundHeld && (groundHeld = true)),   // ステージ5の救出の旅の、最初の地上のことば（10/31-12）
       word, role, size, w, h: size * 1.2, ground, pattern, lane,
-      slot: od ? od.slot : 0, dummy: od ? !od.real : false, odaiReal: od ? od.real : false, penaltyAt: -9,
+      slot: od ? od.slot : 0, order: od ? !!od.order : false, dummy: od ? !od.real : false, odaiReal: od ? od.real : false, penaltyAt: -9,
       last: phase !== "round1",                    // 2周目と大ボスは、倒せば吸い込む
       spd: (phase === "round1" ? BATTLE.round1Speed : 1) * P.speedScale,
       bx: x, x, y, hp, maxHp: hp,
@@ -1179,7 +1181,7 @@ const Battle = (() => {
       const n = Math.max(1, deco.filter(d => !d).length);
       const lim = BATTLE.perCharHp[role];
       const per = BATTLE.hpOverride[role] ||
-        Math.min(lim.max, Math.max(lim.min, Math.round(BATTLE.wordTotalHp[role] * (role === "mid" ? P.midHpScale : P.bossHpScale) * (od ? BATTLE.odaiHpByLevel[POWER_LEVELS.indexOf(level)] || 1 : 1) / n)));
+        Math.min(lim.max, Math.max(lim.min, Math.round(BATTLE.wordTotalHp[role] * (role === "mid" ? P.midHpScale : P.bossHpScale) * (od ? BATTLE.odaiHpByLevel[POWER_LEVELS.indexOf(level)] || 1 : 1) * (od && od.order ? BATTLE.orderShare * (opts.stage.orderHp || 1) : 1) / n)));   // 「3つを順に」は1つあたり 1/3（orderHp ＝ ステージごとの倍率）
       const ws = chars.map(ch => ctx.measureText(ch).width);
       const total = ws.reduce((a, b) => a + b, 0);
       let ox = -total / 2, k = 0;
@@ -1904,6 +1906,7 @@ const Battle = (() => {
       p.broken = true;
       breakPart(e, p);
       e.hp--;
+      if (e.hp <= 0 && e.order && odai && odai.mode === "order") { orderOpen(e); return; }   // 「3つを順に」: 殻を削りきったら、ほどけて番号（11/2-2）
       if (e.hp <= 0 && e.role === "boss" && !e.dummy && (e.pattern !== "odai" || e.odaiReal) && opts.stage && opts.stage.bossTwoStep && !e.phase2) { bossAgain(e); return; }
       if (e.hp <= 0) defeat(e);
       return;
@@ -2057,8 +2060,8 @@ const Battle = (() => {
     const longest = Math.max(...cands.map(w => Array.from(w.word).length));
     const room = H * 0.66 - odaiTop() - 30;   // 問題文の帯の下から、自機の上まで
     const size = Math.round(Math.max(24, Math.min(BATTLE.fontSize[role], Math.floor(room / (longest * 1.12)))) * BATTLE.odaiTextScale);   // 11/1 決定: 0.8倍
-    cands.forEach((w, i) => spawn(w, { role, size, slot: i, real: w === real }));
-    if (seq) for (const e of enemies) if (e.pattern === "odai") { e.seqNo = seq.indexOf(e.word); e.dummy = true; e.num = 0; }   // 3つを順に: そろうまでは3つとも、当てても削れない
+    cands.forEach((w, i) => spawn(w, { role, size, slot: i, real: w === real, order: !!seq }));
+    if (seq) for (const e of enemies) if (e.pattern === "odai") { e.seqNo = seq.indexOf(e.word); e.dummy = true; e.num = 0; }   // 3つを順に: 正しい順のことばだけ削れる（orderHit）
     // お題のあいだは、雑魚と雑魚の弾を出さない（10/3-12）。始まる瞬間に画面の雑魚と弾を消す（殻から飛ぶ弾は、読む時間が終わってから）
     fillers.forEach(f => addPop(f.x, f.y, "#fff8d8", 0.8, f.layer === "ground"));
     fillers = []; ebullets = []; odaiLater = [];
@@ -2101,35 +2104,19 @@ const Battle = (() => {
     }
   }
 
-  // 大ボス「3つを順に」で、ことばに光が当たった
+  // 大ボス「3つを順に」で、ことばに光が当たった（11/2-2 決定: 正しい順に1つずつ殻を削りきってほどく）
   function orderHit(e, s) {
-    const list = enemies.filter(q => q.pattern === "odai" && q.hp > 0);
-    if (e.num || odai.show > 0) { bounces.push({ x: s.x, y: e.y + e.h / 2, vx: (Math.random() - 0.5) * 120, vy: 320, age: 0 }); return; }   // もう番号がついている・正しい順を見せているあいだ
-    // 光は自動で出るので、となりの列へ動くとちゅうに、まん中のことばを横切ってしまう。同じことばに続けて orderHits 発当てたときだけ「当てた」にする
+    if (e.open || odai.show > 0) { bounces.push({ x: s.x, y: e.y + e.h / 2, vx: (Math.random() - 0.5) * 120, vy: 320, age: 0 }); return; }   // もうほどけた・正しい順を見せているあいだ
+    if (e.seqNo === odai.step) { e.hitN = 0; odai.goodT = t; damageWord(e, s.x); return; }   // 正しい順のことば: 殻を削る
+    // 正しい順のことばに当てていたすぐあと（orderGoodHold 秒）は、広がった光や、弾をよけたときの光がとなりのことばに当たっても、まちがいにしない
+    if (t - (odai.goodT === undefined ? -9 : odai.goodT) <= BATTLE.orderGoodHold) { e.hitN = 0; bounces.push({ x: s.x, y: e.y + e.h / 2, vx: (Math.random() - 0.5) * 120, vy: 320, age: 0 }); return; }
+    // 順がちがうことば: 光は自動で出るので、となりの列へ動くとちゅうに横切ってしまう。続けて orderHits 発当てたときだけ「まちがい」にする
     if (e.hitT === t && e.hitN) return;   // 同じ瞬間に当たった光（パワーの2本・3本）は1発と数える（11/1）
     if (t - (e.hitT || -9) > BATTLE.orderHitGap) e.hitN = 0;
     e.hitT = t; e.hitN = (e.hitN || 0) + 1; e.flash = 0.12;
     if (e.hitN < BATTLE.orderHits) { Sound.se("hit"); return; }
     e.hitN = 0;
-    if (e.seqNo === odai.step) {   // 正しい順: その場で殻がほどける（11/2 決定）
-      odai.step++; e.num = odai.step; e.flash = 0.3; e.open = true;
-      for (const p of e.parts || []) if (!p.deco) shellBits(e, p);
-      floats.push({ x: e.x, y: e.y - e.h / 2 - 16, text: String(e.num), big: true, age: 0 });
-      Sound.se("crack");
-      if (odai.step >= 3) {   // 3つともほどけた: 大ボスのことばが助かる。ほかの2つは消える
-        if (!odai.slip) { score += BATTLE.odaiBonus; floats.push({ x: W / 2, y: H * 0.45, text: `ひらめき！ +${BATTLE.odaiBonus}`, big: true, age: 0 }); Sound.se("hirameki"); }
-        let real = null;
-        for (const q of list) {
-          if (q.word === odai.real) { real = q; continue; }
-          vanish.push({ word: q.word, x: q.x, y: q.y, size: q.size, w: q.w, ground: false, age: 0 }); q.hp = 0;
-        }
-        odai.firstHit = "done";
-        if (real) { real.dummy = false; for (const p of real.parts || []) p.broken = true; real.hp = 0; defeat(real); }
-        enemies = enemies.filter(q => q.hp > 0);
-      }
-      return;
-    }
-    // 順がちがう: 3つとも最初にもどして、正しい順を一度だけ見せる。減点は世界1のダミーと同じ
+    // まちがい: 3つとも最初にもどして（ほどけた殻が戻り、番号も消える）、正しい順を一度だけ見せる。減点は世界1のダミーと同じ
     odai.slip = true;
     if (t - e.penaltyAt >= BATTLE.odaiPenaltyCool) {
       e.penaltyAt = t;
@@ -2138,8 +2125,30 @@ const Battle = (() => {
       Sound.se("boing");
       wrongFx = { age: 0, text: tx("odaiForm.orderWrong") }; e.wrongT = BATTLE.odaiWrongTime;
     }
-    for (const q of list) { if (q.open) addPop(q.x, q.y, "#d8e6b0", 0.8); q.num = 0; q.open = false; }   // ほどけた殻が戻り、番号も消える（11/2）
+    for (const q of enemies) {   // ほどけた殻だけ戻る（削っているとちゅうのことばは、削ったぶんを残す）
+      if (!q.order || q.hp <= 0 || !q.open) continue;
+      addPop(q.x, q.y, "#d8e6b0", 0.8);
+      for (const p of q.parts || []) if (!p.deco) { p.broken = false; p.hp = p.maxHp; }
+      q.hp = q.maxHp; q.num = 0; q.open = false;
+    }
     odai.step = 0; odai.show = 1.8;
+  }
+  // 「3つを順に」: 正しい順のことばの殻を削りきった。ほどけて番号がつく。3つ目で大ボスのことばが助かる
+  function orderOpen(e) {
+    odai.step++; e.num = odai.step; e.open = true; e.hp = 1; e.flash = 0.3;   // （hp は残す: まちがえたときに殻を戻すため）
+    floats.push({ x: e.x, y: e.y - e.h / 2 - 16, text: String(e.num), big: true, age: 0 });
+    Sound.se("shine");
+    if (odai.step < 3) return;
+    if (!odai.slip) { score += BATTLE.odaiBonus; floats.push({ x: W / 2, y: H * 0.45, text: `ひらめき！ +${BATTLE.odaiBonus}`, big: true, age: 0 }); Sound.se("hirameki"); }
+    let real = null;
+    for (const q of enemies) {
+      if (!q.order || q.hp <= 0) continue;
+      if (q.word === odai.real) { real = q; continue; }
+      vanish.push({ word: q.word, x: q.x, y: q.y, size: q.size, w: q.w, ground: false, age: 0 }); q.hp = 0;
+    }
+    odai.firstHit = "done";
+    if (real) { real.dummy = false; for (const p of real.parts || []) p.broken = true; real.hp = 0; defeat(real); }
+    enemies = enemies.filter(q => q.hp > 0);
   }
 
   // お題バトルの終わり。ok: 本物を吸い込んだ／false: 時間切れ（取り逃がし）
@@ -2205,7 +2214,7 @@ const Battle = (() => {
     else if (skill === "shower") {   // 画面じゅうのことばの殻を半分けずる（地面のことばも。ほどけはしない）
       showerFx = { age: 0 };
       for (const e of enemies) {
-        if (e.hp <= 0 || !onScreen(e) || !hasShell(e) || e.dummy) continue;
+        if (e.hp <= 0 || !onScreen(e) || !hasShell(e) || (e.dummy && !e.order) || e.open) continue;   // 「3つを順に」のことばにも効く（11/2-2）
         if (e.parts) { for (const p of e.parts) if (!p.broken && !p.deco) { p.hp = Math.max(1, Math.round(p.hp * BATTLE.skillShowerShell)); p.flash = 0.3; } }
         else e.hp = Math.max(0.01, e.hp * BATTLE.skillShowerShell);
         e.flash = 0.3;
