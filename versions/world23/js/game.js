@@ -123,7 +123,7 @@ const BATTLE = {
   //   aimGap ＝ ねらいの1発ずつの間隔（秒）、sweepCols ＝ 横ながしの列の数、sweepGap ＝ 横ながしの1発ずつの間隔（秒）、ringN ＝ 輪1つの弾の数（たまったら撃つ）、
   //   rainSlant ＝ ななめ雨の傾き（横の速さ ÷ 縦の速さ）、speed ＝ 形ごとの速さの倍率
   odaiShots: { aimGap: 0.18, sweepCols: 7, sweepGap: 0.12, ringN: 6, rainSlant: 0.45, speed: { aim: 1, sweep: 1, ring: 0.85, rain: 1 }, gap: { fan: 1.4, aim: 1.4, sweep: 1.4, ring: 1.4, rain: 1.4 } },
-  rearRate: 0.35,
+  rearRate: 0.35,              // 世界3: 雑魚の群れのうち、うしろ（画面の下）から来る割合（stages.js の rearRate でステージごとに。ステージ12 0.5。11/2-3）
   gravityDrift: 46,             // 出来事「重力が変わる」: ことばが横に流される速さ（px/秒）（10/31-10 試作）
   // 出来事「ねじが飛んでくる」（世界2）と「星がはじける」（世界3）（11/1-2 決定）。warn ＝ 先に出す印の秒数
   screwEvent: { n: [3, 5], warn: 1.5, gap: 0.35, vx: 210, vy: 120 },
@@ -422,7 +422,7 @@ function stageParams(stage) {
 
 // patterns が "auto" のステージ: 語句の出方・順番・位置を、難易度から機械的に決める
 // 意地の悪い語句は、順番の中にちらして置く。難易度が上がるほど「横切る」「端にかくれる」が多くなる
-function autoLayout(words, P, obstacles, groundOn) {
+function autoLayout(words, P, obstacles, groundOn, groundN) {
   const lanes = [0.3, 0.65, 0.5, 0.25, 0.7, 0.4, 0.6, 0.35, 0.55];
   const list = words.filter(w => w.role !== "boss").sort((a, b) => (a.order || 0) - (b.order || 0));
   const n = Math.min(P.tricky, list.length - 1);
@@ -431,7 +431,7 @@ function autoLayout(words, P, obstacles, groundOn) {
   const trickyIdx = new Set();
   for (let k = 0; k < n; k++) trickyIdx.add(Math.min(list.length - 1, 1 + Math.floor(k * (list.length - 1) / Math.max(1, n))));
   const layout = {};
-  let kindNo = 0, groundLeft = groundOn === false ? 0 : BATTLE.autoGroundCount;   // 地上のない世界では0
+  let kindNo = 0, groundLeft = groundOn === false ? 0 : (groundN || BATTLE.autoGroundCount);   // 地上のない世界では0。groundN ＝ stages.js の groundCount（ステージ12 3。11/2-3）
   list.forEach((w, i) => {
     let pattern = "normal", lane = lanes[i % lanes.length];
     if (trickyIdx.has(i)) {
@@ -680,7 +680,7 @@ const Battle = (() => {
     P = stageParams(opts.stage);
     worldDef = ((window.WORLDS || []).find(w => opts.stage && w.id === opts.stage.world)) || {};
     groundOn = worldDef.ground !== false;   // 地上の敵・地上の語句・照準◎（世界2から。10/21-1）
-    layout = opts.stage && opts.stage.patterns === "auto" ? autoLayout(words, P, opts.stage.obstacles, groundOn) : null;
+    layout = opts.stage && opts.stage.patterns === "auto" ? autoLayout(words, P, opts.stage.obstacles, groundOn, opts.stage.groundCount) : null;
     obsDef = (opts.stage && opts.stage.obstacles) || null;
     theme = Object.assign({}, DEFAULT_THEME, (opts.stage && opts.stage.theme) || {});
     bugSprites = worldDef.id >= 2 && typeof document.createElement === "function" ? {} : null;   // 世界2・3の虫は、色を変えた絵を前もって作って使い回す（10/31-14）
@@ -1181,7 +1181,7 @@ const Battle = (() => {
       const n = Math.max(1, deco.filter(d => !d).length);
       const lim = BATTLE.perCharHp[role];
       const per = BATTLE.hpOverride[role] ||
-        Math.min(lim.max, Math.max(lim.min, Math.round(BATTLE.wordTotalHp[role] * (role === "mid" ? P.midHpScale : P.bossHpScale) * (od ? BATTLE.odaiHpByLevel[POWER_LEVELS.indexOf(level)] || 1 : 1) * (od && od.order ? BATTLE.orderShare * (opts.stage.orderHp || 1) : 1) / n)));   // 「3つを順に」は1つあたり 1/3（orderHp ＝ ステージごとの倍率）
+        Math.min(lim.max, Math.max(lim.min, Math.round(BATTLE.wordTotalHp[role] * (role === "mid" ? P.midHpScale : P.bossHpScale) * (od ? BATTLE.odaiHpByLevel[POWER_LEVELS.indexOf(level)] || 1 : 1) * (od && od.order ? BATTLE.orderShare * (opts.stage.orderHp || 1) : 1) * (role === "boss" && opts.stage && opts.stage.bossHp || 1) / n)));   // bossHp ＝ ステージごとの大ボスの硬さの倍率（ステージ12。11/2-3）   // 「3つを順に」は1つあたり 1/3（orderHp ＝ ステージごとの倍率）
       const ws = chars.map(ch => ctx.measureText(ch).width);
       const total = ws.reduce((a, b) => a + b, 0);
       let ox = -total / 2, k = 0;
@@ -1260,7 +1260,7 @@ const Battle = (() => {
 
   function spawnWave() {
     // 世界3: うしろ（画面の下）から綿毛おばけが2匹（10/31-10 試作。WORLDS の rear）。出る前に下のはしに「！」
-    if (worldDef.rear && Math.random() < BATTLE.rearRate) {
+    if (worldDef.rear && Math.random() < ((opts.stage && opts.stage.rearRate) || BATTLE.rearRate)) {
       for (let i = 0; i < 2; i++) { const x = freeX(H, "air", 40); if (x !== null) spawnFiller("ghost", x, H + 30 + i * 50, { bx: 0, rear: true, delay: 0.9 }); }
       newInWorld("rear");
       return;
@@ -3866,6 +3866,35 @@ const Battle = (() => {
   // 絵は assets/fuwari_1〜3.png（資料/絵/ のふわりの絵から tools/fuwari_cut.js で切り出し、背景を透明にしたもの）
   const fuwariImgs = [1, 2, 3].map(n => Object.assign(new Image(), { src: `assets/fuwari_${n}.png` }));
   // ふわりの絵を (x, y) を中心に、幅 size で描く。frame: 1〜3
+  // 元気の絵（11/2-3）: ふわりの1のコマに細い濃い縁取りをつけた絵を、一度だけ作っておく。lost ＝ 失ったぶん（灰色）
+  const LIFE_RES = 3, LIFE_SIZE = 24;
+  let lifeSprites = null;
+  function lifeSprite(alive) {
+    const img = fuwariImgs[0];
+    if (!img.complete || !img.naturalWidth) return null;
+    if (!lifeSprites) {
+      const make = gray => {
+        const s = LIFE_SIZE * LIFE_RES, pad = 2 * LIFE_RES, c = document.createElement("canvas");
+        c.width = c.height = s + pad * 2;
+        const g = c.getContext("2d");
+        const sil = document.createElement("canvas"); sil.width = sil.height = c.width;   // 縁取り用の濃い影
+        const sg = sil.getContext("2d");
+        sg.drawImage(img, pad, pad, s, s); sg.globalCompositeOperation = "source-in"; sg.fillStyle = gray ? "#6a6a6a" : "#3d4a35"; sg.fillRect(0, 0, sil.width, sil.height);
+        const o = 1.2 * LIFE_RES;
+        for (let a = 0; a < 8; a++) g.drawImage(sil, Math.cos(a * Math.PI / 4) * o, Math.sin(a * Math.PI / 4) * o);
+        g.drawImage(img, pad, pad, s, s);
+        if (gray) {   // 灰色に: 色を抜いて（saturation）、形の外にはみ出た分を、元の形で切り取る。少し白っぽく
+          const mask = document.createElement("canvas"); mask.width = mask.height = c.width; mask.getContext("2d").drawImage(c, 0, 0);
+          g.globalCompositeOperation = "saturation"; g.fillStyle = "#808080"; g.fillRect(0, 0, c.width, c.height);
+          g.globalCompositeOperation = "destination-in"; g.drawImage(mask, 0, 0);
+          g.globalCompositeOperation = "source-atop"; g.fillStyle = "rgba(255,255,255,0.35)"; g.fillRect(0, 0, c.width, c.height);
+        }
+        return c;
+      };
+      lifeSprites = { on: make(false), off: make(true) };
+    }
+    return alive ? lifeSprites.on : lifeSprites.off;
+  }
   function drawFuwariArt(frame, x, y, size, rot) {
     const img = fuwariImgs[frame - 1];
     if (!img.complete || !img.naturalWidth) return false;
@@ -4588,9 +4617,14 @@ const Battle = (() => {
     const top = 14;
     if (phase === "round1") { drawExploreHud(); return; }   // 発見の旅は、見本 smple_tansaku の配置（11/1）
     {
+    // 元気のゲージと元気3つの後ろに、半透明の白い板（角丸。11/2-3 決定: どの世界の背景の上でも見やすく）
+    ctx.fillStyle = "rgba(255,255,255,0.72)";
+    roundRect(6, top - 6, 160 + BATTLE.lives * 26, 28, 12); ctx.fill();
+    ctx.strokeStyle = "rgba(90,100,80,0.25)"; ctx.lineWidth = 1; ctx.stroke();
     // 体力
     ctx.fillStyle = "rgba(255,255,255,0.85)";
     roundRect(12, top, 130, 16, 8); ctx.fill();
+    ctx.strokeStyle = "rgba(90,100,80,0.35)"; ctx.lineWidth = 1; ctx.stroke();
     const rate = player.hp / BATTLE.playerMaxHp;
     ctx.fillStyle = rate > 0.4 ? "#8cbf5a" : (Math.floor(t * 4) % 2 ? "#e39a8e" : "#f2c4bb");
     roundRect(14, top + 2, 126 * rate, 12, 6); ctx.fill();
@@ -4610,13 +4644,16 @@ const Battle = (() => {
     }
     }
     ctx.lineWidth = 4; ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.lineJoin = "round";
-    // 元気（残機）: ふわりの小さな絵（1のコマ）をならべる。失ったぶんはうすく（10/25-12。前は雲の絵）。発見の旅では減らないので出さない（10/25-17）
+    // 元気（残機）: ふわりの小さな絵（1のコマ）をならべる（10/25-12。前は雲の絵）。発見の旅では減らないので出さない（10/25-17）
+    //   11/2-3 決定: 絵に細い濃い縁取り。失ったぶんは灰色にして小さな×を重ねる（全世界共通）
     if (phase !== "round1") for (let i = 0; i < BATTLE.lives; i++) {
-      const lx = 160 + i * 26, ly = top + 8;
-      ctx.save();
-      ctx.globalAlpha = i < lives ? 1 : 0.25;
-      drawFuwariArt(1, lx, ly, 26);
-      ctx.restore();
+      const lx = 158 + i * 26, ly = top + 8, sp = lifeSprite(i < lives);
+      if (sp) ctx.drawImage(sp, lx - sp.width / 2 / LIFE_RES, ly - sp.height / 2 / LIFE_RES, sp.width / LIFE_RES, sp.height / LIFE_RES);
+      if (i >= lives) {
+        ctx.save(); ctx.strokeStyle = "#5a5a5a"; ctx.lineWidth = 2.2; ctx.lineCap = "round";
+        ctx.beginPath(); ctx.moveTo(lx - 5, ly - 5); ctx.lineTo(lx + 5, ly + 5); ctx.moveTo(lx + 5, ly - 5); ctx.lineTo(lx - 5, ly + 5); ctx.stroke();
+        ctx.restore();
+      }
     }
     // 点数（右）。上に出すのは体力ゲージ、残機、点数だけ
     ctx.textAlign = "right"; ctx.textBaseline = "top";
