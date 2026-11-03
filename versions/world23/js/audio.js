@@ -250,6 +250,10 @@ const Sound = (() => {
     } else if (name === "pop") {     // 花がぽんっと咲く
       sweep(700, 1100, 0.09, "triangle", 0.18);
       tone(freq("E6"), t + 0.05, 0.15, "sine", 0.06);
+    } else if (name === "seedThrow") {   // 光のたねを投げる（ぽん。11/2 決定。0.25秒ごとに鳴るので、ごく小さく）
+      sweep(520, 760, 0.07, "sine", 0.05);
+    } else if (name === "seedPop") {     // 光のたねがはじける（ぱっ。小さく）
+      sweep(1500, 2300, 0.05, "triangle", 0.045);
     } else if (name === "item") {    // 綿のたねを拾う
       tone(freq("G5"), t, 0.15, "sine", 0.25);
       tone(freq("D6"), t + 0.06, 0.25, "sine", 0.25);

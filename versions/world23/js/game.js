@@ -73,12 +73,14 @@ const BATTLE = {
   // 地上の攻撃（10/31-12 決定 B）: 地上の敵が自機の真上の列に来たら、自動で光が落ちる（左右に合わせるだけ。照準◎はやめた）
   bombRange: 170,              // 自機の真上の地面に置く薄い丸の位置（自機からどれだけ前か、px）
   lockRadius: 26,              // 薄い丸の大きさ（px）
-  groundColumn: 12,            // 「真上の列」の幅のゆとり（地上のことばの幅の半分＋この px まで、真上とみなす）
-  bombInterval: 0.6,           // 光のたねを投げる間隔（秒。11/1-4 決定。前は光が0.15秒ごとに落ちていた）
-  bombFlight: 0.4,             // 光のたねが地面に届くまでの秒数（放物線。着地で光がはじける）
-  seedPower: 4,                // 光のたね1個で削る量（前の「0.15秒ごとに1」と同じ速さで削れるように 0.6÷0.15）
+  groundColumn: 60,            // 「真上の列」の左右の幅（px。11/2 決定。地上のことばがこの幅にかかっていれば、真上ぴったりでなくても投げる。前は12）
+  bombInterval: 0.25,          // 光のたねを投げる間隔（秒。11/2 決定「投げ続ける」。前は0.6）
+  bombFlight: 0.85,            // 光のたねが地面に届くまでの秒数（放物線。0.25秒ごとなので、空中に3〜4個）
+  seedPower: 4 * 0.25 / 0.6,   // 光のたね1個で削る量（11/2: 前の1個4の、およそ1/3。倒す速さは前と同じになるように 4 × 0.25 ÷ 0.6。端数は持ちこす）
   seedArc: 46,                 // 放物線の高さ（px。画面の上へふくらむ）
-  bombRadius: 36,              // 光が当たる広さ（px）
+  seedSpread: 22,              // 落ちる先を左右にばらけさせる幅（px。±この値）
+  seedSplash: 40,              // はじける範囲（幅80px の半分。地上のことばの幅の半分＋この px まで当たる）
+  seedSize: 1.5,               // たねの大きさ（11/1-4 の何倍か）
   groundTextScale: 0.78,       // 地上のことばの文字の高さの倍率（少し平たくして、地面に貼りついて見えるように）
   darkRescue: 0.6,             // 救出の旅の出来事「照明が落ちる」の暗さ（地面と地上のものだけ。発見の旅は0.84）
   powerStartW23: 1,            // 世界2・3のパワーの初期値の段（0 ＝ 1本、1 ＝ 2本。10/31-13 決定: 救出の旅を派手に。世界1は1本のまま）
@@ -336,6 +338,9 @@ const BULLET_COLORS = {
   shot: "#3f8cf0",       // 味方の光（ふわりの光）: 青（10/25-11。前は白寄りの桃色）。敵の弾の赤紫・発見の「きらっ」や助けた瞬間の金色とは別の色
   shotRim: "#ffffff",    // 味方の光の縁取り: 白
   shotHalo: "rgba(170,210,255,0.45)",   // 味方の光のまわりの、やわらかい光の輪（うすい青）
+  seed: "#8fd63a",       // 光のたね（地上への攻撃。11/2 決定）: 黄緑。味方の光の青・敵の弾の赤紫・森のたねの金のどれとも離れた色
+  seedRim: "#ffffff",    // 光のたねの縁取り: 白
+  seedHalo: "rgba(190,240,120,0.4)",    // 光のたねのまわりの光
 };
 
 // 時間帯の色（data/stages.js の theme 欄で、ステージごとに上書きする）。ここは「真昼」の色
@@ -1503,19 +1508,20 @@ const Battle = (() => {
     for (const s of shots) { s.y -= BATTLE.shotSpeed * dt; s.x += s.vx * dt; }
     shots = shots.filter(s => s.y > -20);
 
-    // 地上の攻撃（10/31-12 決定 B、11/1-4 決定で光のたねを投げる形に）: 地上の敵が自機の真上の列に来たら、自動で光のたねを投げる（いちばん近いものに）
-    //   たねは放物線で飛び、着地で光がはじける。着地したときに隠れていることばには効かない
+    // 地上の攻撃（10/31-12 決定 B、11/1-4 決定で光のたねを投げる形に、11/2 決定で投げ続ける形に）: 地上の敵が自機の真上の列（左右 groundColumn px）にいるあいだ、
+    //   自動で光のたねを投げ続ける（いちばん近いものに）。たねは少しずつ左右にばらけて放物線で飛び、着地ではじける。着地したときに隠れていることばには効かない
     lock = groundTargets().filter(g => g.y < player.y - 30 && Math.abs(player.x - g.x) < (g.word ? g.w / 2 : g.r) + BATTLE.groundColumn).sort((a, b) => b.y - a.y)[0] || null;
     bombTimer -= dt;
     if (lock && bombTimer <= 0) {
-      bombs.push({ sx: player.x, sy: player.y - 24, tx: lock.word ? Math.min(lock.x + lock.w / 2 - 4, Math.max(lock.x - lock.w / 2 + 4, player.x)) : lock.x, ty: lock.y, age: 0, tg: lock });
+      const aim = lock.word ? Math.min(lock.x + lock.w / 2 - 4, Math.max(lock.x - lock.w / 2 + 4, player.x)) : lock.x;
+      bombs.push({ sx: player.x, sy: player.y - 24, tx: aim + rand(-1, 1) * BATTLE.seedSpread, ty: lock.y, age: 0, tg: lock, spin: Math.random() < 0.5 ? -1 : 1 });
       bombTimer = BATTLE.bombInterval;
-      Sound.se("bomb");
+      Sound.se("seedThrow");
     }
     for (const b of bombs) {
       b.age += dt;
       b.ty += sc * dt;   // 落ちる先も地面といっしょに流れる
-      if (b.tg && b.tg.hp > 0 && b.tg.word && gMoves(b.tg)) b.tx = Math.min(b.tg.x + b.tg.w / 2 - 4, Math.max(b.tg.x - b.tg.w / 2 + 4, b.tx));   // 動くことばは、ことばの幅の中に落ちる先を保つ
+      if (b.tg && b.tg.hp > 0 && b.tg.word && gMoves(b.tg)) { if (b.lx !== undefined) b.tx += b.tg.x - b.lx; b.lx = b.tg.x; }   // 動くことばは、落ちる先もいっしょに動く（ばらけ方は保つ）
       if (b.age >= BATTLE.bombFlight && !b.done) { b.done = true; landBomb(b.tx, b.ty, BATTLE.seedPower); }
     }
     bombs = bombs.filter(b => !b.done);
@@ -1848,11 +1854,13 @@ const Battle = (() => {
   }
   // たねが地面に届いた: ぽんっと花が咲いて、まわりの地上の敵に当たる
   function landBomb(x, y, n = 1) {
-    addPop(x, y, "#fff6c8", 1.4, true);   // 光がはじける
-    Sound.se("pop");
+    addPop(x, y, "#e4ffc0", 0.9, true);   // 光が小さくはじける
+    Sound.se("seedPop");
     for (const g of groundTargets()) {   // （隠れていることばは groundTargets に入らない）
-      if (!inReach(g, x, y, BATTLE.bombRadius * 0.6)) continue;
-      if (g.word) { for (let i = 0; i < n && g.hp > 0; i++) damageWord(g, x); } else damageFiller(g);
+      if (!inReach(g, x, y, BATTLE.seedSplash)) continue;
+      if (!g.word) { damageFiller(g); continue; }
+      g.seedAcc = (g.seedAcc || 0) + n;   // 1個の威力は端数なので、たまった分だけ削る（11/2）
+      while (g.seedAcc >= 1 - 1e-6 && g.hp > 0) { g.seedAcc -= 1; damageWord(g, x); }
     }
   }
 
@@ -1933,14 +1941,18 @@ const Battle = (() => {
   }
   function breakPart(e, p) {
     const px = e.x + p.ox, py = e.y + (p.oy || 0);
+    shellBits(e, p);
+    floats.push({ x: e.vertical ? px + e.size : px, y: e.vertical ? py : e.y - e.size * 0.9, text: p.kana, big: true, kana: true, age: 0 });
+    Sound.se("crack");
+    if (p.kana !== "ー" && BATTLE.speakWords) Sound.speak(p.kana);
+  }
+  function shellBits(e, p) {   // 殻のかけらが散る
+    const px = e.x + p.ox, py = e.y + (p.oy || 0);
     for (let i = 0; i < 12; i++) {
       const a = Math.random() * Math.PI * 2, sp = 50 + Math.random() * 110;
       threads.push({ x: px, y: py, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, len: 5 + Math.random() * 6,
         curl: (Math.random() - 0.5) * 2, rot: Math.random() * 6, color: (SHELL[e.role] || SHELL.zako).bit, age: 0, scatter: 9, sparkle: true });
     }
-    floats.push({ x: e.vertical ? px + e.size : px, y: e.vertical ? py : e.y - e.size * 0.9, text: p.kana, big: true, kana: true, age: 0 });
-    Sound.se("crack");
-    if (p.kana !== "ー" && BATTLE.speakWords) Sound.speak(p.kana);
   }
   // ===== お題バトル =====
   // ダミー2つ: 同じステージのほかの語句（大ボス以外）から、本物と文字数が近いものを2つ（ステージごとに毎回同じ）
@@ -2007,7 +2019,8 @@ const Battle = (() => {
   }
   // 大ボス「3つを順に」（世界2。10/31-10 試作。構想メモ 5）: stages.js の bossOrder に書いた3つのことば（正しい順。その中に大ボスのことばがあるときだけ。10/31-12 決定）
   //   3つのことばに正しい順に光を当てる（当てたことばに 1・2・3）。順をまちがえたら3つとも最初にもどり、正しい順を一度だけ見せる
-  //   3つそろったら、ほかの2つは消えて、大ボスのことばの殻を世界1と同じようにほどく。問題文は texts.js の odaiForm.orderLead（ステージごと）
+  //   11/2 決定: 正しい順に当てたことばは、その場で殻（いばら）がほどけて文字がはっきり読める（e.open）。3つ目で全部ほどけたら、大ボスのことばが助かる
+  //   順をまちがえたら、ほどけた殻が戻り、番号も消える。問題文は texts.js の odaiForm.orderLead（ステージごと）
   function orderSet(real) {
     const toks = (opts.stage && opts.stage.bossOrder) || [];
     if (toks.length !== 3 || !toks.includes(baseChars(real).join(""))) return null;
@@ -2098,18 +2111,21 @@ const Battle = (() => {
     e.hitT = t; e.hitN = (e.hitN || 0) + 1; e.flash = 0.12;
     if (e.hitN < BATTLE.orderHits) { Sound.se("hit"); return; }
     e.hitN = 0;
-    if (e.seqNo === odai.step) {   // 正しい順
-      odai.step++; e.num = odai.step; e.flash = 0.3;
+    if (e.seqNo === odai.step) {   // 正しい順: その場で殻がほどける（11/2 決定）
+      odai.step++; e.num = odai.step; e.flash = 0.3; e.open = true;
+      for (const p of e.parts || []) if (!p.deco) shellBits(e, p);
       floats.push({ x: e.x, y: e.y - e.h / 2 - 16, text: String(e.num), big: true, age: 0 });
-      Sound.se("shine");
-      if (odai.step >= 3) {   // そろった: ほかの2つは消えて、大ボスの殻をほどく
+      Sound.se("crack");
+      if (odai.step >= 3) {   // 3つともほどけた: 大ボスのことばが助かる。ほかの2つは消える
         if (!odai.slip) { score += BATTLE.odaiBonus; floats.push({ x: W / 2, y: H * 0.45, text: `ひらめき！ +${BATTLE.odaiBonus}`, big: true, age: 0 }); Sound.se("hirameki"); }
+        let real = null;
         for (const q of list) {
-          if (q.word === odai.real) { q.dummy = false; q.num = 0; continue; }
+          if (q.word === odai.real) { real = q; continue; }
           vanish.push({ word: q.word, x: q.x, y: q.y, size: q.size, w: q.w, ground: false, age: 0 }); q.hp = 0;
         }
+        odai.firstHit = "done";
+        if (real) { real.dummy = false; for (const p of real.parts || []) p.broken = true; real.hp = 0; defeat(real); }
         enemies = enemies.filter(q => q.hp > 0);
-        odai.mode = "pick"; odai.firstHit = "done";
       }
       return;
     }
@@ -2122,7 +2138,7 @@ const Battle = (() => {
       Sound.se("boing");
       wrongFx = { age: 0, text: tx("odaiForm.orderWrong") }; e.wrongT = BATTLE.odaiWrongTime;
     }
-    for (const q of list) q.num = 0;
+    for (const q of list) { if (q.open) addPop(q.x, q.y, "#d8e6b0", 0.8); q.num = 0; q.open = false; }   // ほどけた殻が戻り、番号も消える（11/2）
     odai.step = 0; odai.show = 1.8;
   }
 
@@ -3215,18 +3231,20 @@ const Battle = (() => {
     ctx.restore();
   }
 
-  function drawBomb(b) {   // 光のたね（11/1-4）: 放物線で飛ぶ。地面には影が、まっすぐ進む
+  function drawBomb(b) {   // 光のたね（11/1-4。11/2 決定で黄緑・白い縁・1.5倍・回りながら飛ぶ。色は BULLET_COLORS の seed）: 放物線で飛ぶ。地面には影が、まっすぐ進む
     const k = Math.min(1, b.age / BATTLE.bombFlight), lift = Math.sin(Math.PI * k);
     const x = b.sx + (b.tx - b.sx) * k, y = b.sy + (b.ty - b.sy) * k - lift * BATTLE.seedArc;
-    const r = 5 + lift * 4;   // 高いところほど大きく
+    const r = (5 + lift * 4) * BATTLE.seedSize;   // 高いところほど大きく
     ctx.fillStyle = "rgba(30,30,40,0.22)";   // 地面の影（落ちる先へまっすぐ）
-    ctx.beginPath(); ctx.ellipse(x, y + lift * BATTLE.seedArc, 4 + k * 2, 2.5 + k, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.save(); ctx.fillStyle = "rgba(255,240,160,0.35)"; ctx.shadowColor = "rgba(255,220,110,0.9)"; ctx.shadowBlur = 10;
-    ctx.beginPath(); ctx.arc(x, y, r + 4, 0, Math.PI * 2); ctx.fill(); ctx.restore();
-    ctx.fillStyle = "#f2c53d";
-    ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.75, k * 6, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "#ffffff";
-    ctx.beginPath(); ctx.arc(x - r * 0.3, y - r * 0.3, r * 0.3, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(x, y + lift * BATTLE.seedArc, (4 + k * 2) * BATTLE.seedSize, (2.5 + k) * BATTLE.seedSize, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.save(); ctx.fillStyle = BULLET_COLORS.seedHalo;
+    ctx.beginPath(); ctx.arc(x, y, r + 4, 0, Math.PI * 2); ctx.fill();
+    ctx.translate(x, y); ctx.rotate(b.age * 11 * (b.spin || 1));   // 回りながら飛ぶ
+    ctx.fillStyle = BULLET_COLORS.seed; ctx.strokeStyle = BULLET_COLORS.seedRim; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(0, 0, r, r * 0.68, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    ctx.beginPath(); ctx.ellipse(-r * 0.35, -r * 0.2, r * 0.3, r * 0.18, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
   }
 
   // 花がひらく（倒したとき・たねが落ちたとき）
@@ -3500,8 +3518,10 @@ const Battle = (() => {
     const fillColor = e.last ? GOLD_COLOR : ENEMY_COLOR[e.role];
     for (const p of e.parts) {
       const ch = VERTICAL_GLYPH[p.ch] || p.ch, py = y + p.oy;
-      if (p.broken) {   // 殻から解けた文字: 金色に光る
-        ctx.globalAlpha = alpha; ctx.shadowColor = "rgba(255,214,90,1)"; ctx.shadowBlur = 12; ctx.fillStyle = GOLD_COLOR; ctx.fillText(ch, x, py); ctx.shadowBlur = 0; continue;
+      if (p.broken || e.open) {   // 殻から解けた文字: 金色に光る（e.open ＝ 大ボス「3つを順に」で正しい順に当てたことば。白い縁どりで、はっきり読めるように。11/2）
+        ctx.globalAlpha = alpha;
+        if (e.open && !p.broken) { ctx.globalAlpha = 1; ctx.lineWidth = 7; ctx.strokeStyle = "#ffffff"; ctx.strokeText(ch, x, py); }
+        ctx.shadowColor = "rgba(255,214,90,1)"; ctx.shadowBlur = 12; ctx.fillStyle = GOLD_COLOR; ctx.fillText(ch, x, py); ctx.shadowBlur = 0; continue;
       }
       const wob = p.flash > 0 ? (Math.random() - 0.5) * 3 : 0;
       ctx.globalAlpha = alpha;
