@@ -469,6 +469,7 @@ const Main = (() => {
     $("rbook-back").textContent = tx("recipeBook.back");
     $("rbook-info").textContent = tx("recipeBook.tapHint");
     $("rbook-count").textContent = `${tx("recipeBook.head")} ${lit.size}/12`;
+    Sound.play("recipeBook");   // レシピブックの曲（11/3-6。もどるとステージ一覧のタイトルの曲）
     RecipeBook.renderBook($("rbook-ring"), { lit, onTap: id => {   // 11/1: 3世界の本の絵（読み込めないときは円い台座）
       const st = window.STAGES.find(x => x.id === id);
       $("rbook-info").textContent = tx(lit.has(id) ? "recipeBook.litInfo" : "recipeBook.emptyInfo", { id, stage: st.name, recipe: st.recipe });
@@ -477,7 +478,7 @@ const Main = (() => {
   }
   // 12個そろったとき（今は仮の1画面）
   function toEnding() {
-    Sound.play("recipe");
+    Sound.play("ending");
     $("ending-title").textContent = tx("ending.title");
     $("ending-line").textContent = tx("ending.line");
     $("ending-next").textContent = tx("ending.next");
