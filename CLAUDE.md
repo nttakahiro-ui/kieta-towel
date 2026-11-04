@@ -134,3 +134,9 @@ docs/進捗メモ.md     毎回の終わりに更新する
 - `docs/進捗メモ.md` の先頭に、ゲームの公開URLと進捗メモ自身のURL（raw.githubusercontent.com の形）を常に書いておく
 - 各段階が終わるごとに動く状態で commit する
 - コードの中の説明は日本語で書く
+
+## versions/full/ の凍結（11/4-1）
+
+- 決定: versions/full/ は 11/5 の披露用に凍結する。以後、この中のファイルは一切変更しない（文字・曲・数値も含む）。
+- 決定: 以後の改良は、本線（index.html, js/）か、新しい versions/YYYYMMDD/ で行う。versions/full/ をコピー元にするのはよいが、上書きはしない。
+- 決定: タグ v20261103full は動かさない。
