@@ -1,9 +1,10 @@
-// カードの絵の切り分け（11/6-6）: 「10こ並びの1枚」（docs/カード絵/s01_b.png など）を白い余白で10こに分け、正方形にそろえて縮める
+// カードの絵の切り分け（11/6-6）: 「10こ並びの1枚」（docs/カード絵/s01.png など）を白い余白で10こに分け、正方形にそろえて縮める
 // 使い方: node tools/cardsplit.mjs <10こ並びの.png> <ステージ番号> <出す場所（例 versions/20261106/assets/cards）> [オプション]
 //   --map 1=1,2=2,4=5,…   並びの何番目（左上から右へ、次の段へ。1〜10）を、何番（投入用CSVの「順」）として出すか。書かない番目は同じ番号
 //   --only 10             この番目だけを出す（ほかの1枚から一部だけ取るとき）
 //   --size 320            できあがりの1辺（px）。カードの絵の場所の2倍（Retina 用）
 //   --dry                 書き出さずに、見つけたマスの位置と大きさだけを出す
+//   --crop                ふぞろいなマスを、地の色で足すかわりに、まん中を正方形に切りぬく（絵がマスの端まで描いてあるとき。11/7-4 の s02）
 // 出すファイル: s<ステージ2けた>_<順2けた>.png（例 s01_01.png）。マスの高さ・幅がふぞろいなときは、足りない分をそのマスの地の色（クリーム色）で足して正方形にする
 // 読めるのは 8bit の RGB / RGBA の PNG（インターレースなし）。ほかの道具は使わない（node だけ）
 import { readFileSync, writeFileSync, mkdirSync } from "fs";
@@ -13,7 +14,7 @@ const args = process.argv.slice(2);
 const [src, stageS, outDir] = args;
 if (!src || !stageS || !outDir) { console.log("使い方: node tools/cardsplit.mjs 10こ並び.png ステージ番号 出す場所 [--map 4=5,5=4] [--only 10] [--size 320] [--dry]"); process.exit(1); }
 const opt = k => { const i = args.indexOf("--" + k); return i < 0 ? null : (args[i + 1] && !args[i + 1].startsWith("--") ? args[i + 1] : true); };
-const SIZE = +(opt("size") || 320), DRY = !!opt("dry");
+const SIZE = +(opt("size") || 320), DRY = !!opt("dry"), CROP = !!opt("crop");
 const MAP = {}; if (opt("map")) for (const p of String(opt("map")).split(",")) { const [a, b] = p.split("=").map(Number); MAP[a] = b; }
 const ONLY = opt("only") ? String(opt("only")).split(",").map(Number) : null;
 const stage = String(+stageS).padStart(2, "0");
@@ -102,6 +103,7 @@ if (!DRY) mkdirSync(outDir, { recursive: true });
 cells.forEach((c, i) => {
   const pos = i + 1, no = MAP[pos] || pos;
   if (ONLY && !ONLY.includes(pos)) return;
+  if (CROP) { const d = (c.x1 - c.x0) - (c.y1 - c.y0); if (d > 0) { c.x0 += Math.floor(d / 2); c.x1 = c.x0 + (c.y1 - c.y0); } else if (d < 0) { c.y0 += Math.floor(-d / 2); c.y1 = c.y0 + (c.x1 - c.x0); } }   // まん中を正方形に
   const cw = c.x1 - c.x0, ch = c.y1 - c.y0, side = Math.max(cw, ch), bg = CREAM;
   const ox = Math.floor((side - cw) / 2), oy = Math.floor((side - ch) / 2);
   // 正方形（side）を SIZE に縮める（面積の平均）
