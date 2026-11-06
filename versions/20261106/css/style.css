@@ -181,6 +181,11 @@ body { position: fixed; inset: 0; }
 
 /* クイズ */
 .quiz-box { max-width: 440px; margin: 0 auto; }
+/* 1問ごとの制限時間（11/7-4）: 画面の上で、右から左へ減る。残り5秒で赤 */
+.quiz-time { position: sticky; top: 0; z-index: 3; height: 12px; margin: 0 0 10px; background: var(--cream-dark); border-radius: 6px; overflow: hidden; box-shadow: 0 0 0 3px #fffdf6; }
+.quiz-time i { display: block; height: 100%; width: 100%; background: var(--green); border-radius: 6px; }
+.quiz-time.warn i { background: #e5484d; }
+.quiz-time.off { visibility: hidden; }
 .quiz-head { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-size: 18px; color: var(--green-dark); margin-bottom: 12px; }
 #quiz-count { white-space: nowrap; flex-shrink: 0; font-size: 16px; }   /* 「クイズ 1 / 10」は横に1行（10/31-7。細い画面で縦に割れていた） */
 .quiz-dots { display: flex; gap: 4px; min-width: 0; }

@@ -1,8 +1,7 @@
-// 音楽と効果音。Web Audio API の合成で曲を鳴らす（曲ファイルは使わない）
-// 曲の指定はこの SONGS の1か所。どの場面でどの曲かは data/stages.js の WORLDS の music（発見／救出／お題）
-// 曲の書き方（11/3-4）: テンポ・キー・コード進行・メロディ・打楽器パターン・使う楽器。和音とベースはコードから自動
-//   （本番で曲ファイルに替えるときは、その曲に file: "audio/xxx.mp3" を書くと、合成のかわりにファイルを流す）
-//   前の形の仮の曲（melody / bass の音列と wave）は 11/3-7 に全部消した
+// 音楽と効果音。曲は場面ごとの mp3（下の FILE_MUSIC。検討版 11/7-4 から全場面 mp3）。効果音は Web Audio API の合成
+// 合成曲は「タイトル」1曲だけ残す: タイトルの mp3 が読み終わるまでの待ち受け（最初の画面を無音にしない）。ほかの合成曲は 11/7-4 に消した
+//   （消したもの: 森の朝〔タイトルのもと。タイトルに書きこんだ〕・風の畑・きらきらバトル・箱のリズム・コンベア・歯車・星の海・流れ星・星の渦・クイズ・宝石ができた・オープニング）
+// 合成曲の書き方（11/3-4）: テンポ・キー・コード進行・メロディ・打楽器パターン・使う楽器。和音とベースはコードから自動
 //
 // 読み方
 //   bpm      テンポ（4分音符が1分に何回）。1マス ＝ 8分音符。1小節 ＝ 8マス
@@ -20,189 +19,28 @@
 //   echo     響き（"mid" 世界1、"short" 世界2、"long" 世界3）
 //   swing    はねるリズム（裏の8分音符を、8分音符のこの割合だけ遅らせる。0.33 ＝ スウィング、0.5 ＝ 付点の「タッカ」）
 const SONGS = {
-  // 曲の方針（11/3-5 決定「うきうき」。11/3-6 の第2段階も同じ）: 全曲はねるリズム（swing）、長調だけ、メロディは上へ跳ぶ（4度・6度）、2小節の呼びかけ→2小節の答え、
-  // ベースは「ドッ・ドッ」と刻み、ハイハットは裏拍。お題バトルは明るいまま速く（入った瞬間に速くなったと分かるテンポ）
-  // 世界の楽器: 世界1＝オルゴール・木琴・リード（森）、世界2＝金属・リード・機械の音（ギギ・ガシャン）、響き短め（工場）、世界3＝パッド＋オルゴールの分散和音・リード、響き長め（宇宙）
-  // テンポの段（11/3-7。だらだらした曲を残さない）: 発見 116〜124 → 救出 136〜138 → お題 156〜160。山場の回（stages.js の musicTempo）は救出もお題も1割速く。世界の違いは楽器と機械の音で出す
-  // gain ＝ 曲全体の大きさ。ブラウザで測って、場面の同じ世界1の曲（発見＝森の朝、救出＝風の畑、お題＝きらきらバトル）とそろえた（11/3-6）。
-  //   共通の場面は タイトル・レシピブック＝森の朝、クイズ・宝石ができた＝風の畑 の大きさ（tools/cdp/songvol.mjs で測る）
-
-  // ---- 世界1（森） ----
-  // 発見の旅「森の朝」: オルゴールのメロディ、木琴の分散和音、軽いベース、裏拍の小さなハイハット、4小節に1回の鳥（11/3-6 にテンポ 104→116）
-  "森の朝": {
-    bpm: 116, key: "C", echo: "mid", swing: 0.33,
+  // タイトルの待ち受けの合成曲（もとは世界1の発見の旅「森の朝」をテンポ112、ベース「ドッ・ドッ」、裏拍の軽いハイハットにしたもの。11/3-7）
+  "タイトル": {
+    bpm: 112, key: "C", echo: "mid", swing: 0.33,
     chords: "C F G C   Am F G C",
     melody: "C5 - E5 G5 - - C6 -   A5 - - F5 - - . -   F#5 - D6 - B5 - G5 -   E5 - G5 - C5 - . -  " +
             "E5 - A5 - C6 - - -    C6 - A5 - F5 - . -   G5 - D5 - B5 - G5 -     C6 - G5 E5 C5 - . -",
     chord:  "1 - 5 - 3 - 5 -",
-    bass:   "1 - 1 - 5 - 1 -",
+    bass:   "1 - 1 - 1 - 1 -",
     drums:  { hat: "- o - o - o - o" },
     orn:    { every: 4, bar: 3, at: 4, notes: "G6 E6 G6 C7", gap: 0.075, inst: "musicbox" },
     inst:   { melody: "musicbox", chord: "xylo", bass: "bass", oct: { melody: 0, chord: 4, bass: 2 } },
+    gain: 1.0,
     vol:    { chord: 0.9, bass: 0.6, drums: 0.6, orn: 0.6 }
   },
-  // 救出の旅「風の畑」: リードのメロディ、木琴の合いの手、付点の「タッカ」、ベース「ドッ・ドッ」（11/3-6 にテンポ 124→138。山場の回 3・4 は stages.js の musicTempo で1割速く）
-  "風の畑": {
-    bpm: 138, key: "G", echo: "mid", swing: 0.5,
-    chords: "G C D G   Em C D G",
-    melody: "D5 - G5 - B5 - D6 -   E6 - - C6 - - . -   F#5 - D6 - A5 - F#5 -   G5 - B5 - G5 - . -  " +
-            "B4 - E5 - G5 - B5 -   E5 - C6 - B5 - G5 -   F#5 - A5 - D6 - C6 -    B5 - - - G5 - . -",
-    fill:   "- - - - - - - -   - - - - - - B5 D6   - - - - - - - -   - - - - - - E6 D6  " +
-            "- - - - - - - -   - - - - - - - -     - - - - - - - -   - - - - - - D6 B5",
-    chord:  "- - c - - - c -",
-    bass:   "1 - 1 - 1 - 5 -",
-    drums:  { kick: "x - - - x - - -", snare: "- - o - - - o -", hat: "- x - x - x - x" },
-    inst:   { melody: "lead", fill: "xylo", chord: "xylo", bass: "bass", oct: { melody: 0, fill: 0, chord: 4, bass: 2 } },
-    vol:    { fill: 0.8, chord: 0.55 }
-  },
-  // お題バトル「きらきらバトル」: 明るいまま速く。リード、強めのベース、しっかりした打楽器、2小節ごとにオルゴールの高いきらめき（11/3-6 にテンポ 144→160）
-  "きらきらバトル": {
-    bpm: 160, key: "G", echo: "mid", swing: 0.3,
-    chords: "G Em C D   G Bm C D",
-    melody: "D5 - G5 - B5 - G5 -   G5 - E6 - B5 - G5 -   C5 - A5 - G5 - E5 -   F#5 - A5 - D6 - . -  " +
-            "B5 - D6 - G6 - D6 -   F#6 - D6 - B5 - F#5 -   E5 - C6 - G5 - E5 -   D5 - F#5 - A5 - D6 -",
-    chord:  "t - - - - - - -",
-    bass:   "1 - 1 1 - 1 5 -",
-    drums:  { kick: "x - - x - - x -", snare: "- - x - - - x -", hat: "o x o x o x o x" },
-    orn:    { every: 2, bar: 1, at: 7, notes: "B6 D7", gap: 0.09, inst: "musicbox", last: 0.2 },   // 山場の回の速さでも音の数が8つをこえないように、ドン・タッと重ならない最後のマスで短く（11/3-7）
-    inst:   { melody: "lead", chord: "pad", bass: "bass", oct: { melody: 0, chord: 4, bass: 2 } },
-    vol:    { bass: 1.3, drums: 1.2, chord: 0.7, orn: 0.7 }
-  },
-
-  // ---- 世界2（工場）: 金属・リード・刻む打楽器、響き短め（11/3-6） ----
-  // 発見の旅「箱のリズム」: 金属のメロディ、「タッ・タッ・ドン」の規則正しい刻み、軽いベース
-  // 発見の旅「箱のリズム」: 金属のメロディ、「ギギ・ギギ・ガシャン」の機械の刻み、軽いベース（11/3-7 に「タッ・タッ・ドン」から替え、テンポ 108→116）
-  "箱のリズム": {
-    bpm: 116, key: "D", echo: "short", swing: 0.33,
-    chords: "D G A D   Bm G A D",
-    melody: "A4 - D5 - F#5 - A5 -   B5 - - G5 - - . -   E5 - C#6 - A5 - E5 -   F#5 - D5 - A4 - . -  " +
-            "F#5 - B5 - D6 - - -    D6 - B5 - G5 - . -   A5 - E5 - C#6 - A5 -    D6 - A5 - F#5 D5 . -",
-    chord:  "- - t - - - t -",
-    bass:   "1 - - - 1 - - -",
-    drums:  { gigi: "x - x - - - - -", gashan: "- - - - x - - -", hat: "- o - o - o - o" },
-    inst:   { melody: "bell", chord: "bell", bass: "bass", oct: { melody: 0, chord: 4, bass: 2 } },
-    len:    { chord: 0.2 },
-    vol:    { chord: 0.6, bass: 0.6, drums: 0.8 }
-  },
-  // 救出の旅「コンベア」: リード＋金属の合いの手、付点の「タッカ」、刻む打楽器、ベース「ドッ・ドッ」
-  // 救出の旅「コンベア」: 金属の跳ねるメロディ＋リードの合いの手、付点の「タッカ」、「ギギ・ガシャン」の刻み、ベース「ドッ・ドッ」（11/3-7 にテンポ 128→136）
-  "コンベア": {
-    gain: 1.5,
-    bpm: 136, key: "D", echo: "short", swing: 0.5,
-    chords: "D A Bm G   D G A D",
-    melody: "F#5 . A5 D6 . A5 F#5 .   E5 . A5 C#6 . E6 . .   B4 . F#5 B5 . D6 B5 .   D6 . B5 G5 . . . .  " +
-            "A4 . D5 F#5 . A5 D6 .    B5 . G5 D6 . B5 G5 .   C#6 . A5 E6 . C#6 A5 .   D6 . A5 F#5 . D6 . .",
-    fill:   "- - - - - - - -   - - - - - - E6 C#6   - - - - - - - -   - - - - - - D6 F#6  " +
-            "- - - - - - - -   - - - - - - - -      - - - - - - - -   - - - - - - F#6 A6",
-    bass:   "1 - 1 - 1 - 1 -",
-    drums:  { gigi: "x - - - x - - -", gashan: "- - x - - - x -", hat: "o x o x o x o x" },
-    inst:   { melody: "bell", fill: "lead", bass: "bass", oct: { melody: 0, fill: 0, bass: 2 } },
-    vol:    { fill: 0.7 }
-  },
-  // お題バトル「歯車」: 金属とリード、ベースと打楽器を前に
-  // お題バトル「歯車」: 金属とリード、ベースと打楽器を前に。「ガシャン」を強く（11/3-7 にテンポ 148→156）
-  "歯車": {
-    gain: 1.12,
-    bpm: 156, key: "A", echo: "short", swing: 0.3,
-    chords: "A F#m D E   A D E A",
-    melody: "E5 - A5 - C#6 - A5 -   C#5 - A5 - F#5 - C#6 -   D5 - A5 - F#5 - D6 -   E5 - B5 - G#5 - . -  " +
-            "A5 - C#6 - E6 - C#6 -   F#5 - D6 - A5 - F#5 -   G#5 - E5 - B5 - E6 -    A5 - - - E5 - . -",
-    chord:  "- - t - - - t -",
-    bass:   "1 1 - 1 1 - 5 -",
-    drums:  { kick: "x - - x x - - -", gashan: "- - x - - - x -", hat: "o x o x o x o x" },
-    orn:    { every: 2, bar: 1, at: 6, notes: "A6 E7", gap: 0.09, inst: "bell" },
-    inst:   { melody: "lead", chord: "bell", bass: "bass", oct: { melody: 0, chord: 4, bass: 2 } },
-    len:    { chord: 0.18 },
-    vol:    { chord: 0.6, bass: 1.4, drums: 1.4, orn: 0.6 }
-  },
-
-  // ---- 世界3（宇宙）: パッド＋オルゴールの分散和音・リード、響き長め（11/3-6） ----
-  // 発見の旅「星の海」: パッドの上でオルゴールの分散和音（はねる）、オルゴールのメロディ、小さなハイハット
-  // 発見の旅「星の海」: パッドと長い響き（宇宙らしさ）の上で、オルゴールの分散和音とリードの跳ねるメロディ。ベース「ドッ・ドッ」、裏拍のハイハット、1拍目と3拍目の軽い「ドン」、
-  //   2小節に1回の金属の高い「キラッ」（11/3-7 にテンポ 96→124。打楽器を入れ、コードを7の和音から明るい3つの音に）。レシピブックもこの曲
-  "星の海": {
-    gain: 0.35,
-    bpm: 124, key: "F", echo: "long", swing: 0.33,
-    chords: "F C Dm Bb   F C Dm Bb",
-    melody: "C5 - F5 A5 - C6 . -   G5 - C6 - E6 - . -   A4 - D5 F5 - A5 . -   F5 - Bb5 - D6 - . -  " +
-            "A5 - C6 F6 - C6 . -   E5 - G5 C6 - E6 . -   D5 - F5 A5 - D6 . -   Bb5 - D6 - F6 - . -",
-    chord:  "t - - - - - - -",
-    arp:    "1 3 5 8 10 8 5 3",
-    bass:   "1 - 1 - 1 - 1 -",
-    drums:  { kick: "o - - - o - - -", hat: "- o - o - o - o" },
-    orn:    { every: 2, bar: 1, at: 6, notes: "A6 C7", gap: 0.09, inst: "bell" },
-    inst:   { melody: "lead", chord: "pad", arp: "musicbox", bass: "bass", oct: { melody: 0, chord: 3, arp: 4, bass: 2 } },
-    vol:    { arp: 0.6, chord: 0.8, bass: 0.6, drums: 0.6, orn: 0.5 }
-  },
-  // 救出の旅「流れ星」: パッド、リード、ベース「ドッ・ドッ」、裏拍のハイハット、付点の「タッカ」（11/3-7 にテンポ 120→136）
-  "流れ星": {
-    gain: 0.86,
-    bpm: 136, key: "F", echo: "long", swing: 0.5,
-    chords: "F C Dm Bb   Gm C F F",
-    melody: "C5 - F5 - A5 - C6 -   E6 - - C6 - - . -   A4 - F5 - D5 - A5 -   F5 - D5 - Bb4 - . -  " +
-            "D5 - Bb5 - G5 - D5 -   E5 - C6 - G5 - E5 -   F5 - A5 - C6 - F6 -   C6 - - - F5 - . -",
-    chord:  "t - - - - - - -",
-    bass:   "1 - 1 - 1 - 5 -",
-    drums:  { hat: "- x - x - x - x" },
-    inst:   { melody: "lead", chord: "pad", bass: "bass", oct: { melody: 0, chord: 4, bass: 2 } },
-    vol:    { chord: 0.9 }
-  },
-  // お題バトル「星の渦」: パッドにベースと打楽器、リードは高めで跳ぶ、2小節ごとにオルゴールのきらめき（11/3-7 にテンポ 140→156）
-  "星の渦": {
-    bpm: 156, key: "F", echo: "long", swing: 0.3,
-    chords: "F Dm Bb C   F Am Bb C",
-    melody: "A5 - C6 - F6 - C6 -   D6 - A5 - F5 - D6 -   D5 - Bb5 - F5 - D6 -   E6 - C6 - G5 - . -  " +
-            "C6 - F6 - A5 - C6 -   E5 - C6 - A5 - E6 -   F5 - D6 - Bb5 - F5 -   G5 - C6 - E6 - G6 -",
-    chord:  "t - - - - - - -",
-    bass:   "1 - 1 1 - 1 5 -",
-    drums:  { kick: "x - - - x - - -", snare: "- - x - - - x -", hat: "- x - x - x - x" },
-    orn:    { every: 2, bar: 1, at: 6, notes: "A6 C7", gap: 0.09, inst: "musicbox" },
-    inst:   { melody: "lead", chord: "pad", bass: "bass", oct: { melody: 0, chord: 4, bass: 2 } },
-    vol:    { bass: 1.2, drums: 1.1, chord: 0.8, orn: 0.6 }
-  },
-
-  // ---- 共通の場面（11/3-6）。どの場面で鳴るかは下の SCENE ----
-  // クイズ: 戦闘曲の勢いで、音は少なく。リードは短い呼びかけだけ、ベース「ドッ・ドッ」、「ドン・タッ」を軽く、パッドなし（問題文を読む邪魔をしない）。
-  //   3問目と8問目でテンポを上げる（js/quiz.js の tempoUpAt。128→140→152）
-  // クイズ: 戦闘曲の勢いで、音は少なく。リードは短い呼びかけ、その合間を小さなオルゴールの分散和音（中くらいの高さ）で埋める。
-  //   ベース「ドッ・ドッ」と裏拍のハイハットは途切れずに、「ドン・タッ」を軽く、パッドなし（問題文を読む邪魔をしない）。
-  //   3問目と8問目でテンポを上げる（js/quiz.js の tempoUpAt。128→140→152）。11/3-7: 音の鳴らない時間をなくした（1小節の中のすき間は半拍まで）
-  "クイズ": {
-    gain: 2.55,
-    bpm: 128, key: "G", echo: "mid", swing: 0.33,
-    chords: "G C D G   Em C D G",
-    melody: "D5 G5 B5 - . - - -   - - - - - - - -   A4 D5 F#5 - . - - -   - - - - - - - -  " +
-            "B4 E5 G5 - . - - -   - - - - - - - -   F#5 A5 D6 - . - - -   B5 - G5 - . - - -",
-    arp:    "- - - - 1 3 5 3   1 3 5 8 5 3 1 3   - - - - 1 3 5 3   1 3 5 8 5 3 1 3  " +
-            "- - - - 1 3 5 3   1 3 5 8 5 3 1 3   - - - - 1 3 5 3   - - - - 1 3 5 3",
-    bass:   "1 - 1 - 1 - 1 -",
-    drums:  { kick: "o - - - o - - -", snare: "- - o - - - o -", hat: "- o - o - o - o" },
-    inst:   { melody: "lead", arp: "musicbox", bass: "bass", oct: { melody: 0, arp: 4, bass: 2 } },
-    len:    { arp: 0.2 },
-    vol:    { arp: 0.45 }
-  },
-  // 宝石ができた: 4小節の短い上がる曲。最後を長くのばす。ループしない
-  "宝石ができた": {
-    gain: 1.6,
-    bpm: 120, key: "C", echo: "mid", swing: 0.33, loop: false,
-    chords: "C F G C",
-    melody: "C5 - E5 - G5 - C6 -   A5 - C6 - F6 - - -   G5 - B5 - D6 - G6 -   C6 - - - - - - -",
-    chord:  "1 3 5 8 5 3 1 -",
-    bass:   "1 - - - 5 - - -",
-    inst:   { melody: "lead", chord: "xylo", bass: "bass", oct: { melody: 0, chord: 4, bass: 2 } },
-    vol:    { chord: 0.8, bass: 0.7 }
-  }
 };
 // 同じ素材の曲: タイトルは「森の朝」をテンポ112で、裏拍の軽いハイハットとベース「ドッ・ドッ」（11/3-7。前は 92 で打楽器なし）。オープニングだけは同じ曲の打楽器なし
-SONGS["タイトル"] = Object.assign({}, SONGS["森の朝"], { bpm: 112, bass: "1 - 1 - 1 - 1 -", drums: { hat: "- o - o - o - o" }, gain: 1.0 });
-SONGS["オープニング"] = Object.assign({}, SONGS["タイトル"], { drums: {}, orn: null });
-// 共通の場面の曲。js の Sound.play("title") などは、ここで曲の名前に替わる（ワープの会話・ステージ一覧・カードの画面も title）。世界ごとの場面は stages.js の WORLDS の music
-//   レシピブックとエンディングは「星の海」そのまま（11/3-7。静か版はやめた）。検討版 11/7 からは mp3 の recipe（FILE_MUSIC.scenes）
-// mp3 の曲（11/6-5 決定。検討版 11/6 だけ）: 世界1〜3の発見・救出・クイズの9曲。元のファイルは docs/曲/（ここは assets/music/ のコピー）
+// mp3 の曲（11/6-5 から。検討版 11/7-4 で全場面）: 元のファイルは docs/曲/（ここは assets/music/ のコピー）
 //   loop ＝ くり返す区間 [始まり, 終わり]（秒）。最初は曲の頭から鳴らし、終わりまで来たら始まりへもどる。終わりのあとの音が消えていくところ・無音は使わない。
 //     区間は小節の切れ目（終わり − 始まり ＝ 小節の倍数）で、「終わりの前の2小節」と「始まりの前の2小節」の音（和音・リズム）がいちばん似ているところ
 //     （頭の静かな前奏にもどると音が小さくなってとぎれて聞こえるので、2周目からは曲の中ほどへもどる）。つなぎ目は FILE_MUSIC.xfade 秒だけ前後を重ねる（クロスフェード）
-//   lufs ＝ 区間の聞こえる大きさ（LUFS。測った値）。どの曲も FILE_MUSIC.lufs の大きさにそろえる。level ＝ 合成曲とつりあう全体の大きさ（測って決めた値）
+//   once ＝ くり返さない（1回鳴って終わり、そのあとは無音）。end ＝ そこまでで止める（秒。終わりは少しだけ小さくして止める）。file ＝ ほかの曲のファイルを使う
+//   lufs ＝ 区間の聞こえる大きさ（LUFS。測った値。once の曲は鳴らすところ全体）。どの曲も FILE_MUSIC.lufs の大きさにそろえる。level ＝ 全体の大きさ（合成曲とつりあうように測って決めた値）
 //   救出の旅のお題バトル（中ボス・大ボス）も救出の曲のまま流す（曲をとめない・テンポは変えない）。クイズのテンポ上げも mp3 ではしない（音の高さが変わるため）
 const FILE_MUSIC = {
   dir: "assets/music/", xfade: 0.12, lufs: -11, level: 0.33,   // level 0.33: 合成曲（発見 −24〜−26、救出 −18〜−20、クイズ −16。同じはかり方）のまん中 −20 くらいに合わせた
@@ -216,15 +54,21 @@ const FILE_MUSIC = {
     w3_hakken:    { loop: [23.834, 55.834], lufs: -10.08 },   // 120、16小節
     w3_kyushutsu: { loop: [24.623, 51.289], lufs: -10.61 },   // 144、16小節
     w3_quiz:      { loop: [6.397, 61.898], lufs: -10.57 },   // 160、37小節
-    title:        { loop: [17.146, 55.546], lufs: -11.18 },   // 100、16小節（11/6-6。タイトル・ステージ一覧・カード図鑑・結果のカード）。11/7: 大きさを今の区間で測り直した（前の -10.82 は前の区間の値）
-    recipe:       { once: true, lufs: -11.22 },               // レシピブック・エンディング（11/7-2）。くり返さず1回鳴って終わる（終わったら無音）。lufs は曲の全体
+    title:        { loop: [17.146, 55.546], lufs: -11.18 },   // 100、16小節（11/6-6）。11/7: 大きさを今の区間で測り直した（前の -10.82 は前の区間の値）
+    recipe:       { once: true, lufs: -11.22 },               // 90.9秒（11/7-2）。lufs は曲の全体
+    map:          { loop: [24.664, 53.464], lufs: -10.86 },   // 100、12小節（11/7-4）
+    opening:      { loop: [24.952, 75.352], lufs: -10.60 },   // 100、21小節（11/7-4）
+    fanfare:      { loop: [7.100, 59.100], lufs: -11.91 },    // 120、26小節（11/7-4）。頭の 0〜7.1秒がファンファーレ。2周目からは区切り 7.1秒のあとへもどる
+    fanfare_head: { file: "fanfare", once: true, end: 7.100, lufs: -11.91 },   // 宝石ができた画面: ファンファーレだけ1回（大きさは fanfare と同じにする。頭は本体より 2.3dB 大きい曲の作り）
   },
-  // 世界によらない場面（11/7-2）: js の Sound.play の場面の名前 → mp3。合成曲の名前では読みかえない（世界3の発見の旅の合成曲も「星の海」で、取り違えたため）
-  scenes: { title: "title", card: "title", recipeBook: "recipe", ending: "recipe" },
-  first: "title",   // 最初の画面で読む曲。読めるまでは合成曲を鳴らし、読めたら mp3 に替える（11/6-6）
+  // 場面（js の Sound.play に渡す名前）→ mp3（11/7-2: 合成曲の名前では読みかえない）
+  scenes: { title: "title", zukan: "title", stages: "map", warp: "map", review: "map", results: "fanfare", gem: "fanfare_head", recipeBook: "recipe", ending: "recipe", opening: "opening" },
+  first: "title",               // 読み終わるまでは合成曲「タイトル」で待つ曲（11/6-6）。ほかの曲は、読み終わるまで無音
+  preload: ["title", "map"],    // タイトルを開いたときに読む（main.js が load のあとに呼ぶ）。opening は初めて遊ぶときだけ、recipe ははじめて開いたときに読む
+  withWorld: ["fanfare"],       // ステージに入ったときに、その世界の3曲と一緒に読む
   worlds: { 1: { explore: "w1_hakken", rescue: "w1_kyushutsu", quiz: "w1_quiz" }, 2: { explore: "w2_hakken", rescue: "w2_kyushutsu", quiz: "w2_quiz" }, 3: { explore: "w3_hakken", rescue: "w3_kyushutsu", quiz: "w3_quiz" } },
 };
-const SCENE = { title: "タイトル", opening: "オープニング", card: "タイトル", quiz: "クイズ", recipe: "宝石ができた", recipeBook: "星の海", ending: "星の海" };
+const fileOf = k => (FILE_MUSIC.songs[k] && FILE_MUSIC.songs[k].file) || k;   // 曲 → 読むファイルの名前
 
 
 // 語句の読み上げ（仮）。端末の読み上げ機能を使う。本番で声のファイルに替えるときは speak() を書き換える
@@ -542,33 +386,34 @@ const Sound = (() => {
   }
 
   // ===== mp3 の曲（11/6-5） =====
-  // 場面から mp3 をえらぶ（11/7-2）。key ＝ Sound.play に渡した名前（場面の名前 title・quiz など、または世界の合成曲の名前）、
-  //   scene ＝ 世界の場面（explore／rescue／odai。game.js・main.js が渡す）。合成曲の名前どうしをくらべて読みかえることはしない。なければ null（合成曲のまま）
+  // 場面から mp3 をえらぶ（11/7-2）。key ＝ Sound.play に渡した場面の名前（title・stages・quiz・explore・rescue・odai など）。なければ null（無音）
+  //   scene ＝ 前の形の呼び方（3つ目の引数）。合成曲の名前どうしをくらべて読みかえることはしない
   function fileKeyOf(key, scene) {
     if (FILE_MUSIC.scenes[key]) return FILE_MUSIC.scenes[key];
     const fw = FILE_MUSIC.worlds[world];
     if (!fw) return null;
-    if (key === "quiz") return fw.quiz;
-    if (scene === "explore") return fw.explore;
-    if (scene === "rescue" || scene === "odai") return fw.rescue;
+    const sc = scene || key;
+    if (sc === "quiz") return fw.quiz;
+    if (sc === "explore") return fw.explore;
+    if (sc === "rescue" || sc === "odai") return fw.rescue;
     return null;
   }
-  const commonKeys = () => [...new Set(Object.values(FILE_MUSIC.scenes))];
+  const keepFiles = () => [...new Set(Object.values(FILE_MUSIC.scenes).map(fileOf))];   // 世界によらない曲（ステージに入っても手ばなさない）
   // ステージに入るとき: その世界の3曲だけを読む（発見の曲から順に）。ほかの世界の曲は手ばなす
   function loadWorld(id) {
     world = id;
     const fw = FILE_MUSIC.worlds[id];
-    const keep = new Set((fw ? Object.values(fw) : []).concat(commonKeys()));   // タイトル・レシピブックの曲は手ばなさない
+    const keep = new Set((fw ? Object.values(fw) : []).concat(keepFiles()));   // 世界によらない曲（タイトル・地図・ファンファーレなど）は手ばなさない
     for (const k of Object.keys(buffers)) if (!keep.has(k) && k !== fileKey) delete buffers[k];
     for (const k of Object.keys(raw)) if (!keep.has(k)) delete raw[k];
     if (!fw) return;
-    fetchSongs([fw.explore, fw.rescue, fw.quiz]);
+    fetchSongs([fw.explore, fw.rescue, fw.quiz].concat(FILE_MUSIC.withWorld));
   }
   // 順に読む（読み終わったものはとばす）
   const decoding = {};   // 音にしている途中の曲（11/6-6: タイトルの曲を2回読まないように）
   function fetchSongs(keys) {
     let chain = Promise.resolve();
-    for (const k of keys) {
+    for (const k of keys.map(fileOf)) {
       if (buffers[k] || raw[k] || loading[k] || decoding[k]) continue;   // 音にしている途中のものも、もう一度は読まない
       loading[k] = true;
       chain = chain.then(() => fetch(FILE_MUSIC.dir + k + ".mp3").then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
@@ -577,7 +422,7 @@ const Sound = (() => {
     }
   }
   // タイトルの曲を読む（11/6-6）: 最初の画面が出たあと（main.js が load のあとに呼ぶ）。最初の画面の読み込みとは取り合わない
-  function preloadCommon() { fetchSongs([FILE_MUSIC.first]); }   // （レシピブックの曲は、はじめて開いたときに読む）
+  function preloadCommon() { fetchSongs(FILE_MUSIC.preload); }
   // 音にする（AudioContext が要る。まだなければ unlock のときに）
   function decodeRaw(k) {
     if (!ctx || !raw[k]) return Promise.resolve();
@@ -586,19 +431,20 @@ const Sound = (() => {
       const res = () => { delete decoding[k]; res0(); };
       const ok = b => {
         buffers[k] = b; res();
-        if (fileKey === k && (!loopRun || loopRun.key !== k)) {   // 待っていた曲なら、読めたところから鳴らす
+        if (fileKey && fileOf(fileKey) === k && (!loopRun || loopRun.key !== fileKey)) {   // （k はファイルの名前。fileKey は曲の名前）
+          const fk = fileKey;   // 待っていた曲なら、読めたところから鳴らす
           if (fallback) {   // 合成曲で待っていた（タイトル）: 合成曲を0.5秒で小さくしてから mp3 に替える
             const fb = fallback; fallback = null;
             const now = ctx.currentTime;
             musicBus.gain.cancelScheduledValues(now); musicBus.gain.setValueAtTime(musicBus.gain.value, now); musicBus.gain.linearRampToValueAtTime(0.0001, now + 0.5);
             setTimeout(() => {
-              if (fileKey !== k || synth !== fb) return;
+              if (fileKey !== fk || synth !== fb) return;
               stopSynth();
               const n2 = ctx.currentTime;
               musicBus.gain.cancelScheduledValues(n2); musicBus.gain.setValueAtTime(0.0001, n2); musicBus.gain.linearRampToValueAtTime(1, n2 + 0.3);
-              startLoop(k);
+              startLoop(fk);
             }, 500);
-          } else startLoop(k);
+          } else startLoop(fk);
         }
       };
       try { const p = ctx.decodeAudioData(ab, ok, () => res()); if (p && p.catch) p.catch(() => res()); } catch (e) { res(); }
@@ -607,14 +453,16 @@ const Sound = (() => {
   // くり返し: 区間の終わりの xfade 秒前から、次の回（区間の始まり）を重ねて鳴らす
   function startLoop(k) {
     stopLoop();
-    const buf = buffers[k], c = FILE_MUSIC.songs[k];
+    const buf = buffers[fileOf(k)], c = FILE_MUSIC.songs[k];
     if (!buf || !ctx) return;
     const g = ctx.createGain();
     g.gain.value = FILE_MUSIC.level * Math.pow(10, (FILE_MUSIC.lufs - c.lufs) / 20);
     g.connect(musicBus);
-    if (c.once) {   // くり返さない曲（11/7-2）: 頭から1回鳴らして終わる
+    if (c.once) {   // くり返さない曲（11/7-2）: 頭から1回鳴らして終わる。end があれば、そこで少しだけ小さくして止める（11/7-4）
       const s = ctx.createBufferSource(); s.buffer = buf; s.connect(g);
-      s.start(ctx.currentTime + 0.05, 0);
+      const t0 = ctx.currentTime + 0.05;
+      if (c.end) { s.start(t0, 0, c.end); try { g.gain.setValueAtTime(g.gain.value, t0 + c.end - 0.12); g.gain.linearRampToValueAtTime(0.0001, t0 + c.end); } catch (e) {} }
+      else s.start(t0, 0);
       loopRun = { key: k, g, segs: [s], next: Infinity, off: 0, once: true };
       return;
     }
@@ -623,7 +471,7 @@ const Sound = (() => {
     loopTimer = setInterval(() => { if (loopRun && ctx.currentTime > loopRun.next - 3) addSeg(); }, 250);
   }
   function addSeg() {
-    const r = loopRun, buf = buffers[r.key], [a, b] = FILE_MUSIC.songs[r.key].loop, X = FILE_MUSIC.xfade;
+    const r = loopRun, buf = buffers[fileOf(r.key)], [a, b] = FILE_MUSIC.songs[r.key].loop, X = FILE_MUSIC.xfade;
     const s = ctx.createBufferSource(), sg = ctx.createGain();
     s.buffer = buf; s.connect(sg); sg.connect(r.g);
     const t = r.next, first = r.off === 0;
@@ -655,21 +503,18 @@ const Sound = (() => {
     if (!ctx) return;
     musicBus.gain.cancelScheduledValues(ctx.currentTime);
     musicBus.gain.setValueAtTime(1, ctx.currentTime);
-    if (buffers[k]) { startLoop(k); return; }
-    if (k === FILE_MUSIC.first) { fallback = name; startSynth(name, 1); }   // タイトル: 読めるまでは合成曲（最初の画面を無音にしない。11/6-6）
+    if (buffers[fileOf(k)]) { startLoop(k); return; }
+    if (k === FILE_MUSIC.first) { fallback = "タイトル"; startSynth("タイトル", 1); }   // タイトル: 読めるまでは合成曲（最初の画面を無音にしない。11/6-6）
     fetchSongs([k]);   // まだ読んでいなければ読む（読み中・音にしている途中ならとばす）
-    if (raw[k]) decodeRaw(k);   // 読めていれば音にして鳴らす。まだ読んでいる途中なら、読めたところから鳴らす（それまでは無音か合成曲）
+    if (raw[fileOf(k)]) decodeRaw(fileOf(k));   // 読めていれば音にして鳴らす。まだ読んでいる途中なら、読めたところから鳴らす（それまでは無音か合成曲）
   }
 
   // t ＝ 曲ごとのテンポの倍率（山場の回など。なければ 1）
+  // 場面の曲を鳴らす（11/7-4: どの場面も mp3。mp3 のない場面は無音）
   function play(key, t, scene) {
-    const name = SCENE[key] || key;
     const fk = fileKeyOf(key, scene);
-    if (fk) { playFile(name, fk); return; }
-    if (current === name) return;
+    if (fk) { playFile(key, fk); return; }
     stop();
-    current = name;
-    startSynth(name, t);
   }
   function startSynth(name, t) {
     synth = name;
@@ -677,15 +522,6 @@ const Sound = (() => {
     songTempo = t || 1;
     const song = SONGS[name];
     if (!song) return;
-    if (song.file) {
-      try {
-        fileAudio = new Audio(song.file);
-        fileAudio.loop = true;
-        fileAudio.volume = muted ? 0 : 0.6;
-        fileAudio.play().catch(() => {});
-      } catch (e) { fileAudio = null; }
-      return;
-    }
     if (!ctx) return;
     musicBus.gain.cancelScheduledValues(ctx.currentTime);
     musicBus.gain.setValueAtTime(1, ctx.currentTime);
@@ -698,7 +534,7 @@ const Sound = (() => {
 
   // 前の曲を少しずつ小さくしてから、次の曲に替える（場面の切り替え。11/3-4 から0.5秒。曲だけを小さくし、効果音は小さくしない）
   function fadeTo(key, sec = 0.5, t, scene) {
-    const fk = fileKeyOf(key, scene), id = fk ? "♪" + fk : (SCENE[key] || key);
+    const fk = fileKeyOf(key, scene), id = fk ? "♪" + fk : "（無音）";
     if (current === id || current === "→" + id) return;
     if (fk && fk === fileKey && current) return;   // 同じ mp3 の曲なら、そのまま流す（救出の旅 ⇄ お題バトル）
     if (!ctx || !musicBus) { play(key, t, scene); return; }
@@ -760,6 +596,9 @@ const Sound = (() => {
     } else if (name === "correct") { // 正解
       tone(freq("E6"), t, 0.35, "triangle", 0.4);
       tone(freq("A6"), t + 0.11, 0.5, "triangle", 0.4);
+    } else if (name === "tick") {    // クイズの残り5秒の「カチ」（11/7-4）
+      tone(2093, t, 0.035, "square", 0.12);
+      tone(1568, t + 0.012, 0.03, "square", 0.06);
     } else if (name === "wrong") {   // 不正解
       sweep(420, 300, 0.45, "sine", 0.35);
     } else if (name === "damage") {  // やられた

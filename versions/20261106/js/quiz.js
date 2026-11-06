@@ -3,6 +3,8 @@ const QUIZ = {
   reviewTime: 3,
   previewTime: 3,                    // 受け直しクイズで、出題の前にカード（語句＋一言メモ）を見せる秒数                     // クイズの前に「今日あつめたことば」を見せる秒数
   tempoUpAt: { 2: 140 / 128, 7: 152 / 128 },   // 何問目（0から数える）で音楽のテンポを上げるか。3問目と8問目（11/3-6: クイズの曲 128 → 140 → 152）
+  timeLimit: 25,                     // 1問の制限時間（秒。11/7-4 決定）。時間切れは、まちがえたときと同じ（正解を見せて、受け直しに回る）
+  warnAt: 5,                         // 残りこの秒数で、バーが赤くなり「カチカチ」が鳴る（1秒ごと）
   nextDelay: 1.6,                    // 正解のあと、次の問題へ進むまでの秒数（10/25-1: カードゲットの演出を見せるため 1.1 → 1.6）
 };
 
@@ -13,18 +15,20 @@ const FUWARI_SAY = {
   wrong:   ["うーん、まだぼんやりしてる…", "あれ？ちがったみたい…", "だいじょうぶ、いっしょに覚えよう", "メモを読んだら、きっと思い出せるよ"],
   streak:  ["{n}問れんぞく！ふわりがぽかぽかしてきた！", "{n}問れんぞく正解！すごい！"],
   last:    ["さいごの問題だよ！"],
+  timeUp:  ["あっ、時間切れ…あとでもう一度やってみよう", "時間切れ！正解をいっしょに覚えよう"],
 };
 const pick = a => a[Math.floor(Math.random() * a.length)];
 
 const Quiz = (() => {
   let list = [], idx = 0, results = [], onEnd = null, locked = false, streak = 0, preview = false, previewTimer = 0;
+  let timer = null;   // 制限時間 { left: 残り秒, last: 前の時刻, tick: 次に「カチ」を鳴らす残り秒, raf }
   const $ = id => document.getElementById(id);
 
   // words: 吸い込んだ順の語句、end(results): 終わったときに呼ぶ。results は [{ id, correct }]
   // o.preview: 受け直しクイズ（出題の前に、その語句のカードを3秒見せる）
   function start(words, end, o) {
     list = words; idx = 0; results = []; onEnd = end; streak = 0; preview = !!(o && o.preview);
-    clearTimeout(previewTimer);
+    clearTimeout(previewTimer); stopTimer();
     Sound.play("quiz");
     Sound.setTempo(1);
     say(pick(FUWARI_SAY.start));
@@ -58,6 +62,7 @@ const Quiz = (() => {
     $("quiz-count").textContent = `クイズ ${idx + 1} / ${list.length}`;
     dots();
     $("quiz-feedback").classList.add("hidden");
+    stopTimer(); setBar(1, false); $("quiz-time").classList.add("off");   // （受け直しのカードを見せているあいだは、バーを出さない）
     const box = $("quiz-choices");
     box.innerHTML = "";
     if (preview) {   // 受け直し: まずカードを見せる
@@ -87,11 +92,40 @@ const Quiz = (() => {
       box.appendChild(b);
     });
     $("screen-quiz").scrollTop = 0;
+    startTimer();
   }
+
+  // ===== 制限時間（11/7-4）。画面が見えていないあいだ（アプリを切りかえたとき）は止まる =====
+  function setBar(k, warn) {
+    const bar = $("quiz-time");
+    bar.firstElementChild.style.width = `${Math.max(0, k) * 100}%`;
+    bar.classList.toggle("warn", warn);
+  }
+  function startTimer() {
+    stopTimer();
+    $("quiz-time").classList.remove("off");
+    timer = { left: QUIZ.timeLimit, last: performance.now(), tick: QUIZ.warnAt, raf: 0 };
+    setBar(1, false);
+    const step = now => {
+      if (!timer) return;
+      const dt = Math.min(0.25, (now - timer.last) / 1000); timer.last = now;   // （0.25秒より長いすき間は、画面が止まっていたとみなす）
+      if (!$("screen-quiz").classList.contains("active")) { stopTimer(); return; }   // クイズの画面を出た（とちゅうでやめた）
+      if (!document.hidden) timer.left -= dt;
+      const warn = timer.left <= QUIZ.warnAt;
+      setBar(timer.left / QUIZ.timeLimit, warn);
+      if (warn && timer.left > 0 && timer.left <= timer.tick) { Sound.se("tick"); timer.tick = Math.ceil(timer.left) - 1; }
+      if (timer.left <= 0) { stopTimer(); answer(-1, null); return; }
+      timer.raf = requestAnimationFrame(step);
+    };
+    timer.raf = requestAnimationFrame(step);
+  }
+  function stopTimer() { if (timer) { cancelAnimationFrame(timer.raf); timer = null; } }
 
   function answer(i, btn) {
     if (locked) return;
     locked = true;
+    stopTimer();   // バーはそこで止める（残りの長さのまま）
+    const timeUp = i === -1;   // 時間切れ（11/7-4）: まちがえたときと同じ
     const w = list[idx];
     const ok = i === w.answer;
     results[idx] = { id: w.id, correct: ok };
@@ -121,12 +155,12 @@ const Quiz = (() => {
     } else {
       // 不正解: 正解と一言メモをその場で見せてから次へ
       Sound.se("wrong");
-      btn.classList.add("wrong");
+      if (btn) btn.classList.add("wrong");
       streak = 0;
-      say(w.sayWrong || pick(FUWARI_SAY.wrong));
+      say(timeUp ? pick(FUWARI_SAY.timeUp) : (w.sayWrong || pick(FUWARI_SAY.wrong)));
       const fb = $("quiz-feedback");
       fb.innerHTML = "";
-      const p1 = document.createElement("p"); p1.style.margin = "0"; p1.textContent = "正解は";
+      const p1 = document.createElement("p"); p1.style.margin = "0"; p1.textContent = timeUp ? "時間切れ！ 正解は" : "正解は";
       const p2 = document.createElement("p"); p2.className = "answer"; p2.textContent = w.choices[w.answer];
       const p3 = document.createElement("p"); p3.className = "memo"; p3.textContent = w.memo;
       const b = document.createElement("button"); b.className = "btn"; b.textContent = "次へ";
@@ -161,5 +195,5 @@ const Quiz = (() => {
     setTimeout(done, QUIZ.reviewTime * 1000);
   }
 
-  return { start, review };
+  return { start, review, stop: stopTimer };
 })();

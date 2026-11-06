@@ -26,11 +26,11 @@ const Cards = (() => {
   const GLUE = new Set(["を", "は", "が", "に", "の", "と", "で", "へ", "も", "や", "よ", "ね", "て", "た", "か", "な", "、", "。", "!", "！", "?", "？", ")", "）", "」"]);   // 「」の閉じかっこも前につける（10/25-14）
   const esc = t => t.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   // カードの絵（11/6-6）: 絵があるステージ（stages）だけ、持っているカードの上に出す。絵は tools/cardsplit.mjs で切り分けた assets/cards/s<ステージ>_<順>.png（1辺 320px。表示の2倍）
-  const CARD_ART = { dir: "assets/cards/", stages: [1] };   // s02〜s12 の絵が来たら、ここに番号を足す
+  const CARD_ART = { dir: "assets/cards/", stages: [1, 2], v: "1107" };   // v ＝ 絵を差し替えたら変える（前の絵がブラウザに残らないように。11/7-3 ステージ1を完成版に）   // s02〜s12 の絵が来たら、ここに番号を足す
   function artEl(w) {
     if (!CARD_ART.stages.includes(w.stage) || !w.order) return null;
     const im = document.createElement("img"); im.className = "pic"; im.alt = ""; im.decoding = "async";
-    im.src = `${CARD_ART.dir}s${String(w.stage).padStart(2, "0")}_${String(w.order).padStart(2, "0")}.png`;
+    im.src = `${CARD_ART.dir}s${String(w.stage).padStart(2, "0")}_${String(w.order).padStart(2, "0")}.png?v=${CARD_ART.v}`;
     im.onerror = () => im.remove();
     return im;
   }
@@ -91,7 +91,7 @@ const Cards = (() => {
   }
 
   function showCards(o) {
-    Sound.play("card");
+    Sound.play("results");   // 結果（今回のカード）: fanfare.mp3（11/7-4）
     bindSwipe(); setPage(1);
     $("cards-to-p2").textContent = tx("results.toCards"); $("cards-to-p2").onclick = () => setPage(2);
     $("cards-to-p1").textContent = tx("results.toBack"); $("cards-to-p1").onclick = () => setPage(1);
@@ -190,7 +190,7 @@ const Cards = (() => {
   // o: { stage, words（このステージの10のことば）, lit（光っている stage id の Set）, isNew（初めてそろった）, onNext, hint, heroSrc }
   let fxTimers = [];
   function showRecipe(o) {
-    Sound.play("recipe");
+    Sound.play("gem");   // 宝石ができた: fanfare.mp3 の頭だけ1回（11/7-4）
     fxTimers.forEach(clearTimeout); fxTimers = [];
     showHint("recipe-hint", o.hint); showHero("recipe-hero", o.heroSrc);
     $("recipe-label").textContent = tx("recipe.label");

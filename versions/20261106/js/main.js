@@ -351,7 +351,7 @@ const Main = (() => {
     reviewing = reviewNext && stage.id === 1;
     showScreen("battle");
     Sound.loadWorld(stage.world);   // その世界の mp3 の曲（発見・救出・クイズ）だけを読む。読めるまでは無音（11/6-5）
-    { const sc = rescueAgain ? "rescue" : "explore", m = window.musicOf(stage, sc); Sound.play(m.name, m.tempo, sc); }   // 発見の旅の曲。救出の旅が始まると救出の曲に替わる（曲の名前は stages.js の WORLDS の music。11/3-4）
+    Sound.play(rescueAgain ? "rescue" : "explore");   // 発見の旅の曲。救出の旅が始まると救出の曲に替わる（曲は js/audio.js の FILE_MUSIC。11/7-4）
     // 画面が表示されてから大きさを測る
     requestAnimationFrame(() => {
       Battle.start(words, {
@@ -386,7 +386,7 @@ const Main = (() => {
     if (!ordered.length) { toCards([]); return; }
     // クイズの前に「今日あつめたことば」を3秒見せる
     showScreen("review");
-    Sound.play("card");
+    Sound.play("review");   // 今日あつめたことば: ステージ一覧の曲（11/7-4）。クイズの説明もそのまま
     Quiz.review(ordered, () => {
       // クイズの1問目の前に、大きく1画面（ステージ1の初回だけ。おさらいのときも出す）
       if (stage.id === 1 && (reviewing || !TutSave.load().quizIntro)) {
@@ -492,7 +492,7 @@ const Main = (() => {
   const worldDone = id => worldStages(id).every(s => window.WORDS.filter(w => w.stage === s.id).every(w => Save.data.cards[w.id]));
   function toStages() {
     Battle.stop();
-    Sound.play("title");
+    Sound.play("stages");   // ステージ一覧の曲（map.mp3。11/7-4）
     const wid = Math.min(window.WORLDS.length, Math.max(1, Save.data.world || 1));
     const wd = window.WORLDS.find(w => w.id === wid);
     $("stages-world-title").textContent = tx("worlds.title", { id: wd.id, name: wd.name });
@@ -560,7 +560,7 @@ const Main = (() => {
     const wd = window.WORLDS.find(w => w.id === id);
     $("wt-title").textContent = tx("worlds.title", { id, name: wd ? wd.name : "" });
     box.classList.remove("hidden");
-    Sound.play("title");
+    Sound.play("warp");   // ワープの会話もステージ一覧と同じ曲（11/7-4）
     const finish = () => {
       wtTimers.forEach(clearTimeout); wtTimers = [];
       box.onclick = null; box.classList.add("hidden");
@@ -678,6 +678,7 @@ const Main = (() => {
 
   // カード図鑑（10/22-1）: 今いる世界の、ステージごとの10枚。持っているカードは語句と一言メモ、ないものは「？」
   function toZukan() {
+    Sound.play("zukan");   // カード図鑑はタイトルの曲（11/7-4）
     const wid = Save.data.world || 1;
     // 見出しは制作側の絵 g_title（11/1）。絵が読めなければ今までの文字
     const sub = `<small>${tx("worlds.title", { id: wid, name: window.WORLDS.find(w => w.id === wid).name })}</small>`;
@@ -855,6 +856,7 @@ const Main = (() => {
     $("btn-quiz-quit").addEventListener("click", () => {
       if (!window.confirm("クイズをやめて、ステージ一覧にもどりますか？（このバトルの記録はのこりません）")) return;
       Sound.setTempo(1);
+      Quiz.stop();
       toStages();
     });
 
