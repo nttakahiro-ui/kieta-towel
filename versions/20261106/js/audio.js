@@ -198,6 +198,27 @@ SONGS["タイトル"] = Object.assign({}, SONGS["森の朝"], { bpm: 112, bass: 
 SONGS["オープニング"] = Object.assign({}, SONGS["タイトル"], { drums: {}, orn: null });
 // 共通の場面の曲。js の Sound.play("title") などは、ここで曲の名前に替わる（ワープの会話・ステージ一覧・カードの画面も title）。世界ごとの場面は stages.js の WORLDS の music
 //   レシピブックとエンディングは「星の海」そのまま（11/3-7。静か版はやめた）
+// mp3 の曲（11/6-5 決定。検討版 11/6 だけ）: 世界1〜3の発見・救出・クイズの9曲。元のファイルは docs/曲/（ここは assets/music/ のコピー）
+//   loop ＝ くり返す区間 [始まり, 終わり]（秒）。最初は曲の頭から鳴らし、終わりまで来たら始まりへもどる。終わりのあとの音が消えていくところ・無音は使わない。
+//     区間は小節の切れ目（終わり − 始まり ＝ 小節の倍数）で、「終わりの前の2小節」と「始まりの前の2小節」の音（和音・リズム）がいちばん似ているところ
+//     （頭の静かな前奏にもどると音が小さくなってとぎれて聞こえるので、2周目からは曲の中ほどへもどる）。つなぎ目は FILE_MUSIC.xfade 秒だけ前後を重ねる（クロスフェード）
+//   lufs ＝ 区間の聞こえる大きさ（LUFS。測った値）。どの曲も FILE_MUSIC.lufs の大きさにそろえる。level ＝ 合成曲とつりあう全体の大きさ（測って決めた値）
+//   救出の旅のお題バトル（中ボス・大ボス）も救出の曲のまま流す（曲をとめない・テンポは変えない）。クイズのテンポ上げも mp3 ではしない（音の高さが変わるため）
+const FILE_MUSIC = {
+  dir: "assets/music/", xfade: 0.12, lufs: -11, level: 0.33,   // level 0.33: 合成曲（発見 −24〜−26、救出 −18〜−20、クイズ −16。同じはかり方）のまん中 −20 くらいに合わせた
+  songs: {
+    w1_hakken:    { loop: [23.088, 67.088], lufs: -10.37 },   // 120拍/分、22小節
+    w1_kyushutsu: { loop: [21.807, 62.950], lufs: -10.43 },   // 140、24小節
+    w1_quiz:      { loop: [8.858, 55.676], lufs: -12.05 },   // 164、32小節
+    w2_hakken:    { loop: [10.838, 58.838], lufs: -11.58 },   // 120、24小節
+    w2_kyushutsu: { loop: [20.303, 52.735], lufs: -10.98 },   // 148、20小節
+    w2_quiz:      { loop: [18.190, 54.190], lufs: -11.50 },   // 160、24小節
+    w3_hakken:    { loop: [23.834, 55.834], lufs: -10.08 },   // 120、16小節
+    w3_kyushutsu: { loop: [24.623, 51.289], lufs: -10.61 },   // 144、16小節
+    w3_quiz:      { loop: [6.397, 61.898], lufs: -10.57 },   // 160、37小節
+  },
+  worlds: { 1: { explore: "w1_hakken", rescue: "w1_kyushutsu", quiz: "w1_quiz" }, 2: { explore: "w2_hakken", rescue: "w2_kyushutsu", quiz: "w2_quiz" }, 3: { explore: "w3_hakken", rescue: "w3_kyushutsu", quiz: "w3_quiz" } },
+};
 const SCENE = { title: "タイトル", opening: "オープニング", card: "タイトル", quiz: "クイズ", recipe: "宝石ができた", recipeBook: "星の海", ending: "星の海" };
 
 
@@ -217,6 +238,14 @@ const Sound = (() => {
   let tempo = 1;         // テンポの倍率（クイズで上げる）
   let songTempo = 1;     // 曲ごとのテンポの倍率（山場の回。stages.js の musicTempo）
   let fileAudio = null;  // ファイルの曲を流しているとき
+  // mp3 の曲（11/6-5）
+  let world = 0;           // 今の世界（loadWorld で決める）
+  const buffers = {};      // 読めた曲 { key: AudioBuffer }
+  const raw = {};          // 読みこんだが、まだ音にしていない曲（AudioContext ができる前）
+  const loading = {};      // 読んでいる途中の曲
+  let fileKey = null;      // 今流している（または、読めたら流す）mp3 の曲
+  let loopRun = null;      // くり返しの状態 { key, g, segs, next, off }
+  let loopTimer = null;
   // 音のオン・オフ（10/21-1）。オフのときは曲・効果音・読み上げを鳴らさない。設定は main.js がブラウザに保存する
   const VOLUME = 0.22;
   let muted = false;
@@ -259,6 +288,7 @@ const Sound = (() => {
         for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
       }
       if (ctx.state === "suspended") ctx.resume();
+      for (const k of Object.keys(raw)) decodeRaw(k);   // AudioContext の前に読んでいた mp3 を音にする（11/6-5）
       // 無音を1回鳴らして解禁する
       const b = ctx.createBuffer(1, 1, 22050);
       const src = ctx.createBufferSource();
@@ -504,9 +534,97 @@ const Sound = (() => {
     tickSong(song, stepDur);
   }
 
+  // ===== mp3 の曲（11/6-5） =====
+  // 曲の名前（合成曲の名前）を、今の世界の mp3 に読みかえる。なければ null（合成曲のまま）
+  function fileKeyOf(name) {
+    const fw = FILE_MUSIC.worlds[world], w = window.WORLDS && window.WORLDS.find(x => x.id === world);
+    if (!fw || !w) return null;
+    const m = w.music || {};
+    if (name === m.explore) return fw.explore;
+    if (name === m.rescue || name === m.odai) return fw.rescue;
+    if (name === SCENE.quiz) return fw.quiz;
+    return null;
+  }
+  // ステージに入るとき: その世界の3曲だけを読む（発見の曲から順に）。ほかの世界の曲は手ばなす
+  function loadWorld(id) {
+    world = id;
+    const fw = FILE_MUSIC.worlds[id];
+    const keep = new Set(fw ? Object.values(fw) : []);
+    for (const k of Object.keys(buffers)) if (!keep.has(k) && k !== fileKey) delete buffers[k];
+    for (const k of Object.keys(raw)) if (!keep.has(k)) delete raw[k];
+    if (!fw) return;
+    let chain = Promise.resolve();
+    for (const k of [fw.explore, fw.rescue, fw.quiz]) {
+      if (buffers[k] || raw[k] || loading[k]) continue;
+      loading[k] = true;
+      chain = chain.then(() => fetch(FILE_MUSIC.dir + k + ".mp3").then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+        .then(ab => { raw[k] = ab; return decodeRaw(k); })
+        .catch(() => {}).then(() => { delete loading[k]; }));
+    }
+  }
+  // 音にする（AudioContext が要る。まだなければ unlock のときに）
+  function decodeRaw(k) {
+    if (!ctx || !raw[k]) return Promise.resolve();
+    const ab = raw[k]; delete raw[k];
+    return new Promise(res => {
+      const ok = b => { buffers[k] = b; res(); if (fileKey === k && (!loopRun || loopRun.key !== k)) startLoop(k); };   // 待っていた曲なら、読めたところから鳴らす
+      try { const p = ctx.decodeAudioData(ab, ok, () => res()); if (p && p.catch) p.catch(() => res()); } catch (e) { res(); }
+    });
+  }
+  // くり返し: 区間の終わりの xfade 秒前から、次の回（区間の始まり）を重ねて鳴らす
+  function startLoop(k) {
+    stopLoop();
+    const buf = buffers[k], c = FILE_MUSIC.songs[k];
+    if (!buf || !ctx) return;
+    const g = ctx.createGain();
+    g.gain.value = FILE_MUSIC.level * Math.pow(10, (FILE_MUSIC.lufs - c.lufs) / 20);
+    g.connect(musicBus);
+    loopRun = { key: k, g, segs: [], next: ctx.currentTime + 0.05, off: 0 };
+    addSeg();
+    loopTimer = setInterval(() => { if (loopRun && ctx.currentTime > loopRun.next - 3) addSeg(); }, 250);
+  }
+  function addSeg() {
+    const r = loopRun, buf = buffers[r.key], [a, b] = FILE_MUSIC.songs[r.key].loop, X = FILE_MUSIC.xfade;
+    const s = ctx.createBufferSource(), sg = ctx.createGain();
+    s.buffer = buf; s.connect(sg); sg.connect(r.g);
+    const t = r.next, first = r.off === 0;
+    const from = first ? 0 : a - X / 2;            // 2回目からは、始まりの少し前から重ねる
+    const seam = t + (b - from) - X / 2;           // 次の回を重ね始める時刻
+    const N = 32, fin = new Float32Array(N), fout = new Float32Array(N);
+    for (let i = 0; i < N; i++) { fin[i] = Math.sin(i / (N - 1) * Math.PI / 2); fout[i] = Math.cos(i / (N - 1) * Math.PI / 2); }   // 同じ大きさに聞こえる重ね方
+    try {   // （同じ時刻に別の変化を重ねると Safari で止まることがあるので、曲線だけを置く。fin は 0 から始まる）
+      if (!first) { sg.gain.value = 0; sg.gain.setValueCurveAtTime(fin, t, X); }
+      sg.gain.setValueCurveAtTime(fout, seam, X);
+    } catch (e) {}
+    s.start(t, from);
+    s.stop(seam + X + 0.02);
+    r.segs.push(s); if (r.segs.length > 3) r.segs.shift();
+    r.next = seam; r.off = 1;
+  }
+  function stopLoop() {
+    if (loopTimer) { clearInterval(loopTimer); loopTimer = null; }
+    if (!loopRun) return;
+    const r = loopRun; loopRun = null;
+    try { const now = ctx.currentTime; r.g.gain.cancelScheduledValues(now); r.g.gain.setValueAtTime(r.g.gain.value, now); r.g.gain.linearRampToValueAtTime(0.0001, now + 0.05); } catch (e) {}
+    for (const s of r.segs) { try { s.stop(ctx.currentTime + 0.06); } catch (e) {} }
+    setTimeout(() => { try { r.g.disconnect(); } catch (e) {} }, 200);
+  }
+  function playFile(name, k) {
+    if (fileKey === k && current) { current = name; return; }   // 同じ曲（救出の旅とお題バトルなど）は、とめずにそのまま流す
+    stop();
+    current = name; fileKey = k; tempo = 1; songTempo = 1;
+    if (!ctx) return;
+    musicBus.gain.cancelScheduledValues(ctx.currentTime);
+    musicBus.gain.setValueAtTime(1, ctx.currentTime);
+    if (buffers[k]) startLoop(k);
+    else if (raw[k]) decodeRaw(k);   // 読めていれば音にして鳴らす。まだ読んでいる途中なら、読めたところから鳴らす（それまでは無音）
+  }
+
   // t ＝ 曲ごとのテンポの倍率（山場の回など。なければ 1）
   function play(name, t) {
     name = SCENE[name] || name;
+    const fk = fileKeyOf(name);
+    if (fk) { playFile(name, fk); return; }
     if (current === name) return;
     stop();
     current = name;
@@ -537,12 +655,15 @@ const Sound = (() => {
   function fadeTo(name, sec = 0.5, t) {
     name = SCENE[name] || name;
     if (current === name || current === "→" + name) return;
+    { const fk = fileKeyOf(name); if (fk && fk === fileKey && current) { current = name; return; } }   // 同じ mp3 の曲なら、そのまま流す（救出の旅 ⇄ お題バトル）
     if (!ctx || !musicBus) { play(name, t); return; }
     const now = ctx.currentTime;
     musicBus.gain.cancelScheduledValues(now);
     musicBus.gain.setValueAtTime(musicBus.gain.value, now);
     musicBus.gain.linearRampToValueAtTime(0.0001, now + sec);
     if (fileAudio) { const fa = fileAudio; setTimeout(() => fa.pause(), sec * 1000); }
+    if (loopRun) { const lr = loopRun; setTimeout(() => { if (loopRun === lr) stopLoop(); }, sec * 1000); }
+    fileKey = null;
     setTimeout(() => {
       if (current !== "→" + name) return;   // そのあいだに別の曲になった（play がもとの音量に戻す）
       play(name, t);
@@ -557,12 +678,15 @@ const Sound = (() => {
 
   function stop() {
     current = null;
+    fileKey = null;
+    stopLoop();
     if (timer) { clearInterval(timer); timer = null; }
     if (fileAudio) { fileAudio.pause(); fileAudio = null; }
   }
 
   // テンポを上げる（1 = もとの速さ）
   function setTempo(t) {
+    if (fileKey) return;   // mp3 の曲はテンポを変えない（音の高さが変わるため。11/6-5）
     tempo = t;
     if (fileAudio) fileAudio.playbackRate = t;
   }
@@ -678,5 +802,5 @@ const Sound = (() => {
     if (ctx && current && !fileAudio) nextTime = Math.max(nextTime, ctx.currentTime + 0.05);
   }
 
-  return { unlock, play, fadeTo, stop, setTempo, setMuted, get voices() { return voiceEnds.length; }, get dropped() { return dropped; }, get muted() { return muted; }, se, suspend, resume, speak };
+  return { unlock, play, fadeTo, stop, loadWorld, get fileState() { return { world, fileKey, playing: loopRun && loopRun.key, loaded: Object.keys(buffers), loading: Object.keys(loading) }; }, setTempo, setMuted, get voices() { return voiceEnds.length; }, get dropped() { return dropped; }, get muted() { return muted; }, se, suspend, resume, speak };
 })();
