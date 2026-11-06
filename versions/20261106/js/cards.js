@@ -26,7 +26,7 @@ const Cards = (() => {
   const GLUE = new Set(["を", "は", "が", "に", "の", "と", "で", "へ", "も", "や", "よ", "ね", "て", "た", "か", "な", "、", "。", "!", "！", "?", "？", ")", "）", "」"]);   // 「」の閉じかっこも前につける（10/25-14）
   const esc = t => t.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   // カードの絵（11/6-6）: 絵があるステージ（stages）だけ、持っているカードの上に出す。絵は tools/cardsplit.mjs で切り分けた assets/cards/s<ステージ>_<順>.png（1辺 320px。表示の2倍）
-  const CARD_ART = { dir: "assets/cards/", stages: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], v: "1107" };   // v ＝ 絵を差し替えたら変える（前の絵がブラウザに残らないように）。11/7-5 で120枚そろった。絵が読めなかったときは onerror で「絵がないカード」の表示にもどる（保険として残す）
+  const CARD_ART = { dir: "assets/cards/", stages: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], v: "1107-6" };   // v ＝ 絵を差し替えたら変える（前の絵がブラウザに残らないように）。11/7-5 で120枚そろった。絵が読めなかったときは onerror で「絵がないカード」の表示にもどる（保険として残す）
   function artEl(w) {
     if (!CARD_ART.stages.includes(w.stage) || !w.order) return null;
     const im = document.createElement("img"); im.className = "pic"; im.alt = ""; im.decoding = "async"; im.loading = "lazy";   // 図鑑は1度に40枚。見える所から読む
