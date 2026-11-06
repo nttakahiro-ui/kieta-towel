@@ -161,7 +161,8 @@ function runOnce(skill, seed) { HUDLOG.rows.push(["--", skill]); HUDLOG.lastK = 
         // ゆれるお題のことば（11/3-3）: ねらったことばを、指で追いかけつづける（ずれの量は考えたときのまま）
         trackE = tgt && tgt.pattern === "odai" ? tgt : null; trackOff = tgt ? targetX - tgt.x : 0;
         // 近くの弾に気づいたら、ときどきよける
-        const near = S.ebullets.find(b => b.y < p.y && p.y - b.y < 140 && Math.abs(b.x - p.x) < 40);
+        const near = S.ebullets.find(b => b.y < p.y && p.y - b.y < 140 && Math.abs(b.x - p.x) < 40)
+          || (process.env.REARDODGE && S.fillers.find(f => f.rear && f.hp > 0 && !(f.delay > 0) && f.y > p.y && f.y - p.y < 140 && Math.abs(f.x - p.x) < 45));   // REARDODGE=1: うしろから来る虫も、弾と同じようによける（11/6-3。ふだんはよけない）
         if (near && rnd() < skill.dodge) {
           let dir = near.x < p.x ? 1 : -1;
           if (p.x + dir * 70 < 30 || p.x + dir * 70 > 345) dir = -dir;   // 壁のほうへはよけない
