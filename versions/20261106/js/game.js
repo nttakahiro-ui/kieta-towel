@@ -268,6 +268,7 @@ const BATTLE = {
   // --- 世界2・3の試作（10/31-10。docs/世界2・3の構想メモ.md）。数は仮 ---
   groundMark: true,            // 左の帯で、地上に出ることばの枠に小さな地面の絵のマーク（10/31-12 決定。文字の「地」ではない）
   // 必殺ワザ（11/6-6 決定）: 「ぜんぶ消し」「無敵タイム」「巻き戻し」の3つ。最初から全部持っていて、左下に3つのボタン。ゲージは3つで1本（使うと0にもどる）
+  loosePad: 18,   // ぜんぶ消しでほどけたことばに、ふわりがさわったとみなす広さ（ことばの外側 px。11/7-1）
   skillGuardTime: 15,          // 「無敵タイム」の秒数（自機が大きく光り、ぶつかった虫と弾が消える。元気は減らない）
   skillGuardR: 44,             //   無敵タイムの光の半径（px。この中に入った虫と弾が消える）
   clearBossDmg: 0.5,           // 「ぜんぶ消し」: 中ボス・大ボスの文字ごとの硬さを、もとの硬さの何倍けずるか（大ダメージ。最後の1は残す）。ザコのことばの殻はぜんぶほどける
@@ -1608,7 +1609,7 @@ const Battle = (() => {
         e.x = e.bx + Math.sin(e.age * BATTLE.swaySpeed + e.phase) * BATTLE.sway;
       }
       // 弾を撃つ（画面の上のほうにいる間だけ）。1語目を待っているあいだと、ステージ1のお題では撃たない
-      if (holdOn() || e.pattern === "odai") continue;   // お題の殻は odaiFire で順番に撃つ（11/1 決定）
+      if (holdOn() || e.pattern === "odai" || e.loose) continue;   // お題の殻は odaiFire で順番に撃つ（11/1 決定）
       e.fire -= dt;
       if (e.fire <= 0 && e.y > 0 && e.y < H * 0.62) {
         e.fire = BATTLE.enemyFireInterval[e.role] / P.fireRate / fireRamp() * (e.pattern === "odai" ? 3 : 1) * (0.8 + Math.random() * 0.4);
@@ -1739,7 +1740,7 @@ const Battle = (() => {
       }
       if (!hit) {
         for (const e of enemies.slice().sort((a, b) => b.y - a.y)) {   // 下にいる語句から当たる
-          if (e.ground || e.hp <= 0 || !onScreen(e) || e.appearT > 0) continue;   // 画面に全部入るまで・入ってすぐの1秒は当たらない
+          if (e.ground || e.loose || e.hp <= 0 || !onScreen(e) || e.appearT > 0) continue;   // （ぜんぶ消しでほどけたことばは、光が通りぬける）画面に全部入るまで・入ってすぐの1秒は当たらない
           if (e.pattern === "odai" ? (odai && odai.intro > 0) : (e.role === "boss" && e.age < BATTLE.bossEnterTime)) continue;   // 読む時間・降りてくる間は当たらない
           if (odai && e.pattern !== "odai") continue;   // お題バトルの間、止まっているほかの語句には当たらない（上のほうで殻がほどけないように。10/25-8）
           const pad = (s.thick ? 6 : 0) + (e.pattern === "odai" ? 4 : BATTLE.wordHitPad);   // お題の語句は今のまま（となりの列に当たらないように）
@@ -1756,6 +1757,11 @@ const Battle = (() => {
         }
       }
       if (hit) s.y = -999;
+    }
+    enemies = enemies.filter(e => e.hp > 0);
+    // ぜんぶ消しでほどけたことば: ふわりがさわると助けられる（11/7-1）
+    for (const e of enemies) {
+      if (e.loose && e.hp > 0 && !gHidden(e) && Math.abs(player.x - e.x) < e.w / 2 + BATTLE.loosePad && Math.abs(player.y - e.y) < e.h / 2 + BATTLE.loosePad) { e.hp = 0; bombing = true; defeat(e); bombing = false; }   // （ぜんぶ消しで取り戻したぶんなので、ゲージはたまらない）
     }
     enemies = enemies.filter(e => e.hp > 0);
 
@@ -1892,7 +1898,7 @@ const Battle = (() => {
     post("tutorial", () => { hintCard = { text, t: BATTLE.hintTime }; slow = Math.max(slow, BATTLE.hintSlow); });
   }
   function groundTargets() {
-    return enemies.filter(e => e.ground && e.hp > 0 && onScreen(e) && !(e.appearT > 0) && !gHidden(e)).concat(fillers.filter(f => f.layer === "ground" && f.hp > 0 && f.y > 0));
+    return enemies.filter(e => e.ground && !e.loose && e.hp > 0 && onScreen(e) && !(e.appearT > 0) && !gHidden(e)).concat(fillers.filter(f => f.layer === "ground" && f.hp > 0 && f.y > 0));
   }
   function inReach(g, x, y, r) {
     if (g.word) return Math.abs(x - g.x) < g.w / 2 + r && Math.abs(y - g.y) < g.h / 2 + r;
@@ -2242,7 +2248,7 @@ const Battle = (() => {
     player.glow = 0.35;
     if (id === "guard") { guardT = BATTLE.skillGuardTime; return; }
     if (id === "rewind") { rewind(); return; }
-    // ぜんぶ消し: 画面の虫と敵の弾を、本当に全部消す。ザコのことばは殻がぜんぶほどける。中ボス・大ボスには大ダメージ
+    // ぜんぶ消し: 画面の虫と敵の弾を、本当に全部消す。ザコのことばは殻がぜんぶほどけて画面に残る（自分で取りに行く。11/7-1）。中ボス・大ボスには大ダメージ
     typhoon = { age: 0 };
     wave = { x: player.x, y: player.y, age: 0 };
     player.inv = Math.max(player.inv, 1);
@@ -2259,10 +2265,20 @@ const Battle = (() => {
         for (const p of e.parts) if (!p.broken && !p.deco) { p.hp = Math.max(1, p.hp - Math.ceil(p.maxHp * BATTLE.clearBossDmg)); p.flash = 0.3; }
         e.flash = 0.3;
         if (e.role === "boss") bossCheer(e);
-      } else if (!e.dummy) damageWord(e, undefined, e.hp);
+      } else if (!e.dummy && !e.hold) loosen(e);   // 止まって待つ1語目（ステージ1・5の案内）には効かない（ほどけても止まったままになるので。11/7-1）
     }
     enemies = enemies.filter(e => e.hp > 0);
     bombing = false;
+  }
+  // ぜんぶ消しでほどけたザコのことば（11/7-1 決定）: 殻だけほどけて画面に残る。自動では手に入らず、ふわりがさわると助けられる。
+  //   光は通りぬけ、弾も撃たない。そのまま下へ抜けたら取り逃がし
+  function loosen(e) {
+    e.loose = true; e.hp = 1; e.flash = 0.3;
+    for (let i = 0; i < 18; i++) {
+      const a = Math.random() * Math.PI * 2, sp = 50 + Math.random() * 110;
+      threads.push({ x: e.x + (Math.random() - 0.5) * e.w, y: e.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 30, len: 5 + Math.random() * 8, curl: (Math.random() - 0.5) * 2, rot: Math.random() * 6,
+        color: (SHELL[e.role] || SHELL.zako).bit, age: 0, scatter: 9, sparkle: true });
+    }
   }
   // 巻き戻し（11/6-6 決定）: その救出の旅の最初にもどる。取り戻したことばは残り、取り逃したことばだけもう一度出る。元気は全回復、敵は最初から。ボス戦の途中でも使える
   function rewind() {
@@ -3675,7 +3691,7 @@ const Battle = (() => {
   }
 
   // 殻があるか（2回目の旅の語句。1回目の旅の双眼鏡の語句にはない）
-  const hasShell = e => e.last && !e.explore && !!e.pattern;
+  const hasShell = e => e.last && !e.explore && !!e.pattern && !e.loose;
   const SHELL = {
     zako: { name: "綿毛のまゆ", color: "#ffffff", bit: "#ffffff" },
     mid:  { name: "いばら",     color: "#5f6f34", bit: "#8a9a50" },
@@ -3830,7 +3846,7 @@ const Battle = (() => {
   function drawGroundWord(e) {
     const wob = e.flash > 0 ? (Math.random() - 0.5) * 4 : 0;
     if (worldDef.id >= 2) {   // 世界2・3（10/31-12 決定）: 地面に貼りついた見た目。下に濃い影、殻は地面らしい形（世界2 木箱・世界3 歯車。仮の図形）、文字は少し平たく
-      const k = e.maxHp > 0 ? Math.max(0, e.hp / e.maxHp) : 0;   // 殻は残りの硬さでうすくなる
+      const k = e.maxHp > 0 && !e.loose ? Math.max(0, e.hp / e.maxHp) : 0;   // 殻は残りの硬さでうすくなる（ぜんぶ消しでほどけたら、殻なし）
       const bw = e.w + 30, bh = e.size * 1.15;
       if (gMoves(e)) drawBelt(e.y, bh + 14, e.vx * (evActive("reverse") ? -1 : 1));   // 動く: コンベアの帯（10/31-13）
       if (gHides(e)) {   // 隠れる: 隠れているあいだは隠れ場所だけ。顔を出すときは、隠れ場所から「ぴょこ」と出る（10/31-13）
@@ -3917,7 +3933,7 @@ const Battle = (() => {
   // 中ボス・大ボスは硬さを小さな丸で表示
   function drawHpDots(e) {
     if (e.parts || e.maxHp <= 1) return;
-    if (hasShell(e)) return;   // 2回目の旅は、硬さを丸ではなく殻の厚みで見せる   // 1文字ずつ壊す敵は、文字ごとの帯で出す
+    if (hasShell(e) || e.loose) return;   // 2回目の旅は、硬さを丸ではなく殻の厚みで見せる   // 1文字ずつ壊す敵は、文字ごとの帯で出す
     const n = e.maxHp, gap = 10, x0 = e.x - (n - 1) * gap / 2;
     const dy = e.y - e.h / 2 - 10 - (hasKanji(e.word.word) ? BATTLE.kanaSize + 4 : 0);   // ふりがなより上に出す
     for (let i = 0; i < n; i++) {
