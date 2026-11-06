@@ -330,6 +330,7 @@ const Main = (() => {
   }
   // 「新しい必殺ワザ『○○』を手に入れた！」の1画面。まだ見ていないワザがあれば出して、タップで next へ（なければすぐ next）
   function showNewSkill(next) {
+    next(); return;   // 11/6-6 決定: 必殺ワザは最初から3つとも持っているので、「手に入れた！」の画面は出さない
     const id = ownedSkills().find(k => k !== "clear" && !Save.data.skillsSeen[k]);
     if (!id) { next(); return; }
     Save.data.skillsSeen[id] = true;
@@ -359,8 +360,6 @@ const Main = (() => {
         fuwariCount: Save.cardCount(),
         hints: stage.id === 1 ? { seen: TutSave.load(), mark: TutSave.mark, all: reviewNext } : null,   // 案内はステージ1だけ（初めての瞬間に。おさらいのときは全部）
         hero: Save.data.hero || "boy",
-        skills: ownedSkills(), skill: Save.data.skill,   // 必殺ワザ（10/31-10 試作）
-        onSkill: id => { Save.data.skill = id; Save.store(); },
         firstChoice: !TutSave.load().choice,          // 持ち物選択: 初めては時間制限なし（記録は版ごと）
         bombHintSeen: !!TutSave.load().bombReady,     // ぜんぶ消しの案内（初めての1回だけ。記録は版ごと）
         onBombHint: () => TutSave.mark("bombReady"),
@@ -708,6 +707,7 @@ const Main = (() => {
           c.className = "card";
           const wd = Cards.wordEl(w);
           const m = document.createElement("div"); m.className = "m"; m.innerHTML = Cards.phraseHTML(w.memo);
+          const art = Cards.artEl(w); if (art) { c.appendChild(art); c.classList.add("has-pic"); }   // カードの絵（11/6-6）
           c.append(wd, m);
         } else { c.className = "card empty"; c.textContent = tx("zukan.empty"); }
         list.appendChild(c);
@@ -778,6 +778,8 @@ const Main = (() => {
     // ダブルタップでの拡大を防ぐ
     document.addEventListener("dblclick", e => e.preventDefault());
 
+    // タイトルの曲（mp3）は、最初の画面が出たあと（load のあと）に読む。読めるまでは合成曲（11/6-6）
+    if (document.readyState === "complete") Sound.preloadCommon(); else window.addEventListener("load", () => Sound.preloadCommon());
     // 音は「はじめる」をタップしたときに解禁する（iOSの制限）
     $("btn-start").addEventListener("click", () => {
       Sound.unlock();

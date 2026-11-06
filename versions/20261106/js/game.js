@@ -87,6 +87,7 @@ const BATTLE = {
   bombRingTime: 0.35,          // 輪が広がりきるまでの秒数（見た目だけ。当たりは落ちた瞬間）
   // 世界3の光の玉（11/6-3 決定。検討版 11/6 だけ）: 自機のまわりを2つの玉が回る。触れた敵（空中の虫）にダメージ。操作はふえない
   orbs: { n: 2, radius: 50, period: 2, r: 10, cd: 0.3 },   // 数、回る半径（px）、一周の秒数、玉の当たりの大きさ（px）、同じ虫に続けて当たらない秒数
+  orbHintTime: 2.6,            // ステージ9の救出の旅の最初の「うしろから虫が来る！…」を出す秒数（11/6-6）
   rearHp: 3,                   // 世界3でうしろから来る虫の硬さ（回る玉に3回触れると倒れる）。ぶつかると元気が減る（＋100 は出さない）
   groundTextScale: 0.78,       // 地上のことばの文字の高さの倍率（少し平たくして、地面に貼りついて見えるように）
   darkRescue: 0.6,             // 救出の旅の出来事「照明が落ちる」の暗さ（地面と地上のものだけ。発見の旅は0.84）
@@ -266,13 +267,23 @@ const BATTLE = {
 
   // --- 世界2・3の試作（10/31-10。docs/世界2・3の構想メモ.md）。数は仮 ---
   groundMark: true,            // 左の帯で、地上に出ることばの枠に小さな地面の絵のマーク（10/31-12 決定。文字の「地」ではない）
-  skillStopTime: 4,            // 必殺ワザ「時間止め」の秒数（敵も弾もことばも止まる。ふわりの光は出る）
-  skillGuardTime: 10,          // 必殺ワザ「無敵タイム」の秒数（ぶつかっても元気が減らない）
-  skillShowerShell: 0.5,
+  // 必殺ワザ（11/6-6 決定）: 「ぜんぶ消し」「無敵タイム」「巻き戻し」の3つ。最初から全部持っていて、左下に3つのボタン。ゲージは3つで1本（使うと0にもどる）
+  skillGuardTime: 15,          // 「無敵タイム」の秒数（自機が大きく光り、ぶつかった虫と弾が消える。元気は減らない）
+  skillGuardR: 44,             //   無敵タイムの光の半径（px。この中に入った虫と弾が消える）
+  clearBossDmg: 0.5,           // 「ぜんぶ消し」: 中ボス・大ボスの文字ごとの硬さを、もとの硬さの何倍けずるか（大ダメージ。最後の1は残す）。ザコのことばの殻はぜんぶほどける
+  gaugeKill: 3,                // ゲージのたまり方（100で満タン）: 虫を1匹倒す。虫の多いステージでたまりすぎないように、gaugeKillHalf 匹倒すごとに減る（10匹目で半分、20匹目で3分の1…）
+  gaugeKillHalf: 10,
+  gaugeWord: 24,               //   ことばを1つ取り戻す
+  gaugeHit: 8,                 //   被弾する（元気が減る）。中ボス・大ボスが出た瞬間は満タンになる
+  skillButtonGap: 10,          // 左下の3つのボタンのあいだ（px）
+  // とくい（11/6-6 決定。出撃前に1つ選ぶ。そのステージのあいだだけ）: パワーアップ＝光が1段上から（世界1は2本、世界3は4本）／守りアップ／ゲージ2倍速
+  guardHpMul: 1.5,             // 守りアップ: 元気の上限の倍率
+  guardInvMul: 1.5,            // 守りアップ: 被弾したあとの無敵の秒数の倍率
+  gaugeFastMul: 2,             // ゲージ2倍速: ゲージのたまる速さの倍率
   orderHits: 3,                // 大ボス「3つを順に」: 順がちがうことばに続けて何発当てたら「まちがい」にするか（横切っただけでは数えない）
   orderGoodHold: 1.2,          //   正しい順のことばに当てたあと、この秒数は、ほかのことばに当たってもまちがいにしない（よけたとき・広がった光。11/2-2）
   orderShare: 1 / 3,           // 大ボス「3つを順に」（11/2-2 決定）: 1つのことばの殻の硬さを、大ボスの硬さの線の何倍にするか（3つで大ボス1つ分）
-  orderHitGap: 0.35,           //   この秒数あいだがあくと、続けて当てた数は0にもどる       // 必殺ワザ「光のシャワー」: 画面じゅうのことばの殻の硬さを何倍にするか（0.5 ＝ 半分けずる）
+  orderHitGap: 0.35,           //   この秒数あいだがあくと、続けて当てた数は0にもどる
 };
 
 // ===== 雑魚の種類 =====
@@ -322,8 +333,8 @@ const EXPLORE_MOVES = {
   space:   { box: true, space: true, speed: 24, spin: 0.55, align: Math.PI / 3, turn: 0.5, hold: 1, maxOn: 6, minOn: 3, chars: 26, gap: 1.2, dim: 0.35 },   // 10/31-14 決定: 易しく（回る速さ半分・判定60度・押さえると0.5秒で向き直る。前は spin 1.1・align 0.8）
 };
 
-// ===== 必殺ワザ（10/31-10 試作。構想メモ 6）: 4つ。名前と説明は texts.js の skills。持っているワザは main.js が宝石の数で決める
-const SKILL_IDS = ["clear", "stop", "guard", "shower"];   // clear ぜんぶ消し／stop 時間止め／guard 無敵タイム／shower 光のシャワー
+// ===== 必殺ワザ（11/6-6 決定）: 3つ。名前と説明は texts.js の skills。最初から全部持っている
+const SKILL_IDS = ["clear", "guard", "rewind"];   // clear ぜんぶ消し／guard 無敵タイム／rewind 巻き戻し（11/6-6 決定。時間止め・光のシャワーはやめた）
 const LOADOUT_VARS = { skill: "" };   // 持ち物「必殺ワザ」の説明の {skill}（選んでいるワザの名前）
 
 // ===== 世界ごとの殻・弾の色（10/31-10 試作。絵が来るまでの仮: 世界1の絵の色を変えただけ）。書いていない世界は世界1のまま
@@ -482,7 +493,7 @@ const Battle = (() => {
   let stateTimer = 0;
   let player, shots, enemies, ebullets, threads, fluff;
   let fillers, bombs, pops, items, terrain, cloudShadows;
-  let blasts = [], orbAng = 0;   // 爆発の輪、光の玉の角度（11/6-3）
+  let blasts = [], orbAng = 0, orbFlash = [0, 0], orbHinted = false;   // 爆発の輪、光の玉の角度（11/6-3）
   let script, absorbed, missed, bossWord, groundIds;
   let P = null;              // このステージの難易度から決まった数値
   let worldDef = {}, groundOn = true;   // 今の世界（stages.js の WORLDS）。groundOn: 地上の仕組みがあるか
@@ -565,8 +576,9 @@ const Battle = (() => {
   let bombing = false;       // 「ぜんぶ消し」で反応させている最中（ゲージをためない）
   let wave = null;           // 吸い込んだときに広がる光
   // 世界2・3の試作（10/31-10）
-  let skill = "clear", skills = ["clear"];   // 選んでいる必殺ワザと、持っているワザ（main.js の opts.skill・opts.skills）
-  let stopT = 0, guardT = 0, showerFx = null;   // 時間止め・無敵タイムの残り秒、光のシャワーの演出
+  let stopT = 0, guardT = 0;   // 時間止め（いまは使わない。0のまま）・無敵タイムの残り秒
+  let rewindUsed = false, rewindFx = null, baseScript = [], killN = 0;   // 巻き戻しを使ったか（1ステージ1回）、その演出、救出の旅の最初の台本
+  let skillUse = { clear: 0, guard: 0, rewind: 0, fullAcc: 0, fullBoss: 0, firstAcc: -1 };   // 必殺ワザを使った回数と、ゲージが満タンになった回数（ためて／中ボス・大ボスで）、ためて初めて満タンになった救出の旅の時計（調べる用）
   let meteorT = 0;   // 流星雨の次の1つまで（世界3。10/31-10 試作）
   let bgOff = 0, bgGo = false;   // 救出の旅の背景の絵の流れた量と、流しはじめたか（1語目が出てから。11/1-2 決定）
   let evPlans = {};   // 出来事「ねじ」「星がはじける」の段取り（11/1-2）
@@ -599,7 +611,12 @@ const Battle = (() => {
   const stripRight = () => 6 + BATTLE.stripWidth;
 
   // 「ぜんぶ消し」ボムのボタン（画面左下のふわりマーク）
-  function bombButton() { return { x: 14 + BATTLE.bombButtonR, y: H - 18 - BATTLE.bombButtonR, r: BATTLE.bombButtonR }; }
+  function skillButtons() {   // 左下に横にならべた3つ（ぜんぶ消し・無敵タイム・巻き戻し。11/6-6）
+    const r = BATTLE.bombButtonR, y = H - 18 - r, step = 2 * r + BATTLE.skillButtonGap;
+    return SKILL_IDS.map((id, i) => ({ id, x: 14 + r + i * step, y, r }));
+  }
+  function bombButton() { return skillButtons()[0]; }
+  const skillOk = id => gauge >= 100 && state === "play" && !(id === "rewind" && rewindUsed);
 
   // ===== 操作: 指一本のドラッグ（指の動いたぶんだけ自機が動く） =====
   function onDown(e) {
@@ -619,8 +636,6 @@ const Battle = (() => {
         if (sortieNo === 2 && sortieStep === "choice") {
           const rect = canvas.getBoundingClientRect();
           const px = e.clientX - rect.left, py = e.clientY - rect.top;
-          const sk = skillRects().find(r => px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h);
-          if (sk) { if (sk.id !== skill) { skill = sk.id; LOADOUT_VARS.skill = skillName(skill); if (opts.onSkill) opts.onSkill(skill); } Sound.se("item"); return; }   // 必殺ワザの段（ワザが2つ以上のとき。10/31-10 試作）
           const c = choiceRects().find(r => px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h);
           if (!c) return;   // 選ぶまで出撃しない（10秒で「つよい弾」）
           chooseLoadout(c.id);
@@ -634,12 +649,10 @@ const Battle = (() => {
         }
         return;
     }
-    // ふわりマークをタップ: ゲージが満タンなら「ぜんぶ消し」
-    const rect = canvas.getBoundingClientRect(), bb = bombButton();
-    if (phase !== "round1" && Math.hypot(e.clientX - rect.left - bb.x, e.clientY - rect.top - bb.y) < bb.r + 10) {   // （1回目の旅にはボタンがない）
-      if (gauge >= 100 && state === "play") useBomb();
-      return;
-    }
+    // 左下の3つのボタンをタップ: ゲージが満タンなら、その必殺ワザ（1回目の旅にはボタンがない）
+    const rect = canvas.getBoundingClientRect();
+    const sb = phase === "round1" ? null : skillButtons().find(q => Math.hypot(e.clientX - rect.left - q.x, e.clientY - rect.top - q.y) < q.r + 4);
+    if (sb) { if (skillOk(sb.id)) useSkill(sb.id); return; }
     const exploring = phase === "round1";   // 1回目の旅は、指で双眼鏡を動かす
     if (exploring && exMove.box) { const r0 = canvas.getBoundingClientRect(); press = { x: e.clientX - r0.left, y: e.clientY - r0.top, id: e.pointerId }; }   // 世界2の箱: 指で直接押さえる
     drag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, px: exploring ? bino.x : player.x, py: exploring ? bino.y : player.y };
@@ -716,7 +729,7 @@ const Battle = (() => {
     level = POWER_LEVELS[basePower()];
     score = 0; combo = 0; maxCombo = 0; floats = [];
     hits = 0; downs = 0; lives = BATTLE.lives; gameOvers = 0; scoreAtMain = 0; retryMain = false;
-    paused = false; moved = false; groundHinted = false; groundHeld = false; groundIntroShown = false; rearHinted = false; banner = null; shake = 0; showWord = null; threads = []; pops = [];
+    paused = false; moved = false; groundHinted = false; groundHeld = false; groundIntroShown = false; rearHinted = false; orbHinted = false; orbFlash = [0, 0]; banner = null; shake = 0; showWord = null; threads = []; pops = [];
     slow = 0; wave = null; gauge = 0; bombsUsed = 0; fsay = null; odai = null; bounces = []; odaiLater = [];
     fpsT0 = 0; fpsN = 0; fpsNow = 0; fpsMin = 0;
     msgQ = []; msgGap = 0; msgWasBusy = false;
@@ -731,10 +744,7 @@ const Battle = (() => {
     bino = { x: W / 2 + 10, y: H * 0.42 };
     state = "sortie"; sortieNo = 1; reacted = 0; sortieStep = "cover";   // 発見の旅の表紙から始める   // 「出撃1 探検」の画面から始める
     loadout = null; powerBonus = basePower(); shield = 0; gaugeMul = 1;
-    skills = (opts.skills && opts.skills.length ? opts.skills : ["clear"]).filter(id => SKILL_IDS.includes(id));
-    skill = skills.includes(opts.skill) ? opts.skill : skills[0];
-    LOADOUT_VARS.skill = skillName(skill);
-    stopT = 0; guardT = 0; showerFx = null; rescueT = 0; evShown = {}; evPlans = {}; bgOff = 0; bgGo = false; press = null;
+    stopT = 0; guardT = 0; rewindUsed = false; rewindFx = null; skillUse = { clear: 0, guard: 0, rewind: 0, fullAcc: 0, fullBoss: 0, firstAcc: -1 }; baseScript = script; rescueT = 0; evShown = {}; evPlans = {}; bgOff = 0; bgGo = false; press = null;
     events = (opts.stage && opts.stage.event) ? [].concat(opts.stage.event) : [];
     // 救出の旅をもう一度（10/25-14。結果画面のボタン）: 発見の旅をとばして、持ち物選択から。発見で見つけたことばの記録（opts.foundIds）は残す
     if (opts.foundIds) {
@@ -895,7 +905,12 @@ const Battle = (() => {
     roundT = 0;
     gapT = 0;
     nextAt = p === "round1" ? BATTLE.firstSpawnDelay : 0.8;
+    if (p === "round2") killN = 0;   // 救出の旅で倒した虫の数（ゲージのたまり方。11/6-6）
     if (p !== "round1") music("rescue");   // 救出の旅の曲へ（発見の旅は静かめの曲）
+    if (p === "round2" && worldDef.id === 3 && !orbHinted) {   // 世界3の最初のステージ（9）の救出の旅の最初: ふわりの一言で回る玉を教える（ステージ5の地上の案内と同じ形。11/6-6）
+      const ids = (window.STAGES || []).filter(s => s.world === 3).map(s => s.id);
+      if (opts.stage && opts.stage.id === Math.min(...ids)) { orbHinted = true; rearHinted = true; post("tutorial", () => { hintCard = { text: tx("newInWorld.orbs"), t: BATTLE.orbHintTime }; slow = Math.max(slow, BATTLE.hintSlow); }); }
+    }
   }
   // カウントの今の段階（0〜2 ＝「3」「2」「1」、3 ＝「出撃！」）
   const holdOn = () => enemies.some(e => e.hold && e.hp > 0);   // 1語目を待っているあいだ（弾も虫も出さない。台本も進めない）
@@ -906,6 +921,7 @@ const Battle = (() => {
   // ===== 世界2・3の試作（10/31-10） =====
   const skillName = id => tx(`skills.${id}.name`);
   const basePower = () => (worldDef.id >= 3 ? BATTLE.powerStartW3 : worldDef.id >= 2 ? BATTLE.powerStartW23 : 0);   // パワーの初期値の段（10/31-13 決定: 世界2・3は1段上の2本から。パワーUPでさらに1段）
+  const maxHp = () => BATTLE.playerMaxHp * (loadout === "shield" ? BATTLE.guardHpMul : 1);   // 元気の上限（守りアップで1.5倍。11/6-6）
   const frozen = () => stopT > 0;   // 時間止めのあいだ（敵・弾・ことば・コンベアが止まる）
   // 出来事（stages.js の event: { kind, sortie, at, dur }）がいま起きているか。sortie 1 ＝ 発見の旅の時刻、2 ＝ 救出の旅の時刻
   //   同じ出来事を発見の旅と救出の旅の両方に書いてよい（10/31-13 決定: ステージ6〜8は救出の旅でも1回）。救出の旅の出来事は、お題のあいだは起こさない（時刻も進めない）
@@ -1014,7 +1030,6 @@ const Battle = (() => {
       moved = false;   // 2回目の旅の最初に、もう一度「ゆびでふわりをうごかそう」を出す
       stripFlash = 0.6;   // 帯の灰色の名前がいっせいに光る
       hint("rescueStart");   // 案内: 救出の旅が始まった
-      if (gauge >= 100) bombReady();   // 必殺ワザ（最初からゲージ満タン）や、発見の旅でたまっていたとき
       // （「ことばを助けよう！」の一言は、表紙の「ことばを助けに行こう！」と同じなので出さない。10/25-1）
       Sound.se("power");
     }
@@ -1026,8 +1041,8 @@ const Battle = (() => {
     choiceFree = false;
     loadout = id;
     if (id === "power") powerBonus = basePower() + 1;
-    if (id === "shield") shield = 1;
-    if (id === "bomb") gauge = 100;   // 必殺ワザ: ぜんぶ消しがすぐ使える（救出の旅の最初からゲージ満タン。10/25-1）
+    if (id === "shield") player.hp = maxHp();   // 守りアップ: 元気の上限が1.5倍（11/6-6）
+    if (id === "bomb") gaugeMul = BATTLE.gaugeFastMul;   // ゲージ2倍速（11/6-6。前は「救出の旅の最初からゲージ満タン」）
     level = POWER_LEVELS[Math.min(Math.floor(absorbed.length / BATTLE.powerEvery) + powerBonus, topLevel())];
     Sound.se("item");
   }
@@ -1040,36 +1055,6 @@ const Battle = (() => {
     }
     const bw = Math.min(W - 48, 320), bh = 62, gap = 12, x = W / 2 - bw / 2, y0 = H * 0.42;
     return LOADOUTS.map((l, i) => ({ id: l.id, x, y: y0 + i * (bh + gap), w: bw, h: bh }));
-  }
-
-  // 持ち物選択の画面の「必殺ワザ」の段（10/31-10 試作）: 持っているワザが2つ以上のときだけ、3つのボタンの下に出す。1つのあいだは今の見た目のまま
-  function skillRects() {
-    if (skills.length < 2) return [];
-    const rs = choiceRects(), last = rs[rs.length - 1];
-    const per = skills.length <= 3 ? skills.length : 2, gap = 8, h = 38;
-    const rowW = Math.min(last.w, W - 66 - last.x);   // 右下の一時停止のボタンと重ならない幅
-    const w = (rowW - gap * (per - 1)) / per, y0 = Math.min(last.y + last.h + 30, H - 8 - Math.ceil(skills.length / per) * (h + gap));
-    return skills.map((id, i) => ({ id, x: last.x + (i % per) * (w + gap), y: y0 + Math.floor(i / per) * (h + gap), w, h }));
-  }
-  function drawSkillRow() {
-    const rs = skillRects();
-    if (!rs.length) return;
-    ctx.save();
-    ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.font = font(13);
-    ctx.lineWidth = 4; ctx.strokeStyle = "rgba(255,252,242,0.95)"; ctx.lineJoin = "round";
-    ctx.strokeText(tx("skills.row"), rs[0].x + 2, rs[0].y - 12); ctx.fillStyle = "#6b4a10"; ctx.fillText(tx("skills.row"), rs[0].x + 2, rs[0].y - 12);
-    ctx.textAlign = "center";
-    for (const r of rs) {
-      const on = r.id === skill;
-      ctx.fillStyle = on ? "#f2541b" : "rgba(255,252,242,0.96)"; ctx.strokeStyle = on ? "#b8400f" : "#dcae3c"; ctx.lineWidth = on ? 3 : 2;
-      roundRect(r.x, r.y, r.w, r.h, 12); ctx.fill(); ctx.stroke();
-      let fs = 15; ctx.font = font(fs);
-      const name = skillName(r.id);
-      while (ctx.measureText(name).width > r.w - 10 && fs > 11) { fs--; ctx.font = font(fs); }
-      ctx.fillStyle = on ? "#ffffff" : "#8a5a10";
-      ctx.fillText(name, r.x + r.w / 2, r.y + r.h / 2 + 1);
-    }
-    ctx.restore();
   }
 
   // stages.js の override.battle に書いた BATTLE の数値を、そのステージのあいだだけ上書きする（終わったらもとにもどす）
@@ -1393,7 +1378,7 @@ const Battle = (() => {
     bounces = bounces.filter(b => b.age < 0.5);
     t += dt;
     stopT = Math.max(0, stopT - dt); guardT = Math.max(0, guardT - dt);   // 必殺ワザの残り（10/31-10 試作）
-    if (showerFx) { showerFx.age += realDt; if (showerFx.age > 1.2) showerFx = null; }
+    if (rewindFx) { rewindFx.age += realDt; if (rewindFx.age > 1.2) rewindFx = null; }
     shake = Math.max(0, shake - dt);
     player.glow = Math.max(0, player.glow - dt);
     player.hurt = Math.max(0, player.hurt - dt);
@@ -1532,7 +1517,8 @@ const Battle = (() => {
     if (lock && bombTimer <= 0) {
       const aim = lock.word ? Math.min(lock.x + lock.w / 2 - 4, Math.max(lock.x - lock.w / 2 + 4, player.x)) : lock.x;
       const pair = { hit: new Set() };   // 左右の2個で同じ敵に2回当てない（倒す速さは前のたねと同じ）
-      for (const side of [-1, 1]) bombs.push({ sx: player.x, sy: player.y - 24, tx: player.x + side * BATTLE.bombSide, ty: lock.y, age: 0, tg: lock, side, pair });   // 左右45度へ山なりに（11/6-3）
+      // パワー1本のときは真正面に1個、2本以上で左右45度に2個（11/6-6）。左右45度へ山なりに（11/6-3）
+      for (const side of (shotUnits() >= 2 ? [-1, 1] : [0])) bombs.push({ sx: player.x, sy: player.y - 24, tx: player.x + side * BATTLE.bombSide, ty: lock.y, age: 0, tg: lock, side, pair });
       bombTimer = BATTLE.bombInterval;
       Sound.se("seedThrow");
     }
@@ -1695,10 +1681,12 @@ const Battle = (() => {
     // 世界3の光の玉（11/6-3）: 自機のまわりを回り、触れた空中の虫にダメージ。うしろから来た虫は、自機にぶつかると元気が減る
     if (orbsOn()) {
       if (!frozen()) orbAng += Math.PI * 2 / BATTLE.orbs.period * dt;
+      for (let i = 0; i < orbFlash.length; i++) orbFlash[i] = Math.max(0, orbFlash[i] - dt);
       for (const f of fillers) {
         if (f.layer !== "air" || f.hp <= 0 || f.delay > 0) continue;
         f.orbCd = Math.max(0, (f.orbCd || 0) - dt);
-        if (f.orbCd <= 0 && orbPos().some(o => Math.hypot(o.x - f.x, o.y - f.y) < f.r + BATTLE.orbs.r)) { f.orbCd = BATTLE.orbs.cd; damageFiller(f); }
+        const oi = f.orbCd <= 0 ? orbPos().findIndex(o => Math.hypot(o.x - f.x, o.y - f.y) < f.r + BATTLE.orbs.r) : -1;
+        if (oi >= 0) { f.orbCd = BATTLE.orbs.cd; orbFlash[oi] = 0.3; Sound.se("orbHit"); damageFiller(f); }   // 当たった玉がはっきり光って、音が鳴る（11/6-6）
         if (f.rear && f.hp > 0 && !frozen() && Math.hypot(f.x - player.x, f.y - player.y) < f.r + 14 && player.inv <= 0 && !showWord && !(odai && odai.intro > 0)) {
           f.hp = 0;   // ぶつかった虫は消える（点は入らない。＋100 も出さない）
           addPop(f.x, f.y, "#ffb0b8", 0.7);
@@ -1790,7 +1778,7 @@ const Battle = (() => {
       it.y += (sc * 0.7 + 12) * dt;
       if (Math.hypot(it.x - player.x, it.y - player.y) < 28) {
         it.got = true;
-        player.hp = Math.min(BATTLE.playerMaxHp, player.hp + BATTLE.healItem);
+        player.hp = Math.min(maxHp(), player.hp + BATTLE.healItem);
         player.glow = 0.3;
         player.healFlash = 1;   // 体力ゲージが光って「+回復」
         post("say0", () => { fsay = { text: tx("rescue.thanks"), t: 1.2, small: true }; });   // ふわりが小さく（何か出ていれば出さない）
@@ -1810,6 +1798,11 @@ const Battle = (() => {
         b.y = H + 999;
         hurt();
       }
+    }
+    if (guardT > 0) {   // 無敵タイム（11/6-6）: 自機の大きな光にふれた虫と弾は消える
+      const gr = BATTLE.skillGuardR;
+      for (const b of ebullets) if (b.y < H + 20 && Math.hypot(b.x - player.x, b.y - player.y) < gr + R) { addPop(b.x, b.y, "#fff8d8", 0.4); b.y = H + 999; }
+      for (const f of fillers) if (f.layer === "air" && f.hp > 0 && !(f.delay > 0) && Math.hypot(f.x - player.x, f.y - player.y) < gr + f.r) { f.hp = 1; damageFiller(f); }
     }
     ebullets = ebullets.filter(b => b.y < H + 20 && b.y > -20 && b.x > -20 && b.x < W + 20);
   }
@@ -2104,6 +2097,7 @@ const Battle = (() => {
     Sound.fadeTo(m.name, 0.5, m.tempo);
   }
   function startOdai(real, isBoss) {
+    if (phase !== "round1") fillGauge();   // 中ボス・大ボスが出た瞬間に、ゲージが満タン（11/6-6）
     const role = isBoss ? "boss" : "mid";
     const seq = isBoss && orderSet(real);   // 大ボス「3つを順に」
     const prev = !isBoss && nextPrev(real);   // 中ボス「次は？」（世界2。10/31-10 試作）: 1つ前の工程
@@ -2230,63 +2224,60 @@ const Battle = (() => {
     if (!ok) post("say", () => { fsay = { text: tx("rescue.odaiLost"), t: 2 }; });
   }
 
-  // 「ぜんぶ消し」: 画面の雑魚と敵の弾を全部消す。1周目は、出ている語句を全部「反応」させる
-  // 2周目と大ボスのときは、語句には効かない（雑魚と敵の弾だけ）
-  function useBomb() {
-    if (skill !== "clear") { useSkill(); return; }   // ぜんぶ消し以外の必殺ワザ（10/31-10 試作）
+  // ゲージ（11/6-6 決定）: 虫を倒す・ことばを取り戻す・被弾する、でたまる（ゲージ2倍速なら2倍）。中ボス・大ボスが出た瞬間は満タン
+  function addGauge(v) {
+    if (phase === "round1" || bombing) return;
+    const before = gauge;
+    gauge = Math.min(100, gauge + v * gaugeMul);
+    if (before < 100 && gauge >= 100) { skillUse.fullAcc++; if (skillUse.firstAcc < 0) skillUse.firstAcc = rescueT; bombReady(); }
+  }
+  function fillGauge() { if (gauge < 100) { gauge = 100; skillUse.fullBoss++; bombReady(); } }
+  // 必殺ワザを使う（11/6-6 決定）: ゲージを全部使う
+  function useSkill(id) {
+    if (!skillOk(id)) return;
     gauge = 0;
-    bombsUsed++;
-    typhoon = { age: 0 };
-    post("say", () => { fsay = { text: tx("rescue.typhoon"), t: 1.5 }; });
+    bombsUsed++; skillUse[id]++;
+    post("say", () => { fsay = { text: tx("skills.say." + id), t: 1.5 }; });
     Sound.se("light");
-    wave = { x: player.x, y: player.y, age: 0 };
     player.glow = 0.35;
+    if (id === "guard") { guardT = BATTLE.skillGuardTime; return; }
+    if (id === "rewind") { rewind(); return; }
+    // ぜんぶ消し: 画面の虫と敵の弾を、本当に全部消す。ザコのことばは殻がぜんぶほどける。中ボス・大ボスには大ダメージ
+    typhoon = { age: 0 };
+    wave = { x: player.x, y: player.y, age: 0 };
     player.inv = Math.max(player.inv, 1);
     for (const f of fillers) {
       score += BATTLE.scoreFiller;
       addPop(f.x, f.y, "#fff8d8", 1, f.layer === "ground");
     }
-    fillers = [];
-    ebullets = [];
-    if (phase === "round1") {
-      bombing = true;
-      for (const e of enemies) {
-        if (e.role === "boss" || e.hp <= 0 || !onScreen(e) || e.appearT > 0) continue;
-        e.hp = 0;
-        defeat(e);
-      }
-      enemies = enemies.filter(e => e.hp > 0);
-      bombing = false;   // 反応させたぶんでは、ゲージはたまらない
-    } else {
-      // 救出の旅（10/25-17）: 画面のことばの殻の硬さが半分減る（ほどけはしない）。中ボス・大ボスは文字ごとに
-      for (const e of enemies) {
-        if (e.ground || e.hp <= 0 || !onScreen(e) || !hasShell(e)) continue;
-        if (e.parts) { for (const p of e.parts) if (!p.broken && !p.deco) { p.hp *= BATTLE.bombShell; p.flash = 0.3; } }
-        else e.hp *= BATTLE.bombShell;
+    fillers = []; ebullets = [];
+    bombing = true;   // ぜんぶ消しで取り戻したぶんでは、ゲージはたまらない
+    for (const e of enemies.slice()) {
+      if (e.hp <= 0 || !onScreen(e) || !hasShell(e) || e.appearT > 0 || e.open || e.againT > 0) continue;
+      if (e.parts) {
+        if (e.dummy && !e.order) continue;   // お題のはずれのことばには効かない
+        for (const p of e.parts) if (!p.broken && !p.deco) { p.hp = Math.max(1, p.hp - Math.ceil(p.maxHp * BATTLE.clearBossDmg)); p.flash = 0.3; }
         e.flash = 0.3;
         if (e.role === "boss") bossCheer(e);
-      }
+      } else if (!e.dummy) damageWord(e, undefined, e.hp);
     }
+    enemies = enemies.filter(e => e.hp > 0);
+    bombing = false;
   }
-  // 必殺ワザ（10/31-10 試作。構想メモ 6）: 時間止め・無敵タイム・光のシャワー。ゲージのため方とボタンは、ぜんぶ消しと同じ
-  function useSkill() {
-    gauge = 0;
-    bombsUsed++;
-    post("say", () => { fsay = { text: tx("skills.say." + skill), t: 1.5 }; });
-    Sound.se("light");
-    player.glow = 0.35;
-    if (skill === "stop") stopT = BATTLE.skillStopTime;
-    else if (skill === "guard") guardT = BATTLE.skillGuardTime;
-    else if (skill === "shower") {   // 画面じゅうのことばの殻を半分けずる（地面のことばも。ほどけはしない）
-      showerFx = { age: 0 };
-      for (const e of enemies) {
-        if (e.hp <= 0 || !onScreen(e) || !hasShell(e) || (e.dummy && !e.order) || e.open) continue;   // 「3つを順に」のことばにも効く（11/2-2）
-        if (e.parts) { for (const p of e.parts) if (!p.broken && !p.deco) { p.hp = Math.max(1, Math.round(p.hp * BATTLE.skillShowerShell)); p.flash = 0.3; } }
-        else e.hp = Math.max(0.01, e.hp * BATTLE.skillShowerShell);
-        e.flash = 0.3;
-        if (e.role === "boss") bossCheer(e);
-      }
-    }
+  // 巻き戻し（11/6-6 決定）: その救出の旅の最初にもどる。取り戻したことばは残り、取り逃したことばだけもう一度出る。元気は全回復、敵は最初から。ボス戦の途中でも使える
+  function rewind() {
+    rewindUsed = true;
+    const got = new Set(absorbed.map(w => w.id));
+    script = baseScript.filter(w => !got.has(w.id));
+    missed = []; extraRound = false;
+    enemies = []; fillers = []; ebullets = []; bombs = []; blasts = []; items = []; obs = []; bounces = []; odai = null; rest = null; guide = null;
+    gapT = 0; typhoon = null; wave = null; wrongFx = null; againFx = null; showWord = null;
+    clearMsgs(9); msgQ = [];
+    player.hp = maxHp(); player.inv = Math.max(player.inv, 1.5);
+    rescueT = 0; evShown = {}; evPlans = {}; meteorT = 0; bgOff = 0; bgGo = false;
+    startPhase("round2");
+    rewindFx = { age: 0 };
+    Sound.se("power");
   }
   // 大ボスの殻: 2割減るごとに、ふわりが短い声（10/25-17。言葉は texts.js の rescue.bossCheer から順に）
   function bossCheer(e) {
@@ -2308,6 +2299,7 @@ const Battle = (() => {
     f.flash = 0.12;
     if (f.hp > 0) { Sound.se("hit"); return; }
     score += BATTLE.scoreFiller;
+    addGauge(BATTLE.gaugeKill / (1 + killN++ / BATTLE.gaugeKillHalf));
     floats.push({ x: f.x, y: f.y - 10, text: `+${BATTLE.scoreFiller}`, big: false, age: 0 });
     // 倒した雑魚は、ぽんっと大きな花になって、輪ときらきらが広がる
     addPop(f.x, f.y, f.layer === "ground" ? "#f6c9d6" : "#fff2b8", BATTLE.popScale, f.layer === "ground", true);
@@ -2339,9 +2331,7 @@ const Battle = (() => {
     const pts = Math.round(BATTLE.scoreWord * mul);
     score += pts;
     floats.push({ x: e.x, y: e.y - e.size, text: `+${pts}` + (mul > 1 ? ` ×${mul}` : ""), big: true, age: 0 });
-    const before = gauge;
-    if (!bombing) gauge = Math.min(100, gauge + BATTLE.bombGain * mul * gaugeMul * (phase !== "round1" && opts.stage && opts.stage.gaugeRate || 1));   // gaugeRate ＝ 救出の旅のゲージのたまる速さ（11/1-3 決定: 3つ目 1.5、4つ目 2）
-    if (before < 100 && gauge >= 100) bombReady();
+   // gaugeRate ＝ 救出の旅のゲージのたまる速さ（11/1-3 決定: 3つ目 1.5、4つ目 2）
     if (!e.last) { firstPass(e); return; }
     absorb(e);
   }
@@ -2587,7 +2577,6 @@ const Battle = (() => {
     reacted++;
     found.add(d.word.id); foundAt[d.word.id] = t;
     score += BATTLE.scoreWord;
-    gauge = Math.min(100, gauge + BATTLE.bombGain * gaugeMul);
     floats.push({ x: d.x, y: d.y - d.size, text: tx("explore.found"), big: false, found: true, age: 0 });
     Sound.se("shine");
   }
@@ -2611,6 +2600,7 @@ const Battle = (() => {
   // 2周目・大ボス: 糸がほどけるように散って、自機へ吸い込まれる
   function absorb(e) {
     absorbed.push(e.word);
+    addGauge(BATTLE.gaugeWord);
     if (e.hold && e.ground) post("banner", () => { banner = { text: tx("newInWorld.groundDone"), t: 2.4, color: "rgba(111,154,74,0.9)" }; });   // ステージ5の最初の地上のことばを助けた（10/31-12）
     if (e.odaiReal && odai) endOdai(true);
     const lv = POWER_LEVELS[Math.min(Math.floor(absorbed.length / BATTLE.powerEvery) + powerBonus, topLevel())];
@@ -2633,7 +2623,7 @@ const Battle = (() => {
     freed.push({ word: e.word.word, x: e.x, y: e.y, size: e.size, age: 0 });   // ことばは形をたもったまま、ふわりのところへ飛んでくる
     Sound.se("absorb");
     if (BATTLE.speakWords) Sound.speak(e.word.kana || e.word.word);   // 語句を読み上げる（仮: 端末の読み上げ機能。10/31-3 から初期値はオフ）
-    player.hp = Math.min(BATTLE.playerMaxHp, player.hp + BATTLE.healOnAbsorb);
+    player.hp = Math.min(maxHp(), player.hp + BATTLE.healOnAbsorb);
     post("word", () => { showWord = { word: e.word, t: BATTLE.wordShowTime }; });
     slow = BATTLE.slowTime;
     // 光が広がって、画面上の雑魚と敵の弾が全部消える（keep の虫＝コガネムシは残る。10/25-2）
@@ -2722,16 +2712,9 @@ const Battle = (() => {
   function hurt() {
     if (BATTLE.debugInvincible) return;   // デバッグ: 無敵
     if (guardT > 0) return;   // 必殺ワザ「無敵タイム」: ぶつかっても元気が減らない（10/31-10 試作）
-    if (shield > 0) {   // 盾: 1回だけ弾を防ぐ
-      shield = 0;
-      player.inv = 1;
-      player.glow = 0.35;
-      floats.push({ x: player.x, y: player.y - 40, text: tx("rescue.shieldSaved"), big: true, age: 0 });
-      Sound.se("shield");
-      return;
-    }
     player.hp -= BATTLE.damage;
-    player.inv = BATTLE.invincibleTime;
+    player.inv = BATTLE.invincibleTime * (loadout === "shield" ? BATTLE.guardInvMul : 1);   // 守りアップ: 被弾後の無敵が少し長い（11/6-6）
+    addGauge(BATTLE.gaugeHit);
     player.hurt = 0.4;
     hits++;
     combo = 0;
@@ -2753,7 +2736,7 @@ const Battle = (() => {
     gameOver();
   }
   function respawn() {
-    player.hp = BATTLE.playerMaxHp;
+    player.hp = maxHp();
     player.x = W / 2; player.y = H + 30;
     player.rising = BATTLE.respawnRise;
     player.inv = BATTLE.respawnRise + BATTLE.respawnInv;
@@ -2766,7 +2749,7 @@ const Battle = (() => {
     player.hp = BATTLE.playerMaxHp; player.inv = 0; player.rising = 0;
     enemies = []; fillers = []; ebullets = []; bombs = []; blasts = []; items = []; obs = []; odai = null;
     if (phase !== "round1") {
-      absorbed = []; missed = [];
+      absorbed = []; missed = []; script = baseScript; guardT = 0;
       score = scoreAtMain;
     } else {
       scoreAtMain = score;   // 探検中に3機失ったら、探検はそこまで
@@ -2894,10 +2877,9 @@ const Battle = (() => {
     }
     drawWeather();
     if (stopT > 0) { ctx.fillStyle = `rgba(110,140,220,${0.2 * Math.min(1, stopT / 0.4)})`; ctx.fillRect(0, 0, W, H); }   // 時間止め（10/31-10 試作。仮の見た目）
+    if (guardT > 0) drawGuardGlow();   // 無敵タイム: 自機のうしろに大きな光
     drawPlayer();
     drawOrbs();   // 世界3の光の玉（11/6-3）
-    if (guardT > 0) drawGuardTowels();
-    if (showerFx) drawShower();
     for (const f of freed) {   // 助けた語句（金色に光って、小さくなりながらふわりへ）
       const k = Math.min(1, f.age / 0.7);
       ctx.save();
@@ -2952,7 +2934,8 @@ const Battle = (() => {
     }
     ctx.globalAlpha = 1;
     drawHud();
-    drawBombButton();
+    drawSkillButtons();
+    if (rewindFx) drawRewind();
     // 操作のヒント（まだ動かしていないとき）
     if (!moved && state !== "clear") {
       ctx.globalAlpha = hintFadeIn();   // 点滅しない。出るときに一度ふわっと現れるだけ（10/25-12）
@@ -3167,29 +3150,33 @@ const Battle = (() => {
   }
 
   // ぜんぶ消し（仮の絵）: 自機のまわりでタオルがくるっと回りながら広がり、白いうずが残る
-  // 無敵タイム: タオルが自機のまわりを回る（10/31-10 試作。仮の図形）
-  function drawGuardTowels() {
-    const a0 = t * 3, R = 44, fade = Math.min(1, guardT / 0.6);
-    ctx.save(); ctx.globalAlpha = 0.9 * fade;
-    for (let i = 0; i < 3; i++) {
-      const a = a0 + i * Math.PI * 2 / 3, x = player.x + Math.cos(a) * R, y = player.y + Math.sin(a) * R * 0.8;
-      ctx.save(); ctx.translate(x, y); ctx.rotate(a + Math.PI / 2);
-      ctx.fillStyle = ["#ffffff", "#ffd6e6", "#d6ecff"][i]; ctx.strokeStyle = "#b8a68a"; ctx.lineWidth = 1.5;
-      roundRect(-11, -7, 22, 14, 3); ctx.fill(); ctx.stroke();
-      ctx.strokeStyle = "rgba(180,160,130,0.7)"; ctx.beginPath(); ctx.moveTo(-11, -3); ctx.lineTo(11, -3); ctx.moveTo(-11, 3); ctx.lineTo(11, 3); ctx.stroke();
-      ctx.restore();
-    }
+  // 無敵タイム（11/6-6）: 自機のうしろに大きな光の輪。残り2秒で点滅
+  function drawGuardGlow() {
+    const R = BATTLE.skillGuardR, p = 0.5 + 0.5 * Math.sin(t * 8), fade = Math.min(1, guardT / 0.4) * (guardT < 2 && Math.sin(t * 18) < 0 ? 0.45 : 1);
+    ctx.save(); ctx.globalAlpha = fade;
+    const g = ctx.createRadialGradient(player.x, player.y, R * 0.2, player.x, player.y, R * 2);
+    g.addColorStop(0, "rgba(255,255,235,0.9)"); g.addColorStop(0.55, `rgba(255,214,90,${0.5 + 0.25 * p})`); g.addColorStop(1, "rgba(255,190,60,0)");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(player.x, player.y, R * 2, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "rgba(255,240,170,0.95)"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(player.x, player.y, R * (1 + 0.06 * p), 0, Math.PI * 2); ctx.stroke();
     ctx.restore();
   }
-  // 光のシャワー: 画面の上から光の粒が降る（10/31-10 試作。仮の見た目）
-  function drawShower() {
-    const k = showerFx.age / 1.2;
-    ctx.save(); ctx.globalAlpha = Math.max(0, 1 - k) * 0.85; ctx.strokeStyle = "#fff2a8"; ctx.lineWidth = 3; ctx.lineCap = "round";
-    for (let i = 0; i < 24; i++) {
-      const x = (i + 0.5) / 24 * W, y = ((k * 1.6 + (i * 0.37) % 1) % 1.2) * H;
-      ctx.beginPath(); ctx.moveTo(x, y - 26); ctx.lineTo(x, y); ctx.stroke();
-    }
+  // 巻き戻し（11/6-6）: 画面が青白く光り、まん中で大きな矢印がぐるっと逆に回る
+  function drawRewind() {
+    const k = rewindFx.age / 1.2;
+    ctx.save(); ctx.globalAlpha = Math.max(0, 1 - k);
+    ctx.fillStyle = "rgba(210,228,255,0.6)"; ctx.fillRect(0, 0, W, H);
+    ctx.translate(W / 2, H * 0.45); ctx.rotate(-k * Math.PI * 3);
+    drawRewindArrow(70, "#3f8cf0", 12);
     ctx.restore();
+  }
+  function drawRewindArrow(r, color, lw) {   // 左回りの矢印（いまの位置が中心。右回りの形を左右に返して描く）
+    ctx.scale(-1, 1);
+    const a1 = Math.PI * 1.65;
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = lw; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.arc(0, 0, r, Math.PI * 0.35, a1); ctx.stroke();
+    const hx = Math.cos(a1) * r, hy = Math.sin(a1) * r, d = lw * 1.8;
+    ctx.beginPath(); ctx.moveTo(hx + d, hy - d * 0.2); ctx.lineTo(hx - d * 0.3, hy - d * 1.1); ctx.lineTo(hx - d * 0.6, hy + d * 0.9); ctx.closePath(); ctx.fill();
   }
   function drawTyphoon() {
     const k = typhoon.age / 0.9, cx = player.x, cy = player.y;
@@ -3344,13 +3331,17 @@ const Battle = (() => {
     if (!orbsOn()) return;
     const O = BATTLE.orbs;
     ctx.save();
-    ctx.strokeStyle = "rgba(220,200,255,0.25)"; ctx.lineWidth = 1.5;   // 回る道のうすい輪
+    ctx.strokeStyle = "rgba(63,140,240,0.28)"; ctx.lineWidth = 1.5;   // 回る道のうすい輪（自分の弾と同じ青。11/6-6）
     ctx.beginPath(); ctx.arc(player.x, player.y, O.radius, 0, Math.PI * 2); ctx.stroke();
-    for (const o of orbPos()) {
-      const g = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, O.r * 2.2);
-      g.addColorStop(0, "rgba(255,255,255,1)"); g.addColorStop(0.35, "rgba(230,210,255,0.95)"); g.addColorStop(1, "rgba(180,140,255,0)");
-      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(o.x, o.y, O.r * 2.2, 0, Math.PI * 2); ctx.fill();
-    }
+    orbPos().forEach((o, i) => {
+      const fl = orbFlash[i] / 0.3, R = O.r * (2.2 + fl * 1.6);   // 虫に当たったとき: 大きく白く光る
+      const g = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, R);
+      g.addColorStop(0, "rgba(255,255,255,1)"); g.addColorStop(0.3 + fl * 0.2, fl > 0 ? "rgba(200,230,255,1)" : "rgba(63,140,240,0.95)"); g.addColorStop(1, "rgba(63,140,240,0)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(o.x, o.y, R, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = BULLET_COLORS.shot; ctx.strokeStyle = BULLET_COLORS.shotRim; ctx.lineWidth = 2;   // 玉のしん: 自分の弾と同じ青に白い縁
+      ctx.beginPath(); ctx.arc(o.x, o.y, O.r * 0.75, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      if (fl > 0) { ctx.strokeStyle = `rgba(255,255,255,${fl})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(o.x, o.y, O.r * (1.2 + (1 - fl) * 2), 0, Math.PI * 2); ctx.stroke(); }   // 広がる白い輪
+    });
     ctx.restore();
   }
   function drawSeedOld(b) {   // 前の光のたねの絵（11/6-3 から使っていない）   // 光のたね（11/1-4。11/2 決定で黄緑・白い縁・1.5倍・回りながら飛ぶ。色は BULLET_COLORS の seed）: 放物線で飛ぶ。地面には影が、まっすぐ進む
@@ -4652,7 +4643,6 @@ const Battle = (() => {
       drawChoiceIcon(l.id, r.x + r.w * 0.85, r.y + r.h / 2, r.h * 0.3);
       ctx.textAlign = "center";
     });
-    drawSkillRow();
   }
 
   function drawChoice() {
@@ -4689,7 +4679,6 @@ const Battle = (() => {
       ctx.fillText(l.desc, r.x + 18, r.y + 45);
       ctx.textAlign = "center";
     });
-    drawSkillRow();
     // （ぜんぶ消しの説明の1行は、10/25-17 に消した）
     // （残り時間の帯と「あと○秒」は、10/25-14 に時間制限といっしょになくした）
   }
@@ -4744,7 +4733,7 @@ const Battle = (() => {
     ctx.fillStyle = "rgba(255,255,255,0.85)";
     roundRect(12, top, 130, 16, 8); ctx.fill();
     ctx.strokeStyle = "rgba(90,100,80,0.35)"; ctx.lineWidth = 1; ctx.stroke();
-    const rate = player.hp / BATTLE.playerMaxHp;
+    const rate = player.hp / maxHp();
     ctx.fillStyle = rate > 0.4 ? "#8cbf5a" : (Math.floor(t * 4) % 2 ? "#e39a8e" : "#f2c4bb");
     roundRect(14, top + 2, 126 * rate, 12, 6); ctx.fill();
     if (player.healFlash > 0) {   // 綿のたねを取った: ゲージが光って「+回復」
@@ -4781,54 +4770,63 @@ const Battle = (() => {
     ctx.fillText(String(score), W - 14, top);
     // パワーと持ちものは、左下のぜんぶ消しのボタンの横に小さく（1回目の旅は光を使わないので出さない）
     if (phase === "round1") { drawStrip(); return; }
-    const b = bombButton();
+    const b = skillButtons()[SKILL_IDS.length - 1];   // 3つ目のボタンの右
     ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.font = font(11);
     const lvNo = POWER_LEVELS.indexOf(level) + 1;
     const lvText = `${tx("rescue.lightLabel")} ${"★".repeat(lvNo)}`;
     ctx.strokeText(lvText, b.x + b.r + 8, b.y - 8); ctx.fillText(lvText, b.x + b.r + 8, b.y - 8);
     if (loadout) {   // 持っていったもの（盾は使うと消える）
       const l = LOADOUTS.find(x => x.id === loadout);
-      const txt = loadout === "shield" && !shield ? l.name + tx("rescue.itemUsed") : l.name;
-      const it = `${tx("rescue.itemLabel")}: ${txt}`; ctx.strokeText(it, b.x + b.r + 8, b.y + 8); ctx.fillText(it, b.x + b.r + 8, b.y + 8);
+      const it = `${tx("rescue.itemLabel")}: ${l.name}`; ctx.strokeText(it, b.x + b.r + 8, b.y + 8); ctx.fillText(it, b.x + b.r + 8, b.y + 8);
     }
     drawStrip();
   }
 
-  // 「ぜんぶ消し」のボタン: ふわりマークのまわりにゲージ。満タンで光る
-  function drawBombButton() {
-    const b = bombButton(), full = gauge >= 100, C = BOMB_COLORS;
+  // 必殺ワザの3つのボタン（11/6-6）: どれも同じゲージ（まわりの輪）。満タンで色がつき、脈打って光る。巻き戻しは使ったら灰色
+  const SKILL_COLORS = { clear: ["#f2541b", "#ffd2b8"], guard: ["#e8a412", "#fff0b8"], rewind: ["#3f8cf0", "#cfe4ff"] };
+  function drawSkillButtons() {
+    for (const b of skillButtons()) drawSkillButton(b);
+  }
+  function drawSkillButton(b) {
+    const used = b.id === "rewind" && rewindUsed, full = gauge >= 100 && !used, [C, rim] = SKILL_COLORS[b.id];
     ctx.save();
-    if (bombFlash > 0) {   // たまった瞬間: 大きく光る
+    if (bombFlash > 0 && !used) {   // たまった瞬間: 大きく光る
       const k = bombFlash / 1.2;
-      const g2 = ctx.createRadialGradient(b.x, b.y, b.r * 0.5, b.x, b.y, b.r * (1.8 + 1.4 * k));
-      g2.addColorStop(0, `rgba(255,120,60,${0.9 * k})`); g2.addColorStop(1, "rgba(255,120,60,0)");
-      ctx.fillStyle = g2; ctx.beginPath(); ctx.arc(b.x, b.y, b.r * (1.8 + 1.4 * k), 0, Math.PI * 2); ctx.fill();
+      const g2 = ctx.createRadialGradient(b.x, b.y, b.r * 0.5, b.x, b.y, b.r * (1.6 + 1.0 * k));
+      g2.addColorStop(0, `rgba(255,170,80,${0.8 * k})`); g2.addColorStop(1, "rgba(255,170,80,0)");
+      ctx.fillStyle = g2; ctx.beginPath(); ctx.arc(b.x, b.y, b.r * (1.6 + 1.0 * k), 0, Math.PI * 2); ctx.fill();
     }
     const pulse = full ? 0.5 + 0.5 * Math.sin(t * 6) : 0, r = b.r * (1 + pulse * 0.08);
-    if (full) {   // たまったら: 赤橙に変わり、脈打って光る（10/25-9）
-      const g = ctx.createRadialGradient(b.x, b.y, r * 0.6, b.x, b.y, r * 2);
-      g.addColorStop(0, `rgba(255,110,50,${0.35 + pulse * 0.4})`); g.addColorStop(1, "rgba(255,110,50,0)");
-      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(b.x, b.y, r * 2, 0, Math.PI * 2); ctx.fill();
+    if (full) {
+      const g = ctx.createRadialGradient(b.x, b.y, r * 0.6, b.x, b.y, r * 1.7);
+      g.addColorStop(0, C + "88"); g.addColorStop(1, C + "00");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(b.x, b.y, r * 1.7, 0, Math.PI * 2); ctx.fill();
     }
-    ctx.fillStyle = full ? C.full : "rgba(255,253,245,0.85)";
+    ctx.globalAlpha = used ? 0.45 : 1;
+    ctx.fillStyle = full ? C : used ? "rgba(200,200,200,0.85)" : "rgba(255,253,245,0.85)";
     ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = full ? C.fullRim : "rgba(0,0,0,0.1)"; ctx.lineWidth = full ? 3 : 5;
+    ctx.strokeStyle = full ? rim : "rgba(0,0,0,0.1)"; ctx.lineWidth = full ? 3 : 5;
     ctx.beginPath(); ctx.arc(b.x, b.y, r - 3, 0, Math.PI * 2); ctx.stroke();
-    if (!full) {   // たまっていないとき: 今の薄い色のゲージ
+    if (!full && !used) {   // たまっていないとき: 薄い色のゲージ
       ctx.strokeStyle = "#8cbf5a"; ctx.lineWidth = 5; ctx.lineCap = "round";
       ctx.beginPath(); ctx.arc(b.x, b.y, b.r - 3, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * gauge / 100); ctx.stroke();
     }
-    // ふわりマーク（小さなふわり。たまったら3のコマ）
-    drawFuwariArt(full ? 3 : 1, b.x, b.y, b.r * 1.5);
-    // 上の文字: たまったら「タップ」を大きく
-    const label = full ? tx("rescue.typhoonTap") : skillName(skill);   // 選んだ必殺ワザの名前（世界1は「ぜんぶ消し」。10/31-10 試作）
-    ctx.font = font(full ? 17 : 9); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
-    const ly = b.y - r - (full ? 13 : 7);
-    ctx.lineWidth = full ? 5 : 3; ctx.strokeStyle = "#ffffff"; ctx.strokeText(label, b.x, ly);
-    ctx.fillStyle = full ? C.full : "#7a8a68"; ctx.fillText(label, b.x, ly);
+    // まん中の絵: ぜんぶ消し＝ふわり、無敵タイム＝星（使っているあいだは残りの秒数）、巻き戻し＝左回りの矢印
+    if (b.id === "clear") drawFuwariArt(full ? 3 : 1, b.x, b.y, b.r * 1.5);
+    else if (b.id === "guard") {
+      ctx.save(); ctx.translate(b.x, b.y);
+      if (guardT > 0) { ctx.font = font(18); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = full ? "#ffffff" : C; ctx.fillText(String(Math.ceil(guardT)), 0, 1); }
+      else { ctx.beginPath(); for (let k = 0; k < 10; k++) { const ang = k * Math.PI / 5 - Math.PI / 2, d = k % 2 ? b.r * 0.26 : b.r * 0.6; ctx.lineTo(Math.cos(ang) * d, Math.sin(ang) * d); } ctx.closePath(); ctx.fillStyle = full ? "#ffffff" : C; ctx.fill(); }
+      ctx.restore();
+    } else { ctx.save(); ctx.translate(b.x, b.y); drawRewindArrow(b.r * 0.48, full ? "#ffffff" : used ? "#888888" : C, 4); ctx.restore(); }
+    // 上の名前（使った巻き戻しは「使った」）
+    const label = used ? tx("skills.used") : skillName(b.id);
+    ctx.font = font(full ? 10 : 9); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
+    const ly = b.y - r - (full ? 9 : 7);
+    ctx.lineWidth = 3; ctx.strokeStyle = "#ffffff"; ctx.strokeText(label, b.x, ly);
+    ctx.fillStyle = full ? C : "#7a8a68"; ctx.fillText(label, b.x, ly);
     ctx.restore();
   }
-
 
   // 帯: 画面の左端に、10のあき枠を上から縦にならべる（出てくる順。いちばん下が大ボス）
   // はじめは「？」、探検で見つけると灰色の名前、本番で吸い込むと金色。名前は枠の中に縦書き

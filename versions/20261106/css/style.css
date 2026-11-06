@@ -715,3 +715,6 @@ body { position: fixed; inset: 0; }
 .op-foot #op-tap { animation: op-blink 1.6s ease-in-out infinite; }
 .op-skip { position: absolute; top: max(10px, env(safe-area-inset-top)); right: 10px; z-index: 2; font-family: var(--font); font-size: 14px; color: #5d4a22; background: rgba(255,250,236,.88); border: 1.5px solid #e0c58a; border-radius: 999px; padding: 5px 14px; cursor: pointer; }
 @keyframes op-blink { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+
+/* カードの絵（11/6-6）: 語句の上に正方形の絵。いちばん大きくて 160px（絵のファイルはその2倍の 320px） */
+.card .pic { display: block; width: 100%; max-width: 160px; aspect-ratio: 1 / 1; margin: 0 auto 6px; border-radius: 10px; object-fit: cover; background: #feecc6; }

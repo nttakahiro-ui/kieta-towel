@@ -25,6 +25,15 @@ const Cards = (() => {
   const seg = (typeof Intl !== "undefined" && Intl.Segmenter) ? new Intl.Segmenter("ja", { granularity: "word" }) : null;
   const GLUE = new Set(["を", "は", "が", "に", "の", "と", "で", "へ", "も", "や", "よ", "ね", "て", "た", "か", "な", "、", "。", "!", "！", "?", "？", ")", "）", "」"]);   // 「」の閉じかっこも前につける（10/25-14）
   const esc = t => t.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  // カードの絵（11/6-6）: 絵があるステージ（stages）だけ、持っているカードの上に出す。絵は tools/cardsplit.mjs で切り分けた assets/cards/s<ステージ>_<順>.png（1辺 320px。表示の2倍）
+  const CARD_ART = { dir: "assets/cards/", stages: [1] };   // s02〜s12 の絵が来たら、ここに番号を足す
+  function artEl(w) {
+    if (!CARD_ART.stages.includes(w.stage) || !w.order) return null;
+    const im = document.createElement("img"); im.className = "pic"; im.alt = ""; im.decoding = "async";
+    im.src = `${CARD_ART.dir}s${String(w.stage).padStart(2, "0")}_${String(w.order).padStart(2, "0")}.png`;
+    im.onerror = () => im.remove();
+    return im;
+  }
   // カードの見出し（語句）の div。漢字を含む語句には、上に小さく kana 欄のふりがな（11/1。本文にはつけない）
   function wordEl(w) {
     const wd = document.createElement("div"); wd.className = "w";
@@ -152,6 +161,7 @@ const Cards = (() => {
       c.style.animationDelay = `${i * 0.08}s`;
       const wd = wordEl(w);
       const m = document.createElement("div"); m.className = "m"; m.innerHTML = phraseHTML(w.memo);
+      const art = owned && artEl(w); if (art) { c.appendChild(art); c.classList.add("has-pic"); }   // 絵（持っているカードだけ。11/6-6）
       c.append(wd, m);
       // まだカードになっていない語句には、理由を出す
       if (!owned) {
@@ -262,5 +272,5 @@ const Cards = (() => {
     };
   }
 
-  return { showCards, showRecipe, phraseHTML, wordEl, names };
+  return { showCards, showRecipe, phraseHTML, wordEl, artEl, names };
 })();
