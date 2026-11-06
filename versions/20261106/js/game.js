@@ -81,6 +81,13 @@ const BATTLE = {
   seedSpread: 22,              // 落ちる先を左右にばらけさせる幅（px。±この値）
   seedSplash: 40,              // はじける範囲（幅80px の半分。地上のことばの幅の半分＋この px まで当たる）
   seedSize: 1.5,               // たねの大きさ（11/1-4 の何倍か）
+  // 地上の攻撃を「爆弾」に（11/6-3 決定。検討版 11/6 だけ）: 1回に左右45度の2方向へ2個を山なりに投げる。落ちた場所で爆発の輪が広がり、輪の中の地上の敵に当たる
+  bombSide: 40,                // 爆弾が落ちる場所の、自機からの左右のずれ（px）。左右の輪が真ん中で重なる
+  bombRing: 58,                // 爆発の輪の半径（px）。bombSide より大きいので、左右の2つで真正面もおおう
+  bombRingTime: 0.35,          // 輪が広がりきるまでの秒数（見た目だけ。当たりは落ちた瞬間）
+  // 世界3の光の玉（11/6-3 決定。検討版 11/6 だけ）: 自機のまわりを2つの玉が回る。触れた敵（空中の虫）にダメージ。操作はふえない
+  orbs: { n: 2, radius: 50, period: 2, r: 10, cd: 0.3 },   // 数、回る半径（px）、一周の秒数、玉の当たりの大きさ（px）、同じ虫に続けて当たらない秒数
+  rearHp: 3,                   // 世界3でうしろから来る虫の硬さ（回る玉に3回触れると倒れる）。ぶつかると元気が減る（＋100 は出さない）
   groundTextScale: 0.78,       // 地上のことばの文字の高さの倍率（少し平たくして、地面に貼りついて見えるように）
   darkRescue: 0.6,             // 救出の旅の出来事「照明が落ちる」の暗さ（地面と地上のものだけ。発見の旅は0.84）
   powerStartW23: 1,            // 世界2・3のパワーの初期値の段（0 ＝ 1本、1 ＝ 2本。10/31-13 決定: 救出の旅を派手に。世界1は1本のまま）
@@ -475,6 +482,7 @@ const Battle = (() => {
   let stateTimer = 0;
   let player, shots, enemies, ebullets, threads, fluff;
   let fillers, bombs, pops, items, terrain, cloudShadows;
+  let blasts = [], orbAng = 0;   // 爆発の輪、光の玉の角度（11/6-3）
   let script, absorbed, missed, bossWord, groundIds;
   let P = null;              // このステージの難易度から決まった数値
   let worldDef = {}, groundOn = true;   // 今の世界（stages.js の WORLDS）。groundOn: 地上の仕組みがあるか
@@ -701,7 +709,7 @@ const Battle = (() => {
     cloudShadows = Array.from({ length: 3 }, (_, i) => ({ x: Math.random() * W, y: (i / 3) * H, rx: rand(70, 120), ry: rand(35, 55) }));
     terrain = [];
     fillTerrain();
-    shots = []; enemies = []; ebullets = []; fillers = []; bombs = []; items = []; obs = []; guide = null;
+    shots = []; enemies = []; ebullets = []; fillers = []; bombs = []; blasts = []; items = []; obs = []; guide = null;
     startPhase("round1");
     fillerTimer = 1.2; shotTimer = 0; bombTimer = 0;
     player = { x: W / 2, y: H * 0.8, hp: BATTLE.playerMaxHp, inv: 0, glow: 0, hurt: 0 };
@@ -1241,6 +1249,8 @@ const Battle = (() => {
     const fhp = Math.max(1, Math.round(def.hp * (P.fillerHp || 1)));   // 虫の硬さ（難易度の線）
     fillers.push(Object.assign({ type, layer: def.layer, hp: fhp, maxHp: fhp, r: def.r * BATTLE.fillerScale, x, y, age: 0, flash: 0,
       fire: def.fire ? rand(0.8, 1.6) * def.fire * BATTLE.fillerFireScale * fillerDense() / P.fireRate / fireRamp() : 0 }, extra || {}));
+    const f = fillers[fillers.length - 1];
+    if (f.rear && worldDef.id === 3) { f.hp = f.maxHp = BATTLE.rearHp; }   // 世界3のうしろの虫は、回る玉に3回で倒れる（11/6-3）
   }
   // 語句の近くかどうか（雑魚を出す場所をえらぶとき用）
   function nearWord(x, y, layer) {
@@ -1387,6 +1397,7 @@ const Battle = (() => {
     shake = Math.max(0, shake - dt);
     player.glow = Math.max(0, player.glow - dt);
     player.hurt = Math.max(0, player.hurt - dt);
+    player.red = Math.max(0, (player.red || 0) - dt);
     if (banner) { banner.t -= dt; if (banner.t <= 0) banner = null; }
     const sc = frozen() ? 0 : scrollSpeed() * (evActive("reverse") ? -1 : 1) * convFast();   // 時間止めのあいだは地面も止まる。救出の旅の出来事「コンベアが逆」では、地面の流れが逆（上へ。10/31-13）
 
@@ -1445,7 +1456,7 @@ const Battle = (() => {
         if (phase === "round1") {
           // 探検が終わった: 画面の雑魚と弾を片づけて、「出撃2 本番」の画面で止まる
           fillers.forEach(f => addPop(f.x, f.y, "#fff8d8", 0.8, f.layer === "ground"));
-          fillers = []; ebullets = []; bombs = []; items = [];
+          fillers = []; ebullets = []; bombs = []; blasts = []; items = [];
           state = "sortie"; sortieNo = 2; choiceT = BATTLE.choiceTime; sortieStep = "say";
           scoreAtMain = score;
           drag = null;
@@ -1520,7 +1531,8 @@ const Battle = (() => {
     bombTimer -= dt;
     if (lock && bombTimer <= 0) {
       const aim = lock.word ? Math.min(lock.x + lock.w / 2 - 4, Math.max(lock.x - lock.w / 2 + 4, player.x)) : lock.x;
-      bombs.push({ sx: player.x, sy: player.y - 24, tx: aim + rand(-1, 1) * BATTLE.seedSpread, ty: lock.y, age: 0, tg: lock, spin: Math.random() < 0.5 ? -1 : 1 });
+      const pair = { hit: new Set() };   // 左右の2個で同じ敵に2回当てない（倒す速さは前のたねと同じ）
+      for (const side of [-1, 1]) bombs.push({ sx: player.x, sy: player.y - 24, tx: player.x + side * BATTLE.bombSide, ty: lock.y, age: 0, tg: lock, side, pair });   // 左右45度へ山なりに（11/6-3）
       bombTimer = BATTLE.bombInterval;
       Sound.se("seedThrow");
     }
@@ -1528,9 +1540,11 @@ const Battle = (() => {
       b.age += dt;
       b.ty += sc * dt;   // 落ちる先も地面といっしょに流れる
       if (b.tg && b.tg.hp > 0 && b.tg.word && gMoves(b.tg)) { if (b.lx !== undefined) b.tx += b.tg.x - b.lx; b.lx = b.tg.x; }   // 動くことばは、落ちる先もいっしょに動く（ばらけ方は保つ）
-      if (b.age >= BATTLE.bombFlight && !b.done) { b.done = true; landBomb(b.tx, b.ty, BATTLE.seedPower); }
+      if (b.age >= BATTLE.bombFlight && !b.done) { b.done = true; landBomb(b.tx, b.ty, BATTLE.seedPower, b.pair); }
     }
     bombs = bombs.filter(b => !b.done);
+    for (const r of blasts) { r.age += dt; r.y += sc * dt; }   // 爆発の輪も地面といっしょに流れる
+    blasts = blasts.filter(r => r.age < BATTLE.bombRingTime + 0.25);
 
     // 語句の敵の動き
     for (const e of enemies) {
@@ -1674,6 +1688,22 @@ const Battle = (() => {
         if (f.fire <= 0 && f.y > 0 && f.y < H * 0.68) {
           f.fire = def.fire * BATTLE.fillerFireScale * fillerDense() / P.fireRate / fireRamp() * rand(0.8, 1.2);
           fireAt(f.x, f.y, def.spread || [0], undefined, def.keep);
+        }
+      }
+    }
+
+    // 世界3の光の玉（11/6-3）: 自機のまわりを回り、触れた空中の虫にダメージ。うしろから来た虫は、自機にぶつかると元気が減る
+    if (orbsOn()) {
+      if (!frozen()) orbAng += Math.PI * 2 / BATTLE.orbs.period * dt;
+      for (const f of fillers) {
+        if (f.layer !== "air" || f.hp <= 0 || f.delay > 0) continue;
+        f.orbCd = Math.max(0, (f.orbCd || 0) - dt);
+        if (f.orbCd <= 0 && orbPos().some(o => Math.hypot(o.x - f.x, o.y - f.y) < f.r + BATTLE.orbs.r)) { f.orbCd = BATTLE.orbs.cd; damageFiller(f); }
+        if (f.rear && f.hp > 0 && !frozen() && Math.hypot(f.x - player.x, f.y - player.y) < f.r + 14 && player.inv <= 0 && !showWord && !(odai && odai.intro > 0)) {
+          f.hp = 0;   // ぶつかった虫は消える（点は入らない。＋100 も出さない）
+          addPop(f.x, f.y, "#ffb0b8", 0.7);
+          player.red = 0.5;   // 自機が赤く光る
+          hurt();
         }
       }
     }
@@ -1876,11 +1906,19 @@ const Battle = (() => {
     return Math.hypot(x - g.x, y - g.y) < g.r + r;
   }
   // たねが地面に届いた: ぽんっと花が咲いて、まわりの地上の敵に当たる
-  function landBomb(x, y, n = 1) {
-    addPop(x, y, "#e4ffc0", 0.9, true);   // 光が小さくはじける
+  // 世界3の光の玉（11/6-3）
+  function orbsOn() { return worldDef.id === 3 && state === "play" && phase !== "round1" && !(player.rising > 0); }
+  function orbPos() {
+    const O = BATTLE.orbs, out = [];
+    for (let i = 0; i < O.n; i++) { const a = orbAng + i * Math.PI * 2 / O.n; out.push({ x: player.x + Math.cos(a) * O.radius, y: player.y + Math.sin(a) * O.radius }); }
+    return out;
+  }
+  function landBomb(x, y, n = 1, pair) {
+    blasts.push({ x, y, age: 0 });   // 爆発の輪が広がる（11/6-3）
     Sound.se("seedPop");
     for (const g of groundTargets()) {   // （隠れていることばは groundTargets に入らない）
-      if (!inReach(g, x, y, BATTLE.seedSplash)) continue;
+      if (!inReach(g, x, y, BATTLE.bombRing)) continue;
+      if (pair) { if (pair.hit.has(g)) continue; pair.hit.add(g); }
       if (!g.word) { damageFiller(g); continue; }
       g.seedAcc = (g.seedAcc || 0) + n;   // 1個の威力は端数なので、たまった分だけ削る（11/2）
       while (g.seedAcc >= 1 - 1e-6 && g.hp > 0) { g.seedAcc -= 1; damageWord(g, x); }
@@ -2607,7 +2645,7 @@ const Battle = (() => {
       // 大ボスを吸い込んだらバトル終了。残っている雑魚はみんな花になる
       enemies.forEach(x => (x.hp = 0));
       fillers.forEach(f => addPop(f.x, f.y, "#fff2b8", 1, f.layer === "ground"));
-      fillers = []; ebullets = []; bombs = [];
+      fillers = []; ebullets = []; bombs = []; blasts = [];
       state = "clear";
       stateTimer = 2;
       banner = null;
@@ -2629,7 +2667,7 @@ const Battle = (() => {
     extraUsed = true; extraRound = true;
     missed = [];   // 延長戦でまた逃がしたら、もう一度ここに入る
     script = list;
-    enemies = []; fillers = []; ebullets = []; bombs = []; items = []; odai = null; obs = []; rest = null;
+    enemies = []; fillers = []; ebullets = []; bombs = []; blasts = []; items = []; odai = null; obs = []; rest = null;
     state = "play"; drag = null;
     startPhase("round2");
     post("banner", () => { banner = { text: tx("rescue.extraStart"), t: 1.6, color: "rgba(201,138,30,0.92)" }; });
@@ -2726,7 +2764,7 @@ const Battle = (() => {
     gameOvers++;
     lives = BATTLE.lives;
     player.hp = BATTLE.playerMaxHp; player.inv = 0; player.rising = 0;
-    enemies = []; fillers = []; ebullets = []; bombs = []; items = []; obs = []; odai = null;
+    enemies = []; fillers = []; ebullets = []; bombs = []; blasts = []; items = []; obs = []; odai = null;
     if (phase !== "round1") {
       absorbed = []; missed = [];
       score = scoreAtMain;
@@ -2755,6 +2793,7 @@ const Battle = (() => {
     for (const f of fillers) if (f.layer === "ground") drawFiller(f);
     for (const e of enemies) if (e.ground) drawGroundWord(e);
     // 落ちていくたね
+    for (const r of blasts) drawBlast(r);
     for (const b of bombs) drawBomb(b);
     // 照準
     if (state === "play" && groundOn) drawGroundSpot();   // 真上の薄い丸と光の筋は、地上のある世界だけ
@@ -2856,6 +2895,7 @@ const Battle = (() => {
     drawWeather();
     if (stopT > 0) { ctx.fillStyle = `rgba(110,140,220,${0.2 * Math.min(1, stopT / 0.4)})`; ctx.fillRect(0, 0, W, H); }   // 時間止め（10/31-10 試作。仮の見た目）
     drawPlayer();
+    drawOrbs();   // 世界3の光の玉（11/6-3）
     if (guardT > 0) drawGuardTowels();
     if (showerFx) drawShower();
     for (const f of freed) {   // 助けた語句（金色に光って、小さくなりながらふわりへ）
@@ -3268,7 +3308,52 @@ const Battle = (() => {
     ctx.restore();
   }
 
-  function drawBomb(b) {   // 光のたね（11/1-4。11/2 決定で黄緑・白い縁・1.5倍・回りながら飛ぶ。色は BULLET_COLORS の seed）: 放物線で飛ぶ。地面には影が、まっすぐ進む
+  function drawBomb(b) {   // 爆弾（11/6-3）: 丸い爆弾に導火線と火花。左右45度へ出て山なりに落ちる。色は黄緑のまま
+    const k = Math.min(1, b.age / BATTLE.bombFlight), lift = Math.sin(Math.PI * k);
+    const x = b.sx + (b.tx - b.sx) * Math.sqrt(k), y = b.sy + (b.ty - b.sy) * k - lift * BATTLE.seedArc;   // 横は先に進む（ななめ45度に飛び出して見える）
+    const r = (6 + lift * 4) * BATTLE.seedSize * 0.9;
+    ctx.fillStyle = "rgba(30,30,40,0.22)";   // 地面の影
+    ctx.beginPath(); ctx.ellipse(x, y + lift * BATTLE.seedArc, r * 0.8, r * 0.45, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.save(); ctx.translate(x, y); ctx.rotate(b.side * (0.5 + k * 1.2));   // 少しずつ回る
+    ctx.fillStyle = BULLET_COLORS.seedHalo; ctx.beginPath(); ctx.arc(0, 0, r + 4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = BULLET_COLORS.seed; ctx.strokeStyle = "#35501a"; ctx.lineWidth = 2;   // 丸い爆弾
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#35501a"; ctx.fillRect(-r * 0.32, -r - 3, r * 0.64, 4);   // 口金
+    ctx.strokeStyle = "#6b4a2a"; ctx.lineWidth = 2;   // 導火線
+    ctx.beginPath(); ctx.moveTo(0, -r - 3); ctx.quadraticCurveTo(r * 0.5, -r - 9, r * 0.2, -r - 13); ctx.stroke();
+    const sx = r * 0.2, sy = -r - 13, fl = 3 + Math.sin(b.age * 40) * 1.5;   // 火花（ちらちら）
+    ctx.fillStyle = "#ffd23a"; ctx.beginPath();
+    for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2 + b.age * 9, rr = i % 2 ? fl : fl * 2.2; ctx.lineTo(sx + Math.cos(a) * rr, sy + Math.sin(a) * rr); }
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(sx, sy, 1.6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(255,255,255,0.8)"; ctx.beginPath(); ctx.ellipse(-r * 0.35, -r * 0.3, r * 0.28, r * 0.18, -0.6, 0, Math.PI * 2); ctx.fill();   // つや
+    ctx.restore();
+  }
+  function drawBlast(r) {   // 爆発の輪（11/6-3）: 落ちた場所で広がる
+    const k = Math.min(1, r.age / BATTLE.bombRingTime), fade = r.age > BATTLE.bombRingTime ? 1 - (r.age - BATTLE.bombRingTime) / 0.25 : 1;
+    const R = BATTLE.bombRing * (0.35 + 0.65 * k);
+    ctx.save(); ctx.globalAlpha = Math.max(0, fade);
+    ctx.fillStyle = `rgba(200,255,120,${0.28 * (1 - k * 0.5)})`;
+    ctx.beginPath(); ctx.ellipse(r.x, r.y, R, R * 0.62, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#f4ffd0"; ctx.lineWidth = 4 * (1 - k) + 2;
+    ctx.beginPath(); ctx.ellipse(r.x, r.y, R, R * 0.62, 0, 0, Math.PI * 2); ctx.stroke();
+    if (k < 0.6) { ctx.fillStyle = `rgba(255,240,170,${0.9 * (1 - k / 0.6)})`; ctx.beginPath(); ctx.arc(r.x, r.y, 14 + k * 20, 0, Math.PI * 2); ctx.fill(); }   // まん中の光
+    ctx.restore();
+  }
+  function drawOrbs() {   // 世界3の光の玉（11/6-3）
+    if (!orbsOn()) return;
+    const O = BATTLE.orbs;
+    ctx.save();
+    ctx.strokeStyle = "rgba(220,200,255,0.25)"; ctx.lineWidth = 1.5;   // 回る道のうすい輪
+    ctx.beginPath(); ctx.arc(player.x, player.y, O.radius, 0, Math.PI * 2); ctx.stroke();
+    for (const o of orbPos()) {
+      const g = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, O.r * 2.2);
+      g.addColorStop(0, "rgba(255,255,255,1)"); g.addColorStop(0.35, "rgba(230,210,255,0.95)"); g.addColorStop(1, "rgba(180,140,255,0)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(o.x, o.y, O.r * 2.2, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+  function drawSeedOld(b) {   // 前の光のたねの絵（11/6-3 から使っていない）   // 光のたね（11/1-4。11/2 決定で黄緑・白い縁・1.5倍・回りながら飛ぶ。色は BULLET_COLORS の seed）: 放物線で飛ぶ。地面には影が、まっすぐ進む
     const k = Math.min(1, b.age / BATTLE.bombFlight), lift = Math.sin(Math.PI * k);
     const x = b.sx + (b.tx - b.sx) * k, y = b.sy + (b.ty - b.sy) * k - lift * BATTLE.seedArc;
     const r = (5 + lift * 4) * BATTLE.seedSize;   // 高いところほど大きく
@@ -3936,6 +4021,12 @@ const Battle = (() => {
 
   function drawPlayer() {
     const { x, y } = player;
+    if (player.red > 0) {   // うしろの虫にぶつかった: 赤く光る（11/6-3）
+      ctx.save(); const a = player.red / 0.5;
+      const g = ctx.createRadialGradient(x, y, 4, x, y, 46);
+      g.addColorStop(0, `rgba(255,60,70,${0.75 * a})`); g.addColorStop(1, "rgba(255,60,70,0)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, 46, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    }
     if (shield > 0) {   // 盾のまく
       ctx.save();
       ctx.strokeStyle = `rgba(140,190,230,${0.6 + Math.sin(t * 4) * 0.2})`; ctx.lineWidth = 3;
@@ -4907,7 +4998,7 @@ const Battle = (() => {
     // 探検をとばして、「本番に持っていくもの」を選ぶ画面へ
     skipRecon() {
       if (!running || phase !== "round1") return;
-      enemies = []; fillers = []; ebullets = []; bombs = []; items = []; odai = null;
+      enemies = []; fillers = []; ebullets = []; bombs = []; blasts = []; items = []; odai = null;
       nextIdx = script.length;
       for (const w of script) found.add(w.id);
       reacted = found.size;
