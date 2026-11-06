@@ -133,7 +133,7 @@ const BATTLE = {
   //   aimGap ＝ ねらいの1発ずつの間隔（秒）、sweepCols ＝ 横ながしの列の数、sweepGap ＝ 横ながしの1発ずつの間隔（秒）、ringN ＝ 輪1つの弾の数（たまったら撃つ）、
   //   rainSlant ＝ ななめ雨の傾き（横の速さ ÷ 縦の速さ）、speed ＝ 形ごとの速さの倍率
   odaiShots: { aimGap: 0.18, sweepCols: 7, sweepGap: 0.12, ringN: 6, rainSlant: 0.45, speed: { aim: 1, sweep: 1, ring: 0.85, rain: 1 }, gap: { fan: 1.4, aim: 1.4, sweep: 1.4, ring: 1.4, rain: 1.4 } },
-  rearRate: 0.35,              // 世界3: 雑魚の群れのうち、うしろ（画面の下）から来る割合（stages.js の rearRate でステージごとに。ステージ12 0.5。11/2-3）
+  rearRate: 0.2,               // 世界3: 雑魚の群れのうち、うしろ（画面の下）から来る割合（stages.js の rearRate でステージごとに）。11/6-4: 0.35→0.2（うしろの虫がぶつかると元気が減るようになったので、数を減らした。ステージ12 0.5→0.25）
   gravityDrift: 46,             // 出来事「重力が変わる」: ことばが横に流される速さ（px/秒）（10/31-10 試作）
   // 出来事「ねじが飛んでくる」（世界2）と「星がはじける」（世界3）（11/1-2 決定）。warn ＝ 先に出す印の秒数
   screwEvent: { n: [3, 5], warn: 1.5, gap: 0.35, vx: 210, vy: 120 },
