@@ -4,6 +4,7 @@
 //   --only 10             この番目だけを出す（ほかの1枚から一部だけ取るとき）
 //   --size 320            できあがりの1辺（px）。カードの絵の場所の2倍（Retina 用）
 //   --dry                 書き出さずに、見つけたマスの位置と大きさだけを出す
+//   --paper               すき間が白でなく紙の色（クリーム色など）のとき、白に加えて、左上の角の色もすき間の色とみなす（11/7-5 の s12）
 //   --crop                ふぞろいなマスを、地の色で足すかわりに、まん中を正方形に切りぬく（絵がマスの端まで描いてあるとき。11/7-4 の s02）
 // 出すファイル: s<ステージ2けた>_<順2けた>.png（例 s01_01.png）。マスの高さ・幅がふぞろいなときは、足りない分をそのマスの地の色（クリーム色）で足して正方形にする
 // 読めるのは 8bit の RGB / RGBA の PNG（インターレースなし）。ほかの道具は使わない（node だけ）
@@ -71,7 +72,9 @@ function writePng(path, w, h, px) {
 
 // ---- 白い余白でマスに分ける ----
 const { w: W, h: H, px } = readPng(src);
-const isWhite = i => px[i] > 238 && px[i + 1] > 238 && px[i + 2] > 238;
+const PAPER = opt("paper") ? [px[0], px[1], px[2]] : null;
+const white = i => px[i] > 238 && px[i + 1] > 238 && px[i + 2] > 238;
+const isWhite = PAPER ? i => white(i) || (Math.abs(px[i] - PAPER[0]) <= 8 && Math.abs(px[i + 1] - PAPER[1]) <= 8 && Math.abs(px[i + 2] - PAPER[2]) <= 8) : white;   // （--paper のときは、白も紙の色も、すき間とみなす）
 // 列・行ごとの「白でない点」の割合。2% 未満を余白とみなす
 const colFill = new Float32Array(W), rowFill = new Float32Array(H);
 for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (!isWhite((y * W + x) * 3)) { colFill[x]++; rowFill[y]++; }
