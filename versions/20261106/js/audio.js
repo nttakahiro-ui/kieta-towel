@@ -197,7 +197,7 @@ const SONGS = {
 SONGS["タイトル"] = Object.assign({}, SONGS["森の朝"], { bpm: 112, bass: "1 - 1 - 1 - 1 -", drums: { hat: "- o - o - o - o" }, gain: 1.0 });
 SONGS["オープニング"] = Object.assign({}, SONGS["タイトル"], { drums: {}, orn: null });
 // 共通の場面の曲。js の Sound.play("title") などは、ここで曲の名前に替わる（ワープの会話・ステージ一覧・カードの画面も title）。世界ごとの場面は stages.js の WORLDS の music
-//   レシピブックとエンディングは「星の海」そのまま（11/3-7。静か版はやめた）
+//   レシピブックとエンディングは「星の海」そのまま（11/3-7。静か版はやめた）。検討版 11/7 からは mp3 の recipe（FILE_MUSIC.scenes）
 // mp3 の曲（11/6-5 決定。検討版 11/6 だけ）: 世界1〜3の発見・救出・クイズの9曲。元のファイルは docs/曲/（ここは assets/music/ のコピー）
 //   loop ＝ くり返す区間 [始まり, 終わり]（秒）。最初は曲の頭から鳴らし、終わりまで来たら始まりへもどる。終わりのあとの音が消えていくところ・無音は使わない。
 //     区間は小節の切れ目（終わり − 始まり ＝ 小節の倍数）で、「終わりの前の2小節」と「始まりの前の2小節」の音（和音・リズム）がいちばん似ているところ
@@ -216,10 +216,12 @@ const FILE_MUSIC = {
     w3_hakken:    { loop: [23.834, 55.834], lufs: -10.08 },   // 120、16小節
     w3_kyushutsu: { loop: [24.623, 51.289], lufs: -10.61 },   // 144、16小節
     w3_quiz:      { loop: [6.397, 61.898], lufs: -10.57 },   // 160、37小節
-    title:        { loop: [17.146, 55.546], lufs: -10.82 },   // 100、16小節（11/6-6。タイトル・ステージ一覧・カード図鑑・結果のカード）
+    title:        { loop: [17.146, 55.546], lufs: -11.18 },   // 100、16小節（11/6-6。タイトル・ステージ一覧・カード図鑑・結果のカード）。11/7: 大きさを今の区間で測り直した（前の -10.82 は前の区間の値）
+    recipe:       { once: true, lufs: -11.22 },               // レシピブック・エンディング（11/7-2）。くり返さず1回鳴って終わる（終わったら無音）。lufs は曲の全体
   },
-  // 世界によらない曲（11/6-6）: 合成曲の名前 → mp3。最初の画面で読むので、読めるまでは合成曲を鳴らし、読めたら mp3 に替える
-  common: { "タイトル": "title" },
+  // 世界によらない場面（11/7-2）: js の Sound.play の場面の名前 → mp3。合成曲の名前では読みかえない（世界3の発見の旅の合成曲も「星の海」で、取り違えたため）
+  scenes: { title: "title", card: "title", recipeBook: "recipe", ending: "recipe" },
+  first: "title",   // 最初の画面で読む曲。読めるまでは合成曲を鳴らし、読めたら mp3 に替える（11/6-6）
   worlds: { 1: { explore: "w1_hakken", rescue: "w1_kyushutsu", quiz: "w1_quiz" }, 2: { explore: "w2_hakken", rescue: "w2_kyushutsu", quiz: "w2_quiz" }, 3: { explore: "w3_hakken", rescue: "w3_kyushutsu", quiz: "w3_quiz" } },
 };
 const SCENE = { title: "タイトル", opening: "オープニング", card: "タイトル", quiz: "クイズ", recipe: "宝石ができた", recipeBook: "星の海", ending: "星の海" };
@@ -234,7 +236,8 @@ const Sound = (() => {
   let musicBus = null;   // 曲だけの音量（場面の切り替えのフェード。効果音は通らない）
   let echoIn = null, echoDelay = null, echoFb = null, echoOut = null;   // 響き（短いディレイ1つ）
   let noiseBuf = null;   // 打楽器・木琴のノイズ
-  let current = null;    // 今流れている曲の名前
+  let current = null;    // 今流れている曲の名前（mp3 のときは「♪曲」）
+  let synth = null;      // 今鳴らしている合成曲の名前
   let timer = null;      // 曲を進めるタイマー
   let step = 0;
   let nextTime = 0;
@@ -532,29 +535,30 @@ const Sound = (() => {
   }
 
   function tick() {
-    const song = SONGS[current];
+    const song = SONGS[synth];
     if (!song || !ctx) return;
     const stepDur = 60 / song.bpm / 2 / tempo / songTempo;
     tickSong(song, stepDur);
   }
 
   // ===== mp3 の曲（11/6-5） =====
-  // 曲の名前（合成曲の名前）を、今の世界の mp3 に読みかえる。なければ null（合成曲のまま）
-  function fileKeyOf(name) {
-    if (FILE_MUSIC.common[name]) return FILE_MUSIC.common[name];
-    const fw = FILE_MUSIC.worlds[world], w = window.WORLDS && window.WORLDS.find(x => x.id === world);
-    if (!fw || !w) return null;
-    const m = w.music || {};
-    if (name === m.explore) return fw.explore;
-    if (name === m.rescue || name === m.odai) return fw.rescue;
-    if (name === SCENE.quiz) return fw.quiz;
+  // 場面から mp3 をえらぶ（11/7-2）。key ＝ Sound.play に渡した名前（場面の名前 title・quiz など、または世界の合成曲の名前）、
+  //   scene ＝ 世界の場面（explore／rescue／odai。game.js・main.js が渡す）。合成曲の名前どうしをくらべて読みかえることはしない。なければ null（合成曲のまま）
+  function fileKeyOf(key, scene) {
+    if (FILE_MUSIC.scenes[key]) return FILE_MUSIC.scenes[key];
+    const fw = FILE_MUSIC.worlds[world];
+    if (!fw) return null;
+    if (key === "quiz") return fw.quiz;
+    if (scene === "explore") return fw.explore;
+    if (scene === "rescue" || scene === "odai") return fw.rescue;
     return null;
   }
+  const commonKeys = () => [...new Set(Object.values(FILE_MUSIC.scenes))];
   // ステージに入るとき: その世界の3曲だけを読む（発見の曲から順に）。ほかの世界の曲は手ばなす
   function loadWorld(id) {
     world = id;
     const fw = FILE_MUSIC.worlds[id];
-    const keep = new Set((fw ? Object.values(fw) : []).concat(Object.values(FILE_MUSIC.common)));   // タイトルの曲は手ばなさない
+    const keep = new Set((fw ? Object.values(fw) : []).concat(commonKeys()));   // タイトル・レシピブックの曲は手ばなさない
     for (const k of Object.keys(buffers)) if (!keep.has(k) && k !== fileKey) delete buffers[k];
     for (const k of Object.keys(raw)) if (!keep.has(k)) delete raw[k];
     if (!fw) return;
@@ -573,7 +577,7 @@ const Sound = (() => {
     }
   }
   // タイトルの曲を読む（11/6-6）: 最初の画面が出たあと（main.js が load のあとに呼ぶ）。最初の画面の読み込みとは取り合わない
-  function preloadCommon() { fetchSongs(Object.values(FILE_MUSIC.common)); }
+  function preloadCommon() { fetchSongs([FILE_MUSIC.first]); }   // （レシピブックの曲は、はじめて開いたときに読む）
   // 音にする（AudioContext が要る。まだなければ unlock のときに）
   function decodeRaw(k) {
     if (!ctx || !raw[k]) return Promise.resolve();
@@ -588,7 +592,7 @@ const Sound = (() => {
             const now = ctx.currentTime;
             musicBus.gain.cancelScheduledValues(now); musicBus.gain.setValueAtTime(musicBus.gain.value, now); musicBus.gain.linearRampToValueAtTime(0.0001, now + 0.5);
             setTimeout(() => {
-              if (fileKey !== k || current !== fb) return;
+              if (fileKey !== k || synth !== fb) return;
               stopSynth();
               const n2 = ctx.currentTime;
               musicBus.gain.cancelScheduledValues(n2); musicBus.gain.setValueAtTime(0.0001, n2); musicBus.gain.linearRampToValueAtTime(1, n2 + 0.3);
@@ -608,6 +612,12 @@ const Sound = (() => {
     const g = ctx.createGain();
     g.gain.value = FILE_MUSIC.level * Math.pow(10, (FILE_MUSIC.lufs - c.lufs) / 20);
     g.connect(musicBus);
+    if (c.once) {   // くり返さない曲（11/7-2）: 頭から1回鳴らして終わる
+      const s = ctx.createBufferSource(); s.buffer = buf; s.connect(g);
+      s.start(ctx.currentTime + 0.05, 0);
+      loopRun = { key: k, g, segs: [s], next: Infinity, off: 0, once: true };
+      return;
+    }
     loopRun = { key: k, g, segs: [], next: ctx.currentTime + 0.05, off: 0 };
     addSeg();
     loopTimer = setInterval(() => { if (loopRun && ctx.currentTime > loopRun.next - 3) addSeg(); }, 250);
@@ -639,24 +649,22 @@ const Sound = (() => {
     setTimeout(() => { try { r.g.disconnect(); } catch (e) {} }, 200);
   }
   function playFile(name, k) {
-    if (fileKey === k && current) { current = name; return; }   // 同じ曲（救出の旅とお題バトル、タイトルとステージ一覧など）は、とめずにそのまま流す
+    if (fileKey === k && current) return;   // 同じ曲（救出の旅とお題バトル、タイトルとステージ一覧など）は、とめずにそのまま流す
     stop();
-    current = name; fileKey = k; tempo = 1; songTempo = 1;
+    current = "♪" + k; fileKey = k; tempo = 1; songTempo = 1;   // （mp3 のときの current は「♪曲」。合成曲の名前とまざらないように。11/7-2）
     if (!ctx) return;
     musicBus.gain.cancelScheduledValues(ctx.currentTime);
     musicBus.gain.setValueAtTime(1, ctx.currentTime);
     if (buffers[k]) { startLoop(k); return; }
-    if (FILE_MUSIC.common[name] === k) {   // タイトル: 読めるまでは合成曲（最初の画面を無音にしない。11/6-6）
-      fallback = name; startSynth(name, 1);
-      fetchSongs([k]);   // まだ読んでいなければ読む（読み中・音にしている途中ならとばす）
-    }
+    if (k === FILE_MUSIC.first) { fallback = name; startSynth(name, 1); }   // タイトル: 読めるまでは合成曲（最初の画面を無音にしない。11/6-6）
+    fetchSongs([k]);   // まだ読んでいなければ読む（読み中・音にしている途中ならとばす）
     if (raw[k]) decodeRaw(k);   // 読めていれば音にして鳴らす。まだ読んでいる途中なら、読めたところから鳴らす（それまでは無音か合成曲）
   }
 
   // t ＝ 曲ごとのテンポの倍率（山場の回など。なければ 1）
-  function play(name, t) {
-    name = SCENE[name] || name;
-    const fk = fileKeyOf(name);
+  function play(key, t, scene) {
+    const name = SCENE[key] || key;
+    const fk = fileKeyOf(key, scene);
     if (fk) { playFile(name, fk); return; }
     if (current === name) return;
     stop();
@@ -664,6 +672,7 @@ const Sound = (() => {
     startSynth(name, t);
   }
   function startSynth(name, t) {
+    synth = name;
     tempo = 1;
     songTempo = t || 1;
     const song = SONGS[name];
@@ -688,11 +697,11 @@ const Sound = (() => {
   }
 
   // 前の曲を少しずつ小さくしてから、次の曲に替える（場面の切り替え。11/3-4 から0.5秒。曲だけを小さくし、効果音は小さくしない）
-  function fadeTo(name, sec = 0.5, t) {
-    name = SCENE[name] || name;
-    if (current === name || current === "→" + name) return;
-    { const fk = fileKeyOf(name); if (fk && fk === fileKey && current) { current = name; return; } }   // 同じ mp3 の曲なら、そのまま流す（救出の旅 ⇄ お題バトル）
-    if (!ctx || !musicBus) { play(name, t); return; }
+  function fadeTo(key, sec = 0.5, t, scene) {
+    const fk = fileKeyOf(key, scene), id = fk ? "♪" + fk : (SCENE[key] || key);
+    if (current === id || current === "→" + id) return;
+    if (fk && fk === fileKey && current) return;   // 同じ mp3 の曲なら、そのまま流す（救出の旅 ⇄ お題バトル）
+    if (!ctx || !musicBus) { play(key, t, scene); return; }
     const now = ctx.currentTime;
     musicBus.gain.cancelScheduledValues(now);
     musicBus.gain.setValueAtTime(musicBus.gain.value, now);
@@ -701,20 +710,20 @@ const Sound = (() => {
     if (loopRun) { const lr = loopRun; setTimeout(() => { if (loopRun === lr) stopLoop(); }, sec * 1000); }
     fileKey = null;
     setTimeout(() => {
-      if (current !== "→" + name) return;   // そのあいだに別の曲になった（play がもとの音量に戻す）
-      play(name, t);
+      if (current !== "→" + id) return;   // そのあいだに別の曲になった（play がもとの音量に戻す）
+      play(key, t, scene);
       const n2 = ctx.currentTime;
       musicBus.gain.cancelScheduledValues(n2);
       musicBus.gain.setValueAtTime(0.0001, n2);
       musicBus.gain.linearRampToValueAtTime(1, n2 + 0.15);
     }, sec * 1000);
     if (timer) { const tm = timer; setTimeout(() => clearInterval(tm), sec * 1000); timer = null; }
-    current = "→" + name;   // 替わるまでのあいだ、同じ曲を二重に呼ばない
+    current = "→" + id;   // 替わるまでのあいだ、同じ曲を二重に呼ばない
   }
 
   function stopSynth() { if (timer) { clearInterval(timer); timer = null; } }
   function stop() {
-    current = null;
+    current = null; synth = null;
     fileKey = null;
     fallback = null;
     stopLoop();

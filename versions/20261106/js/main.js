@@ -351,7 +351,7 @@ const Main = (() => {
     reviewing = reviewNext && stage.id === 1;
     showScreen("battle");
     Sound.loadWorld(stage.world);   // その世界の mp3 の曲（発見・救出・クイズ）だけを読む。読めるまでは無音（11/6-5）
-    { const m = window.musicOf(stage, rescueAgain ? "rescue" : "explore"); Sound.play(m.name, m.tempo); }   // 発見の旅の曲。救出の旅が始まると救出の曲に替わる（曲の名前は stages.js の WORLDS の music。11/3-4）
+    { const sc = rescueAgain ? "rescue" : "explore", m = window.musicOf(stage, sc); Sound.play(m.name, m.tempo, sc); }   // 発見の旅の曲。救出の旅が始まると救出の曲に替わる（曲の名前は stages.js の WORLDS の music。11/3-4）
     // 画面が表示されてから大きさを測る
     requestAnimationFrame(() => {
       Battle.start(words, {

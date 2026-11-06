@@ -2100,7 +2100,7 @@ const Battle = (() => {
   // 場面の曲へ0.5秒で替える（stages.js の WORLDS の music。11/3-4）
   function music(scene) {
     const m = window.musicOf ? window.musicOf(opts.stage, scene) : { name: scene === "explore" ? "recon" : "battle", tempo: 1 };
-    Sound.fadeTo(m.name, 0.5, m.tempo);
+    Sound.fadeTo(m.name, 0.5, m.tempo, scene);   // （場面も渡す: mp3 は場面でえらぶ。11/7-2）
   }
   function startOdai(real, isBoss) {
     if (phase !== "round1") fillGauge();   // 中ボス・大ボスが出た瞬間に、ゲージが満タン（11/6-6）
