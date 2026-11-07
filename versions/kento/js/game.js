@@ -825,7 +825,7 @@ const Battle = (() => {
   // ===== チュートリアル（11/7-20）=====
   // ステージ1・5・9で、初めてのときだけ。止まる → ふわりの吹き出しで説明（2行以内）→ タップ → 1回やってみる（ほかは止まったまま）→ できたら「OK！」→ 再開
   // 見た記録は hints の mark（main.js。版ごと）。「OK！」まで行ったら見たことにする。おさらい（all）のときは全部出す
-  const LESSON_STAGE = { binoMove: 1, rescueStart: 1, shell: 1, bug: 1, seed: 1, odai: 1, s5box: 5, s5ground: 5, s5mid: 5, s9spin: 9, s9rear: 9, s9mid: 9 };
+  const LESSON_STAGE = { binoMove: 1, rescueStart: 1, shell: 1, bug: 1, seed: 1, odai: 1, s5box: 5, s5ground: 5, s5boss: 5, s9spin: 9, s9rear: 9 };   // 11/7-24: s5mid（中ボスの前）は s5boss（大ボスの前）に。s9mid はやめた
   function lessonOn(id) {
     if (!hintOpts || hintShown[id] || !opts.stage || LESSON_STAGE[id] !== opts.stage.id) return false;
     return !!(hintOpts.all || !(hintOpts.seen && hintOpts.seen[id]));
@@ -1438,10 +1438,11 @@ const Battle = (() => {
     if (wrongFx) { wrongFx.age += realDt; if (wrongFx.age > BATTLE.odaiWrongTime) wrongFx = null; }
     if (powerFx) { powerFx.age += realDt; if (powerFx.age > BATTLE.powerFxTime) powerFx = null; }
     if (odai && odai.intro > 0) odai.intro -= realDt;
-    if (odai && odai.intro <= 0 && !odai.lesTried && state === "play") {   // チュートリアル: 最初のお題（読む時間のあと）→ 答える（11/7-20）
+    if (odai && odai.intro <= 0 && !odai.lesTried && state === "play") {   // チュートリアル: お題（読む時間のあと）→ 答える（11/7-20）
       odai.lesTried = true;
-      const id = { 1: "odai", 5: "s5mid", 9: "s9mid" }[opts.stage && opts.stage.id];
-      if (id && (id === "odai" || !odai.boss)) lesson(id, { low: true, done: () => !odai || odai.firstHit !== null });   // 吹き出しは下に（ことばと重ならない）
+      //   ステージ1は最初のお題。ステージ5は大ボスの「3つを順に」の前（11/7-24。中ボスの前には出さない）。ステージ9の中ボスの説明はやめた（11/7-24）
+      const sid = opts.stage && opts.stage.id, id = sid === 1 ? "odai" : sid === 5 && odai.boss && odai.mode === "order" ? "s5boss" : null;
+      if (id) lesson(id, { low: true, done: () => !odai || odai.firstHit !== null || odai.answered });   // 吹き出しは下に（ことばと重ならない）。順番は1つ目に当てたら（正しくてもまちがいでも）
     }
     if (odai && odai.show > 0) odai.show -= realDt;   // 「3つを順に」の正しい順を見せている残り
     for (const b of bounces) { b.age += realDt; b.x += b.vx * realDt; b.y += b.vy * realDt; }
@@ -2127,6 +2128,7 @@ const Battle = (() => {
   const PARTICLES = new Set(["を", "は", "が", "に", "の", "と", "で", "へ", "も", "や", "よ", "ね", "て", "た", "か", "な"]);   // 助詞なども前の行に
   function wrapText(text, maxW, rs) {
     let pieces = segmenter ? Array.from(segmenter.segment(text), x => x.segment) : Array.from(text);
+    pieces = pieces.reduce((m, pc) => { if (m.length && /[0-9０-９]$/.test(m[m.length - 1]) && !/^\s/.test(pc)) m[m.length - 1] += pc; else m.push(pc); return m; }, []);   // 数字と、すぐあとの語（「3つ」「10枚」など）は折り返さない（11/7-24）
     if (rs && rs.length) {   // ふりがなのついた語の途中では折り返さない（11/7-18）
       const merged = []; let at = 0;
       for (const pc of pieces) { if (merged.length && rs.some(([p, l]) => p < at && p + l > at)) merged[merged.length - 1] += pc; else merged.push(pc); at += pc.length; }
@@ -2307,7 +2309,7 @@ const Battle = (() => {
       score = Math.max(0, score - BATTLE.odaiPenalty);
       floats.push({ x: e.x, y: e.y - e.size, text: `−${BATTLE.odaiPenalty}`, big: true, wrong: true, age: 0 });
       Sound.se("boing");
-      wrongFx = { age: 0, text: tx("odaiForm.orderWrong") }; e.wrongT = BATTLE.odaiWrongTime;
+      wrongFx = { age: 0, text: tx("odaiForm.orderWrong") }; odai.answered = true; e.wrongT = BATTLE.odaiWrongTime;
     }
     for (const q of enemies) {   // ほどけた殻だけ戻る（削っているとちゅうのことばは、削ったぶんを残す）
       if (!q.order || q.hp <= 0 || !q.open) continue;
@@ -2319,6 +2321,7 @@ const Battle = (() => {
   }
   // 「3つを順に」: 正しい順のことばの殻を削りきった。ほどけて番号がつく。3つ目で大ボスのことばが助かる
   function orderOpen(e) {
+    odai.answered = true;   // チュートリアル（11/7-24）: 順番のお題に答えた
     odai.step++; e.num = odai.step; e.open = true; e.hp = 1; e.flash = 0.3;   // （hp は残す: まちがえたときに殻を戻すため）
     floats.push({ x: e.x, y: e.y - e.h / 2 - 16, text: String(e.num), big: true, age: 0 });
     Sound.se("shine");
