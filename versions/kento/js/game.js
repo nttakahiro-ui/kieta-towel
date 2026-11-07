@@ -187,6 +187,8 @@ const BATTLE = {
   odaiWrongRun: 3,             // 続けてこの回数ちがうことばに当てたら、ふわりが「問題をもう一度読んでみよう」
   shellNearDone: 0.2,          // 殻の残りがこの割合以下（ほどけるまでの8割まで光を当てた）になると、黄色く光る（あと少しの印。10/25-16）
   tutCloseAfter: 0.8,          // 紙芝居（デバッグ）の札を閉じられるまでの秒数
+  // チュートリアル（11/7-20）: 止まる → ふわりの吹き出しで説明 → タップ → 1回やってみる → 「OK！」→ 再開。文は data/texts.js の lessons
+  lesson: { tapAfter: 0.6, okTime: 0.9, rearSpeed: 45, moveDist: 80 },   // tapAfter ＝ 説明が出てからタップを受けるまでの秒、okTime ＝「OK！」を出す秒、rearSpeed ＝ ステージ9の練習の虫の速さ（px/秒）、moveDist ＝「ふわりを動かそう」で動かす長さ（px）
 
   // 旅の名前と表紙の文は data/texts.js の trips（10/21-1 に移した）
   // 本番の表紙（10/3-9）
@@ -578,6 +580,7 @@ const Battle = (() => {
   let door = null;           // 扉（11/7-19。js/door.js）の時間 { t, go, popped, goX, goY }。表紙とカウント「3・2・1」は、この扉にかえた
   let doorFade = 0;          // 扉から場面に入ったあとの白い光の残り（秒）
   let freed = [];            // 殻から助けられて、ふわりのところへ飛んでいく語句
+  let les = null;            // 出ているチュートリアル（11/7-20）{ id, text, step: say（説明・止まる）| do（やってみる）| ok（OK！）, t, done }
   let tut = null;            // 出ているチュートリアルの案内（出ているあいだはゲームが止まる）{ id, t, rest(紙芝居のつづき) }
   let hintOpts = null, hintShown = {};   // 案内: main.js から { seen, mark, all }（ステージ1だけ。all ＝ おさらいで全部出す）と、このバトルで出したもの
   let hintCard = null;       // 出している案内 { text, t }
@@ -651,6 +654,8 @@ const Battle = (() => {
     e.preventDefault();
     if (paused) { resume(); return; }
     if (tut) { if (tut.t >= BATTLE.tutCloseAfter) closeTut(); return; }
+    if (les && les.step === "say") { if (les.t >= BATTLE.lesson.tapAfter) { les.step = "do"; les.t = 0; Sound.se("item"); } return; }   // 説明をタップ → やってみる
+    if (les && les.step === "ok") return;
     if (!player) return;
     if (state === "sortie") {   // 旅の画面: 選ぶ（救出の旅だけ）→ 表紙をタップ → カウント
         if (sortieNo === 2 && sortieStep === "say") { sortieStep = "choice"; Sound.se("item"); return; }   // ふわりの一言 → 持ち物選択
@@ -691,7 +696,6 @@ const Battle = (() => {
       return;
     }
     if (phase === "round1") {   // 1回目の旅: 双眼鏡を動かす（円が少し画面の外に出てもよい）
-      if (state === "play") hint("binoMove");   // 案内: 双眼鏡を初めて動かした
       bino.x = Math.min(Math.max(drag.px + (e.clientX - drag.sx) * BATTLE.binoMove, stripRight() + 10), W - 10);
       bino.y = Math.min(Math.max(drag.py + (e.clientY - drag.sy) * BATTLE.binoMove, 70), H - 90);
       return;
@@ -755,7 +759,7 @@ const Battle = (() => {
     fpsT0 = 0; fpsN = 0; fpsNow = 0; fpsMin = 0;
     msgQ = []; msgGap = 0; msgWasBusy = false;
     choiceFree = !!opts.firstChoice;
-    tut = null; hintOpts = opts.hints || null; hintShown = {}; hintCard = null; bombHinted = false; bombFlash = 0; powerFx = null; wrongFx = null; againFx = null; extraUsed = false; extraRound = false; lastT = 0; lcQueue = []; lcWords = [];
+    tut = null; les = null; hintOpts = opts.hints || null; hintShown = {}; hintCard = null; bombHinted = false; bombFlash = 0; powerFx = null; wrongFx = null; againFx = null; extraUsed = false; extraRound = false; lastT = 0; lcQueue = []; lcWords = [];
     stripFlash = 0; sortieStep = "choice"; freed = [];
     explore = { t: 0, next: 0, nextAt: BATTLE.exploreFirst, again: [], list: [], bugs: [], bugT: 2, endT: 0, flies: [], streaks: [] };
     {
@@ -808,12 +812,43 @@ const Battle = (() => {
   // ===== チュートリアル =====
   // 案内（10/21-2）: 初めてそれが起きた瞬間に1回だけ。見た記録は版ごと（main.js）。おさらい（all）のときは記録に関係なく全部出す
   function hint(id, vars) {
-    if (!hintOpts || hintShown[id]) return;
+    if (!hintOpts || hintShown[id] || !opts.stage || opts.stage.id !== 1) return;   // 小さな案内はステージ1だけ（11/7-20 からステージ5・9にも hints が来るため）
     if (!hintOpts.all && hintOpts.seen && hintOpts.seen[id]) return;
     hintShown[id] = true;
     if (hintOpts.mark) hintOpts.mark(id);
     const text = tx("hints." + id, Object.assign({ seed: seedName() }, vars || {}));
     post("tutorial", () => { hintCard = { text, t: BATTLE.hintTime, yellow: id === "seed" }; slow = Math.max(slow, BATTLE.hintSlow); });   // たねの案内は黄色い帯（たねが黄色いとわかるように。10/25-17）
+  }
+  // ===== チュートリアル（11/7-20）=====
+  // ステージ1・5・9で、初めてのときだけ。止まる → ふわりの吹き出しで説明（2行以内）→ タップ → 1回やってみる（ほかは止まったまま）→ できたら「OK！」→ 再開
+  // 見た記録は hints の mark（main.js。版ごと）。「OK！」まで行ったら見たことにする。おさらい（all）のときは全部出す
+  const LESSON_STAGE = { binoMove: 1, rescueStart: 1, shell: 1, bug: 1, seed: 1, odai: 1, s5box: 5, s5ground: 5, s5mid: 5, s9spin: 9, s9rear: 9, s9mid: 9 };
+  function lessonOn(id) {
+    if (!hintOpts || hintShown[id] || !opts.stage || LESSON_STAGE[id] !== opts.stage.id) return false;
+    return !!(hintOpts.all || !(hintOpts.seen && hintOpts.seen[id]));
+  }
+  function lesson(id, o) {
+    if (les || state !== "play" || !lessonOn(id)) return false;
+    hintShown[id] = true;
+    const key = (window.TEXTS.lessons && window.TEXTS.lessons[id]) ? "lessons." + id : "hints." + id;
+    les = Object.assign({ id, text: tx(key, { seed: seedName() }), step: "say", t: 0, dist: 0, lx: player ? player.x : 0, ly: player ? player.y : 0, done: () => true }, o || {});
+    drag = null; press = null; hintCard = null; guide = null; clearMsgs(5);
+    if (phase !== "round1") { ebullets.forEach(b => addPop(b.x, b.y, "#fff8d8", 0.4)); ebullets = []; odaiLater = []; }   // 飛んでいる弾は消す
+    Sound.se("odai");
+    return true;
+  }
+  function lessonStep(realDt) {
+    const L = les;
+    L.t += realDt;
+    if (L.step === "ok") { if (L.t >= BATTLE.lesson.okTime) endLesson(); return; }
+    if (L.step !== "do") return;
+    if (player) { L.dist += Math.hypot(player.x - L.lx, player.y - L.ly); L.lx = player.x; L.ly = player.y; }
+    if (L.done(L)) { L.step = "ok"; L.t = 0; if (hintOpts && hintOpts.mark) hintOpts.mark(L.id); Sound.se("correct"); }
+  }
+  function endLesson() {
+    les = null;
+    lastTs = performance.now();
+    msgQ.forEach(m => (m.at = performance.now()));
   }
   // ぜんぶ消しのゲージがたまった（10/25-1）: 初めての1回だけ、1秒ゆっくりにして案内。以後はたまるたびに左下が光って音が鳴る
   function bombReady() {
@@ -856,7 +891,7 @@ const Battle = (() => {
   const MSG_PRI = { say0: 0, say: 1, banner: 2, word: 3, tutorial: 4, guide: 5, odai: 6 };
   function msgBusy() {
     if (odai) return 6;
-    if (tut) return 4;
+    if (tut || les) return 4;
     if (hintCard) return 4;
     if (guide) return 5;
     if (showWord) return 3;
@@ -930,11 +965,11 @@ const Battle = (() => {
     if (p !== "round1") music("rescue");   // 救出の旅の曲へ（発見の旅は静かめの曲）
     if (p === "round2" && worldDef.id === 3 && !orbHinted) {   // 世界3の最初のステージ（9）の救出の旅の最初: ふわりの一言で回る玉を教える（ステージ5の地上の案内と同じ形。11/6-6）
       const ids = (window.STAGES || []).filter(s => s.world === 3).map(s => s.id);
-      if (opts.stage && opts.stage.id === Math.min(...ids)) { orbHinted = true; rearHinted = true; post("tutorial", () => { hintCard = { text: tx("newInWorld.orbs"), t: BATTLE.orbHintTime }; slow = Math.max(slow, BATTLE.hintSlow); }); }
+      if (opts.stage && opts.stage.id === Math.min(...ids)) { orbHinted = true; rearHinted = true; if (lessonOn("s9rear")) spawnFiller("ghost", W * 0.84, H + 30, { bx: 0, rear: true, les: true }); }   // 11/7-20: 初めてのときだけ、練習の虫を1匹（チュートリアル）。2回目からは何も出さない
     }
   }
   // カウントの今の段階（0〜2 ＝「3」「2」「1」、3 ＝「出撃！」）
-  const holdOn = () => enemies.some(e => e.hold && e.hp > 0);   // 1語目を待っているあいだ（弾も虫も出さない。台本も進めない）
+  const holdOn = () => enemies.some(e => e.hold && e.hp > 0) || fillers.some(f => f.les && f.hp > 0);   // ステージ9の練習の虫がいるあいだも（11/7-20）   // 1語目を待っているあいだ（弾も虫も出さない。台本も進めない）
   // 扉を出す（11/7-19）: 発見の旅・救出の旅の前。救出の旅の曲は扉の時点から鳴らす（発見の旅の曲は、ステージに入ったときから鳴っている）
   function openDoor() {
     sortieStep = "door"; door = { t: 0, go: null, popped: false };
@@ -947,7 +982,8 @@ const Battle = (() => {
   const skillName = id => tx(`skills.${id}.name`);
   const basePower = () => (worldDef.id >= 3 ? BATTLE.powerStartW3 : worldDef.id >= 2 ? BATTLE.powerStartW23 : 0);   // パワーの初期値の段（10/31-13 決定: 世界2・3は1段上の2本から。パワーUPでさらに1段）
   const maxHp = () => BATTLE.playerMaxHp * (loadout === "shield" ? BATTLE.guardHpMul : 1);   // 元気の上限（守りアップで1.5倍。11/6-6）
-  const frozen = () => stopT > 0;   // 時間止めのあいだ（敵・弾・ことば・コンベアが止まる）
+  const lesDo = () => !!(les && les.step === "do");   // チュートリアルの「やってみる」のあいだ（11/7-20）
+  const frozen = () => stopT > 0 || (lesDo() && phase !== "round1");   // 救出の旅のチュートリアルの「やってみる」のあいだも、敵・弾・台本・虫は止まる（やってみる相手だけ動く）   // 時間止めのあいだ（敵・弾・ことば・コンベアが止まる）
   // 出来事（stages.js の event: { kind, sortie, at, dur }）がいま起きているか。sortie 1 ＝ 発見の旅の時刻、2 ＝ 救出の旅の時刻
   //   同じ出来事を発見の旅と救出の旅の両方に書いてよい（10/31-13 決定: ステージ6〜8は救出の旅でも1回）。救出の旅の出来事は、お題のあいだは起こさない（時刻も進めない）
   const evOn = e => { const tt = e.sortie === 1 ? (phase === "round1" && explore ? explore.t : -1) : (phase !== "round1" && !odai ? rescueT : -1); return tt >= e.at && tt < e.at + e.dur; };
@@ -1053,7 +1089,7 @@ const Battle = (() => {
       player.x = W / 2; player.y = H * 0.8;
       moved = false;   // 2回目の旅の最初に、もう一度「ゆびでふわりをうごかそう」を出す
       stripFlash = 0.6;   // 帯の灰色の名前がいっせいに光る
-      hint("rescueStart");   // 案内: 救出の旅が始まった
+      lesson("rescueStart", { ty: H * 0.8, done: L => L.dist >= BATTLE.lesson.moveDist });   // チュートリアル: 救出の旅が始まった → ふわりを動かす（11/7-20）
       // （「ことばを助けよう！」の一言は、表紙の「ことばを助けに行こう！」と同じなので出さない。10/25-1）
       Sound.se("power");
     }
@@ -1370,6 +1406,7 @@ const Battle = (() => {
   function update(realDt) {
     if (paused) return;
     if (tut) { tut.t += realDt; return; }   // チュートリアルの案内のあいだは止まる
+    if (les) { lessonStep(realDt); if (les && les.step !== "do") return; }   // チュートリアル（11/7-20）: 説明と「OK！」のあいだは全部止まる
     if (state === "sortie") {   // 出撃の画面のあいだは止まっている
       // （持ち物選択の時間制限は、10/25-14 になくした。選ぶまで待つ）
       if (sortieStep === "door" && door && Door.step(door, realDt, sortieNo === 1 ? "explore" : "rescue", W, H)) {   // 押して光が広がりきった（10秒で自動）
@@ -1398,6 +1435,11 @@ const Battle = (() => {
     if (wrongFx) { wrongFx.age += realDt; if (wrongFx.age > BATTLE.odaiWrongTime) wrongFx = null; }
     if (powerFx) { powerFx.age += realDt; if (powerFx.age > BATTLE.powerFxTime) powerFx = null; }
     if (odai && odai.intro > 0) odai.intro -= realDt;
+    if (odai && odai.intro <= 0 && !odai.lesTried && state === "play") {   // チュートリアル: 最初のお題（読む時間のあと）→ 答える（11/7-20）
+      odai.lesTried = true;
+      const id = { 1: "odai", 5: "s5mid", 9: "s9mid" }[opts.stage && opts.stage.id];
+      if (id && (id === "odai" || !odai.boss)) lesson(id, { low: true, done: () => !odai || odai.firstHit !== null });   // 吹き出しは下に（ことばと重ならない）
+    }
     if (odai && odai.show > 0) odai.show -= realDt;   // 「3つを順に」の正しい順を見せている残り
     for (const b of bounces) { b.age += realDt; b.x += b.vx * realDt; b.y += b.vy * realDt; }
     bounces = bounces.filter(b => b.age < 0.5);
@@ -1558,8 +1600,9 @@ const Battle = (() => {
     for (const e of enemies) {
       if (frozen()) { e.flash = Math.max(0, e.flash - dt); if (e.parts) for (const p of e.parts) p.flash = Math.max(0, p.flash - dt); continue; }   // 時間止め: ことばは止まって撃たない
       // ザコの語句: 画面に全部入ったら1秒止まって光る（この間は撃てない）
-      if (e.role === "zako" && e.pattern !== "odai" && !e.appeared && onScreen(e)) { e.appeared = true; e.appearT = BATTLE.zakoAppearTime; if (!e.ground) hint("shell"); else if (worldDef.id > 1 && !e.hold) newInWorld("ground"); if (e.ground) groundIntroHint(e); }   // 案内: 最初の殻
+      if (e.role === "zako" && e.pattern !== "odai" && !e.appeared && onScreen(e)) { e.appeared = true; e.appearT = BATTLE.zakoAppearTime; if (e.ground && worldDef.id > 1 && !e.hold) newInWorld("ground"); if (e.ground) groundIntroHint(e); }   // 案内: 最初の殻
       if (e.appearT > 0 && !(odai && e.pattern !== "odai")) { e.appearT -= dt; e.flash = Math.max(0, e.flash - dt); continue; }
+      if (e.role === "zako" && e.pattern !== "odai" && !e.ground && !e.lesTried && onScreen(e)) { e.lesTried = true; lesson("shell", { ty: e.y, target: e, done: () => e.hp <= 0 }); }   // チュートリアル: 最初の殻（光が当たるようになったところ）→ 助ける（11/7-20）
       e.age += dt;
       e.flash = Math.max(0, e.flash - dt);
       if (e.againT > 0) {   // 大ボス2段階目: 殻が少しずつ戻る（11/1-4）
@@ -1595,13 +1638,14 @@ const Battle = (() => {
           if (was && !gHidden(e)) { e.popT = 0; if (onScreen(e)) Sound.se("pop"); }
         }
         if (e.popT !== undefined) e.popT += dt;
+        if (e.hold && !e.lesTried && onScreen(e) && e.y > H * 0.22) { e.lesTried = true; lesson("s5ground", { ty: e.y, target: e, done: () => e.hp <= 0 }); }   // チュートリアル: 最初の地上のことば（止まって待つことば）が上の帯の下まで来た → 爆弾で助ける（11/7-20）
         if (gMoves(e)) {   // 動く: コンベアに乗って横に動く。出来事「コンベアが逆」では逆向き。11/7-8 決定: はしの60pxの手前で止まる（前は はしで折り返した）
           const d = evActive("reverse") ? -1 : 1, [lo, hi] = gEdges(e);
           e.x = Math.max(lo, Math.min(hi, e.x + e.vx * d * convFast() * dt));
         }
         if (e.hold && e.y >= H * BATTLE.firstHoldY) {   // ステージ5の最初の地上のことば: 中ほどで止まって待つ。止まったところで案内
           e.y = H * BATTLE.firstHoldY;
-          if (!e.holdHinted) { e.holdHinted = true; newInWorld("ground", true); }
+          if (!e.holdHinted) { e.holdHinted = true; if (!hintOpts) newInWorld("ground", true); }   // （11/7-20 からは、チュートリアルのあるときはそちらで説明。2回目からは何も出さない）
         }
       } else if (e.pattern === "edge") {
         // 端にかくれる: 半分だけ顔を出して、出たり引っこんだりしながら降りる
@@ -1658,12 +1702,21 @@ const Battle = (() => {
 
     // 雑魚の動き
     for (const f of fillers) {
+      if (f.les) {   // ステージ9の練習の虫（11/7-20）: 右下からゆっくり上がってきて、ふわりの横の、玉の通る輪のところで止まる（玉が当たる）。
+        //   ふわりの高さまで来たところで止めて説明（下の帯の文字にかくれないように）。ぶつかっても元気は減らない
+        f.flash = Math.max(0, f.flash - dt);
+        const side = f.x >= player.x ? 1 : -1, gx = player.x + side * BATTLE.orbs.radius, gy = player.y;
+        const dx = gx - f.x, dy = gy - f.y, d = Math.hypot(dx, dy), v = BATTLE.lesson.rearSpeed * dt;
+        if (d > 1) { f.x += dx / d * Math.min(d, v); f.y += dy / d * Math.min(d, v); }
+        if (f.y < player.y + 30) lesson("s9rear", { ty: H, target: f, done: () => f.hp <= 0 || !fillers.includes(f) });
+        continue;
+      }
       if (frozen()) { f.flash = Math.max(0, f.flash - dt); continue; }   // 時間止め: 虫も止まる
       f.age += dt;
       f.flash = Math.max(0, f.flash - dt);
       const def = FILLER_TYPES[f.type];
       if (f.delay > 0) { f.delay -= dt; continue; }
-      if (f.y > 10 && f.layer === "air") hint("bug");   // 案内: 最初の虫が画面に入った
+      if (f.y > 10 && f.layer === "air" && !f.rear && f.x > stripRight() + f.r + 20 && f.x < W - f.r - 20) lesson("bug", { ty: f.y, target: f, done: () => f.hp <= 0 || !fillers.includes(f) });   // チュートリアル: 最初の虫が画面に入った → 倒す（11/7-20）
       if (f.escort) {
         if (f.escort.hp > 0 && enemies.includes(f.escort)) {
           f.x = f.escort.x + f.dx + Math.sin(f.age * 2 + f.dx) * 4;
@@ -1712,14 +1765,14 @@ const Battle = (() => {
 
     // 世界3の光の玉（11/6-3）: 自機のまわりを回り、触れた空中の虫にダメージ。うしろから来た虫は、自機にぶつかると元気が減る
     if (orbsOn()) {
-      if (!frozen()) orbAng += Math.PI * 2 / BATTLE.orbs.period * dt;
+      if (!frozen() || (les && les.id === "s9rear")) orbAng += Math.PI * 2 / BATTLE.orbs.period * dt;   // ステージ9のチュートリアルのあいだも玉は回る
       for (let i = 0; i < orbFlash.length; i++) orbFlash[i] = Math.max(0, orbFlash[i] - dt);
       for (const f of fillers) {
         if (f.layer !== "air" || f.hp <= 0 || f.delay > 0) continue;
         f.orbCd = Math.max(0, (f.orbCd || 0) - dt);
         const oi = f.orbCd <= 0 ? orbPos().findIndex(o => Math.hypot(o.x - f.x, o.y - f.y) < f.r + BATTLE.orbs.r) : -1;
         if (oi >= 0) { f.orbCd = BATTLE.orbs.cd; orbFlash[oi] = 0.3; Sound.se("orbHit"); damageFiller(f); }   // 当たった玉がはっきり光って、音が鳴る（11/6-6）
-        if (f.rear && f.hp > 0 && !frozen() && Math.hypot(f.x - player.x, f.y - player.y) < f.r + 14 && player.inv <= 0 && !showWord && !(odai && odai.intro > 0)) {
+        if (f.rear && !f.les && f.hp > 0 && !frozen() && Math.hypot(f.x - player.x, f.y - player.y) < f.r + 14 && player.inv <= 0 && !showWord && !(odai && odai.intro > 0)) {
           f.hp = 0;   // ぶつかった虫は消える（点は入らない。＋100 も出さない）
           addPop(f.x, f.y, "#ffb0b8", 0.7);
           player.red = 0.5;   // 自機が赤く光る
@@ -1766,7 +1819,7 @@ const Battle = (() => {
       let hit = false;
       if (inObstacle(s.x, s.y)) { s.y = -999; continue; }   // 木は弾をさえぎる
       for (const f of fillers) {
-        if (f.layer !== "air" || f.hp <= 0 || f.delay > 0) continue;
+        if (f.layer !== "air" || f.hp <= 0 || f.delay > 0 || f.les) continue;   // 練習の虫は玉で倒す（光は通りぬける）
         if (Math.hypot(s.x - f.x, s.y - f.y) < f.r + (s.thick ? 10 : 4)) { hit = true; damageFiller(f); break; }
       }
       if (!hit) {
@@ -1931,7 +1984,7 @@ const Battle = (() => {
     post("tutorial", () => { hintCard = { text, t: BATTLE.hintTime }; slow = Math.max(slow, BATTLE.hintSlow); });
   }
   function groundTargets() {
-    return enemies.filter(e => e.ground && !e.loose && e.hp > 0 && onScreen(e) && !(e.appearT > 0) && !gHidden(e)).concat(fillers.filter(f => f.layer === "ground" && f.hp > 0 && f.y > 0));
+    return enemies.filter(e => e.ground && !e.loose && e.hp > 0 && onScreen(e) && !(e.appearT > 0) && !gHidden(e) && !(e.hold && !e.lesTried && lessonOn("s5ground")))   // ステージ5のチュートリアルの地上のことばは、説明が出るまで爆弾が当たらない（11/7-20）.concat(fillers.filter(f => f.layer === "ground" && f.hp > 0 && f.y > 0));
   }
   function inReach(g, x, y, r) {
     if (g.word) return Math.abs(x - g.x) < g.w / 2 + r && Math.abs(y - g.y) < g.h / 2 + r;
@@ -2177,10 +2230,7 @@ const Battle = (() => {
     odai = { real, boss: isBoss, t: 0, intro: read, firstHit: null, q, wrongRun: 0, mode: seq ? "order" : "pick", step: 0, show: 0, slip: false, seq: seq || null, cols: pair || after ? 2 : 3 };
     music("odai");   // お題バトルの曲へ（11/3-4）
     // 案内: 最初のお題は、問題文の下に1行そえて、読む時間を少しのばす（順番待ちにはのせない。お題がいちばん大事なため）
-    if (hintOpts && !hintShown.odai && (hintOpts.all || !(hintOpts.seen && hintOpts.seen.odai))) {
-      hintShown.odai = true; if (hintOpts.mark) hintOpts.mark("odai");
-      odai.hint = tx("hints.odai"); odai.intro += BATTLE.odaiHintExtra; slow = odai.intro;
-    }
+    // （ステージ1の最初のお題の、問題文の下の1行は 11/7-20 にやめた。読む時間のあとのチュートリアルで説明する）
     const longest = Math.max(...cands.map(w => Array.from(w.word).length));
     const room = H * 0.66 - odaiTop() - 30;   // 問題文の帯の下から、自機の上まで
     const size = Math.round(Math.max(24, Math.min(BATTLE.fontSize[role], Math.floor(room / (longest * 1.12)))) * BATTLE.odaiTextScale);   // 11/1 決定: 0.8倍
@@ -2389,7 +2439,7 @@ const Battle = (() => {
         color: ["#ffe9a0", "#ffffff", "#f8c8d8"][i % 3], age: 0, scatter: 9, sparkle: true });
     }
     Sound.se("pop");
-    if (Math.random() < BATTLE.dropRate) { items.push({ x: f.x, y: f.y, age: 0 }); hint("seed"); }   // 案内: 初めてたねが落ちた
+    if (Math.random() < BATTLE.dropRate) { const it = { x: f.x, y: f.y, age: 0 }; items.push(it); lesson("seed", { ty: it.y, target: it, done: () => it.got || it.y >= H + 20 }); }   // チュートリアル: 初めてたねが落ちた → 拾う（11/7-20）
   }
 
   // 花が咲くような小さな演出
@@ -2456,7 +2506,7 @@ const Battle = (() => {
       }
       return;
     }
-    ex.t += dt;
+    if (!lesDo()) ex.t += dt;   // チュートリアルの「やってみる」のあいだは、時間（タイムバー）も、ことば・箱の動きも止まる（11/7-20）
     if (exMove.space) { updateSpace(dt); return; }   // 世界3の無重力（10/31-10 試作）
     if (exMove.box) { updateBoxes(dt); return; }   // 世界2の箱（10/31-10 試作）
     const words = exploreWords();
@@ -2476,9 +2526,11 @@ const Battle = (() => {
       if (drag) drag.px += nx - bino.x;
       bino.x = nx;
     }
+    const xdt = dt;
     for (const d of ex.list) {
+      const dt = lesDo() ? 0 : xdt;   // チュートリアルの「やってみる」のあいだは、ことばは止まる（見つける1秒は進む）
       d.age += dt;
-      if (d.found) { d.foundT += dt; continue; }
+      if (d.found) { d.foundT += xdt; continue; }
       if (d.wait > 0) { d.wait -= dt; d.vis = 0; if (d.wait <= 0) exStart(d); continue; }   // 落ちた・流れて出たあと、出直すまで見えない
       d.since += dt;
       const minX = stripRight() + d.w / 2 + 8, maxX = W - d.w / 2 - 8;
@@ -2503,8 +2555,9 @@ const Battle = (() => {
       d.vis = Math.max(0, Math.min(1, d.since / 0.8, (d.life - d.age) / 1.2, fade));
       if (d.flies) for (const f of d.flies) f.a += f.sp * dt;
       d.hintT += dt;
+      if (d.vis > 0.5 && !les) { const n0 = reacted; lesson("binoMove", { ty: d.y, target: d, done: () => reacted > n0 }); }   // チュートリアル: 最初のことばが見えた → 見つける（11/7-20）
       if (d.age < d.life && d.vis > 0.5 && inBino(d.x, d.y, 0.9)) {
-        d.look += dt;
+        d.look += xdt;
         if (d.look >= (exMove.lookTime || BATTLE.lookTime)) findWord(d);
       }
     }
@@ -2567,6 +2620,7 @@ const Battle = (() => {
       shuffle(list.slice(1).filter(b => b.word)).slice(0, mv.lock).forEach(b => (b.lock = true));
       list.splice(1, 0, { word: null, key: true });
     }
+    if (lessonOn("s5box")) { const i = list.findIndex(b => b.word); if (i > 0) list.unshift(list.splice(i, 1)[0]); }   // チュートリアルのときは、最初の箱にことばを入れる（11/7-20）
     ex.queue = list.map((b, i) => Object.assign(b, { w: mv.boxW, h: mv.boxH, hold: 0, open: false, openT: 0, out: false, wait: 0, phase: (i * 0.77) % 3, shake: 0, warnT: 0 }));
     ex.boxes = []; ex.nextBoxAt = BATTLE.exploreFirst; ex.laneNo = 0; ex.belt = 0; ex.keyFound = false;
   }
@@ -2583,8 +2637,8 @@ const Battle = (() => {
     const ex = explore, mv = exMove, words = exploreWords();
     if (!ex.queue) boxSetup();
     evBanners();
-    const dir = convDir();
-    ex.belt += dir * mv.speed * dt;
+    const dir = convDir(), md = lesDo() ? 0 : dt;   // チュートリアルの「やってみる」のあいだは、コンベアが止まる（押さえる時間は進む）
+    ex.belt += dir * mv.speed * md;
     // 箱を出す（コンベアの入り口があいているレーンへ）
     while (ex.queue.length && ex.t >= ex.nextBoxAt) {
       const b = ex.queue[0];
@@ -2601,19 +2655,21 @@ const Battle = (() => {
     for (const b of ex.boxes) {
       b.shake = Math.max(0, b.shake - dt); b.warnT = Math.max(0, b.warnT - dt);
       if (b.out) {   // 流れきって見えない: しばらくして上手から戻ってくる
-        b.wait -= dt;
+        b.wait -= md;
         if (b.wait <= 0) { if (entryFree(b.lane, b)) { b.out = false; b.x = entryX(b); b.hold = 0; } else b.wait = 0.3; }
         continue;
       }
-      b.x += dir * mv.speed * dt;
+      const entering = dir > 0 ? b.x - b.w / 2 < stripRight() + 6 : b.x + b.w / 2 > W - 6;   // まだ全部は見えていない箱は、チュートリアルのあいだも入ってくる
+      b.x += dir * mv.speed * (entering ? dt : md);
       b.y = laneY(b.lane);
+      if (b.word && !b.open && !entering) { const n0 = reacted; lesson("s5box", { ty: b.y, target: b, done: () => reacted > n0 }); }   // チュートリアル: 最初の箱が全部見えた → 止めて説明 → 押さえて開ける（11/7-20）
       if (b.open) { b.openT += dt; continue; }
       if ((dir > 0 && b.x - b.w / 2 > W) || (dir < 0 && b.x + b.w / 2 < 0)) { b.out = true; b.wait = mv.wait; b.hold = 0; continue; }
       if (press && !pressed && Math.abs(press.x - b.x) < b.w / 2 + 6 && Math.abs(press.y - b.y) < b.h / 2 + 6 && b.x > stripRight() && b.x < W) pressed = b;
     }
     for (const b of ex.boxes) {
       if (b.out || b.open) continue;
-      if (b !== pressed) { b.hold = 0; continue; }
+      if (b !== pressed || (lessonOn("s5box") && !les)) { b.hold = 0; continue; }   // チュートリアルの説明の前は、まだ開かない（11/7-20）
       if (!boxCanOpen(b)) {
         b.hold = 0;
         if (b.lock && !ex.keyFound && b.warnT <= 0) { b.shake = 0.3; b.warnT = 1.5; floats.push({ x: b.x, y: b.y - b.h / 2 - 10, text: tx("box.locked"), big: false, age: 0 }); Sound.se("boing"); }
@@ -2681,7 +2737,7 @@ const Battle = (() => {
   function absorb(e) {
     absorbed.push(e.word);
     addGauge(BATTLE.gaugeWord);
-    if (e.hold && e.ground) post("banner", () => { banner = { text: tx("newInWorld.groundDone"), t: 2.4, color: "rgba(111,154,74,0.9)" }; });   // ステージ5の最初の地上のことばを助けた（10/31-12）
+    if (e.hold && e.ground && !hintShown.s5ground) post("banner", () => { banner = { text: tx("newInWorld.groundDone"), t: 2.4, color: "rgba(111,154,74,0.9)" }; });   // ステージ5の最初の地上のことばを助けた（10/31-12）
     if (e.odaiReal && odai) endOdai(true);
     const lv = POWER_LEVELS[Math.min(Math.floor(absorbed.length / BATTLE.powerEvery) + powerBonus, topLevel())];
     if (lv !== level && absorbed.length < opts.total) {
@@ -2817,6 +2873,7 @@ const Battle = (() => {
 
   function hurt() {
     if (BATTLE.debugInvincible) return;   // デバッグ: 無敵
+    if (les) return;   // チュートリアルのあいだは、ぶつかっても減らない（11/7-20）
     if (guardT > 0) return;   // 必殺ワザ「無敵タイム」: ぶつかっても元気が減らない（10/31-10 試作）
     player.hp -= BATTLE.damage;
     player.inv = BATTLE.invincibleTime * (loadout === "shield" ? BATTLE.guardInvMul : 1);   // 守りアップ: 被弾後の無敵が少し長い（11/6-6）
@@ -3074,6 +3131,7 @@ const Battle = (() => {
     if (hintCard) drawHintCard();
     if (state === "sortie") drawSortie();
     if (doorFade > 0) { ctx.fillStyle = `rgba(255,253,240,${doorFade / BATTLE.doorFade})`; ctx.fillRect(0, 0, W, H); }   // 扉から入ったあとの白い光が消えていく
+    if (les) drawLesson();
     if (tut) drawTut();
     if (state === "clear") centerText(`${absorbed.length}のことばを助けた！`, `${score}点`);
     if (paused) drawSleep();
@@ -4351,6 +4409,7 @@ const Battle = (() => {
     if (hintCard) drawHintCard();
     if (state === "sortie") drawSortie();
     if (doorFade > 0) { ctx.fillStyle = `rgba(255,253,240,${doorFade / BATTLE.doorFade})`; ctx.fillRect(0, 0, W, H); }   // 扉から入ったあとの白い光が消えていく
+    if (les) drawLesson();
     if (tut) drawTut();
     if (paused) drawSleep();
   }
@@ -4387,7 +4446,9 @@ const Battle = (() => {
     let pressed = null, pressedD = 0;
     for (const b of ex.boxes) {
       if (b.open) { b.openT += dt; continue; }
-      b.x += b.vx * dt; b.y += b.vy * dt; if (!b.grab) b.ang += b.spin * dt;   // 押さえているあいだは回らない
+      const md = lesDo() ? 0 : dt;   // チュートリアルの「やってみる」のあいだは、ことばは動かない（回るのは続く）
+      b.x += b.vx * md; b.y += b.vy * md; if (!b.grab) b.ang += b.spin * dt;
+      { const n0 = reacted; lesson("s9spin", { ty: b.y, target: b, done: () => reacted > n0 }); }   // チュートリアル: 最初のことばが出た → 向きを直して見つける（11/7-20）   // 押さえているあいだは回らない
       if (b.x - b.w / 2 < minX) { b.x = minX + b.w / 2; b.vx = Math.abs(b.vx); }
       if (b.x + b.w / 2 > maxX) { b.x = maxX - b.w / 2; b.vx = -Math.abs(b.vx); }
       if (b.y - b.h / 2 < minY) { b.y = minY + b.h / 2; b.vy = Math.abs(b.vy); }
@@ -4552,6 +4613,7 @@ const Battle = (() => {
     if (hintCard) drawHintCard();
     if (state === "sortie") drawSortie();
     if (doorFade > 0) { ctx.fillStyle = `rgba(255,253,240,${doorFade / BATTLE.doorFade})`; ctx.fillRect(0, 0, W, H); }   // 扉から入ったあとの白い光が消えていく
+    if (les) drawLesson();
     if (tut) drawTut();
     if (paused) drawSleep();
   }
@@ -4572,6 +4634,44 @@ const Battle = (() => {
     ctx.restore();
   }
 
+  // チュートリアル（11/7-20）の絵: 説明のあいだは画面をうす暗くして、まん中にふわりと吹き出し（ふりがなつき）と「タップでやってみよう！」。
+  //   やってみるあいだは、上に同じ文を小さく（お題のときは問題文と重なるので出さない）。できたら、まん中に「OK！」（扉と同じデコ文字・世界の色）
+  function drawLesson() {
+    const L = les;
+    ctx.save();
+    ctx.textAlign = "left"; ctx.textBaseline = "top";
+    if (L.step === "say" || (L.step === "do" && !odai)) {
+      const say = L.step === "say", a = say ? Math.min(1, L.t / 0.2) : 1;
+      ctx.globalAlpha = a;
+      if (say) { ctx.fillStyle = "rgba(25,35,30,0.45)"; ctx.fillRect(0, 0, W, H); }
+      const tg = L.target;
+      if (tg && tg.x !== undefined && !(tg.hp <= 0) && !tg.open && !tg.got && !tg.found) {   // やってみる相手を、光る輪で示す
+        const r = Math.max(26, (tg.w ? Math.max(tg.w, tg.h || 0) : 2 * (tg.r || 12)) / 2 + 14) * (1 + 0.08 * Math.sin(performance.now() / 160));
+        ctx.save(); ctx.globalAlpha = a * 0.95; ctx.strokeStyle = "#fff6b8"; ctx.lineWidth = 4; ctx.shadowColor = "rgba(255,220,90,0.9)"; ctx.shadowBlur = 14;
+        ctx.beginPath(); ctx.arc(tg.x, tg.y, r, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+      }
+      const px = say ? Math.max(14, (W - 380) / 2) : stripRight() + 8, pw = say ? W - px * 2 : W - px - 10;
+      const art = say ? 64 : 40, f = fitOdaiText(L.text, say ? 18 : 15, pw - art - 22, 2);
+      const tapH = say ? 34 : 0, ph = Math.max(say ? 92 : 50, 20 + f.lines.length * f.lh + tapH), py = !say ? 46 : L.low ? Math.min(H - ph - 16, H * 0.8 - ph / 2) : L.ty === undefined ? H * 0.4 - ph / 2 : L.ty < H * 0.5 ? H * 0.68 - ph / 2 : H * 0.3 - ph / 2;   // 説明の吹き出しは、やってみる相手（ty）と重ならないほうに
+      ctx.fillStyle = "rgba(255,253,245,0.98)"; ctx.strokeStyle = tint("#9cbf7c"); ctx.lineWidth = say ? 3 : 2.5;
+      roundRect(px, py, pw, ph, say ? 18 : 14); ctx.fill(); ctx.stroke();
+      drawFuwariArt(1, px + 8 + art / 2, py + (ph - tapH) / 2, art * 0.9);
+      ctx.fillStyle = "#3f4a35";
+      drawRubyLines(f, px + art + 12, py + (ph - tapH - f.lines.length * f.lh) / 2);
+      if (say && L.t >= BATTLE.lesson.tapAfter) {
+        ctx.globalAlpha = 0.6 + Math.sin(performance.now() / 250) * 0.4;
+        ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.font = font(15); ctx.fillStyle = tint("#6f9a4a");
+        ctx.fillText(tx("lessons.tap"), W / 2, py + ph - 20);
+      }
+    } else if (L.step === "ok") {
+      const k = Math.min(1, L.t / 0.25), sc = k < 1 ? 0.4 + 0.9 * k : 1.3 - 0.3 * Math.min(1, (L.t - 0.25) / 0.15);
+      const d = Door.deco([tx("lessons.ok")], 52, worldDef.id || 1);
+      ctx.globalAlpha = Math.max(0, Math.min(1, (BATTLE.lesson.okTime - L.t) / 0.2));
+      ctx.translate(W / 2, H * 0.42); ctx.scale(sc, sc);
+      if (d) ctx.drawImage(d.c, -d.w / 2, -d.h / 2, d.w, d.h);
+    }
+    ctx.restore();
+  }
   // 紙芝居（デバッグ。一時停止メニューの「案内を紙芝居で見る」）: 案内の文を1つずつ札にして見せる
   function drawTut() {
     const d = { title: "案内", lines: wrapTextFont(tut.text || "", 17, Math.min(W - 32, 360) - 40) };

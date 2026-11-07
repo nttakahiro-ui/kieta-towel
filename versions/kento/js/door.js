@@ -258,5 +258,5 @@ const Door = (() => {
     raf = requestAnimationFrame(loop);
     return { stop, state: st };
   }
-  return { draw, step, tap, mount, COLORS };
+  return { draw, step, tap, mount, deco, COLORS };   // deco はチュートリアルの「OK！」でも使う（11/7-20）
 })();

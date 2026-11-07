@@ -104,7 +104,7 @@ for (const [o, places] of others) {
 }
 // 画面の文（texts.js の結果・お題・クイズ）と、quiz.js・cards.js に書いてある文
 const walk = (o, p) => typeof o === "string" ? annotate(o, "画面の文 " + p) : o && typeof o === "object" && Object.entries(o).forEach(([k, v]) => walk(v, p + "." + k));
-for (const k of ["results", "odaiForm", "quiz"]) walk(TEXTS[k], k);
+for (const k of ["results", "odaiForm", "quiz", "lessons", "hints"]) walk(TEXTS[k], k);   // lessons・hints はチュートリアルの吹き出し（11/7-20）
 for (const s of ["時間切れ！ 正解は", "正解は", "クイズで不正解。あとで受け直せる", "旅で助けられなかった。もう一度あそんで助けよう", "ベスト更新！", "ランク："]) annotate(s, "画面の文（quiz.js・cards.js）");
 // 文の組み立てで使う語の表（120語の名前など。文の表にない文に使う）
 for (const w of WORDS) if (hard(w.word)) { const v = (dictVotes[w.word] ||= {}); (v[hira(w.kana)] ||= { n: 0, spans: align(w.word, w.kana) }).n += 100; }
