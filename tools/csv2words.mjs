@@ -1,6 +1,8 @@
 // 120語の入れ替え（11/5-2）: 投入用CSV から、ある版の data/words.js と data/stages.js（nextAsk・bossOrder）を作り直す
 // 使い方: node tools/csv2words.mjs <投入用.csv> <版のフォルダ（例 versions/kento）>
-// CSV の列: 世界,ステージ,ステージ名,順,役,語,かな,1文字読み（ボスの漢字）,問題,答え,はずれ,メモ,前の工程（中ボス）,後の工程（中ボス）,3つを順に（大ボス）,難易度,旧語
+// CSV の列: 世界,ステージ,ステージ名,順,役,語,かな,1文字読み（ボスの漢字）,問題,答え,はずれ,メモ,前の工程（中ボス）,後の工程（中ボス）,3つを順に（大ボス）,ボスの問い（世界2）,ボスの問いのはずれ,難易度,旧語
+//   ボスの問い（11/7-11。1107e から）: 中ボスは bossQ（問いの文）と bossMiss（2択のはずれ）、大ボスは bossQ（「3つを順に」の前置き）。空の語には書かない
+//   世界2の nextAsk・bossOrder は、CSV に書いてあるステージだけに書く（ないステージからは消す）
 //   役 ＝ ザコ／中ボス／大ボス。順 ＝ 出る順（大ボスは10）。選択肢は [答え, はずれ]（正解は1つ目。画面ではならびをまぜる）
 //   お題の問い（odaiQuestion）は空にして、問題文をそのまま使う。1文字読み「空:くう|洞:どう」から kanaParts（漢字はCSVの読み、かなはその文字のまま）
 //   世界2: 中ボスの「前の工程」「後の工程」→ nextAsk、大ボスの「3つを順に」（→ でつなぐ）→ bossOrder
@@ -55,6 +57,7 @@ const words = rows.map(r => {
   return {
     id: (stage - 1) * 10 + order, stage, word, kana: col(r, "かな"), question: col(r, "問題"), choices: [ans, miss], answer: 0, memo: col(r, "メモ"),
     role, hp: role === "zako" ? 1 : role === "mid" ? 3 : 12, sayCorrect: "", sayWrong: "", order, pattern, lane, odaiQuestion: "", kanaParts,
+    ...(col(r, "ボスの問い（") ? { bossQ: col(r, "ボスの問い（") } : {}), ...(col(r, "ボスの問いのはずれ") ? { bossMiss: col(r, "ボスの問いのはずれ") } : {}),
   };
 }).sort((a, b) => a.id - b.id);
 
@@ -67,6 +70,7 @@ for (let s = 1; s <= 12; s++) {
   const b = ws.find(w => w.role === "boss"); if (b && b.order !== 10) errs.push(`ステージ${s}: 大ボスが順${b.order}`);
 }
 
+for (const w of words) if (w.role === "mid" && !!w.bossQ !== !!w.bossMiss) errs.push(`ステージ${w.stage} ${w.word}: ボスの問いと、そのはずれは両方そろえる`);
 // 世界2の nextAsk・bossOrder
 const nextAsk = {}, bossOrder = {};
 rows.forEach(r => {

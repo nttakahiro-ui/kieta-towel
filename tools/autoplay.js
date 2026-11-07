@@ -82,6 +82,7 @@ function runOnce(skill, seed) { HUDLOG.rows.push(["--", skill]); HUDLOG.lastK = 
     // お題のあいだ（11/1）: 中ボスのお題の秒数（問題文が出てから殻がほどけるまで）と、お題のあいだの被弾
     if (S.odai && S.odai !== odaiNow) { odaiNow = S.odai; odaiT0 = S.t; odaiH0 = S.hits; }
     if (odaiNow && S.odai !== odaiNow) { if (!odaiNow.boss) midSecs.push(S.t - odaiT0); odaiHits += S.hits - odaiH0; odaiNow = S.odai || null; if (odaiNow) { odaiT0 = S.t; odaiH0 = S.hits; } }
+    if (process.env.ODAILIST && S.odai && S.odai !== globalThis.__listOdai) { const es = S.enemies.filter(e => e.pattern === "odai"); if (es.length >= 2) { globalThis.__listOdai = S.odai; console.log("ODAILIST", STAGE, S.odai.boss ? "大ボス" : "中ボス", S.odai.mode === "order" ? "順" : es.length + "択", "「" + S.odai.q + "」", es.map(e => e.word.word + (e.dummy ? "" : "◎")).join(" / ")); } }   // 11/7-11: 実際に出た問いと選ぶことば（◎＝正解。順は正しい順の3つ）
     if (process.env.ODAILOG && S.odai && S.odai !== globalThis.__lastOdai) { globalThis.__lastOdai = S.odai; console.log("ODAI", S.odai.real.word, "→", S.odai.q); }
     if (S.player && S.state === "play" && S.phase === "round1" && S.explore && S.explore.queue) {
       // 世界2の箱（10/31-10 試作）: 箱はぜんぶ見えている。近い箱へ指を動かして押さえる（空箱かどうかはわからない）。鍵の箱に一度はじかれたら、鍵が見つかるまでさわらない
