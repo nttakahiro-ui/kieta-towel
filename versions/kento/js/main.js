@@ -364,7 +364,7 @@ const Main = (() => {
         stage,
         stageName: stage.name,
         fuwariCount: Save.cardCount(),
-        hints: [1, 5, 9].includes(stage.id) ? { seen: TutSave.load(), mark: TutSave.mark, all: reviewNext && stage.id === 1 } : null,   // 案内とチュートリアルはステージ1・5・9（初めてのときだけ。11/7-20。おさらいのときは全部）
+        hints: [1, 2, 5, 9].includes(stage.id) ? { seen: TutSave.load(), mark: TutSave.mark, all: reviewNext && stage.id === 1 } : null,   // 案内とチュートリアルはステージ1・5・9（初めてのときだけ。11/7-20。おさらいのときは全部）
         hero: Save.data.hero || "boy",
         firstChoice: !TutSave.load().choice,          // 持ち物選択: 初めては時間制限なし（記録は版ごと）
         bombHintSeen: !!TutSave.load().bombReady,     // 必殺ワザの案内（初めての1回だけ。記録は版ごと）

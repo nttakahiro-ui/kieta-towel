@@ -610,7 +610,7 @@ const Battle = (() => {
   let wave = null;           // 吸い込んだときに広がる光
   // 世界2・3の試作（10/31-10）
   let stopT = 0, guardT = 0, boostT = 0;   // 時間止め（いまは使わない。0のまま）・無敵タイム・パワー全開の残り秒
-  let rewindSaid = false, rewindHintWait = false;   // そのステージで「巻き戻し」の一言を出したか・出すのを待っているか（11/7-9）
+  let rewindSaid = false, rewindHintWait = false, guardSayWait = false;   // そのステージで「巻き戻し」の一言を出したか・出すのを待っているか（11/7-9）
   let rewindUsed = false, rewindFx = null, baseScript = [], killN = 0;   // 巻き戻しを使ったか（1ステージ1回）、その演出、救出の旅の最初の台本
   let skillUse = { boost: 0, guard: 0, rewind: 0, fullAcc: 0, fullBoss: 0, firstAcc: -1 };   // 必殺ワザを使った回数と、ゲージが満タンになった回数（ためて／中ボス・大ボスで）、ためて初めて満タンになった救出の旅の時計（調べる用）
   let meteorT = 0;   // 流星雨の次の1つまで（世界3。10/31-10 試作）
@@ -681,7 +681,7 @@ const Battle = (() => {
     // 左下の3つのボタンをタップ: ゲージが満タンなら、その必殺ワザ（1回目の旅にはボタンがない）
     const rect = canvas.getBoundingClientRect();
     const sb = phase === "round1" ? null : skillButtons().find(q => Math.hypot(e.clientX - rect.left - q.x, e.clientY - rect.top - q.y) < q.r + 4);
-    if (sb) { if (skillOk(sb.id)) useSkill(sb.id); return; }
+    if (sb) { if (les && les.id === "boost" && sb.id !== "boost") return; if (skillOk(sb.id)) useSkill(sb.id); return; }   // パワー全開のチュートリアルのあいだは、パワー全開のボタンだけ
     const exploring = phase === "round1";   // 1回目の旅は、指で双眼鏡を動かす
     if (exploring && exMove.box) { const r0 = canvas.getBoundingClientRect(); press = { x: e.clientX - r0.left, y: e.clientY - r0.top, id: e.pointerId }; }   // 世界2の箱: 指で直接押さえる
     drag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, px: exploring ? bino.x : player.x, py: exploring ? bino.y : player.y };
@@ -772,7 +772,7 @@ const Battle = (() => {
     bino = { x: W / 2 + 10, y: H * 0.42 };
     state = "sortie"; sortieNo = 1; reacted = 0; openDoor();   // 発見の旅の扉から始める（11/7-19）
     loadout = null; powerBonus = basePower(); shield = 0; gaugeMul = 1;
-    stopT = 0; guardT = 0; boostT = 0; rewindUsed = false; rewindSaid = false; rewindHintWait = false; rewindFx = null; skillUse = { boost: 0, guard: 0, rewind: 0, fullAcc: 0, fullBoss: 0, firstAcc: -1 }; baseScript = script; rescueT = 0; evShown = {}; evPlans = {}; bgOff = 0; bgGo = false; press = null;
+    stopT = 0; guardT = 0; boostT = 0; rewindUsed = false; rewindSaid = false; rewindHintWait = false; guardSayWait = false; rewindFx = null; skillUse = { boost: 0, guard: 0, rewind: 0, fullAcc: 0, fullBoss: 0, firstAcc: -1 }; baseScript = script; rescueT = 0; evShown = {}; evPlans = {}; bgOff = 0; bgGo = false; press = null;
     events = (opts.stage && opts.stage.event) ? [].concat(opts.stage.event) : [];
     // 救出の旅をもう一度（10/25-14。結果画面のボタン）: 発見の旅をとばして、持ち物選択から。発見で見つけたことばの記録（opts.foundIds）は残す
     if (opts.foundIds) {
@@ -825,13 +825,14 @@ const Battle = (() => {
   // ===== チュートリアル（11/7-20）=====
   // ステージ1・5・9で、初めてのときだけ。止まる → ふわりの吹き出しで説明（2行以内）→ タップ → 1回やってみる（ほかは止まったまま）→ できたら「OK！」→ 再開
   // 見た記録は hints の mark（main.js。版ごと）。「OK！」まで行ったら見たことにする。おさらい（all）のときは全部出す
-  const LESSON_STAGE = { binoMove: 1, rescueStart: 1, shell: 1, bug: 1, seed: 1, odai: 1, s5box: 5, s5ground: 5, s5boss: 5, s9spin: 9, s9rear: 9 };   // 11/7-24: s5mid（中ボスの前）は s5boss（大ボスの前）に。s9mid はやめた
+  const LESSON_STAGE = { binoMove: 1, rescueStart: 1, shell: 1, bug: 1, seed: 1, odai: 1, choice: 1, boost: 1, s2guard: 2, s5box: 5, s5ground: 5, s5boss: 5, s9spin: 9, s9rear: 9 };   // 11/7-24: s5mid（中ボスの前）は s5boss（大ボスの前）に。s9mid はやめた
   function lessonOn(id) {
     if (!hintOpts || hintShown[id] || !opts.stage || LESSON_STAGE[id] !== opts.stage.id) return false;
     return !!(hintOpts.all || !(hintOpts.seen && hintOpts.seen[id]));
   }
+  //   11/7-26: とくいの選択（choice。出撃前の画面）・ゲージが初めて満タン（boost。パワー全開を押す）をステージ1に。ステージ2は無敵タイムの一言だけ（s2guard。止めない）
   function lesson(id, o) {
-    if (les || state !== "play" || !lessonOn(id)) return false;
+    if (les || (state !== "play" && !(id === "choice" && state === "sortie")) || !lessonOn(id)) return false;
     hintShown[id] = true;
     const key = (window.TEXTS.lessons && window.TEXTS.lessons[id]) ? "lessons." + id : "hints." + id;
     les = Object.assign({ id, text: tx(key, { seed: seedName() }), step: "say", t: 0, dist: 0, lx: player ? player.x : 0, ly: player ? player.y : 0, done: () => true }, o || {});
@@ -857,6 +858,8 @@ const Battle = (() => {
   function bombReady() {
     bombFlash = 1.2;
     Sound.se("item");
+    if (lessonOn("s2guard")) { hintShown.s2guard = true; if (hintOpts.mark) hintOpts.mark("s2guard"); guardSayWait = true; }   // ステージ2の初回: 止めずに無敵タイムの一言（11/7-26）
+    if (lessonOn("boost")) { bombHinted = true; if (opts.onBombHint) opts.onBombHint(); return; }   // ステージ1の初回は、案内のかわりにパワー全開のチュートリアル（11/7-26）
     if (opts.bombHintSeen || bombHinted) return;
     bombHinted = true;
     if (opts.onBombHint) opts.onBombHint();
@@ -1411,6 +1414,7 @@ const Battle = (() => {
     if (tut) { tut.t += realDt; return; }   // チュートリアルの案内のあいだは止まる
     if (les) { lessonStep(realDt); if (les && les.step !== "do") return; }   // チュートリアル（11/7-20）: 説明と「OK！」のあいだは全部止まる
     if (state === "sortie") {   // 出撃の画面のあいだは止まっている
+      if (sortieNo === 2 && sortieStep === "choice" && !les && lessonOn("choice")) lesson("choice", { done: () => loadout !== null });   // チュートリアル: とくいの選択 → 1つ選ぶ（11/7-26。ステージ1の初回）
       // （持ち物選択の時間制限は、10/25-14 になくした。選ぶまで待つ）
       if (sortieStep === "door" && door && Door.step(door, realDt, sortieNo === 1 ? "explore" : "rescue", W, H)) {   // 押して光が広がりきった（10秒で自動）
         door = null; doorFade = BATTLE.doorFade;
@@ -1428,7 +1432,12 @@ const Battle = (() => {
     if (showWord) { showWord.t -= realDt; if (showWord.t <= 0) showWord = null; }
     if (wave) { wave.age += realDt; if (wave.age > 0.6) wave = null; }
     if (fsay) { fsay.t -= realDt; if (fsay.t <= 0) fsay = null; }
-    if (rewindHintWait && msgBusy() < 0 && msgGap <= 0 && !odai && state === "play") { rewindHintWait = false; fsay = { text: tx("skills.rewindHint"), t: BATTLE.rewindHintTime }; }   // 巻き戻しの一言（11/7-9）
+    if (gauge >= 100 && phase !== "round1" && !odai && state === "play" && !les && lessonOn("boost")) { const b0 = skillButtons()[0]; lesson("boost", { target: b0, ty: b0.y, done: () => boostT > 0 }); }   // チュートリアル: ゲージが初めて満タン → パワー全開を押す（11/7-26。ステージ1の初回）
+    if ((guardSayWait || rewindHintWait) && msgBusy() < 0 && msgGap <= 0 && !odai && state === "play" && !(gauge >= 100 && lessonOn("boost"))) {
+      // ステージ2の初回は、先に無敵タイムの一言（11/7-26）。ステージ1でパワー全開のチュートリアルをしたあとは、巻き戻しの一言を短く「ピンチのときは無敵タイム、取り逃したら巻き戻し」に
+      if (guardSayWait) { guardSayWait = false; fsay = { text: tx("skills.guardSay"), t: BATTLE.rewindHintTime }; }
+      else { rewindHintWait = false; fsay = { text: tx(hintShown.boost ? "skills.afterBoost" : "skills.rewindHint"), t: BATTLE.rewindHintTime }; }
+    }   // 巻き戻しの一言（11/7-9）
     if (hintCard) { hintCard.t -= realDt; if (hintCard.t <= 0) hintCard = null; }
     bombFlash = Math.max(0, bombFlash - realDt);
     updateMsgs(realDt);
