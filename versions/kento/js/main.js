@@ -509,6 +509,7 @@ const Main = (() => {
     Battle.stop();
     Sound.play("stages");   // ステージ一覧の曲（map.mp3。11/7-4）
     const wid = Math.min(window.WORLDS.length, Math.max(1, Save.data.world || 1));
+    Sound.loadWorld(wid);   // この世界の3曲（発見・救出・クイズ）と fanfare を、いま読み始める。ステージを押したときには読み終わっているように（11/7-14。世界をまたいで戻ったときも、ここを通る）
     const wd = window.WORLDS.find(w => w.id === wid);
     $("stages-world-title").textContent = tx("worlds.title", { id: wd.id, name: wd.name });
     $("screen-stages").style.backgroundImage = `url(assets/bg_world${wd.id}.jpg)`;
@@ -795,7 +796,8 @@ const Main = (() => {
     document.addEventListener("dblclick", e => e.preventDefault());
 
     // タイトルの曲（mp3）は、最初の画面が出たあと（load のあと）に読む。読めるまでは合成曲（11/6-6）
-    if (document.readyState === "complete") Sound.preloadCommon(); else window.addEventListener("load", () => Sound.preloadCommon());
+    const nextWorld = () => Math.min(window.WORLDS.length, Math.max(1, Save.data.world || 1));   // 次に遊ぶ世界（ステージ一覧で出す世界）。そのあとに、その世界の発見の曲も（11/7-14）
+    if (document.readyState === "complete") Sound.preloadCommon(nextWorld()); else window.addEventListener("load", () => Sound.preloadCommon(nextWorld()));
     // 音は「はじめる」をタップしたときに解禁する（iOSの制限）
     $("btn-start").addEventListener("click", () => {
       Sound.unlock();

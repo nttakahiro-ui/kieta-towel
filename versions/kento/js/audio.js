@@ -46,22 +46,23 @@ const SONGS = {
 //   lufs ＝ 区間の聞こえる大きさ（LUFS。測った値。once の曲は鳴らすところ全体）。どの曲も FILE_MUSIC.lufs の大きさにそろえる。level ＝ 全体の大きさ（合成曲とつりあうように測って決めた値）
 //   救出の旅のお題バトル（中ボス・大ボス）も救出の曲のまま流す（曲をとめない・テンポは変えない）。クイズのテンポ上げも mp3 ではしない（音の高さが変わるため）
 const FILE_MUSIC = {
+  // v ＝ ファイルを差し替えた印（前の曲がブラウザに残らないように）。11/7-14: どの曲も 128kbps に変えた（元の 192kbps は docs/曲/）
   dir: "assets/music/", xfade: 0.12, lufs: -11, level: 0.33,   // level 0.33: 合成曲（発見 −24〜−26、救出 −18〜−20、クイズ −16。同じはかり方）のまん中 −20 くらいに合わせた
   songs: {
-    w1_hakken:    { loop: [23.088, 67.088], start: 19.088, lufs: -10.37 },   // 120拍/分、22小節
-    w1_kyushutsu: { loop: [21.807, 62.950], start: 21.807, lufs: -10.43 },   // （11/7-9 の skipIntro は、11/7-13 の start にまとめた）   // 140、24小節
-    w1_quiz:      { loop: [8.858, 55.676], start: 0.000, lufs: -12.05 },   // 164、32小節
-    w2_hakken:    { loop: [10.838, 58.838], start: 6.838, lufs: -11.58 },   // 120、24小節
-    w2_kyushutsu: { loop: [20.303, 52.735], start: 20.303, lufs: -10.98 },   // 148、20小節
-    w2_quiz:      { loop: [18.190, 54.190], start: 18.190, lufs: -11.50 },   // 160、24小節
-    w3_hakken:    { loop: [24.582, 62.582], start: 24.582, lufs: -10.30, v: "1107-10" },   // v ＝ ファイルを差し替えた印（前の曲がブラウザに残らないように）。120、19小節（11/7-10 に新しい曲へ。66.6秒）
-    w3_kyushutsu: { loop: [24.623, 51.289], start: 24.623, lufs: -10.61 },   // 144、16小節
-    w3_quiz:      { loop: [6.397, 61.898], start: 27.397, lufs: -10.57 },   // 160、37小節
-    title:        { loop: [17.146, 55.546], start: 31.546, lufs: -11.18 },   // 100、16小節（11/6-6）。11/7: 大きさを今の区間で測り直した（前の -10.82 は前の区間の値）
-    recipe:       { once: true, lufs: -11.22 },               // 90.9秒（11/7-2）。lufs は曲の全体
-    map:          { loop: [24.664, 53.464], start: 22.264, lufs: -10.86 },   // 100、12小節（11/7-4）
-    opening:      { loop: [24.952, 75.352], start: 44.152, lufs: -10.60 },   // 100、21小節（11/7-4）
-    fanfare:      { loop: [7.100, 59.100], start: 23.100, lufs: -11.91 },    // 120、26小節（11/7-4）。頭の 0〜7.1秒がファンファーレ。2周目からは区切り 7.1秒のあとへもどる
+    w1_hakken:    { loop: [23.088, 67.088], start: 19.088, lufs: -10.37, v: "1107-14" },   // 120拍/分、22小節
+    w1_kyushutsu: { loop: [21.807, 62.950], start: 21.807, lufs: -10.43, v: "1107-14" },   // （11/7-9 の skipIntro は、11/7-13 の start にまとめた）   // 140、24小節
+    w1_quiz:      { loop: [8.858, 55.676], start: 0.000, lufs: -12.05, v: "1107-14" },   // 164、32小節
+    w2_hakken:    { loop: [10.838, 58.838], start: 6.838, lufs: -11.58, v: "1107-14" },   // 120、24小節
+    w2_kyushutsu: { loop: [20.303, 52.735], start: 20.303, lufs: -10.98, v: "1107-14" },   // 148、20小節
+    w2_quiz:      { loop: [18.190, 54.190], start: 18.190, lufs: -11.50, v: "1107-14" },   // 160、24小節
+    w3_hakken:    { loop: [24.582, 62.582], start: 24.582, lufs: -10.30, v: "1107-14" },   // 120、19小節（11/7-10 に新しい曲へ。66.6秒）
+    w3_kyushutsu: { loop: [24.623, 51.289], start: 24.623, lufs: -10.61, v: "1107-14" },   // 144、16小節
+    w3_quiz:      { loop: [6.397, 61.898], start: 27.397, lufs: -10.57, v: "1107-14" },   // 160、37小節
+    title:        { loop: [17.146, 55.546], start: 31.546, lufs: -11.18, v: "1107-14" },   // 100、16小節（11/6-6）。11/7: 大きさを今の区間で測り直した（前の -10.82 は前の区間の値）
+    recipe:       { once: true, lufs: -11.22, v: "1107-14" },               // 90.9秒（11/7-2）。lufs は曲の全体
+    map:          { loop: [24.664, 53.464], start: 22.264, lufs: -10.86, v: "1107-14" },   // 100、12小節（11/7-4）
+    opening:      { loop: [24.952, 75.352], start: 44.152, lufs: -10.60, v: "1107-14" },   // 100、21小節（11/7-4）
+    fanfare:      { loop: [7.100, 59.100], start: 23.100, lufs: -11.91, v: "1107-14" },    // 120、26小節（11/7-4）。頭の 0〜7.1秒がファンファーレ。2周目からは区切り 7.1秒のあとへもどる
     fanfare_head: { file: "fanfare", once: true, end: 7.100, lufs: -11.91 },   // 宝石ができた画面: ファンファーレだけ1回（大きさは fanfare と同じにする。頭は本体より 2.3dB 大きい曲の作り）
   },
   // 場面（js の Sound.play に渡す名前）→ mp3（11/7-2: 合成曲の名前では読みかえない）
@@ -402,30 +403,50 @@ const Sound = (() => {
     return null;
   }
   const keepFiles = () => [...new Set(Object.values(FILE_MUSIC.scenes).map(fileOf))];   // 世界によらない曲（ステージに入っても手ばなさない）
-  // ステージに入るとき: その世界の3曲だけを読む（発見の曲から順に）。ほかの世界の曲は手ばなす
+  // ステージ一覧を開いたとき（11/7-14）と、ステージに入るとき: その世界の3曲だけを読む（発見の曲から順に）。ほかの世界の曲は手ばなす
+  const keepSet = () => { const fw = FILE_MUSIC.worlds[world]; return new Set((fw ? Object.values(fw) : []).concat(keepFiles())); };   // 世界によらない曲（タイトル・地図・ファンファーレなど）は手ばなさない
   function loadWorld(id) {
     world = id;
     const fw = FILE_MUSIC.worlds[id];
-    const keep = new Set((fw ? Object.values(fw) : []).concat(keepFiles()));   // 世界によらない曲（タイトル・地図・ファンファーレなど）は手ばなさない
+    const keep = keepSet();
     for (const k of Object.keys(buffers)) if (!keep.has(k) && k !== fileKey) delete buffers[k];
     for (const k of Object.keys(raw)) if (!keep.has(k)) delete raw[k];
+    for (const k of Object.keys(stopper)) if (!keep.has(k)) stopper[k].abort();   // 前の世界の読みかけは止める（遅い回線で、今の世界の曲と取り合わないように。11/7-14）
     if (!fw) return;
-    fetchSongs([fw.explore, fw.rescue, fw.quiz].concat(FILE_MUSIC.withWorld));
+    fetchSongs([fw.explore, fw.rescue, fw.quiz].concat(FILE_MUSIC.withWorld), true);
   }
-  // 順に読む（読み終わったものはとばす）
+  // 順に読む（読み終わったものはとばす）。11/7-14: 読むのはいつも1曲ずつ（順番待ちは queue）。遅い回線で曲どうしが取り合わないように
   const decoding = {};   // 音にしている途中の曲（11/6-6: タイトルの曲を2回読まないように）
-  function fetchSongs(keys) {
-    let chain = Promise.resolve();
-    for (const k of keys.map(fileOf)) {
-      if (buffers[k] || raw[k] || loading[k] || decoding[k]) continue;   // 音にしている途中のものも、もう一度は読まない
-      loading[k] = true;
-      chain = chain.then(() => fetch(FILE_MUSIC.dir + k + ".mp3" + ((FILE_MUSIC.songs[k] || {}).v ? "?v=" + FILE_MUSIC.songs[k].v : "")).then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
-        .then(ab => { raw[k] = ab; return decodeRaw(k); })
-        .catch(() => {}).then(() => { delete loading[k]; }));
-    }
+  const stopper = {};    // 読んでいる途中の曲の止め札（AbortController）
+  let queue = [], cur = null;   // cur ＝ いま読んでいる曲
+  const need = k => !(buffers[k] || raw[k] || loading[k] || decoding[k]);   // 音にしている途中のものも、もう一度は読まない
+  // front: 順番待ちの前のほうへ（タイトル・地図の曲のすぐあと）。ステージ一覧のその世界の曲や、いま鳴らしたい曲を先に読むため
+  function fetchSongs(keys, front) {
+    const ks = [...new Set(keys.map(fileOf))].filter(need);
+    if (front) { const pre = queue.filter(k => FILE_MUSIC.preload.includes(k) && !ks.includes(k)); queue = pre.concat(ks, queue.filter(k => !pre.includes(k) && !ks.includes(k))); }
+    else queue = queue.concat(ks.filter(k => !queue.includes(k)));
+    pump();
+  }
+  function pump() {
+    if (cur) return;
+    const keep = keepSet();
+    queue = queue.filter(k => need(k) && (keep.has(k) || FILE_MUSIC.preload.includes(k)));   // 世界が替わって要らなくなった曲は読まない
+    const k = queue.shift();
+    if (!k) return;
+    cur = k; loading[k] = true;
+    const ac = window.AbortController ? new AbortController() : null; if (ac) stopper[k] = ac;
+    const fin = () => { if (cur !== k) return; cur = null; delete loading[k]; delete stopper[k]; pump(); };   // 読み終わったら（止めたときも）次の曲へ
+    fetch(FILE_MUSIC.dir + k + ".mp3" + ((FILE_MUSIC.songs[k] || {}).v ? "?v=" + FILE_MUSIC.songs[k].v : ""), ac ? { signal: ac.signal } : {}).then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+      .then(ab => { raw[k] = ab; fin(); return decodeRaw(k); })   // 音にしているあいだに、次の曲を読み始める
+      .catch(fin);
   }
   // タイトルの曲を読む（11/6-6）: 最初の画面が出たあと（main.js が load のあとに呼ぶ）。最初の画面の読み込みとは取り合わない
-  function preloadCommon() { fetchSongs(FILE_MUSIC.preload); }
+  //   nextWorld ＝ 次に遊ぶ世界（11/7-14）: タイトル・地図の曲のあとに、その世界の発見の曲も読んでおく（遅い回線でも、ステージを押したときに読み終わっているように）
+  function preloadCommon(nextWorld) {
+    const fw = FILE_MUSIC.worlds[nextWorld];
+    if (fw) world = nextWorld;
+    fetchSongs(FILE_MUSIC.preload.concat(fw ? [fw.explore] : []));
+  }
   // 音にする（AudioContext が要る。まだなければ unlock のときに）
   function decodeRaw(k) {
     if (!ctx || !raw[k]) return Promise.resolve();
@@ -509,7 +530,7 @@ const Sound = (() => {
     musicBus.gain.setValueAtTime(1, ctx.currentTime);
     if (buffers[fileOf(k)]) { startLoop(k); return; }
     if (k === FILE_MUSIC.first) { fallback = "タイトル"; startSynth("タイトル", 1); }   // タイトル: 読めるまでは合成曲（最初の画面を無音にしない。11/6-6）
-    fetchSongs([k]);   // まだ読んでいなければ読む（読み中・音にしている途中ならとばす）
+    fetchSongs([k], true);   // まだ読んでいなければ読む（読み中・音にしている途中ならとばす）。いま鳴らしたい曲なので順番待ちの前へ（11/7-14）
     if (raw[fileOf(k)]) decodeRaw(fileOf(k));   // 読めていれば音にして鳴らす。まだ読んでいる途中なら、読めたところから鳴らす（それまでは無音か合成曲）
   }
 
