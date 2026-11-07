@@ -165,7 +165,7 @@ const TUNE_ITEMS = [
   ["odaiBigFont", "お題の問題文（中央）の文字のいちばん大きいとき", 16, 48, 1],
   ["odaiSmallFont", "お題の問題文（上の帯の下）の文字のいちばん大きいとき", 11, 30, 1],
   ["odaiMaxLines", "お題の問題文の行数の上限", 1, 5, 1],
-  ["bombGain", "ぜんぶ消しゲージのたまる速さ（1語あたり）", 2, 50, 1],
+  ["bombGain", "必殺ワザのゲージのたまる速さ（1語あたり）", 2, 50, 1],
   ["autoGroundCount", "自動のステージで地上に出る語句の数", 0, 5, 1],
 ];
 const TUNE_KEY = "kietaTowel.tune.v1";
@@ -326,7 +326,7 @@ const Main = (() => {
   }
   let reviewing = false;     // 今のステージ1がおさらいか
 
-  // 必殺ワザ（10/31-10 試作。構想メモ 6・10.5）: 宝石の数で手に入る。ぜんぶ消し＝最初から、時間止め＝世界1の4つ目の宝石、
+  // 必殺ワザ（10/31-10 試作。構想メモ 6・10.5）: 宝石の数で手に入る。前の1つ目のワザ（id は clear のまま。いまは使わない）＝最初から、時間止め＝世界1の4つ目の宝石、
   //   無敵タイム＝世界2の2つ目の宝石、光のシャワー＝世界2の4つ目の宝石
   const SKILL_GET = [["stop", 1, 4], ["guard", 2, 2], ["shower", 2, 4]];   // [ワザ, 世界, 宝石の数]
   function ownedSkills() {
@@ -367,7 +367,7 @@ const Main = (() => {
         hints: [1, 5, 9].includes(stage.id) ? { seen: TutSave.load(), mark: TutSave.mark, all: reviewNext && stage.id === 1 } : null,   // 案内とチュートリアルはステージ1・5・9（初めてのときだけ。11/7-20。おさらいのときは全部）
         hero: Save.data.hero || "boy",
         firstChoice: !TutSave.load().choice,          // 持ち物選択: 初めては時間制限なし（記録は版ごと）
-        bombHintSeen: !!TutSave.load().bombReady,     // ぜんぶ消しの案内（初めての1回だけ。記録は版ごと）
+        bombHintSeen: !!TutSave.load().bombReady,     // 必殺ワザの案内（初めての1回だけ。記録は版ごと）
         onBombHint: () => TutSave.mark("bombReady"),
         onFirstChoice: () => TutSave.mark("choice"),
         foundIds: rescueAgain === true ? (Save.data.found[stage.id] || []) : null,

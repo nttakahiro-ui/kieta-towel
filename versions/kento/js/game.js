@@ -211,7 +211,7 @@ const BATTLE = {
   guideTime: 2.4,              // 木のよけ方の案内（矢印）を出す秒数
   shadeWait: 2.5,              // 「木のかげ」の語句が、木が去ってから待つ秒数（そのあと降りてくる）
 
-  // --- 「ぜんぶ消し」ボム ---
+  // --- 必殺ワザのゲージとボタン ---
   bombGain: 18,                // 語句を倒したときにたまるゲージ（×コンボ倍率）。100で満タン（11/3-1 決定: 12→18。全ステージで1.5倍）
   bombButtonR: 26,             // 画面左下のふわりマーク（ボムのボタン）の大きさ（px）
 
@@ -253,7 +253,6 @@ const BATTLE = {
   respawnInv: 2,               // 復活したあと、無敵で点滅する秒数
   wordShowTime: 1.5,           // 吸い込んだ語句を画面中央に大きく出す秒数（この間は弾が当たらない）
   fuwariSayTime: 3,
-  bombShell: 0.5,              // ぜんぶ消しで、画面のことばの殻の硬さを何倍にするか（0.5 ＝ 半分減る。ほどけはしない。10/25-17）
   powerFxTime: 1.3,
   boss2: { hp: 0.7, shape: "ring", fxTime: 1.6 },   // 大ボス2段階（stages.js の bossTwoStep。11/1-4 決定 ステージ12）: 2段階目の殻の硬さ（1段階目の倍率）・弾の形・「まだだ！」の秒数
   timeBarH: 6,                 // 発見の旅の残り時間の帯の太さ（px。画面のいちばん上。10/25-12）
@@ -265,22 +264,21 @@ const BATTLE = {
   fuwariSize: 62,              // 自機のふわりの絵の幅（px。10/25-6）
   fuwariExploreSize: 50,       // 発見の旅の、下のまん中の小さなふわりの幅
   fuwariFrameTime: 0.18,       // 飛んでいるときに1→2→3のコマを切り替える秒数
-  fuwariBombSize: 0.75,        // ぜんぶ消しの大きなふわり（3のコマ）の幅（画面の短いほうの何倍か）            // 周の始まりの、ふわりの一言を出す秒数
+  fuwariBombSize: 0.75,        // パワー全開を使った瞬間の大きなふわり（3のコマ）の幅（画面の短いほうの何倍か）            // 周の始まりの、ふわりの一言を出す秒数
   slowTime: 0.3,               // 吸い込む瞬間に画面全体がゆっくりになる秒数
   slowScale: 0.25,             // ゆっくりのときの速さ（1でふつう、小さいほどゆっくり）
   stripWidth: 24,              // 左端の「集めたことば」の縦の帯の幅（px。縦書き1文字分ほど）
 
   // --- 世界2・3の試作（10/31-10。docs/世界2・3の構想メモ.md）。数は仮 ---
   groundMark: true,            // 左の帯で、地上に出ることばの枠に小さな地面の絵のマーク（10/31-12 決定。文字の「地」ではない）
-  // 必殺ワザ（11/6-6 決定）: 「ぜんぶ消し」「無敵タイム」「巻き戻し」の3つ。最初から全部持っていて、左下に3つのボタン。ゲージは3つで1本（使うと0にもどる）
+  // 必殺ワザ（11/6-6 決定）: 「パワー全開」「無敵タイム」「巻き戻し」の3つ（11/7-25 決定: 前の1つ目のワザをパワー全開に替えた）。最初から全部持っていて、左下に3つのボタン。ゲージは3つで1本（使うと0にもどる）
   // ラストチャンス（11/7-12 決定で作り直し）: 大ボスのあと、取り逃したことばがあれば15秒。取り逃したことばが本編と同じ姿でもう一度出る（spawnIn 秒以内に全部）。
   //   ふわりが光って、近く（pullR px 以内）のことばを pullSpeed px/秒で引き寄せる。（11/7-10 の「逃げる虫」はやめた）
   lastChance: { time: 15, spawnIn: 3, pullR: 100, pullSpeed: 70 },
-  loosePad: 18,   // ぜんぶ消しでほどけたことばに、ふわりがさわったとみなす広さ（ことばの外側 px。11/7-1）
-  skillGuardTime: 10,          // 「無敵タイム」の秒数（11/7-9 決定: 15 → 10）。（自機が大きく光り、ぶつかった虫と弾が消える。元気は減らない）
+  skillBoostTime: 8,           // 「パワー全開」の秒数（11/7-25 決定）。パワーが1段上がる（世界の上限を1つ超えてよい）。使った瞬間に画面の敵の弾だけ消す
+  skillGuardTime: 8,           // 「無敵タイム」の秒数（11/7-9 決定: 15 → 10。11/7-25 決定: 10 → 8）。（自機が大きく光り、ぶつかった虫と弾が消える。元気は減らない）
   rewindHintTime: 2.6,         // ゲージが初めて満タンになったときの、ふわりの巻き戻しの一言の秒数（11/7-9 決定: 2〜3秒）
   skillGuardR: 44,             //   無敵タイムの光の半径（px。この中に入った虫と弾が消える）
-  clearBossDmg: 0.5,           // 「ぜんぶ消し」: 中ボス・大ボスの文字ごとの硬さを、もとの硬さの何倍けずるか（大ダメージ。最後の1は残す）。ザコのことばの殻はぜんぶほどける
   gaugeKill: 3,                // ゲージのたまり方（100で満タン）: 虫を1匹倒す。虫の多いステージでたまりすぎないように、gaugeKillHalf 匹倒すごとに減る（10匹目で半分、20匹目で3分の1…）
   gaugeKillHalf: 10,
   gaugeWord: 24,               //   ことばを1つ取り戻す
@@ -361,7 +359,7 @@ const UI_TINT = {
        "rgba(72,105,58,0.92)": "rgba(85,58,105,0.92)", "rgba(225,238,212,0.6)": "rgba(227,212,238,0.6)", "rgba(236,244,226,0.93)": "rgba(236,226,244,0.93)",
        "#e0b03a": "#a37cbf", "#dcae3c": "#a37cbf", "rgba(220,174,60,0.35)": "rgba(163,124,191,0.35)", "#b0801a": "#553a69" },
 };
-const SKILL_IDS = ["clear", "guard", "rewind"];   // clear ぜんぶ消し／guard 無敵タイム／rewind 巻き戻し（11/6-6 決定。時間止め・光のシャワーはやめた）
+const SKILL_IDS = ["boost", "guard", "rewind"];   // boost パワー全開（11/7-25）／guard 無敵タイム／rewind 巻き戻し（11/6-6 決定。時間止め・光のシャワーはやめた）
 const LOADOUT_VARS = { skill: "" };   // 持ち物「必殺ワザ」の説明の {skill}（選んでいるワザの名前）
 
 // ===== 世界ごとの殻・弾の色（10/31-10 試作。絵が来るまでの仮: 世界1の絵の色を変えただけ）。書いていない世界は世界1のまま
@@ -373,7 +371,7 @@ const WORLD_LOOK = {
        thornWidth: 1.1, thornAlpha: [0.2, 0.3], textOver: 5 },   // 10/31-12 決定: 紫のいばらを細く薄く、文字はいばらの上にもう一度縁取りして描く（textOver ＝ その縁取りの太さ px）
 };
 
-// ===== ぜんぶ消しのボタンの色（10/25-9）: ゲージがたまったら赤橙（画面のほかの場所に使っていない色）。たまっていないときは薄い色のまま
+// ===== 必殺ワザのボタンの色（10/25-9）: ゲージがたまったら赤橙（画面のほかの場所に使っていない色）。たまっていないときは薄い色のまま
 const BOMB_COLORS = { full: "#f2541b", fullRim: "#ffd2b8" };
 
 // ===== 弾の色（10/25-7。ここだけ書きかえれば、敵の弾と味方の光の色が変わる） =====
@@ -424,6 +422,7 @@ const POWER_LEVELS = [
   { spread: [-0.35, 0.35],     thick: [],  rate: 1 },
   { spread: [-0.55, 0, 0.55],  thick: [0], rate: 1 },
   { spread: [-0.85, -0.28, 0.28, 0.85], thick: [-0.28, 0.28], rate: 1, top: true },   // 4段目（11/1-4 決定）: 4本（内側の2本が太い）。上がれるのは stages.js の power4 のステージ（8・12）だけ
+  { spread: [-1.0, -0.5, 0, 0.5, 1.0], thick: [-0.5, 0, 0.5], rate: 1, top: true },   // 5段目（11/7-25）: パワー全開のときだけ（4段目まで上がれるステージで、上限を1つ超える）。5本（内側の3本が太い）
 ];
 // 画面の言葉は data/texts.js（window.TEXTS）から読む。tx("rescue.start") や tx("explore.endSome", { n: 3 }) のように使う
 function tx(path, vars) {
@@ -545,6 +544,8 @@ const Battle = (() => {
   let shake = 0;             // 画面のゆれ（被弾したとき）
   let level = POWER_LEVELS[0];
   const topLevel = () => opts.stage && opts.stage.power4 ? 3 : 2;   // 上がれる段のいちばん上（0 から数える。4段目は power4 のステージだけ。11/1-4）
+  // いまのパワーの段（0 から）。パワー全開のあいだは1段上（上限を1つ超えてよい。11/7-25）。noBoost ＝ パワー全開を入れない段
+  const levelIdx = noBoost => Math.min(Math.floor(absorbed.length / BATTLE.powerEvery) + powerBonus, topLevel()) + (!noBoost && boostT > 0 ? 1 : 0);
   let score = 0, combo = 0, maxCombo = 0;
   let floats = [];           // 点数が浮かぶ表示
   let shards = [];           // 地上の雑魚が割れたかけら（11/7-23）
@@ -556,7 +557,7 @@ const Battle = (() => {
   let lastPX = 0, lastPY = 0;   // いちばん最近の指の位置
   let lock = null;           // 自機の真上の列にいる地上の敵（いなければ null。10/31-12）
   let slow = 0;              // ゆっくりの残り時間（秒）
-  let gauge = 0;             // 「ぜんぶ消し」ボムのゲージ（0〜100）
+  let gauge = 0;             // 必殺ワザのゲージ（0〜100）
   let fsay = null;           // ふわりの一言（吹き出し）
   // 画面の一言・案内・問題文の順番待ち（10/7-1）。同時に出すのは1つだけ。消えてから次を出す
   let msgQ = [], msgGap = 0, msgWasBusy = false;
@@ -587,7 +588,7 @@ const Battle = (() => {
   let tut = null;            // 出ているチュートリアルの案内（出ているあいだはゲームが止まる）{ id, t, rest(紙芝居のつづき) }
   let hintOpts = null, hintShown = {};   // 案内: main.js から { seen, mark, all }（ステージ1だけ。all ＝ おさらいで全部出す）と、このバトルで出したもの
   let hintCard = null;       // 出している案内 { text, t }
-  let bombHinted = false, bombFlash = 0;   // ぜんぶ消しの案内を出したか、ゲージがたまったときに左下を光らせる残り秒
+  let bombHinted = false, bombFlash = 0;   // 必殺ワザの案内を出したか、ゲージがたまったときに左下を光らせる残り秒
   let explore = null;        // 1回目の旅（双眼鏡）の状態 { t, next, list, bugs, bugT, endT }
   let bino = null;           // 双眼鏡の中心 { x, y }
   let exMove = EXPLORE_MOVES.drift;   // 発見の旅の、ことばの動きの型（10/25-7。stages.js の explore 欄）
@@ -598,7 +599,7 @@ const Battle = (() => {
   let gaugeMul = 1;          // 「必殺ワザ」のゲージ倍率
   let bounces = [];          // ダミーではね返った弾
   let bombsUsed = 0;
-  let typhoon = null;        // ぜんぶ消しの演出（タオルをくるっと振り回す）
+  let typhoon = null;        // パワー全開を使った瞬間の演出（白いうずと大きなふわり。11/7-25）
   let extraUsed = false;     // 延長戦をしたか（1回だけ。10/25-19）
   let extraRound = false;    // いまラストチャンスか
   let lastT = 0;             // ラストチャンスの残り秒（0 ＝ ラストチャンスではない）
@@ -606,13 +607,12 @@ const Battle = (() => {
   let againFx = null;        // 大ボス2段階目の「まだだ！ もう一度！」（11/1-4）{ age }
   let wrongFx = null;        // お題で「ちがうよ」を大きく出している（10/25-16）{ age }
   let powerFx = null;        // 「パワーアップ！」の大きな文字（10/25-9）{ age }
-  let bombing = false;       // 「ぜんぶ消し」で反応させている最中（ゲージをためない）
   let wave = null;           // 吸い込んだときに広がる光
   // 世界2・3の試作（10/31-10）
-  let stopT = 0, guardT = 0;   // 時間止め（いまは使わない。0のまま）・無敵タイムの残り秒
+  let stopT = 0, guardT = 0, boostT = 0;   // 時間止め（いまは使わない。0のまま）・無敵タイム・パワー全開の残り秒
   let rewindSaid = false, rewindHintWait = false;   // そのステージで「巻き戻し」の一言を出したか・出すのを待っているか（11/7-9）
   let rewindUsed = false, rewindFx = null, baseScript = [], killN = 0;   // 巻き戻しを使ったか（1ステージ1回）、その演出、救出の旅の最初の台本
-  let skillUse = { clear: 0, guard: 0, rewind: 0, fullAcc: 0, fullBoss: 0, firstAcc: -1 };   // 必殺ワザを使った回数と、ゲージが満タンになった回数（ためて／中ボス・大ボスで）、ためて初めて満タンになった救出の旅の時計（調べる用）
+  let skillUse = { boost: 0, guard: 0, rewind: 0, fullAcc: 0, fullBoss: 0, firstAcc: -1 };   // 必殺ワザを使った回数と、ゲージが満タンになった回数（ためて／中ボス・大ボスで）、ためて初めて満タンになった救出の旅の時計（調べる用）
   let meteorT = 0;   // 流星雨の次の1つまで（世界3。10/31-10 試作）
   let bgOff = 0, bgGo = false;   // 救出の旅の背景の絵の流れた量と、流しはじめたか（1語目が出てから。11/1-2 決定）
   let evPlans = {};   // 出来事「ねじ」「星がはじける」の段取り（11/1-2）
@@ -644,8 +644,8 @@ const Battle = (() => {
   // 左端の縦の帯の右はし
   const stripRight = () => 6 + BATTLE.stripWidth;
 
-  // 「ぜんぶ消し」ボムのボタン（画面左下のふわりマーク）
-  function skillButtons() {   // 左下に横にならべた3つ（ぜんぶ消し・無敵タイム・巻き戻し。11/6-6）
+  // 必殺ワザのボタン（画面左下）
+  function skillButtons() {   // 左下に横にならべた3つ（パワー全開・無敵タイム・巻き戻し。11/6-6）
     const r = BATTLE.bombButtonR, y = H - 18 - r, step = 2 * r + BATTLE.skillButtonGap;
     return SKILL_IDS.map((id, i) => ({ id, x: 14 + r + i * step, y, r }));
   }
@@ -772,7 +772,7 @@ const Battle = (() => {
     bino = { x: W / 2 + 10, y: H * 0.42 };
     state = "sortie"; sortieNo = 1; reacted = 0; openDoor();   // 発見の旅の扉から始める（11/7-19）
     loadout = null; powerBonus = basePower(); shield = 0; gaugeMul = 1;
-    stopT = 0; guardT = 0; rewindUsed = false; rewindSaid = false; rewindHintWait = false; rewindFx = null; skillUse = { clear: 0, guard: 0, rewind: 0, fullAcc: 0, fullBoss: 0, firstAcc: -1 }; baseScript = script; rescueT = 0; evShown = {}; evPlans = {}; bgOff = 0; bgGo = false; press = null;
+    stopT = 0; guardT = 0; boostT = 0; rewindUsed = false; rewindSaid = false; rewindHintWait = false; rewindFx = null; skillUse = { boost: 0, guard: 0, rewind: 0, fullAcc: 0, fullBoss: 0, firstAcc: -1 }; baseScript = script; rescueT = 0; evShown = {}; evPlans = {}; bgOff = 0; bgGo = false; press = null;
     events = (opts.stage && opts.stage.event) ? [].concat(opts.stage.event) : [];
     // 救出の旅をもう一度（10/25-14。結果画面のボタン）: 発見の旅をとばして、持ち物選択から。発見で見つけたことばの記録（opts.foundIds）は残す
     if (opts.foundIds) {
@@ -853,7 +853,7 @@ const Battle = (() => {
     lastTs = performance.now();
     msgQ.forEach(m => (m.at = performance.now()));
   }
-  // ぜんぶ消しのゲージがたまった（10/25-1）: 初めての1回だけ、1秒ゆっくりにして案内。以後はたまるたびに左下が光って音が鳴る
+  // 必殺ワザのゲージがたまった（10/25-1）: 初めての1回だけ、1秒ゆっくりにして案内。以後はたまるたびに左下が光って音が鳴る
   function bombReady() {
     bombFlash = 1.2;
     Sound.se("item");
@@ -1106,7 +1106,7 @@ const Battle = (() => {
     if (id === "power") powerBonus = basePower() + 1;
     if (id === "shield") player.hp = maxHp();   // 守りアップ: 元気の上限が1.5倍（11/6-6）
     if (id === "bomb") gaugeMul = BATTLE.gaugeFastMul;   // ゲージ2倍速（11/6-6。前は「救出の旅の最初からゲージ満タン」）
-    level = POWER_LEVELS[Math.min(Math.floor(absorbed.length / BATTLE.powerEvery) + powerBonus, topLevel())];
+    level = POWER_LEVELS[levelIdx()];
     Sound.se("item");
   }
   // 出撃2の画面の、3つの選ぶボタンの場所
@@ -1242,7 +1242,7 @@ const Battle = (() => {
       const n = Math.max(1, deco.filter(d => !d).length);
       const lim = BATTLE.perCharHp[role];
       const per = BATTLE.hpOverride[role] ||
-        Math.min(lim.max, Math.max(lim.min, Math.round(BATTLE.wordTotalHp[role] * (role === "mid" ? P.midHpScale : P.bossHpScale) * (od ? BATTLE.odaiHpByLevel[POWER_LEVELS.indexOf(level)] || 1 : 1) * (od && od.order ? BATTLE.orderShare * (opts.stage.orderHp || 1) : 1) * (role === "boss" && opts.stage && opts.stage.bossHp || 1) / n)));   // bossHp ＝ ステージごとの大ボスの硬さの倍率（ステージ12。11/2-3）   // 「3つを順に」は1つあたり 1/3（orderHp ＝ ステージごとの倍率）
+        Math.min(lim.max, Math.max(lim.min, Math.round(BATTLE.wordTotalHp[role] * (role === "mid" ? P.midHpScale : P.bossHpScale) * (od ? BATTLE.odaiHpByLevel[levelIdx(true)] || 1 : 1) * (od && od.order ? BATTLE.orderShare * (opts.stage.orderHp || 1) : 1) * (role === "boss" && opts.stage && opts.stage.bossHp || 1) / n)));   // bossHp ＝ ステージごとの大ボスの硬さの倍率（ステージ12。11/2-3）   // 「3つを順に」は1つあたり 1/3（orderHp ＝ ステージごとの倍率）
       const ws = chars.map(ch => ctx.measureText(ch).width);
       const total = ws.reduce((a, b) => a + b, 0);
       let ox = -total / 2, k = 0;
@@ -1449,6 +1449,7 @@ const Battle = (() => {
     bounces = bounces.filter(b => b.age < 0.5);
     t += dt;
     stopT = Math.max(0, stopT - dt); guardT = Math.max(0, guardT - dt);   // 必殺ワザの残り（10/31-10 試作）
+    if (boostT > 0) { boostT = Math.max(0, boostT - dt); if (boostT === 0) level = POWER_LEVELS[levelIdx()]; }   // パワー全開が終わったら元の段にもどる（11/7-25）
     if (rewindFx) { rewindFx.age += realDt; if (rewindFx.age > 1.2) rewindFx = null; }
     shake = Math.max(0, shake - dt);
     player.glow = Math.max(0, player.glow - dt);
@@ -1572,7 +1573,7 @@ const Battle = (() => {
       // ふわりの段階で弾の数が増える
       // お題バトルの間もパワーの段は保つ（11/1 決定。前は正面1本だけ）。広がる角度だけ狭くして、正面寄りに
       const nk = odai ? BATTLE.odaiSpread : 1;
-      for (const k of level.spread) shots.push({ x: player.x + k * 9 * nk, y: player.y - 22, vx: k * 55 * nk, thick: level.thick.includes(k) });
+      for (const k of level.spread) shots.push({ x: player.x + k * 9 * nk, y: player.y - 22, vx: k * 55 * nk, thick: level.thick.includes(k), boost: boostT > 0 });
       shotTimer = BATTLE.shotInterval * level.rate;
     }
     for (const s of shots) { s.y -= BATTLE.shotSpeed * dt; s.x += s.vx * dt; }
@@ -1679,20 +1680,18 @@ const Battle = (() => {
         if (evActive("gravity")) e.bx = Math.min(W - e.w / 2 - 20, Math.max(stripRight() + e.w / 2 + 20, e.bx + BATTLE.gravityDrift * dt));   // 出来事「重力が変わる」（世界3）: 右へ流される
         e.x = e.bx + Math.sin(e.age * BATTLE.swaySpeed + e.phase) * BATTLE.sway;
       }
-      // ラストチャンスの引き寄せ（11/7-10・11/7-12）: ふわりから pullR px 以内のことば。ほどけたことば（ぜんぶ消しのあと）はふわりのほうへ、
-      //   殻のある空のことばは横だけ、ふわりの真上へ寄る（光が当たりやすくなる）。地上のことばは動かさない
+      // ラストチャンスの引き寄せ（11/7-10・11/7-12）: ふわりから pullR px 以内のことば。空のことばは横だけ、ふわりの真上へ寄る（光が当たりやすくなる）。地上のことばは動かさない
       e.pulled = false;
       if (lastT > 0 && !e.ground && player.hp > 0) {
         const L = BATTLE.lastChance, dx = player.x - e.x, dy = player.y - e.y;
         if (Math.hypot(Math.max(0, Math.abs(dx) - e.w / 2), Math.max(0, Math.abs(dy) - e.h / 2)) < L.pullR) {
           e.pulled = true;
           const v = L.pullSpeed * dt;
-          if (e.loose) { const d = Math.max(1, Math.hypot(dx, dy)); e.x += dx / d * Math.min(d, v); e.y += dy / d * Math.min(d, v); }
-          else if (e.bx !== undefined && e.pattern !== "edge" && e.pattern !== "cross") { const m = Math.sign(dx) * Math.min(Math.abs(dx), v); e.bx += m; e.x += m; }
+          if (e.bx !== undefined && e.pattern !== "edge" && e.pattern !== "cross") { const m = Math.sign(dx) * Math.min(Math.abs(dx), v); e.bx += m; e.x += m; }
         }
       }
       // 弾を撃つ（画面の上のほうにいる間だけ）。1語目を待っているあいだと、ステージ1のお題では撃たない
-      if (holdOn() || e.pattern === "odai" || e.loose) continue;   // お題の殻は odaiFire で順番に撃つ（11/1 決定）
+      if (holdOn() || e.pattern === "odai") continue;   // お題の殻は odaiFire で順番に撃つ（11/1 決定）
       e.fire -= dt;
       if (e.fire <= 0 && e.y > 0 && e.y < H * 0.62) {
         e.fire = BATTLE.enemyFireInterval[e.role] / P.fireRate / fireRamp() * (e.pattern === "odai" ? 3 : 1) * (0.8 + Math.random() * 0.4);
@@ -1832,7 +1831,7 @@ const Battle = (() => {
       }
       if (!hit) {
         for (const e of enemies.slice().sort((a, b) => b.y - a.y)) {   // 下にいる語句から当たる
-          if (e.ground || e.loose || e.hp <= 0 || !onScreen(e) || e.appearT > 0) continue;   // （ぜんぶ消しでほどけたことばは、光が通りぬける）画面に全部入るまで・入ってすぐの1秒は当たらない
+          if (e.ground || e.hp <= 0 || !onScreen(e) || e.appearT > 0) continue;   // 画面に全部入るまで・入ってすぐの1秒は当たらない
           if (e.pattern === "odai" ? (odai && odai.intro > 0) : (e.role === "boss" && e.age < BATTLE.bossEnterTime)) continue;   // 読む時間・降りてくる間は当たらない
           if (odai && e.pattern !== "odai") continue;   // お題バトルの間、止まっているほかの語句には当たらない（上のほうで殻がほどけないように。10/25-8）
           const pad = (s.thick ? 6 : 0) + (e.pattern === "odai" ? 4 : BATTLE.wordHitPad);   // お題の語句は今のまま（となりの列に当たらないように）
@@ -1849,11 +1848,6 @@ const Battle = (() => {
         }
       }
       if (hit) s.y = -999;
-    }
-    enemies = enemies.filter(e => e.hp > 0);
-    // ぜんぶ消しでほどけたことば: ふわりがさわると助けられる（11/7-1）
-    for (const e of enemies) {
-      if (e.loose && e.hp > 0 && !gHidden(e) && Math.abs(player.x - e.x) < e.w / 2 + BATTLE.loosePad && Math.abs(player.y - e.y) < e.h / 2 + BATTLE.loosePad) { e.hp = 0; bombing = true; defeat(e); bombing = false; }   // （ぜんぶ消しで取り戻したぶんなので、ゲージはたまらない）
     }
     enemies = enemies.filter(e => e.hp > 0);
 
@@ -1994,7 +1988,7 @@ const Battle = (() => {
   function groundTargets() {
     // ステージ5のチュートリアルの地上のことばは、説明が出るまで爆弾が当たらない（11/7-20）
     //   （11/7-23: この説明が式の途中の行末に入っていて、うしろの「地上の雑魚」の .concat まで説明あつかいで消えていた。地上の雑魚に爆弾が出なかった）
-    return enemies.filter(e => e.ground && !e.loose && e.hp > 0 && onScreen(e) && !(e.appearT > 0) && !gHidden(e) && !(e.hold && !e.lesTried && lessonOn("s5ground")))
+    return enemies.filter(e => e.ground && e.hp > 0 && onScreen(e) && !(e.appearT > 0) && !gHidden(e) && !(e.hold && !e.lesTried && lessonOn("s5ground")))
       .concat(fillers.filter(f => f.layer === "ground" && f.hp > 0 && f.y > 0));
   }
   function inReach(g, x, y, r) {
@@ -2354,7 +2348,7 @@ const Battle = (() => {
 
   // ゲージ（11/6-6 決定）: 虫を倒す・ことばを取り戻す・被弾する、でたまる（ゲージ2倍速なら2倍）。中ボス・大ボスが出た瞬間は満タン
   function addGauge(v) {
-    if (phase === "round1" || bombing) return;
+    if (phase === "round1") return;
     const before = gauge;
     gauge = Math.min(100, gauge + v * gaugeMul);
     if (before < 100 && gauge >= 100) { skillUse.fullAcc++; if (skillUse.firstAcc < 0) skillUse.firstAcc = rescueT; bombReady(); firstFullSay(); }
@@ -2375,37 +2369,12 @@ const Battle = (() => {
     player.glow = 0.35;
     if (id === "guard") { guardT = BATTLE.skillGuardTime; return; }
     if (id === "rewind") { rewind(); return; }
-    // ぜんぶ消し: 画面の虫と敵の弾を、本当に全部消す。ザコのことばは殻がぜんぶほどけて画面に残る（自分で取りに行く。11/7-1）。中ボス・大ボスには大ダメージ
+    // パワー全開（11/7-25 決定）: 8秒間、パワーが1段上がる（上限を1つ超えてよい）。使った瞬間に、画面の敵の弾だけ消す（敵は消さない）
+    boostT = BATTLE.skillBoostTime;
+    level = POWER_LEVELS[levelIdx()];
     typhoon = { age: 0 };
-    wave = { x: player.x, y: player.y, age: 0 };
-    player.inv = Math.max(player.inv, 1);
-    for (const f of fillers) {
-      score += BATTLE.scoreFiller;
-      addPop(f.x, f.y, "#fff8d8", 1, f.layer === "ground");
-    }
-    fillers = []; ebullets = [];
-    bombing = true;   // ぜんぶ消しで取り戻したぶんでは、ゲージはたまらない
-    for (const e of enemies.slice()) {
-      if (e.hp <= 0 || !onScreen(e) || !hasShell(e) || e.appearT > 0 || e.open || e.againT > 0) continue;
-      if (e.parts) {
-        if (e.dummy && !e.order) continue;   // お題のはずれのことばには効かない
-        for (const p of e.parts) if (!p.broken && !p.deco) { p.hp = Math.max(1, p.hp - Math.ceil(p.maxHp * BATTLE.clearBossDmg)); p.flash = 0.3; }
-        e.flash = 0.3;
-        if (e.role === "boss") bossCheer(e);
-      } else if (!e.dummy && !e.hold) loosen(e);   // 止まって待つ1語目（ステージ1・5の案内）には効かない（ほどけても止まったままになるので。11/7-1）
-    }
-    enemies = enemies.filter(e => e.hp > 0);
-    bombing = false;
-  }
-  // ぜんぶ消しでほどけたザコのことば（11/7-1 決定）: 殻だけほどけて画面に残る。自動では手に入らず、ふわりがさわると助けられる。
-  //   光は通りぬけ、弾も撃たない。そのまま下へ抜けたら取り逃がし
-  function loosen(e) {
-    e.loose = true; e.hp = 1; e.flash = 0.3;
-    for (let i = 0; i < 18; i++) {
-      const a = Math.random() * Math.PI * 2, sp = 50 + Math.random() * 110;
-      threads.push({ x: e.x + (Math.random() - 0.5) * e.w, y: e.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 30, len: 5 + Math.random() * 8, curl: (Math.random() - 0.5) * 2, rot: Math.random() * 6,
-        color: (SHELL[e.role] || SHELL.zako).bit, age: 0, scatter: 9, sparkle: true });
-    }
+    for (const b of ebullets) addPop(b.x, b.y, "#fff8d8", 0.5);
+    ebullets = [];
   }
   // 巻き戻し（11/6-6 決定）: その救出の旅の最初にもどる。取り戻したことばは残り、取り逃したことばだけもう一度出る。元気は全回復、敵は最初から。ボス戦の途中でも使える
   function rewind() {
@@ -2768,7 +2737,7 @@ const Battle = (() => {
     addGauge(BATTLE.gaugeWord);
     if (e.hold && e.ground && !hintShown.s5ground) post("banner", () => { banner = { text: tx("newInWorld.groundDone"), t: 2.4, color: "rgba(111,154,74,0.9)" }; });   // ステージ5の最初の地上のことばを助けた（10/31-12）
     if (e.odaiReal && odai) endOdai(true);
-    const lv = POWER_LEVELS[Math.min(Math.floor(absorbed.length / BATTLE.powerEvery) + powerBonus, topLevel())];
+    const lv = POWER_LEVELS[levelIdx()];
     if (lv !== level && absorbed.length < opts.total) {
       level = lv;
       powerFx = { age: 0, top: !!lv.top };   // その瞬間に、画面に大きく「パワーアップ！」と音（順番待ちはしない。10/25-9）。4段目は大きく金色に（11/1-4）
@@ -2941,7 +2910,7 @@ const Battle = (() => {
     player.hp = BATTLE.playerMaxHp; player.inv = 0; player.rising = 0;
     enemies = []; fillers = []; ebullets = []; bombs = []; blasts = []; items = []; obs = []; odai = null;
     if (phase !== "round1") {
-      absorbed = []; missed = []; script = baseScript; guardT = 0;
+      absorbed = []; missed = []; script = baseScript; guardT = 0; boostT = 0;
       score = scoreAtMain;
     } else {
       scoreAtMain = score;   // 探検中に3機失ったら、探検はそこまで
@@ -2994,7 +2963,15 @@ const Battle = (() => {
 
     // 自機の弾（ふわりの光）: 白寄りの明るい桃色の細長い光。敵の弾（濃い色の球）と見分けられるように（10/25-7。色は BULLET_COLORS）
     for (const s of shots) {
-      const k = BATTLE.shotDrawScale;   // 見た目だけ大きく（当たりは今のまま）
+      const k = BATTLE.shotDrawScale * (s.boost ? 1.3 : 1);   // 見た目だけ大きく（当たりは今のまま）。パワー全開の光はひとまわり大きく、金色の尾がつく（11/7-25）
+      if (s.boost) {
+        const g = ctx.createLinearGradient(s.x, s.y, s.x - s.vx * 0.12, s.y + 46);
+        g.addColorStop(0, "rgba(255,214,90,0.85)"); g.addColorStop(1, "rgba(255,214,90,0)");
+        ctx.strokeStyle = g; ctx.lineWidth = s.thick ? 10 : 6; ctx.lineCap = "round";
+        ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(s.x - s.vx * 0.12, s.y + 46); ctx.stroke();
+        ctx.fillStyle = "rgba(255,226,120,0.5)";
+        ctx.beginPath(); ctx.ellipse(s.x, s.y, (s.thick ? 16 : 11) * k, (s.thick ? 22 : 15) * k, 0, 0, Math.PI * 2); ctx.fill();
+      }
       ctx.fillStyle = BULLET_COLORS.shotHalo;   // まわりにやわらかい光の輪
       ctx.beginPath(); ctx.ellipse(s.x, s.y, (s.thick ? 12 : 8) * k, (s.thick ? 18 : 12) * k, 0, 0, Math.PI * 2); ctx.fill();
       ctx.beginPath(); ctx.ellipse(s.x, s.y, (s.thick ? 7 : 4) * k, (s.thick ? 13 : 8) * k, 0, 0, Math.PI * 2);
@@ -3345,7 +3322,6 @@ const Battle = (() => {
     ctx.restore();
   }
 
-  // ぜんぶ消し（仮の絵）: 自機のまわりでタオルがくるっと回りながら広がり、白いうずが残る
   // 無敵タイム（11/6-6）: 自機のうしろに大きな光の輪。残り2秒で点滅
   function drawGuardGlow() {
     const R = BATTLE.skillGuardR, p = 0.5 + 0.5 * Math.sin(t * 8), fade = Math.min(1, guardT / 0.4) * (guardT < 2 && Math.sin(t * 18) < 0 ? 0.45 : 1);
@@ -3374,6 +3350,7 @@ const Battle = (() => {
     const hx = Math.cos(a1) * r, hy = Math.sin(a1) * r, d = lw * 1.8;
     ctx.beginPath(); ctx.moveTo(hx + d, hy - d * 0.2); ctx.lineTo(hx - d * 0.3, hy - d * 1.1); ctx.lineTo(hx - d * 0.6, hy + d * 0.9); ctx.closePath(); ctx.fill();
   }
+  // パワー全開を使った瞬間（11/7-25。前の1つ目のワザの絵を使う）: 自機のまわりに白いうずが広がり、大きなふわりがふくらむ
   function drawTyphoon() {
     const k = typhoon.age / 0.9, cx = player.x, cy = player.y;
     ctx.save();
@@ -3906,7 +3883,7 @@ const Battle = (() => {
   }
 
   // 殻があるか（2回目の旅の語句。1回目の旅の双眼鏡の語句にはない）
-  const hasShell = e => e.last && !e.explore && !!e.pattern && !e.loose;
+  const hasShell = e => e.last && !e.explore && !!e.pattern;
   const SHELL = {
     zako: { name: "綿毛のまゆ", color: "#ffffff", bit: "#ffffff" },
     mid:  { name: "いばら",     color: "#5f6f34", bit: "#8a9a50" },
@@ -4061,7 +4038,7 @@ const Battle = (() => {
   function drawGroundWord(e) {
     const wob = e.flash > 0 ? (Math.random() - 0.5) * 4 : 0;
     if (worldDef.id >= 2) {   // 世界2・3（10/31-12 決定）: 地面に貼りついた見た目。下に濃い影、殻は地面らしい形（世界2 木箱・世界3 歯車。仮の図形）、文字は少し平たく
-      const k = e.maxHp > 0 && !e.loose ? Math.max(0, e.hp / e.maxHp) : 0;   // 殻は残りの硬さでうすくなる（ぜんぶ消しでほどけたら、殻なし）
+      const k = e.maxHp > 0 ? Math.max(0, e.hp / e.maxHp) : 0;   // 殻は残りの硬さでうすくなる
       const bw = e.w + 30, bh = e.size * 1.15;
       if (gMoves(e)) drawBelt(e.y, bh + 14, e.vx * (evActive("reverse") ? -1 : 1));   // 動く: コンベアの帯（10/31-13）
       if (gHides(e)) {   // 隠れる: 隠れているあいだは隠れ場所だけ。顔を出すときは、隠れ場所から「ぴょこ」と出る（10/31-13）
@@ -4148,7 +4125,7 @@ const Battle = (() => {
   // 中ボス・大ボスは硬さを小さな丸で表示
   function drawHpDots(e) {
     if (e.parts || e.maxHp <= 1) return;
-    if (hasShell(e) || e.loose) return;   // 2回目の旅は、硬さを丸ではなく殻の厚みで見せる   // 1文字ずつ壊す敵は、文字ごとの帯で出す
+    if (hasShell(e)) return;   // 2回目の旅は、硬さを丸ではなく殻の厚みで見せる   // 1文字ずつ壊す敵は、文字ごとの帯で出す
     const n = e.maxHp, gap = 10, x0 = e.x - (n - 1) * gap / 2;
     const dy = e.y - e.h / 2 - 10 - (hasKanji(e.word.word) ? BATTLE.kanaSize + 4 : 0);   // ふりがなより上に出す
     for (let i = 0; i < n; i++) {
@@ -4910,7 +4887,6 @@ const Battle = (() => {
       ctx.fillText(l.desc, r.x + 18, r.y + 45);
       ctx.textAlign = "center";
     });
-    // （ぜんぶ消しの説明の1行は、10/25-17 に消した）
     // （残り時間の帯と「あと○秒」は、10/25-14 に時間制限といっしょになくした）
   }
 
@@ -5002,7 +4978,7 @@ const Battle = (() => {
     ctx.font = font(16); ctx.fillStyle = "#4b5e3a";
     ctx.strokeText(String(score), W - 14, top);   // （発見の旅の点数は drawExploreHud。11/1）
     ctx.fillText(String(score), W - 14, top);
-    // パワーと持ちものは、左下のぜんぶ消しのボタンの横に小さく（1回目の旅は光を使わないので出さない）
+    // パワーと持ちものは、左下の必殺ワザのボタンの横に小さく（1回目の旅は光を使わないので出さない）
     if (phase === "round1") { drawStrip(); return; }
     const b = skillButtons()[SKILL_IDS.length - 1];   // 3つ目のボタンの右
     ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.font = font(11);
@@ -5017,7 +4993,7 @@ const Battle = (() => {
   }
 
   // 必殺ワザの3つのボタン（11/6-6）: どれも同じゲージ（まわりの輪）。満タンで色がつき、脈打って光る。巻き戻しは使ったら灰色
-  const SKILL_COLORS = { clear: ["#f2541b", "#ffd2b8"], guard: ["#e8a412", "#fff0b8"], rewind: ["#3f8cf0", "#cfe4ff"] };
+  const SKILL_COLORS = { boost: ["#f2541b", "#ffd2b8"], guard: ["#e8a412", "#fff0b8"], rewind: ["#3f8cf0", "#cfe4ff"] };
   function drawSkillButtons() {
     for (const b of skillButtons()) drawSkillButton(b);
   }
@@ -5045,8 +5021,16 @@ const Battle = (() => {
       ctx.strokeStyle = "#8cbf5a"; ctx.lineWidth = 5; ctx.lineCap = "round";
       ctx.beginPath(); ctx.arc(b.x, b.y, b.r - 3, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * gauge / 100); ctx.stroke();
     }
-    // まん中の絵: ぜんぶ消し＝ふわり、無敵タイム＝星（使っているあいだは残りの秒数）、巻き戻し＝左回りの矢印
-    if (b.id === "clear") drawFuwariArt(full ? 3 : 1, b.x, b.y, b.r * 1.5);
+    // まん中の絵: パワー全開＝上向きの太い矢印、無敵タイム＝星（どちらも使っているあいだは残りの秒数）、巻き戻し＝左回りの矢印
+    if (b.id === "boost") {
+      ctx.save(); ctx.translate(b.x, b.y); ctx.fillStyle = full ? "#ffffff" : C;
+      if (boostT > 0) { ctx.font = font(18); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(String(Math.ceil(boostT)), 0, 1); }
+      else {
+        const a = b.r * 0.55, w = b.r * 0.22;
+        ctx.beginPath(); ctx.moveTo(0, -a); ctx.lineTo(a * 0.8, -a * 0.1); ctx.lineTo(w, -a * 0.1); ctx.lineTo(w, a * 0.75); ctx.lineTo(-w, a * 0.75); ctx.lineTo(-w, -a * 0.1); ctx.lineTo(-a * 0.8, -a * 0.1); ctx.closePath(); ctx.fill();
+      }
+      ctx.restore();
+    }
     else if (b.id === "guard") {
       ctx.save(); ctx.translate(b.x, b.y);
       if (guardT > 0) { ctx.font = font(18); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = full ? "#ffffff" : C; ctx.fillText(String(Math.ceil(guardT)), 0, 1); }
@@ -5105,7 +5089,7 @@ const Battle = (() => {
 
   function drawStrip() {
     const x = 6, cw = BATTLE.stripWidth, gap = 3;
-    const y0 = 40, y1 = bombButton().y - bombButton().r - 22;   // 体力ゲージの下から、ぜんぶ消しのボタンの上まで
+    const y0 = 40, y1 = bombButton().y - bombButton().r - 22;   // 体力ゲージの下から、必殺ワザのボタンの上まで
     const n = Math.max(1, slots.length), sh = (y1 - y0 - gap * (n - 1)) / n;
     ctx.save();
     ctx.fillStyle = "rgba(255,253,245,0.55)";
