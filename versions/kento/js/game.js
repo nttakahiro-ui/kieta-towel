@@ -84,6 +84,8 @@ const BATTLE = {
   // 地上の攻撃を「爆弾」に（11/6-3 決定。検討版 11/6 だけ）: 1回に左右45度の2方向へ2個を山なりに投げる。落ちた場所で爆発の輪が広がり、輪の中の地上の敵に当たる
   bombSide: 40,                // 爆弾が落ちる場所の、自機からの左右のずれ（px）。左右の輪が真ん中で重なる
   bombRing: 58,                // 爆発の輪の半径（px）。bombSide より大きいので、左右の2つで真正面もおおう
+  groundWide: 0.5,             // 地上の雑魚（星など）が画面のこの高さより下にいれば、真上の列でなくても爆弾を投げる（画面の高さの割合。11/7-23 決定「画面の下半分に星があれば投げる」）。ねらうのはその雑魚の位置
+  bombLook: { size: 1.2, arc: 1.35, trail: 0.35, rays: 8 },   // 爆弾の見た目（11/7-23）: 大きさ・山なりの高さ（見た目だけ。落ちる場所と時刻は同じ）、尾の長さ（飛ぶ時間の割合）、着弾で地面を走る光の数
   bombRingTime: 0.35,          // 輪が広がりきるまでの秒数（見た目だけ。当たりは落ちた瞬間）
   // 世界3の光の玉（11/6-3 決定。検討版 11/6 だけ）: 自機のまわりを2つの玉が回る。触れた敵（空中の虫）にダメージ。操作はふえない
   orbs: { n: 2, radius: 50, period: 2, r: 10, cd: 0.3 },   // 数、回る半径（px）、一周の秒数、玉の当たりの大きさ（px）、同じ虫に続けて当たらない秒数
@@ -545,6 +547,7 @@ const Battle = (() => {
   const topLevel = () => opts.stage && opts.stage.power4 ? 3 : 2;   // 上がれる段のいちばん上（0 から数える。4段目は power4 のステージだけ。11/1-4）
   let score = 0, combo = 0, maxCombo = 0;
   let floats = [];           // 点数が浮かぶ表示
+  let shards = [];           // 地上の雑魚が割れたかけら（11/7-23）
   let hits = 0, downs = 0;   // 被弾した回数、失った機体の数
   let lives = 3;             // 残機
   let gameOvers = 0;         // 3機すべて失って、本番をやり直した回数
@@ -754,7 +757,7 @@ const Battle = (() => {
     level = POWER_LEVELS[basePower()];
     score = 0; combo = 0; maxCombo = 0; floats = [];
     hits = 0; downs = 0; lives = BATTLE.lives; gameOvers = 0; scoreAtMain = 0; retryMain = false;
-    paused = false; moved = false; groundHinted = false; groundHeld = false; groundIntroShown = false; rearHinted = false; orbHinted = false; orbFlash = [0, 0]; banner = null; shake = 0; showWord = null; threads = []; pops = [];
+    paused = false; moved = false; groundHinted = false; groundHeld = false; groundIntroShown = false; rearHinted = false; orbHinted = false; orbFlash = [0, 0]; banner = null; shake = 0; showWord = null; threads = []; pops = []; shards = [];
     slow = 0; wave = null; gauge = 0; bombsUsed = 0; fsay = null; odai = null; bounces = []; odaiLater = [];
     fpsT0 = 0; fpsN = 0; fpsNow = 0; fpsMin = 0;
     msgQ = []; msgGap = 0; msgWasBusy = false;
@@ -1576,13 +1579,17 @@ const Battle = (() => {
 
     // 地上の攻撃（10/31-12 決定 B、11/1-4 決定で光のたねを投げる形に、11/2 決定で投げ続ける形に）: 地上の敵が自機の真上の列（左右 groundColumn px）にいるあいだ、
     //   自動で光のたねを投げ続ける（いちばん近いものに）。たねは少しずつ左右にばらけて放物線で飛び、着地ではじける。着地したときに隠れていることばには効かない
-    lock = groundTargets().filter(g => g.y < player.y - 30 && Math.abs(player.x - g.x) < (g.word ? g.w / 2 : g.r) + BATTLE.groundColumn).sort((a, b) => b.y - a.y)[0] || null;
+    const gts = groundTargets();
+    lock = gts.filter(g => g.y < player.y - 30 && Math.abs(player.x - g.x) < (g.word ? g.w / 2 : g.r) + BATTLE.groundColumn).sort((a, b) => b.y - a.y)[0] || null;
+    //   11/7-23: 真上の列にいなくても、地上の雑魚（星など）が画面の下半分にいれば、すぐにそれをねらって投げる（真上の列のものが先）
+    if (!lock) lock = gts.filter(g => !g.word && g.y < player.y - 30 && g.y >= H * BATTLE.groundWide && g.x > 0 && g.x < W).sort((a, b) => b.y - a.y)[0] || null;
     bombTimer -= dt;
     if (lock && bombTimer <= 0) {
       const aim = lock.word ? Math.min(lock.x + lock.w / 2 - 4, Math.max(lock.x - lock.w / 2 + 4, player.x)) : lock.x;
+      const cx = !lock.word && Math.abs(player.x - lock.x) >= lock.r + BATTLE.groundColumn ? lock.x : player.x;   // 列の外の雑魚は、その位置へ投げる（11/7-23）
       const pair = { hit: new Set() };   // 左右の2個で同じ敵に2回当てない（倒す速さは前のたねと同じ）
       // 真正面に1個。その世界の最大パワー（世界1は2本、世界2は3本、世界3は4本 ＝ 初期値の段＋1）で左右45度に2個。とくいのパワーアップで最初から最大なら最初から2個（11/7-9 決定。11/7-8 は「スタートより1段上」だった）。左右45度へ山なりに（11/6-3）
-      for (const side of (POWER_LEVELS.indexOf(level) >= basePower() + 1 ? [-1, 1] : [0])) bombs.push({ sx: player.x, sy: player.y - 24, tx: player.x + side * BATTLE.bombSide, ty: lock.y, age: 0, tg: lock, side, pair });
+      for (const side of (POWER_LEVELS.indexOf(level) >= basePower() + 1 ? [-1, 1] : [0])) bombs.push({ sx: player.x, sy: player.y - 24, tx: cx + side * BATTLE.bombSide, ty: lock.y, age: 0, tg: lock, side, pair });
       bombTimer = BATTLE.bombInterval;
       Sound.se("seedThrow");
     }
@@ -1984,7 +1991,10 @@ const Battle = (() => {
     post("tutorial", () => { hintCard = { text, t: BATTLE.hintTime }; slow = Math.max(slow, BATTLE.hintSlow); });
   }
   function groundTargets() {
-    return enemies.filter(e => e.ground && !e.loose && e.hp > 0 && onScreen(e) && !(e.appearT > 0) && !gHidden(e) && !(e.hold && !e.lesTried && lessonOn("s5ground")))   // ステージ5のチュートリアルの地上のことばは、説明が出るまで爆弾が当たらない（11/7-20）.concat(fillers.filter(f => f.layer === "ground" && f.hp > 0 && f.y > 0));
+    // ステージ5のチュートリアルの地上のことばは、説明が出るまで爆弾が当たらない（11/7-20）
+    //   （11/7-23: この説明が式の途中の行末に入っていて、うしろの「地上の雑魚」の .concat まで説明あつかいで消えていた。地上の雑魚に爆弾が出なかった）
+    return enemies.filter(e => e.ground && !e.loose && e.hp > 0 && onScreen(e) && !(e.appearT > 0) && !gHidden(e) && !(e.hold && !e.lesTried && lessonOn("s5ground")))
+      .concat(fillers.filter(f => f.layer === "ground" && f.hp > 0 && f.y > 0));
   }
   function inReach(g, x, y, r) {
     if (g.word) return Math.abs(x - g.x) < g.w / 2 + r && Math.abs(y - g.y) < g.h / 2 + r;
@@ -2430,7 +2440,8 @@ const Battle = (() => {
     if (f.hp > 0) { Sound.se("hit"); return; }
     score += BATTLE.scoreFiller;
     addGauge(BATTLE.gaugeKill / (1 + killN++ / BATTLE.gaugeKillHalf));
-    floats.push({ x: f.x, y: f.y - 10, text: `+${BATTLE.scoreFiller}`, big: false, age: 0 });
+    floats.push({ x: f.x, y: f.y - 10, text: `+${BATTLE.scoreFiller}`, big: f.layer === "ground", xl: f.layer === "ground", age: 0 });   // 地上の雑魚は「＋100」を大きめに（11/7-23）
+    if (f.layer === "ground") shatter(f);   // 地上の雑魚（星など）は、パリンと割れてかけらと光の粒が飛び散る（11/7-23）
     // 倒した雑魚は、ぽんっと大きな花になって、輪ときらきらが広がる
     addPop(f.x, f.y, f.layer === "ground" ? "#f6c9d6" : "#fff2b8", BATTLE.popScale, f.layer === "ground", true);
     for (let i = 0; i < 8; i++) {
@@ -2442,6 +2453,19 @@ const Battle = (() => {
     if (Math.random() < BATTLE.dropRate) { const it = { x: f.x, y: f.y, age: 0 }; items.push(it); lesson("seed", { ty: it.y, target: it, done: () => it.got || it.y >= H + 20 }); }   // チュートリアル: 初めてたねが落ちた → 拾う（11/7-20）
   }
 
+  // 地上の雑魚が割れる（11/7-23）: とがったかけらが回りながら飛び散り、光の粒も散る。音は「パリン」
+  function shatter(f) {
+    const w2 = worldDef.id === 2, cols = w2 ? ["#e8e2d8", "#b8b2aa", "#fff6d8"] : ["#ffffff", "#e8e4f4", "#fff2b8"];
+    for (let i = 0; i < 12; i++) {
+      const a = i / 12 * Math.PI * 2 + Math.random() * 0.4, sp = 120 + Math.random() * 130;
+      shards.push({ x: f.x, y: f.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.7 - 60, rot: Math.random() * 6, vr: (Math.random() - 0.5) * 14, s: 6 + Math.random() * 6, color: cols[i % 3], age: 0 });
+    }
+    for (let i = 0; i < 10; i++) {
+      const a = Math.random() * Math.PI * 2, sp = 140 + Math.random() * 140;
+      threads.push({ x: f.x, y: f.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, len: 3, curl: 0, rot: 0, color: ["#ffffff", "#fff2b8", "#d8f0ff"][i % 3], age: 0, scatter: 9, sparkle: true });
+    }
+    Sound.se("shatter");
+  }
   // 花が咲くような小さな演出
   function addPop(x, y, color, scale, ground, ring) {
     pops.push({ x, y, color, scale, ground: !!ground, ring: !!ring, age: 0 });
@@ -2449,6 +2473,8 @@ const Battle = (() => {
   function updatePops(dt) {
     const sc = scrollSpeed();
     for (const p of pops) { p.age += dt; if (p.ground) p.y += sc * dt; }
+    for (const s of shards) { s.age += dt; s.x += s.vx * dt; s.y += (s.vy + sc) * dt; s.vy += 420 * dt; s.vx *= 0.97; s.rot += s.vr * dt; }   // かけら: 飛んで、少し落ちて消える（11/7-23）
+    shards = shards.filter(s => s.age < 0.6);
     pops = pops.filter(p => p.age < 0.7);
   }
 
@@ -2940,6 +2966,7 @@ const Battle = (() => {
     for (const e of enemies) if (e.ground) drawGroundWord(e);
     // 落ちていくたね
     for (const r of blasts) drawBlast(r);
+    for (const s of shards) drawShard(s);
     for (const b of bombs) drawBomb(b);
     // 照準
     if (state === "play" && groundOn) drawGroundSpot();   // 真上の薄い丸と光の筋は、地上のある世界だけ
@@ -3090,7 +3117,7 @@ const Battle = (() => {
     ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
     for (const fl of floats) {
       ctx.globalAlpha = 1 - fl.age / 0.9;
-      ctx.font = font(fl.kana ? 22 : (fl.big ? 18 : 12));
+      ctx.font = font(fl.xl ? 26 : fl.kana ? 22 : (fl.big ? 18 : 12));   // xl: 地上の雑魚を倒した「＋100」（11/7-23）
       ctx.lineWidth = 4; ctx.strokeStyle = "#ffffff";
       ctx.strokeText(fl.text, fl.x, fl.y - fl.age * 30);
       ctx.fillStyle = fl.wrong ? "#b05068" : (fl.found ? tint("#6f9a4a") : (fl.kana ? "#5d6b4c" : (fl.big ? "#c98a1e" : "#8a9a78")));   // 砕けた文字の読みは、ふりがなの色
@@ -3461,36 +3488,71 @@ const Battle = (() => {
     ctx.restore();
   }
 
-  function drawBomb(b) {   // 爆弾（11/6-3）: 丸い爆弾に導火線と火花。左右45度へ出て山なりに落ちる。色は黄緑のまま
-    const k = Math.min(1, b.age / BATTLE.bombFlight), lift = Math.sin(Math.PI * k);
-    const x = b.sx + (b.tx - b.sx) * Math.sqrt(k), y = b.sy + (b.ty - b.sy) * k - lift * BATTLE.seedArc;   // 横は先に進む（ななめ45度に飛び出して見える）
-    const r = (6 + lift * 4) * BATTLE.seedSize * 0.9;
-    ctx.fillStyle = "rgba(30,30,40,0.22)";   // 地面の影
-    ctx.beginPath(); ctx.ellipse(x, y + lift * BATTLE.seedArc, r * 0.8, r * 0.45, 0, 0, Math.PI * 2); ctx.fill();
+  // 爆弾（11/6-3。11/7-23 で少し大きく、山なりを高く、光の尾）: 丸い爆弾に導火線と火花。左右45度へ出て山なりに落ちる。色は黄緑のまま
+  //   山なりの高さは見た目だけ（落ちる場所と時刻は前と同じ）
+  function bombPos(b, k) {
+    const lift = Math.sin(Math.PI * k);
+    return { x: b.sx + (b.tx - b.sx) * Math.sqrt(k), y: b.sy + (b.ty - b.sy) * k - lift * BATTLE.seedArc * BATTLE.bombLook.arc, lift };   // 横は先に進む（ななめ45度に飛び出して見える）
+  }
+  function drawBomb(b) {
+    const L = BATTLE.bombLook, k = Math.min(1, b.age / BATTLE.bombFlight), { x, y, lift } = bombPos(b, k);
+    const r = (6 + lift * 4) * BATTLE.seedSize * 0.9 * L.size;
+    ctx.fillStyle = "rgba(30,30,40,0.22)";   // 地面の影（落ちる先へまっすぐ進む）
+    ctx.beginPath(); ctx.ellipse(x, y + lift * BATTLE.seedArc * L.arc, r * 0.8, r * 0.45, 0, 0, Math.PI * 2); ctx.fill();
+    // 光の尾: 少し前までの軌道を、うしろほど細く・うすく
+    const k0 = Math.max(0, k - L.trail), N = 10;
+    ctx.save(); ctx.lineCap = "round";
+    for (let i = 0; i < N; i++) {
+      const ka = k0 + (k - k0) * i / N, kb = k0 + (k - k0) * (i + 1) / N, pa = bombPos(b, ka), pb = bombPos(b, kb), q = (i + 1) / N;
+      ctx.strokeStyle = `rgba(255,190,60,${0.55 * q})`; ctx.lineWidth = 3 + q * r * 1.1;   // 金色の光（明るい床でも見えるように）
+      ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke();
+      ctx.strokeStyle = `rgba(255,255,240,${0.9 * q})`; ctx.lineWidth = 1 + q * r * 0.4;   // まん中の白い筋
+      ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke();
+    }
+    ctx.restore();
     ctx.save(); ctx.translate(x, y); ctx.rotate(b.side * (0.5 + k * 1.2));   // 少しずつ回る
-    ctx.fillStyle = BULLET_COLORS.seedHalo; ctx.beginPath(); ctx.arc(0, 0, r + 4, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = BULLET_COLORS.seed; ctx.strokeStyle = "#35501a"; ctx.lineWidth = 2;   // 丸い爆弾
+    ctx.fillStyle = BULLET_COLORS.seedHalo; ctx.beginPath(); ctx.arc(0, 0, r + 5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = BULLET_COLORS.seed; ctx.strokeStyle = "#35501a"; ctx.lineWidth = 2.2;   // 丸い爆弾
     ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.fillStyle = "#35501a"; ctx.fillRect(-r * 0.32, -r - 3, r * 0.64, 4);   // 口金
-    ctx.strokeStyle = "#6b4a2a"; ctx.lineWidth = 2;   // 導火線
+    ctx.strokeStyle = "#6b4a2a"; ctx.lineWidth = 2.2;   // 導火線
     ctx.beginPath(); ctx.moveTo(0, -r - 3); ctx.quadraticCurveTo(r * 0.5, -r - 9, r * 0.2, -r - 13); ctx.stroke();
-    const sx = r * 0.2, sy = -r - 13, fl = 3 + Math.sin(b.age * 40) * 1.5;   // 火花（ちらちら）
+    const sx = r * 0.2, sy = -r - 13, fl = 3.5 + Math.sin(b.age * 40) * 1.5;   // 火花（ちらちら）
     ctx.fillStyle = "#ffd23a"; ctx.beginPath();
     for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2 + b.age * 9, rr = i % 2 ? fl : fl * 2.2; ctx.lineTo(sx + Math.cos(a) * rr, sy + Math.sin(a) * rr); }
     ctx.closePath(); ctx.fill();
-    ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(sx, sy, 1.6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(sx, sy, 1.8, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = "rgba(255,255,255,0.8)"; ctx.beginPath(); ctx.ellipse(-r * 0.35, -r * 0.3, r * 0.28, r * 0.18, -0.6, 0, Math.PI * 2); ctx.fill();   // つや
     ctx.restore();
   }
-  function drawBlast(r) {   // 爆発の輪（11/6-3）: 落ちた場所で広がる
+  // 爆発（11/6-3。11/7-23 で地面を走る光）: 落ちた場所で輪が広がり、地面に光の筋が放射状に走る
+  function drawBlast(r) {
     const k = Math.min(1, r.age / BATTLE.bombRingTime), fade = r.age > BATTLE.bombRingTime ? 1 - (r.age - BATTLE.bombRingTime) / 0.25 : 1;
     const R = BATTLE.bombRing * (0.35 + 0.65 * k);
     ctx.save(); ctx.globalAlpha = Math.max(0, fade);
     ctx.fillStyle = `rgba(200,255,120,${0.28 * (1 - k * 0.5)})`;
     ctx.beginPath(); ctx.ellipse(r.x, r.y, R, R * 0.62, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = "#f4ffd0"; ctx.lineWidth = 4 * (1 - k) + 2;
+    // 地面を走る光（輪より少し先まで伸びる、細長い光の筋）
+    ctx.lineCap = "round";
+    for (let i = 0; i < BATTLE.bombLook.rays; i++) {
+      const a = i / BATTLE.bombLook.rays * Math.PI * 2 + 0.3, c = Math.cos(a), s = Math.sin(a) * 0.62;
+      const r0 = R * 0.25, r1 = BATTLE.bombRing * (0.6 + 1.1 * k);
+      const g = ctx.createLinearGradient(r.x + c * r0, r.y + s * r0, r.x + c * r1, r.y + s * r1);
+      g.addColorStop(0, "rgba(255,200,60,0)"); g.addColorStop(0.65, `rgba(255,190,50,${0.95 * (1 - k * 0.5)})`); g.addColorStop(1, "rgba(255,240,180,0)");
+      ctx.strokeStyle = g; ctx.lineWidth = 5 * (1 - k) + 2;
+      ctx.beginPath(); ctx.moveTo(r.x + c * r0, r.y + s * r0); ctx.lineTo(r.x + c * r1, r.y + s * r1); ctx.stroke();
+    }
+    ctx.strokeStyle = "#f4ffd0"; ctx.lineWidth = 4.5 * (1 - k) + 2;
     ctx.beginPath(); ctx.ellipse(r.x, r.y, R, R * 0.62, 0, 0, Math.PI * 2); ctx.stroke();
     if (k < 0.6) { ctx.fillStyle = `rgba(255,240,170,${0.9 * (1 - k / 0.6)})`; ctx.beginPath(); ctx.arc(r.x, r.y, 14 + k * 20, 0, Math.PI * 2); ctx.fill(); }   // まん中の光
+    ctx.restore();
+  }
+  // 割れたかけら（11/7-23）: とがった三角が回りながら飛び、消える
+  function drawShard(s) {
+    const a = Math.max(0, 1 - s.age / 0.6);
+    ctx.save(); ctx.globalAlpha = a; ctx.translate(s.x, s.y); ctx.rotate(s.rot);
+    ctx.fillStyle = s.color; ctx.strokeStyle = "rgba(80,70,100,0.75)"; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(0, -s.s); ctx.lineTo(s.s * 0.7, s.s * 0.6); ctx.lineTo(-s.s * 0.5, s.s * 0.4); ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.restore();
   }
   function drawOrbs() {   // 世界3の光の玉（11/6-3）

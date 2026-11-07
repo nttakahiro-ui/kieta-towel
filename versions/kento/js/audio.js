@@ -709,8 +709,12 @@ const Sound = (() => {
       tone(freq("E6"), t + 0.05, 0.15, "sine", 0.06);
     } else if (name === "seedThrow") {   // 光のたねを投げる（ぽん。11/2 決定。0.25秒ごとに鳴るので、ごく小さく）
       sweep(520, 760, 0.07, "sine", 0.05);
-    } else if (name === "seedPop") {     // 光のたねがはじける（ぱっ。小さく）
+    } else if (name === "seedPop") {     // 爆弾が落ちてはじける（11/7-23: 「ドン」。前の「ぱっ」より少し大きく。0.25秒ごとに鳴るので大きすぎないように）
+      sweep(170, 55, 0.2, "sine", 0.16);
       sweep(1500, 2300, 0.05, "triangle", 0.045);
+    } else if (name === "shatter") {     // 地上の雑魚（星など）が割れる「パリン」（11/7-23）: 高い音がいくつか、すぐ消える
+      ["E7", "B7", "G7"].forEach((n, i) => tone(freq(n), t + i * 0.025, 0.12, "triangle", 0.09));
+      sweep(3200, 5200, 0.06, "sine", 0.05);
     } else if (name === "item") {    // 綿のたねを拾う
       tone(freq("G5"), t, 0.15, "sine", 0.25);
       tone(freq("D6"), t + 0.06, 0.25, "sine", 0.25);
