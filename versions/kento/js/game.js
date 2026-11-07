@@ -270,9 +270,9 @@ const BATTLE = {
   // --- 世界2・3の試作（10/31-10。docs/世界2・3の構想メモ.md）。数は仮 ---
   groundMark: true,            // 左の帯で、地上に出ることばの枠に小さな地面の絵のマーク（10/31-12 決定。文字の「地」ではない）
   // 必殺ワザ（11/6-6 決定）: 「ぜんぶ消し」「無敵タイム」「巻き戻し」の3つ。最初から全部持っていて、左下に3つのボタン。ゲージは3つで1本（使うと0にもどる）
-  // ラストチャンス（11/7-10 決定。延長戦の作り直し）: 大ボスのあと、取り逃したことばがあれば20秒。ことばを背負った「逃げる虫」（1語に1匹、4秒以内に全部出る）を倒すと、ことばが落ちてゆっくり流れる。
-  //   ふわりが光って、近く（pullR px 以内）のことばをゆっくり引き寄せる。bugHp ＝ 虫の硬さ（弾の数）、bugSpeed ＝ 速さ（px/秒）、turn ＝ ジグザグの向きを変える間隔（秒）
-  lastChance: { time: 20, spawnIn: 4, bugHp: 3, bugR: 15, bugSpeed: 95, turn: [0.45, 0.9], dropFall: 24, pullR: 100, pullSpeed: 70 },
+  // ラストチャンス（11/7-12 決定で作り直し）: 大ボスのあと、取り逃したことばがあれば15秒。取り逃したことばが本編と同じ姿でもう一度出る（spawnIn 秒以内に全部）。
+  //   ふわりが光って、近く（pullR px 以内）のことばを pullSpeed px/秒で引き寄せる。（11/7-10 の「逃げる虫」はやめた）
+  lastChance: { time: 15, spawnIn: 3, pullR: 100, pullSpeed: 70 },
   loosePad: 18,   // ぜんぶ消しでほどけたことばに、ふわりがさわったとみなす広さ（ことばの外側 px。11/7-1）
   skillGuardTime: 10,          // 「無敵タイム」の秒数（11/7-9 決定: 15 → 10）。（自機が大きく光り、ぶつかった虫と弾が消える。元気は減らない）
   rewindHintTime: 2.6,         // ゲージが初めて満タンになったときの、ふわりの巻き戻しの一言の秒数（11/7-9 決定: 2〜3秒）
@@ -584,7 +584,7 @@ const Battle = (() => {
   let extraUsed = false;     // 延長戦をしたか（1回だけ。10/25-19）
   let extraRound = false;    // いまラストチャンスか
   let lastT = 0;             // ラストチャンスの残り秒（0 ＝ ラストチャンスではない）
-  let lcBugs = [], lcWords = [], lcKills = 0;   // 逃げる虫と、ラストチャンスに出たことばと、倒した虫の数
+  let lcWords = [], lcQueue = [], lcClock = 0;   // ラストチャンスに出すことばと、出す順番待ち、始まってからの秒
   let againFx = null;        // 大ボス2段階目の「まだだ！ もう一度！」（11/1-4）{ age }
   let wrongFx = null;        // お題で「ちがうよ」を大きく出している（10/25-16）{ age }
   let powerFx = null;        // 「パワーアップ！」の大きな文字（10/25-9）{ age }
@@ -743,7 +743,7 @@ const Battle = (() => {
     fpsT0 = 0; fpsN = 0; fpsNow = 0; fpsMin = 0;
     msgQ = []; msgGap = 0; msgWasBusy = false;
     choiceFree = !!opts.firstChoice;
-    tut = null; hintOpts = opts.hints || null; hintShown = {}; hintCard = null; bombHinted = false; bombFlash = 0; powerFx = null; wrongFx = null; againFx = null; extraUsed = false; extraRound = false; lastT = 0; lcBugs = []; lcWords = [];
+    tut = null; hintOpts = opts.hints || null; hintShown = {}; hintCard = null; bombHinted = false; bombFlash = 0; powerFx = null; wrongFx = null; againFx = null; extraUsed = false; extraRound = false; lastT = 0; lcQueue = []; lcWords = [];
     stripFlash = 0; sortieStep = "choice"; freed = [];
     explore = { t: 0, next: 0, nextAt: BATTLE.exploreFirst, again: [], list: [], bugs: [], bugT: 2, endT: 0, flies: [], streaks: [] };
     {
@@ -1444,7 +1444,7 @@ const Battle = (() => {
     }
 
     // ===== 台本: 決まった時刻に、決まった順番で語句を出す（倒したかどうかには関係しない） =====
-    if (lastT > 0) updateLast(dt);   // ラストチャンス: 台本のかわりに、逃げる虫
+    if (lastT > 0) updateLast(dt);   // ラストチャンス: 台本のかわりに、取り逃したことばだけを出す
     else if (gapT > 0) {
       // 周と周のあいだ
       gapT -= dt;
@@ -1573,12 +1573,6 @@ const Battle = (() => {
         e.y = -e.size + (H * BATTLE.bossStopY + e.size) * (1 - Math.pow(1 - enter, 2));
         const range = Math.min(W * BATTLE.bossSway, Math.max(0, W / 2 - e.w / 2 - 12));
         e.x = W / 2 + Math.sin(e.age * 0.7) * range;
-      } else if (e.pattern === "drop") {   // ラストチャンスで虫が落としたことば: ゆっくり流れる。ふわりの近くなら、ゆっくり引き寄せられる
-        const L = BATTLE.lastChance, dx = player.x - e.x, dy = player.y - e.y;
-        const gap = Math.hypot(Math.max(0, Math.abs(dx) - e.w / 2), Math.max(0, Math.abs(dy) - e.h / 2));
-        e.pulled = gap < L.pullR && player.hp > 0;
-        if (e.pulled) { const d = Math.max(1, Math.hypot(dx, dy)), v = Math.min(d, L.pullSpeed * dt); e.x += dx / d * v; e.y += dy / d * v; }
-        else e.y += L.dropFall * dt;
       } else if (e.ground) {
         e.y += sc * dt / (e.last ? stayOf() : 1);     // 地上の語句は地面といっしょに流れる（世界2・3の救出の旅は少しゆっくり。11/7-8）
         if (gHides(e)) {   // 隠れる: 出る hideOut 秒・隠れる hideIn 秒のあと、また出る（隠れるのは1回だけ。11/7-8）。顔を出すときに「ぴょこ」
@@ -1618,6 +1612,18 @@ const Battle = (() => {
         if (e.hold) e.y = Math.min(e.y, H * BATTLE.firstHoldY);   // ステージ1の救出の旅の1語目: 中ほどで止まって待つ
         if (evActive("gravity")) e.bx = Math.min(W - e.w / 2 - 20, Math.max(stripRight() + e.w / 2 + 20, e.bx + BATTLE.gravityDrift * dt));   // 出来事「重力が変わる」（世界3）: 右へ流される
         e.x = e.bx + Math.sin(e.age * BATTLE.swaySpeed + e.phase) * BATTLE.sway;
+      }
+      // ラストチャンスの引き寄せ（11/7-10・11/7-12）: ふわりから pullR px 以内のことば。ほどけたことば（ぜんぶ消しのあと）はふわりのほうへ、
+      //   殻のある空のことばは横だけ、ふわりの真上へ寄る（光が当たりやすくなる）。地上のことばは動かさない
+      e.pulled = false;
+      if (lastT > 0 && !e.ground && player.hp > 0) {
+        const L = BATTLE.lastChance, dx = player.x - e.x, dy = player.y - e.y;
+        if (Math.hypot(Math.max(0, Math.abs(dx) - e.w / 2), Math.max(0, Math.abs(dy) - e.h / 2)) < L.pullR) {
+          e.pulled = true;
+          const v = L.pullSpeed * dt;
+          if (e.loose) { const d = Math.max(1, Math.hypot(dx, dy)); e.x += dx / d * Math.min(d, v); e.y += dy / d * Math.min(d, v); }
+          else if (e.bx !== undefined && e.pattern !== "edge" && e.pattern !== "cross") { const m = Math.sign(dx) * Math.min(Math.abs(dx), v); e.bx += m; e.x += m; }
+        }
       }
       // 弾を撃つ（画面の上のほうにいる間だけ）。1語目を待っているあいだと、ステージ1のお題では撃たない
       if (holdOn() || e.pattern === "odai" || e.loose) continue;   // お題の殻は odaiFire で順番に撃つ（11/1 決定）
@@ -1745,7 +1751,6 @@ const Battle = (() => {
     for (const s of shots) {
       let hit = false;
       if (inObstacle(s.x, s.y)) { s.y = -999; continue; }   // 木は弾をさえぎる
-      if (lastT > 0 && hitBugs(s)) { s.y = -999; continue; }   // 逃げる虫
       for (const f of fillers) {
         if (f.layer !== "air" || f.hp <= 0 || f.delay > 0) continue;
         if (Math.hypot(s.x - f.x, s.y - f.y) < f.r + (s.thick ? 10 : 4)) { hit = true; damageFiller(f); break; }
@@ -2275,7 +2280,6 @@ const Battle = (() => {
       addPop(f.x, f.y, "#fff8d8", 1, f.layer === "ground");
     }
     fillers = []; ebullets = [];
-    for (const b of lcBugs.slice()) if (b.delay <= 0 && b.entered) killBug(b);   // ラストチャンスの逃げる虫も倒れて、ことばを落とす
     bombing = true;   // ぜんぶ消しで取り戻したぶんでは、ゲージはたまらない
     for (const e of enemies.slice()) {
       if (e.hp <= 0 || !onScreen(e) || !hasShell(e) || e.appearT > 0 || e.open || e.againT > 0) continue;
@@ -2686,7 +2690,8 @@ const Battle = (() => {
     for (const w of missed) if (!ids.has(w.id) && !out.includes(w)) out.push(w);
     return out;
   }
-  // ラストチャンス（11/7-10 決定）: 20秒。取り逃したことばを背負った逃げる虫だけが出る（ふつうの敵と出来事は出ない）。持ち物・元気・パワー・ゲージは今のまま
+  // ラストチャンス（11/7-10 決定、11/7-12 作り直し）: 15秒。取り逃したことばが、本編と同じ姿（出方・地上・殻）でもう一度出てくる（3秒以内に全部）。
+  //   ふつうの敵と出来事は出ない。持ち物・元気・パワー・ゲージは今のまま
   function startLast() {
     const L = BATTLE.lastChance;
     lcWords = extraWords();
@@ -2694,106 +2699,42 @@ const Battle = (() => {
     enemies = []; fillers = []; ebullets = []; bombs = []; blasts = []; items = []; odai = null; obs = []; rest = null; guide = null;
     state = "play";
     lastT = L.time;
-    const step = Math.min(0.6, L.spawnIn / Math.max(1, lcWords.length));   // 4秒以内に全部出る
-    lcBugs = lcWords.map((w, i) => ({ word: w, x: rand(stripRight() + 40, W - 40), y: -24, ang: Math.PI / 2 + rand(-0.5, 0.5), turnT: rand(0.6, 1), zig: i % 2 ? 1 : -1,
-      hp: L.bugHp, maxHp: L.bugHp, age: 0, flash: 0, delay: 0.4 + i * step, entered: false }));
-    lcKills = 0;
+    const step = Math.min(0.6, (L.spawnIn - 0.3) / Math.max(1, lcWords.length - 1));   // 3秒以内に全部出る（間は最大0.6秒）
+    lcQueue = lcWords.map((w, i) => ({ w, at: 0.3 + i * step }));
+    lcClock = 0;
     music("quiz");   // そのステージのクイズの曲（いちばん速い曲）
     Sound.se("odai");
   }
   function updateLast(dt) {
-    const L = BATTLE.lastChance;
     lastT = Math.max(0, lastT - dt);
-    const lo = stripRight() + 20, hi = W - 20, top = H * 0.24, bot = H * 0.62;   // 上の「ラストチャンス！」と秒数には重ならない
-    for (const b of lcBugs) {
-      if (b.delay > 0) { b.delay -= dt; continue; }
-      b.age += dt; b.flash = Math.max(0, b.flash - dt);
-      if (frozen()) continue;
-      b.turnT -= dt;
-      if (b.turnT <= 0 && b.entered) {   // ジグザグ: 行き先へ向かう向きから、左右かわるがわるにずらす
-        b.turnT = rand(L.turn[0], L.turn[1]);
-        if (!b.goal || Math.hypot(b.goal.x - b.x, b.goal.y - b.y) < 60 || Math.random() < 0.25) b.goal = { x: rand(lo, hi), y: rand(top, bot) };
-        b.zig = -b.zig;
-        b.ang = Math.atan2(b.goal.y - b.y, b.goal.x - b.x) + b.zig * rand(0.5, 0.9);
-      }
-      b.x += Math.cos(b.ang) * L.bugSpeed * dt; b.y += Math.sin(b.ang) * L.bugSpeed * dt;
-      if (!b.entered) { if (b.y > top) b.entered = true; else continue; }
-      if (b.x < lo) { b.x = lo; b.ang = Math.PI - b.ang; } else if (b.x > hi) { b.x = hi; b.ang = Math.PI - b.ang; }
-      if (b.y < top) { b.y = top; b.ang = -b.ang; } else if (b.y > bot) { b.y = bot; b.ang = -b.ang; }
-    }
+    lcClock += dt;
+    while (lcQueue.length && lcClock >= lcQueue[0].at) spawn(lcQueue.shift().w);   // 本編と同じ spawn（出方・地上・殻・硬さ）
     const got = new Set(absorbed.map(w => w.id));
-    if (lastT <= 0 || lcWords.every(w => got.has(w.id))) endLast();
-  }
-  function hitBugs(s) {
-    for (const b of lcBugs) {
-      if (b.delay > 0 || !b.entered) continue;
-      if (Math.hypot(s.x - b.x, s.y - b.y) < BATTLE.lastChance.bugR + (s.thick ? 10 : 4)) {
-        b.hp -= s.thick ? 2 : 1; b.flash = 0.12;
-        if (b.hp <= 0) killBug(b); else Sound.se("hit");
-        return true;
-      }
-    }
-    return false;
-  }
-  // 虫が倒れた: ことばを落とす（殻のない、ほどけたことば。ふわりがさわると助けられる）
-  function killBug(b) {
-    lcBugs = lcBugs.filter(q => q !== b);
-    lcKills++;
-    score += BATTLE.scoreFiller;
-    addPop(b.x, b.y, "#fff8d8", 1, false);
-    const w = b.word;
-    let sz = isShortWord(w) ? Math.round(BATTLE.fontSize.zako * BATTLE.shortScale) : BATTLE.fontSize.zako;
-    ctx.font = font(sz);
-    let ww = ctx.measureText(w.word).width;
-    while (ww > W - 40 && sz > 24) { sz -= 2; ctx.font = font(sz); ww = ctx.measureText(w.word).width; }
-    const x = Math.max(stripRight() + ww / 2 + 8, Math.min(W - ww / 2 - 8, b.x));
-    enemies.push({ word: w, role: "zako", size: sz, w: ww, h: sz * 1.2, ground: false, pattern: "drop", lane: 0.5, slot: 0, last: true, spd: 1, bx: x, x, y: b.y,
-      hp: 1, maxHp: 1, age: 0, phase: 0, fire: 99, flash: 0.3, loose: true, appeared: true, appearT: 0, penaltyAt: -9 });
-    Sound.se("pop");
+    const left = lcWords.filter(w => !got.has(w.id));
+    const onField = enemies.some(e => e.hp > 0 && lcWords.includes(e.word));
+    if (lastT <= 0 || !left.length || (!lcQueue.length && !onField)) endLast();   // 時間切れ・全部取れた・もう画面にいない
   }
   function endLast() {
     const got = new Set(absorbed.map(w => w.id));
-    missed = lcWords.filter(w => !got.has(w.id));   // 20秒で取れなかったことばは、取り逃しのまま
-    for (const b of lcBugs) addPop(b.x, b.y, "#fff8d8", 0.8, false);
-    for (const e of enemies) addPop(e.x, e.y, "#fff8d8", 0.8, false);
-    lcBugs = []; enemies = [];
+    missed = lcWords.filter(w => !got.has(w.id));   // 15秒で取れなかったことばは、取り逃しのまま
+    for (const e of enemies) addPop(e.x, e.y, "#fff8d8", 0.8, !!e.ground);
+    enemies = []; ebullets = []; lcQueue = [];
     lastT = 0; extraRound = false;
     state = "clear"; stateTimer = 1.2;
   }
-  // ラストチャンスの表示: 上に大きく「ラストチャンス！」と残り秒数
+  // ラストチャンスの表示（11/7-12）: 上に「ラスト15秒！のこりをとろう」の帯、その下に大きく残り秒数（どちらもいちばん手前）
   function drawLastHud() {
     ctx.save();
     ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
-    const y = H * 0.11, warn = lastT <= 5, n = String(Math.ceil(lastT));
-    ctx.font = font(30); ctx.lineWidth = 7; ctx.strokeStyle = "rgba(255,255,255,0.95)"; ctx.fillStyle = "#c0392b";
-    ctx.strokeText(tx("rescue.lastChance"), W / 2, y); ctx.fillText(tx("rescue.lastChance"), W / 2, y);
-    const k = warn ? 1 + 0.12 * Math.max(0, 1 - (Math.ceil(lastT) - lastT) * 4) : 1;   // のこり5秒からは、1秒ごとに少しはねる
-    ctx.font = font(Math.round(52 * k)); ctx.lineWidth = 8; ctx.fillStyle = warn ? "#e74c3c" : "#4b3a1a";
-    ctx.strokeText(n, W / 2, y + 50); ctx.fillText(n, W / 2, y + 50);
+    const label = tx("rescue.lastChance", { n: BATTLE.lastChance.time }), y = 58, warn = lastT <= 5;
+    let fs = 22; ctx.font = font(fs); while (ctx.measureText(label).width > W - 60 && fs > 14) { fs -= 1; ctx.font = font(fs); }
+    const tw = ctx.measureText(label).width;
+    ctx.fillStyle = "rgba(192,57,43,0.88)"; roundRect(W / 2 - tw / 2 - 14, y - fs * 0.75, tw + 28, fs * 1.5, fs * 0.75); ctx.fill();
+    ctx.fillStyle = "#ffffff"; ctx.fillText(label, W / 2, y + 1);
+    const k = warn ? 1 + 0.12 * Math.max(0, 1 - (Math.ceil(lastT) - lastT) * 4) : 1;   // のこり5秒からは赤く、1秒ごとに少しはねる
+    ctx.font = font(Math.round(50 * k)); ctx.lineWidth = 8; ctx.strokeStyle = "rgba(255,255,255,0.95)"; ctx.fillStyle = warn ? "#e74c3c" : "#4b3a1a";
+    ctx.strokeText(String(Math.ceil(lastT)), W / 2, y + 52); ctx.fillText(String(Math.ceil(lastT)), W / 2, y + 52);
     ctx.restore();
-  }
-  // 逃げる虫: ことばを背負った丸い虫（世界の色）
-  function drawLcBugs() {
-    const zc = (WORLD_TINT[worldDef.id] || WORLD_TINT[1]).zako, r = BATTLE.lastChance.bugR;
-    for (const b of lcBugs) {
-      if (b.delay > 0) continue;
-      ctx.save();
-      ctx.translate(b.x + (b.flash > 0 ? rand(-2, 2) : 0), b.y);
-      const flap = Math.abs(Math.sin(b.age * 16));
-      ctx.fillStyle = "rgba(235,245,255,0.8)";
-      for (const sd of [-1, 1]) { ctx.beginPath(); ctx.ellipse(sd * r * 0.9, -r * 0.2, r * 0.75 * (0.4 + flap * 0.6), r * 0.45, sd * 0.5, 0, Math.PI * 2); ctx.fill(); }
-      ctx.fillStyle = b.flash > 0 ? "#ffffff" : zc;
-      ctx.beginPath(); ctx.ellipse(0, 0, r * 0.8, r, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = "#2f2a24"; ctx.beginPath(); ctx.arc(0, -r * 0.95, r * 0.35, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = "#fff"; for (const sd of [-1, 1]) { ctx.beginPath(); ctx.arc(sd * r * 0.15, -r * 1.05, 2, 0, Math.PI * 2); ctx.fill(); }
-      ctx.font = font(15); ctx.textAlign = "center"; ctx.textBaseline = "middle";   // 背負ったことば
-      const tw = ctx.measureText(b.word.word).width;
-      ctx.fillStyle = "rgba(255,253,245,0.95)"; ctx.strokeStyle = zc; ctx.lineWidth = 2;
-      roundRect(-tw / 2 - 6, r * 0.2, tw + 12, 22, 8); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = "#3a3020"; ctx.fillText(b.word.word, 0, r * 0.2 + 11.5);
-      for (let i = 0; i < b.maxHp; i++) { ctx.fillStyle = i < b.hp ? "#e0b03a" : "rgba(0,0,0,0.2)"; ctx.beginPath(); ctx.arc((i - (b.maxHp - 1) / 2) * 7, -r - 12, 2.5, 0, Math.PI * 2); ctx.fill(); }   // 硬さ
-      ctx.restore();
-    }
   }
   // ふわりが光って、近くのことばを引き寄せる（引き寄せる広さを、うすい光の輪で見せる）
   function drawLastPull() {
@@ -2935,7 +2876,6 @@ const Battle = (() => {
 
     // 空中の雑魚
     for (const f of fillers) if (f.layer === "air") drawFiller(f);
-    if (lastT > 0) drawLcBugs();
     for (const f of fillers) if (f.rear && f.delay > 0) {   // うしろから来る敵（世界3）: 出てくる前に、下のはしに「！」（10/31-10 試作）
       ctx.save(); ctx.globalAlpha = 0.6 + 0.4 * Math.sin(t * 14); ctx.font = font(26); ctx.textAlign = "center"; ctx.textBaseline = "middle";
       ctx.lineWidth = 5; ctx.strokeStyle = "#ffffff"; ctx.strokeText("！", f.x, H - 34); ctx.fillStyle = "#c23a6a"; ctx.fillText("！", f.x, H - 34); ctx.restore();
@@ -3060,6 +3000,7 @@ const Battle = (() => {
     }
     ctx.globalAlpha = 1;
     drawHud();
+    if (lastT > 0) drawLastHud();   // ラストチャンスの帯と残り秒数（いちばん手前。11/7-12）
     drawSkillButtons();
     if (rewindFx) drawRewind();
     // 操作のヒント（まだ動かしていないとき）
@@ -3093,7 +3034,6 @@ const Battle = (() => {
     if (state === "sortie") drawSortie();
     if (tut) drawTut();
     if (state === "clear") centerText(`${absorbed.length}のことばを助けた！`, `${score}点`);
-    if (lastT > 0) drawLastHud();
     if (paused) drawSleep();
   }
 
