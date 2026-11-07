@@ -120,7 +120,7 @@ const Cards = (() => {
     const rb = $("cards-retake");
     rb.classList.remove("hidden");
     if (wrong.length && o.onRetake) { rb.textContent = tx("results.retakeButton"); rb.onclick = () => o.onRetake(wrong); }
-    else { rb.textContent = tx("results.nextButton"); rb.onclick = () => (done ? o.onRecipe() : o.onNext()); }
+    else { rb.textContent = tx("results.nextButton"); rb.onclick = () => (done ? o.onRecipe() : o.onShort ? o.onShort(o.words.length - ownedCount) : o.onNext()); }   // そろっていなければ「宝石まであと○こ」（11/7-10）
     // 救出の旅をもう一度（10/25-14）: 助けられなかったことばがあるとき。「クイズをもう一度」（または「次へ」）の下に
     const rs = $("cards-rescue");
     rs.classList.toggle("hidden", !(notHelped.length && o.onRescue));
@@ -138,6 +138,7 @@ const Cards = (() => {
       const r = rankOf(st.score);
       const sc = document.createElement("div"); sc.className = "rank-score"; sc.textContent = `${st.score} 点`;
       const nm = document.createElement("div"); nm.className = "rank-name"; nm.textContent = `ランク：${r.name}`;
+      if (st.missN) { const mp = document.createElement("div"); mp.className = "miss-penalty"; mp.textContent = tx("results.missPenalty", { n: st.missN, pts: st.missN * st.missPts }); rk.append(mp); }   // 取り逃しの減点（11/7-10。赤）
       rk.append(sc, nm);
       // ベスト更新と、今回とれた印
       if (o.record) {
@@ -189,6 +190,14 @@ const Cards = (() => {
   //   そのあと「あと○個で…」と、次の宝石が小さく点滅。秒数は js/recipebook.js の RECIPE_FX。画面のどこをタップしても最後に飛ぶ
   // o: { stage, words（このステージの10のことば）, lit（光っている stage id の Set）, isNew（初めてそろった）, onNext, hint, heroSrc }
   let fxTimers = [];
+  // 宝石まであと○こ（11/7-10 決定）: カードが10こそろっていないとき、宝石の画面のかわりに出す。o: { n, heroSrc, onRescue, onStages }
+  function showShort(o) {
+    showHero("short-hero", o.heroSrc);
+    $("short-label").textContent = tx("short.label", { n: o.n });
+    const btns = $("short-buttons");
+    btns.innerHTML = "";
+    btns.append(button(tx("short.rescue"), "btn-main", o.onRescue), button(tx("short.stages"), "btn-sub", o.onStages));
+  }
   function showRecipe(o) {
     Sound.play("gem");   // 宝石ができた: fanfare.mp3 の頭だけ1回（11/7-4）
     fxTimers.forEach(clearTimeout); fxTimers = [];
@@ -272,5 +281,5 @@ const Cards = (() => {
     };
   }
 
-  return { showCards, showRecipe, phraseHTML, wordEl, artEl, names };
+  return { showCards, showRecipe, showShort, phraseHTML, wordEl, artEl, names };
 })();

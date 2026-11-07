@@ -311,6 +311,7 @@ const Main = (() => {
     showScreen("title");
   }
 
+  const MISS_POINTS = 100;   // 取り逃し1こあたりの減点（11/7-10）
   let reviewNext = false;    // 「ステージ1でおさらい」: 次のステージ1は、見た記録に関係なく案内を全部出す
   const heroSrc = pose => `assets/hero_${Save.data.hero || "boy"}_${pose}.png`;   // 主人公の絵（10/31-7: 制作側の地が透明な絵）（point 指さす／think 考える／joy 喜ぶ）
   // 案内（ステージ1）を結果画面とレシピ完成で出すか。出すなら見た記録をつける
@@ -368,6 +369,10 @@ const Main = (() => {
         foundIds: rescueAgain === true ? (Save.data.found[stage.id] || []) : null,
         showFps: tuneMode,   // 調整パネルのとき、1秒あたりの描画回数を右下に（10/31-14）
         onEnd: (ids, stats) => {
+          // 取り逃しの減点（11/7-10 決定）: 助けられなかったことば1こにつき −100。点数の合計からも引く
+          const got = new Set(ids), missN = new Set((stats.missed || []).filter(id => !got.has(id))).size;
+          stats.missN = missN; stats.missPts = MISS_POINTS; stats.rawScore = stats.score;
+          stats.score = Math.max(0, stats.score - missN * MISS_POINTS);
           lastStats = stats; lastIds = ids;
           // 発見の記録はブラウザに保存（10/25-15）。10のことばすべて助けたら、もういらないので消す
           if (ids.length >= words.length) delete Save.data.found[stage.id]; else Save.data.found[stage.id] = stats.found;
@@ -442,6 +447,7 @@ const Main = (() => {
       onRetake: startRetake,
       onRescue: Save.data.found[stage.id] ? () => toBattle(true) : null,   // 救出の旅をもう一度（10/25-14。発見の記録があるステージだけ。記録はブラウザに保存 10/25-15）
       onRecipe: toRecipe,
+      onShort: toShort,
       onRetry: toBattle,
       onTitle: toStages,
       hint: "",   // （「クイズに正解したことばが、カードになるよ」は、10/25-1 からクイズの前の画面で出す）
@@ -453,6 +459,13 @@ const Main = (() => {
     });
   }
 
+  // 宝石まであと○こ（11/7-10 決定）: 「救出の旅をもう一度」（今ある作り。発見の記録がなければ最初から）と「ステージ一覧へ」
+  function toShort(n) {
+    showScreen("short");
+    Cards.showShort({ n, heroSrc: heroSrc("point"),
+      onRescue: () => (Save.data.found[stage.id] ? toBattle(true) : toBattle()),
+      onStages: toStages });
+  }
   // レシピ完成（10/25-4）: 台座に、そのステージの宝石がはまる（初めてそろったときだけ）。12個目なら「つぎへ」で12個そろったときの画面へ
   function toRecipe() {
     const lit = RecipeBook.litIds(Save.data.cards);

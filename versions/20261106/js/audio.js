@@ -51,7 +51,7 @@ const FILE_MUSIC = {
     w2_hakken:    { loop: [10.838, 58.838], lufs: -11.58 },   // 120、24小節
     w2_kyushutsu: { loop: [20.303, 52.735], lufs: -10.98, skipIntro: true },   // 148、20小節
     w2_quiz:      { loop: [18.190, 54.190], lufs: -11.50 },   // 160、24小節
-    w3_hakken:    { loop: [23.834, 55.834], lufs: -10.08 },   // 120、16小節
+    w3_hakken:    { loop: [24.582, 62.582], lufs: -10.30, v: "1107-10" },   // v ＝ ファイルを差し替えた印（前の曲がブラウザに残らないように）。120、19小節（11/7-10 に新しい曲へ。66.6秒）
     w3_kyushutsu: { loop: [24.623, 51.289], lufs: -10.61, skipIntro: true },   // 144、16小節
     w3_quiz:      { loop: [6.397, 61.898], lufs: -10.57 },   // 160、37小節
     title:        { loop: [17.146, 55.546], lufs: -11.18 },   // 100、16小節（11/6-6）。11/7: 大きさを今の区間で測り直した（前の -10.82 は前の区間の値）
@@ -416,7 +416,7 @@ const Sound = (() => {
     for (const k of keys.map(fileOf)) {
       if (buffers[k] || raw[k] || loading[k] || decoding[k]) continue;   // 音にしている途中のものも、もう一度は読まない
       loading[k] = true;
-      chain = chain.then(() => fetch(FILE_MUSIC.dir + k + ".mp3").then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+      chain = chain.then(() => fetch(FILE_MUSIC.dir + k + ".mp3" + ((FILE_MUSIC.songs[k] || {}).v ? "?v=" + FILE_MUSIC.songs[k].v : "")).then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
         .then(ab => { raw[k] = ab; return decodeRaw(k); })
         .catch(() => {}).then(() => { delete loading[k]; }));
     }

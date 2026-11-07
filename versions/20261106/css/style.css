@@ -740,3 +740,16 @@ body { position: fixed; inset: 0; }
 #screen-quiz[data-world="2"] { background: linear-gradient(#dce8f3, var(--cream)); }   /* 背景の帯（上のうすい色。世界1は #app の #eaf3dc のまま） */
 #screen-quiz[data-world="3"] { background: linear-gradient(#e9dcf3, var(--cream)); }
 #screen-quiz[data-world="2"] .fuwari-icon, #screen-quiz[data-world="3"] .fuwari-icon { border-color: var(--green-light); }   /* ふわりの小さな印のふちも世界の色（世界1は今の #c9d9b4） */
+/* 取り逃しの減点（11/7-10）: 点数の上に赤く */
+.miss-penalty { font-size: 18px; font-weight: bold; color: #c0392b; }
+/* 宝石まであと○こ（11/7-10） */
+.short-box { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100%; }
+.short-hero { width: 150px; height: auto; }
+.short-label { white-space: pre-line; text-align: center; font-size: 24px; line-height: 1.5; color: #8a5a10; margin: 14px 0 0; }
+#short-buttons .btn-main { font-size: 21px; padding: 14px 28px; white-space: nowrap; }
+/* 結果の2枚目（11/7-10）: 絵つきのカードで長くなり、点数が画面の外に切れていた。点数（と取り逃しの減点）をカードの上に出し、たてに動かせるように */
+#cards-p2 { overflow-y: auto; justify-content: flex-start; -webkit-overflow-scrolling: touch; }
+#cards-p2 > * { order: 2; flex-shrink: 0; }
+#cards-p2 > .cards-top, #cards-p2 > #cards-title { order: 0; }
+#cards-p2 > #cards-rank, #cards-p2 > #cards-summary { order: 1; }
+#cards-p2 #cards-summary { margin-bottom: 8px; }
