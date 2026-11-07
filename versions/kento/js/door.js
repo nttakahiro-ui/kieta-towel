@@ -12,6 +12,8 @@ const DOOR = {
   popDur: 0.35,      // 文字が飛び出す動きの長さ（秒）
   icon: 0.62,        // アイコンが出る時刻（文字のあと。秒）
   iconDur: 0.35,     // アイコンが下からぽんと出る動きの長さ（秒）
+  iconSize: 1 / 3,   // アイコンの絵の大きさ（画面の幅に対して。11/7-22）
+  iconMax: 160,      // アイコンの絵のいちばん大きい幅（px。横に広い画面で大きくなりすぎないように）
   tapShow: 1.0,      // 「タップで出発！」が出る時刻（秒）
   tapOk: 0.6,        // これより前のタップは受けつけない（前の画面のタップが続けて入らないように）
   auto: 10,          // 押さなければ自動で進む（秒）
@@ -76,7 +78,13 @@ const Door = (() => {
     return (decoCache[key] = { c, w, h });
   }
 
-  // アイコン: 発見の旅は双眼鏡、救出の旅は光の弾（世界2は爆弾、世界3は回る玉）、クイズはカードと「？」
+  // アイコンの絵（11/7-22）: docs/カード絵/icons.png を tools/icon_cut.js で切り分け、背景を透明にしたもの
+  //   発見の旅は双眼鏡、救出の旅は光の弾（世界2は爆弾、世界3は回る玉）、クイズはカード。読み終わる前は下の drawIcon（線で描いた絵）
+  const ICON_SRC = { explore: "assets/icon_binoculars.png", rescue1: "assets/icon_shot.png", rescue2: "assets/icon_bomb.png", rescue3: "assets/icon_orbs.png", quiz: "assets/icon_quiz.png" };
+  const iconKey = (kind, world) => (kind === "rescue" ? "rescue" + (ICON_SRC["rescue" + world] ? world : 1) : kind);
+  if (typeof Image !== "undefined") for (const src of Object.values(ICON_SRC)) imgs[src] = Object.assign(new Image(), { src });   // 先に読んでおく（扉が出たときに間に合うように）
+  function iconImg(kind, world) { const im = imgs[ICON_SRC[iconKey(kind, world)]]; return im && im.complete && im.naturalWidth ? im : null; }
+  // 線で描いたアイコン（11/7-19。絵を読み終わる前だけ使う）: 発見の旅は双眼鏡、救出の旅は光の弾（世界2は爆弾、世界3は回る玉）、クイズはカードと「？」
   function drawIcon(ctx, kind, world, x, y, s, t) {
     ctx.save(); ctx.translate(x, y);
     if (kind === "explore") {   // 双眼鏡
@@ -191,7 +199,9 @@ const Door = (() => {
     const ki = clamp01((t - DOOR.icon) / DOOR.iconDur);
     if (ki > 0) {
       ctx.globalAlpha = clamp01(ki * 2.5);
-      drawIcon(ctx, o.kind, o.world, W / 2, H * 0.6 + (1 - easeBack(ki)) * 70, Math.min(110, W * 0.28), t);
+      const iy = H * 0.6 + (1 - easeBack(ki)) * 70, im = iconImg(o.kind, o.world);
+      if (im) { const s = Math.min(DOOR.iconMax, W * DOOR.iconSize), bob = ki >= 1 ? Math.sin((t - DOOR.icon - DOOR.iconDur) * 2.4) * 2.5 : 0; ctx.drawImage(im, W / 2 - s / 2, iy - s / 2 + bob, s, s); }
+      else drawIcon(ctx, o.kind, o.world, W / 2, iy, Math.min(110, W * 0.28), t);
       ctx.globalAlpha = 1;
     }
     // 説明の行（旅の表紙にあった一言）
