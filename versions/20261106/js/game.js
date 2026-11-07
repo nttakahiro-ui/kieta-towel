@@ -94,11 +94,13 @@ const BATTLE = {
   powerStartW23: 1,            // 世界2・3のパワーの初期値の段（0 ＝ 1本、1 ＝ 2本。10/31-13 決定: 救出の旅を派手に。世界1は1本のまま）
   powerStartW3: 2,             // 世界3のパワーの初期値の段（2 ＝ 3本。パワーUPで4本。11/3-3 決定: 世界3を最初から1段強く）
   groundHold: false,           // 救出の旅の最初の地上のことばを、中ほどで止めて待つ（stages.js の override.battle でステージ5だけ true）
-  hideOut: 2.5,                // 地上のことば「隠れる」（10/31-13 決定 B改）: 顔を出している秒数（このあいだだけ光が届く）
-  hideIn: 1.5,                 //   隠れている秒数（隠れ場所だけが見える）
+  hideOut: 3.75,               // 地上のことば「隠れる」（10/31-13 決定 B改）: 顔を出している秒数（このあいだだけ光が届く）。11/7-8 決定: 1.5倍（前 2.5）
+  hideIn: 0.75,                //   隠れている秒数（隠れ場所だけが見える）。11/7-8 決定: 半分（前 1.5）。1つのことばが隠れるのは最大1回
+  groundEdge: 60,              // 隠れる・動く地上のことばは、画面の左右のはしから この px には出さない（はしに寄ったら手前で止まる。11/7-8 決定）
+  stayW23: 1.2,                // 世界2・3の救出の旅で、ことばが画面にいる時間（流れて消えるまで）の倍率（11/7-8 決定。大ボス・お題は別）
   groundSlide: 26,             // 世界2の地上の雑魚（歯車・ねじ・糸くずの玉）がコンベアで横にすべる速さ（px/秒。11/1 決定）
   groundHop: 9,                // 世界3の地上の雑魚（星のかけら・隕石）が跳ねる高さ（px。見た目だけ。当たりは地面のまま）
-  groundMoveSpeed: 40,         // 地上のことば「動く」: コンベアに乗って横に動く速さ（px/秒。はしで折り返す）
+  groundMoveSpeed: 28,         // 地上のことば「動く」: コンベアに乗って横に動く速さ（px/秒。はしの手前で止まる）。11/7-8 決定: 7割（前 40）
 
   // --- 強さ（1945型） ---
   powerEvery: 3,               // 語句を何語吸い込むごとに1段階強くなるか
@@ -331,7 +333,7 @@ const EXPLORE_MOVES = {
   //   speed ＝ 漂う速さ（px/秒）、spin ＝ 回る速さ（ラジアン/秒）、maxOn ＝ 同時に漂う数の上限、gap ＝ 次のことばが出てくる間隔（秒）。くっつき・照らすは入れていない
   //   chars ＝ 同時に漂う数を「chars ÷ そのステージのことばの平均の文字数」（切り捨て、minOn〜maxOn）にする（10/31-12 決定: 長いことばのステージほど少なく。ステージ9・10 は5つ、11・12 は4つ）
   //   dim ＝ まっすぐでないことばの濃さ（10/31-12 決定: 薄くして、まっすぐになった金色のことばだけ浮き出るように）
-  space:   { box: true, space: true, speed: 24, spin: 0.55, align: Math.PI / 3, turn: 0.5, hold: 1, maxOn: 6, minOn: 3, chars: 26, gap: 1.2, dim: 0.35 },   // 10/31-14 決定: 易しく（回る速さ半分・判定60度・押さえると0.5秒で向き直る。前は spin 1.1・align 0.8）
+  space:   { box: true, space: true, speed: 24, spin: 0.55, align: Math.PI / 2, turn: 0.5, hold: 1, maxOn: 6, minOn: 3, chars: 26, gap: 1.2, dim: 0.35 },   // 10/31-14 決定: 易しく（回る速さ半分・判定60度・押さえると0.5秒で向き直る。前は spin 1.1・align 0.8）。11/7-8 決定: ねらえる時間を1.5倍に（判定 60度 → 90度。回る速さはそのまま）
 };
 
 // ===== 必殺ワザ（11/6-6 決定）: 3つ。名前と説明は texts.js の skills。最初から全部持っている
@@ -1161,13 +1163,14 @@ const Battle = (() => {
       word, role, size, w, h: size * 1.2, ground, pattern, lane,
       slot: od ? od.slot : 0, order: od ? !!od.order : false, dummy: od ? !od.real : false, odaiReal: od ? od.real : false, penaltyAt: -9,
       last: phase !== "round1",                    // 2周目と大ボスは、倒せば吸い込む
-      spd: (phase === "round1" ? BATTLE.round1Speed : 1) * P.speedScale,
+      spd: (phase === "round1" ? BATTLE.round1Speed : 1) * P.speedScale / (phase !== "round1" && !od && role !== "boss" ? stayOf() : 1),   // 世界2・3は画面にいる時間を1.2倍（11/7-8）
       bx: x, x, y, hp, maxHp: hp,
       age: 0, phase: (word.id * 1.7) % 6, fire: 1.2, flash: 0,
       gplay: ground && phase !== "round1" ? groundPlayOf(word) : null   // 地上のことばの「隠れる」「動く」（10/31-13）
     };
     if (gHides(e)) e.hideT = Math.random() * BATTLE.hideOut * 0.5;   // 顔を出したところから
     if (gMoves(e)) e.vx = BATTLE.groundMoveSpeed * (Math.random() < 0.5 ? -1 : 1);
+    if (e.gplay) { const [lo, hi] = gEdges(e); e.x = e.bx = Math.max(lo, Math.min(hi, e.x)); }   // はしの60pxには出さない（11/7-8）
     // 中ボス・大ボスは1文字ずつ壊す: 文字がそれぞれ部品
     // 硬さは「語句全体の硬さ」（役割で決まる）を、壊す文字の数で割った1文字あたりの耐久（上限・下限つき）
     // かっこと、かっこの中の別名は飾り（壊さない・当たらない・読まない）
@@ -1518,14 +1521,14 @@ const Battle = (() => {
     if (lock && bombTimer <= 0) {
       const aim = lock.word ? Math.min(lock.x + lock.w / 2 - 4, Math.max(lock.x - lock.w / 2 + 4, player.x)) : lock.x;
       const pair = { hit: new Set() };   // 左右の2個で同じ敵に2回当てない（倒す速さは前のたねと同じ）
-      // パワー1本のときは真正面に1個、2本以上で左右45度に2個（11/6-6）。左右45度へ山なりに（11/6-3）
-      for (const side of (shotUnits() >= 2 ? [-1, 1] : [0])) bombs.push({ sx: player.x, sy: player.y - 24, tx: player.x + side * BATTLE.bombSide, ty: lock.y, age: 0, tg: lock, side, pair });
+      // 真正面に1個。パワーが「その世界のスタート時（とくいのパワーアップを含む）」より1段上がったら、左右45度に2個（11/7-8 決定。前は2本以上で2個）。左右45度へ山なりに（11/6-3）
+      for (const side of (POWER_LEVELS.indexOf(level) >= powerBonus + 1 ? [-1, 1] : [0])) bombs.push({ sx: player.x, sy: player.y - 24, tx: player.x + side * BATTLE.bombSide, ty: lock.y, age: 0, tg: lock, side, pair });
       bombTimer = BATTLE.bombInterval;
       Sound.se("seedThrow");
     }
     for (const b of bombs) {
       b.age += dt;
-      b.ty += sc * dt;   // 落ちる先も地面といっしょに流れる
+      b.ty += sc * dt / (b.tg && b.tg.word && b.tg.last ? stayOf() : 1);   // 落ちる先も地面といっしょに流れる（ことばをねらったときは、ことばといっしょに）
       if (b.tg && b.tg.hp > 0 && b.tg.word && gMoves(b.tg)) { if (b.lx !== undefined) b.tx += b.tg.x - b.lx; b.lx = b.tg.x; }   // 動くことばは、落ちる先もいっしょに動く（ばらけ方は保つ）
       if (b.age >= BATTLE.bombFlight && !b.done) { b.done = true; landBomb(b.tx, b.ty, BATTLE.seedPower, b.pair); }
     }
@@ -1567,18 +1570,16 @@ const Battle = (() => {
         const range = Math.min(W * BATTLE.bossSway, Math.max(0, W / 2 - e.w / 2 - 12));
         e.x = W / 2 + Math.sin(e.age * 0.7) * range;
       } else if (e.ground) {
-        e.y += sc * dt;     // 地上の語句は地面といっしょに流れる
-        if (gHides(e)) {   // 隠れる: 出る hideOut 秒・隠れる hideIn 秒をくり返す。顔を出すときに「ぴょこ」
+        e.y += sc * dt / (e.last ? stayOf() : 1);     // 地上の語句は地面といっしょに流れる（世界2・3の救出の旅は少しゆっくり。11/7-8）
+        if (gHides(e)) {   // 隠れる: 出る hideOut 秒・隠れる hideIn 秒のあと、また出る（隠れるのは1回だけ。11/7-8）。顔を出すときに「ぴょこ」
           const was = gHidden(e);
           e.hideT += dt;
           if (was && !gHidden(e)) { e.popT = 0; if (onScreen(e)) Sound.se("pop"); }
         }
         if (e.popT !== undefined) e.popT += dt;
-        if (gMoves(e)) {   // 動く: コンベアに乗って横に動き、はしで折り返す。出来事「コンベアが逆」では逆向き
-          const d = evActive("reverse") ? -1 : 1, lo = stripRight() + e.w / 2 + 16, hi = W - e.w / 2 - 16;
-          e.x += e.vx * d * convFast() * dt;
-          if (e.x < lo) { e.x = lo; e.vx = Math.abs(e.vx) * d; }
-          if (e.x > hi) { e.x = hi; e.vx = -Math.abs(e.vx) * d; }
+        if (gMoves(e)) {   // 動く: コンベアに乗って横に動く。出来事「コンベアが逆」では逆向き。11/7-8 決定: はしの60pxの手前で止まる（前は はしで折り返した）
+          const d = evActive("reverse") ? -1 : 1, [lo, hi] = gEdges(e);
+          e.x = Math.max(lo, Math.min(hi, e.x + e.vx * d * convFast() * dt));
         }
         if (e.hold && e.y >= H * BATTLE.firstHoldY) {   // ステージ5の最初の地上のことば: 中ほどで止まって待つ。止まったところで案内
           e.y = H * BATTLE.firstHoldY;
@@ -1888,7 +1889,9 @@ const Battle = (() => {
   }
   const gHides = e => e.gplay === "hide" || e.gplay === "both";
   const gMoves = e => e.gplay === "move" || e.gplay === "both";
-  const gHidden = e => gHides(e) && e.hideT % (BATTLE.hideOut + BATTLE.hideIn) >= BATTLE.hideOut;   // 隠れているあいだは、光が届かない
+  const gHidden = e => gHides(e) && e.hideT >= BATTLE.hideOut && e.hideT < BATTLE.hideOut + BATTLE.hideIn;   // 隠れているあいだは、光が届かない。隠れるのは1回だけ（11/7-8 決定。前は くり返した）
+  const gEdges = e => { const lo = Math.max(stripRight(), BATTLE.groundEdge) + e.w / 2, hi = W - BATTLE.groundEdge - e.w / 2; return lo <= hi ? [lo, hi] : [(lo + hi) / 2, (lo + hi) / 2]; };   // はしの60pxに入らない中心の範囲（長いことばは まん中）
+  const stayOf = () => worldDef.id >= 2 ? BATTLE.stayW23 : 1;   // ことばが画面にいる時間の倍率（11/7-8）
   // そのステージで初めて「隠れる」「動く」ことばが出た瞬間に1行（stages.js の groundIntro: "hide" ステージ6／"move" ステージ7）
   function groundIntroHint(e) {
     const k = opts.stage && opts.stage.groundIntro;
