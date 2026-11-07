@@ -734,12 +734,15 @@ body { position: fixed; inset: 0; }
 @media (max-width: 350px) { .card .w { font-size: 16px; } }   /* 細い画面では語を少し小さく（7文字の語が1行に入るように） */
 
 /* 11/7-9 決定: クイズの画面の色を世界ごとに（世界1 緑・世界2 青・世界3 紫）。緑と同じ明るさ・あざやかさで色合いだけ変えた。タイムバー・ボタン・正解のしるし・枠など、緑を使うところすべて */
-#screen-quiz[data-world="2"] { --green: #4a729a; --green-dark: #3a5169; --green-light: #c6d8eb; --q-ok: #d3e2f2; }
-#screen-quiz[data-world="3"] { --green: #794a9a; --green-dark: #553a69; --green-light: #dcc6eb; --q-ok: #e5d3f2; }
+#screen-quiz[data-world="2"], #screen-review[data-world="2"] { --green: #4a729a; --green-dark: #3a5169; --green-light: #c6d8eb; --q-ok: #d3e2f2; }
+#screen-quiz[data-world="3"], #screen-review[data-world="3"] { --green: #794a9a; --green-dark: #553a69; --green-light: #dcc6eb; --q-ok: #e5d3f2; }
 #screen-quiz .choice.correct { background: var(--q-ok, #e5f2d3); }
-#screen-quiz[data-world="2"] { background: linear-gradient(#dce8f3, var(--cream)); }   /* 背景の帯（上のうすい色。世界1は #app の #eaf3dc のまま） */
-#screen-quiz[data-world="3"] { background: linear-gradient(#e9dcf3, var(--cream)); }
+#screen-quiz[data-world="2"], #screen-review[data-world="2"] { background: linear-gradient(#dce8f3, var(--cream)); }   /* 背景の帯（上のうすい色。世界1は #app の #eaf3dc のまま） */
+#screen-quiz[data-world="3"], #screen-review[data-world="3"] { background: linear-gradient(#e9dcf3, var(--cream)); }
 #screen-quiz[data-world="2"] .fuwari-icon, #screen-quiz[data-world="3"] .fuwari-icon { border-color: var(--green-light); }   /* ふわりの小さな印のふちも世界の色（世界1は今の #c9d9b4） */
+/* 11/7-15 決定: 「今日あつめたことば」の画面（救出の旅→クイズの間）も世界ごとの色（上の --green などをクイズと共通に。帯・枠・ことば・バー）。ふりがなの灰色も世界の色合いに */
+#screen-review[data-world="2"] .review-list .k { color: #68798a; }
+#screen-review[data-world="3"] .review-list .k { color: #7c688a; }
 /* 取り逃しの減点（11/7-10）: 点数の上に赤く */
 .miss-penalty { font-size: 18px; font-weight: bold; color: #c0392b; }
 /* 宝石まであと○こ（11/7-10） */
