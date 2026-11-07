@@ -24,6 +24,8 @@ function runOnce(skill, seed) { HUDLOG.rows.push(["--", skill]); HUDLOG.lastK = 
   vm.runInContext(fs.readFileSync(P + "data/words.js", "utf8"), sb);
   vm.runInContext(fs.readFileSync(P + "data/stages.js", "utf8"), sb);
   vm.runInContext(fs.readFileSync(P + "data/texts.js", "utf8"), sb);
+  for (const f of ["data/ruby.js", "js/ruby.js"]) if (fs.existsSync(P + f)) vm.runInContext(fs.readFileSync(P + f, "utf8"), sb);   // ふりがな（11/7-18。検討版）: お題の問題文で使う
+  if (fs.existsSync(P + "js/door.js")) vm.runInContext(fs.readFileSync(P + "js/door.js", "utf8"), sb);   // 扉（11/7-19。検討版）: 出撃の画面のタップで押す（文字が出る0.6秒より前のタップは受けない）
   let src = fs.readFileSync(P + "js/game.js", "utf8");
   src = src.replace(/return \{ start, stop, resize, pause.*/, "return { start, stop, resize, pause, peek: () => ({ rescueT, lastT: typeof lastT !== 'undefined' ? lastT : 0, lcBugs: typeof lcBugs !== 'undefined' ? lcBugs : [], lcWords: typeof lcWords !== 'undefined' ? lcWords : [], lcKills: typeof lcKills !== 'undefined' ? lcKills : 0, extraButtons: typeof extraButtons === 'function' ? extraButtons : null, player, enemies, ebullets, fillers, gauge, state, phase, bombButton, skillButtons: typeof skillButtons === 'function' ? skillButtons : null, skillUse: typeof skillUse === 'object' ? skillUse : null, rewindUsed: typeof rewindUsed !== 'undefined' && rewindUsed, missed, maxHp: typeof maxHp === 'function' ? maxHp() : BATTLE.playerMaxHp, odai, sortieNo, choiceRects, loadout, obs, guide, fsay, fogLevel, explore, bino, reacted, t, tut, rest, hits }) };");
   // ザコの語句の殻がほどけた高さ（画面の高さに対する割合）と、そのときのパワーの段階（10/25-8）
@@ -66,7 +68,7 @@ function runOnce(skill, seed) { HUDLOG.rows.push(["--", skill]); HUDLOG.lastK = 
     now += 1000 / 60;
     const S = sb.Battle.peek();
     if (S.player && !dragging) { canvas.onpointerdown(pe(fx, fy)); dragging = true; }
-    if (S.state === "sortie") {   // 出撃の画面はタップで出撃。出撃2では持っていくものをランダムにえらぶ（表紙もタップ。そのあと指をつけ直す）
+    if (S.state === "sortie") {   // 出撃の画面はタップで出撃。出撃2では持っていくものをランダムにえらぶ（表紙・扉もタップ。そのあと指をつけ直す）
       dragging = false; fx = 187; fy = 520;
       if (S.sortieNo === 2) { const rs = S.choiceRects(); const r = process.env.LOADOUT ? rs.find(q => q.id === process.env.LOADOUT) : rs[Math.floor(rnd() * rs.length)]; canvas.onpointerdown(pe(r.x + r.w / 2, r.y + r.h / 2)); }
       else canvas.onpointerdown(pe(fx, fy));
