@@ -756,3 +756,13 @@ body[data-world="3"] { --green: #794a9a; --green-dark: #553a69; --green-light: #
 #cards-p2 > .cards-top, #cards-p2 > #cards-title { order: 0; }
 #cards-p2 > #cards-rank, #cards-p2 > #cards-summary { order: 1; }
 #cards-p2 #cards-summary { margin-bottom: 8px; }
+
+/* ===== ふりがな（ルビ）（11/7-18）: 小学4年生までに習わない漢字をふくむ語に、漢字の上に小さく ===== */
+ruby { ruby-position: over; white-space: nowrap; }   /* ルビのついた語の途中では折り返さない */
+.rbw { white-space: nowrap; }   /* ルビのついたかたまり（送りがな・助詞まで）を折り返さない */
+rt { font-size: 0.5em; font-weight: normal; line-height: 1; letter-spacing: 0; color: inherit; opacity: 0.85; }
+.quiz-question { line-height: 1.85; }
+.choice { line-height: 1.7; }
+.quiz-feedback { line-height: 1.85; }
+.card .m { line-height: 1.8; }
+.cards-next p { line-height: 1.8; }

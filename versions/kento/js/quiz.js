@@ -70,7 +70,7 @@ const Quiz = (() => {
       const q = $("quiz-question");
       q.innerHTML = "";
       const card = document.createElement("div"); card.className = "card preview";
-      const wd = document.createElement("div"); wd.className = "w"; wd.textContent = w.word;
+      const wd = Cards.wordEl(w);   // カードの語は、ほかのカードと同じに kana のふりがな（11/7-18）
       const m = document.createElement("div"); m.className = "m"; m.innerHTML = Cards.phraseHTML(w.memo);
       card.append(wd, m); q.appendChild(card);
       previewTimer = setTimeout(() => showQuestion(w, box), QUIZ.previewTime * 1000);
@@ -81,12 +81,12 @@ const Quiz = (() => {
   }
   function showQuestion(w, box) {
     locked = false;
-    $("quiz-question").textContent = w.question;
+    $("quiz-question").innerHTML = Cards.phraseHTML(w.question);   // ふりがな（11/7-18）
     // 選択肢の順番は毎回入れ替える
     shuffle(w.choices.map((c, i) => i)).forEach(i => {
       const b = document.createElement("button");
       b.className = "choice";
-      b.textContent = w.choices[i];
+      b.innerHTML = Cards.phraseHTML(w.choices[i]);
       b.dataset.i = i;
       b.addEventListener("click", () => answer(i, b));
       box.appendChild(b);
@@ -146,7 +146,7 @@ const Quiz = (() => {
       get.innerHTML = "";
       const lb = document.createElement("div"); lb.className = "get-label"; lb.textContent = window.TEXTS.quiz.cardGet;
       const cd = document.createElement("div"); cd.className = "card get-card";
-      const cw = document.createElement("div"); cw.className = "w"; cw.textContent = w.word;
+      const cw = Cards.wordEl(w);
       cd.appendChild(cw); get.append(lb, cd);
       get.classList.remove("hidden");
       get.style.animation = "none"; void get.offsetWidth; get.style.animation = "";
@@ -160,9 +160,9 @@ const Quiz = (() => {
       say(timeUp ? pick(FUWARI_SAY.timeUp) : (w.sayWrong || pick(FUWARI_SAY.wrong)));
       const fb = $("quiz-feedback");
       fb.innerHTML = "";
-      const p1 = document.createElement("p"); p1.style.margin = "0"; p1.textContent = timeUp ? "時間切れ！ 正解は" : "正解は";
-      const p2 = document.createElement("p"); p2.className = "answer"; p2.textContent = w.choices[w.answer];
-      const p3 = document.createElement("p"); p3.className = "memo"; p3.textContent = w.memo;
+      const p1 = document.createElement("p"); p1.style.margin = "0"; p1.innerHTML = Cards.phraseHTML(timeUp ? "時間切れ！ 正解は" : "正解は");
+      const p2 = document.createElement("p"); p2.className = "answer"; p2.innerHTML = Cards.phraseHTML(w.choices[w.answer]);
+      const p3 = document.createElement("p"); p3.className = "memo"; p3.innerHTML = Cards.phraseHTML(w.memo);
       const b = document.createElement("button"); b.className = "btn"; b.textContent = "次へ";
       b.addEventListener("click", next);
       fb.append(p1, p2, p3, b);

@@ -2060,8 +2060,13 @@ const Battle = (() => {
   const segmenter = (typeof Intl !== "undefined" && Intl.Segmenter) ? new Intl.Segmenter("ja", { granularity: "word" }) : null;
   const NO_HEAD = "、。，．！？!?」』）)ーっゃゅょッャュョ…";   // 行の頭に来ないようにする文字（前の行にぶら下げる）
   const PARTICLES = new Set(["を", "は", "が", "に", "の", "と", "で", "へ", "も", "や", "よ", "ね", "て", "た", "か", "な"]);   // 助詞なども前の行に
-  function wrapText(text, maxW) {
-    const pieces = segmenter ? Array.from(segmenter.segment(text), x => x.segment) : Array.from(text);
+  function wrapText(text, maxW, rs) {
+    let pieces = segmenter ? Array.from(segmenter.segment(text), x => x.segment) : Array.from(text);
+    if (rs && rs.length) {   // ふりがなのついた語の途中では折り返さない（11/7-18）
+      const merged = []; let at = 0;
+      for (const pc of pieces) { if (merged.length && rs.some(([p, l]) => p < at && p + l > at)) merged[merged.length - 1] += pc; else merged.push(pc); at += pc.length; }
+      pieces = merged;
+    }
     const lines = []; let line = "";
     for (const pc of pieces) {
       if (ctx.measureText(line + pc).width <= maxW || !line || NO_HEAD.includes(pc[0]) || PARTICLES.has(pc)) { line += pc; continue; }
@@ -2080,18 +2085,40 @@ const Battle = (() => {
   // 問題文の大きさを、長さに合わせて決める: いちばん上の大きさから、行数の上限に収まるまで小さくする
   // 10/25-3: 行数（maxLines）に収まり、どの行も幅（width）からはみ出さない大きさまで小さくする。いちばん下は 14px。
   // 14px でも maxLines に入らないときだけ、行数を odaiMaxLines（3行）まで許す（それでも入らなければ odaiMinFont まで小さく）
+  // 11/7-18: ふりがな（ルビ）があるときは、行の上にルビの高さ（rf）をあける。rs ＝ Ruby.spans の結果
   function fitOdaiText(text, maxFont, width, maxLines) {
-    const fits = (fs, n) => { ctx.font = font(fs); const ls = wrapText(text, width); return ls.length <= n && ls.every(l => ctx.measureText(l).width <= width) ? ls : null; };
+    const rs = Ruby.spans(text);
+    const fits = (fs, n) => { ctx.font = font(fs); const ls = wrapText(text, width, rs); return ls.length <= n && ls.every(l => ctx.measureText(l).width <= width) ? ls : null; };
+    const out = (fs, lines) => { const rf = rs.length ? Math.max(9, Math.round(fs * 0.46)) : 0; return { fs, lines, lh: Math.round(fs * 1.38) + rf, rf, rs }; };
     const want = maxLines || BATTLE.odaiMaxLines;
-    for (let fs = maxFont; fs >= BATTLE.odaiFitFont; fs--) { const ls = fits(fs, want); if (ls) return { fs, lines: ls, lh: Math.round(fs * 1.38) }; }
-    for (let fs = BATTLE.odaiFitFont; fs >= BATTLE.odaiMinFont; fs--) { const ls = fits(fs, BATTLE.odaiMaxLines); if (ls) return { fs, lines: ls, lh: Math.round(fs * 1.38) }; }
+    for (let fs = maxFont; fs >= BATTLE.odaiFitFont; fs--) { const ls = fits(fs, want); if (ls) return out(fs, ls); }
+    for (let fs = BATTLE.odaiFitFont; fs >= BATTLE.odaiMinFont; fs--) { const ls = fits(fs, BATTLE.odaiMaxLines); if (ls) return out(fs, ls); }
     ctx.font = font(BATTLE.odaiMinFont);
-    return { fs: BATTLE.odaiMinFont, lines: wrapText(text, width), lh: Math.round(BATTLE.odaiMinFont * 1.38) };
+    return out(BATTLE.odaiMinFont, wrapText(text, width, rs));
+  }
+  // 行を左そろえで描き、ふりがなを漢字の上に小さく描く（textBaseline は top）。y0 ＝ 1行目のルビの上
+  function drawRubyLines(f, x, y0) {
+    let at = 0;
+    f.lines.forEach((l, i) => {
+      const ty = y0 + i * f.lh + f.rf;
+      ctx.font = font(f.fs); ctx.fillText(l, x, ty);
+      const style = ctx.fillStyle;
+      for (const [p, n, r] of f.rs) {
+        if (p < at || p + n > at + l.length) continue;
+        ctx.font = font(f.fs);
+        const bx = x + ctx.measureText(l.slice(0, p - at)).width, bw = ctx.measureText(l.slice(p - at, p - at + n)).width;
+        ctx.font = font(f.rf); ctx.textAlign = "center"; ctx.fillStyle = "#6b7a5a";
+        ctx.fillText(r, bx + bw / 2, ty - f.rf - 1);
+        ctx.textAlign = "left"; ctx.fillStyle = style;
+      }
+      at += l.length;
+    });
+    ctx.font = font(f.fs);
   }
   function odaiPanel() {
     const y = 40;   // 上の体力ゲージ・点数の下
     const f = fitOdaiText(odai ? odai.q : "", BATTLE.odaiSmallFont, W - stripRight() - 42, BATTLE.odaiPanelLines);   // 枠の中に2行（内側の幅）
-    return { y, lines: f.lines, fs: f.fs, lh: f.lh, h: f.lines.length * f.lh + 14 };
+    return { y, f, lines: f.lines, fs: f.fs, lh: f.lh, h: f.lines.length * f.lh + 14 };
   }
   function odaiTop() { const p = odaiPanel(); return p.y + p.h; }
 
@@ -2103,11 +2130,11 @@ const Battle = (() => {
     const a = nextAskOf(real).after;
     if (!a) return odaiDummies(real, prev)[0] || null;
     const w = opts.words.find(x => x.word === a);
-    return w && w !== bossWord ? w : { id: -130, stage: real.stage, word: a, kana: w ? w.kana : "", hp: 1, role: "zako", order: 0 };
+    return w && w !== bossWord ? w : { id: -130, stage: real.stage, word: a, kana: w ? w.kana : Ruby.kana(a), hp: 1, role: "zako", order: 0 };
   }
   function nextPrev(real) {
     const a = nextAskOf(real);
-    return a ? opts.words.find(w => w.word === a.prev) || { id: -120, stage: real.stage, word: a.prev, kana: "", hp: 1, role: "zako", order: 0 } : null;
+    return a ? opts.words.find(w => w.word === a.prev) || { id: -120, stage: real.stage, word: a.prev, kana: Ruby.kana(a.prev), hp: 1, role: "zako", order: 0 } : null;
   }
   // 大ボス「3つを順に」（世界2。10/31-10 試作。構想メモ 5）: stages.js の bossOrder に書いた3つのことば（正しい順。その中に大ボスのことばがあるときだけ。10/31-12 決定）
   //   3つのことばに正しい順に光を当てる（当てたことばに 1・2・3）。順をまちがえたら3つとも最初にもどり、正しい順を一度だけ見せる
@@ -2116,7 +2143,7 @@ const Battle = (() => {
   function orderSet(real) {
     const toks = (opts.stage && opts.stage.bossOrder) || [];
     if (toks.length !== 3 || !toks.includes(baseChars(real).join(""))) return null;
-    return toks.map((tk, i) => tk === baseChars(real).join("") ? real : (opts.words.find(w => w.word === tk) || { id: -100 - i, stage: real.stage, word: tk, kana: "", hp: 1, role: "zako", order: 0 }));
+    return toks.map((tk, i) => tk === baseChars(real).join("") ? real : (opts.words.find(w => w.word === tk) || { id: -100 - i, stage: real.stage, word: tk, kana: Ruby.kana(tk), hp: 1, role: "zako", order: 0 }));
   }
   // 世界3「どっち？」（10/31-10 試作）: stages.js の which: true のステージで、choices が2つ、1つ目が本物のことば（かっこの中をのぞいて同じ）のときだけ。
   //   2つ目のことばを、もう1つの候補にする（同じステージにあることばなら、それを使う）。そうでないときは世界1と同じ「どれ？」
@@ -2126,7 +2153,7 @@ const Battle = (() => {
     const ch = real.choices || [];
     const other = real.bossQ && real.bossMiss ? real.bossMiss : ch.length === 2 && plainWord(ch[0]) === real.word ? plainWord(ch[1]) : null;
     if (!other) return null;
-    return opts.words.find(w => w.word === other) || { id: -110, stage: real.stage, word: other, kana: "", hp: 1, role: "zako", order: 0 };
+    return opts.words.find(w => w.word === other) || { id: -110, stage: real.stage, word: other, kana: Ruby.kana(other), hp: 1, role: "zako", order: 0 };
   }
   // 場面の曲へ0.5秒で替える（stages.js の WORLDS の music。11/3-4）
   function music(scene) {
@@ -2142,7 +2169,7 @@ const Battle = (() => {
     const cands = seq ? shuffle(seq.slice()) : pair ? shuffle([real, pair]) : after ? shuffle([real, after]) : shuffle([real, ...odaiDummies(real, prev)]);   // ならびは毎回入れかえ
     // 3つとも同じ大きさ（いちばん長い語句が、縦書きで画面に入る大きさ。24px より小さくしない）
     clearMsgs(9); msgQ = [];   // お題が始まるときは、出ているメッセージと待っているものを、すべて消してから問題文を出す
-    const q = seq ? (real.bossQ ? real.bossQ + tx("odaiForm.orderTail") : tx("odaiForm.orderLead." + opts.stage.id)) : pair && real.bossQ ? real.bossQ : pair ? (/は[?？]\s*$/.test(real.question) ? real.question.replace(/[?？]\s*$/, "") + tx("odaiForm.which") : real.question) :   /* 「〜は？」だけ「〜はどっち？」に。「何という？」などはそのまま（11/7-11） */ prev ? tx("odaiForm.next", { prev: prev.word + (hasKanji(prev.word) && prev.kana ? `（${prev.kana}）` : "") }) : (real.odaiQuestion || real.question);
+    const q = seq ? (real.bossQ ? real.bossQ + tx("odaiForm.orderTail") : tx("odaiForm.orderLead." + opts.stage.id)) : pair && real.bossQ ? real.bossQ : pair ? (/は[?？]\s*$/.test(real.question) ? real.question.replace(/[?？]\s*$/, "") + tx("odaiForm.which") : real.question) :   /* 「〜は？」だけ「〜はどっち？」に。「何という？」などはそのまま（11/7-11） */ prev ? tx("odaiForm.next", { prev: prev.word }) : (real.odaiQuestion || real.question);
     // 問題文を読む時間（10/25-16）: 文の長さに合わせる。1文字あたり odaiReadPerChar 秒＋odaiReadBase 秒（最短 odaiReadMin、最長 odaiReadMax）
     const read = Math.min(BATTLE.odaiReadMax, Math.max(BATTLE.odaiReadMin, Array.from(q).length * BATTLE.odaiReadPerChar + BATTLE.odaiReadBase));
     odai = { real, boss: isBoss, t: 0, intro: read, firstHit: null, q, wrongRun: 0, mode: seq ? "order" : "pick", step: 0, show: 0, slip: false, seq: seq || null, cols: pair || after ? 2 : 3 };
@@ -4133,7 +4160,7 @@ const Battle = (() => {
     ctx.save();
     ctx.textAlign = "left"; ctx.textBaseline = "top";
     if (odai.intro > 0) {
-      const { fs, lh, lines } = fitOdaiText(odai.q, BATTLE.odaiBigFont, W - 72, BATTLE.odaiMaxLines);   // 画面の幅に3行以内（はみ出さない大きさ）
+      const fo = fitOdaiText(odai.q, BATTLE.odaiBigFont, W - 72, BATTLE.odaiMaxLines), { fs, lh, lines } = fo;   // 画面の幅に3行以内（はみ出さない大きさ）
       ctx.font = font(14);
       const hl = odai.hint ? wrapText(odai.hint, W - 72) : [];   // 最初のお題だけ、案内を1行そえる
       const h = lines.length * lh + 50 + hl.length * 20 + (hl.length ? 10 : 0), y = H * 0.4 - h / 2;
@@ -4141,8 +4168,8 @@ const Battle = (() => {
       roundRect(20, y, W - 40, h, 18); ctx.fill(); ctx.stroke();
       ctx.font = font(14); ctx.fillStyle = tint("#b0801a");
       ctx.fillText(tx(odai.cols === 2 ? "rescue.odaiPanel2" : "rescue.odaiPanel"), 34, y + 12);   // 2択（「どっち？」「次は？」）は「2つから」
-      ctx.font = font(fs); ctx.fillStyle = "#3e4a34";
-      lines.forEach((l, i) => ctx.fillText(l, 32, y + 36 + i * lh));
+      ctx.fillStyle = "#3e4a34";
+      drawRubyLines(fo, 32, y + 36);   // ふりがな（11/7-18）。ルビの分だけ文が下がる（枠の高さ h は lh にルビの分が入っている）
       if (hl.length) {
         ctx.font = font(14); ctx.fillStyle = tint("#6f9a4a");
         hl.forEach((l, i) => ctx.fillText(l, 32, y + 36 + lines.length * lh + 10 + i * 20));
@@ -4152,8 +4179,8 @@ const Battle = (() => {
       ctx.fillStyle = "rgba(255,253,245,0.92)"; ctx.strokeStyle = tint("#e0b03a"); ctx.lineWidth = 2;
       const px = stripRight() + 6;
       roundRect(px, pnl.y, W - px - 10, pnl.h, 12); ctx.fill(); ctx.stroke();
-      ctx.font = font(pnl.fs); ctx.fillStyle = "#3e4a34";
-      pnl.lines.forEach((l, i) => ctx.fillText(l, px + 12, pnl.y + 7 + i * pnl.lh));
+      ctx.fillStyle = "#3e4a34";
+      drawRubyLines(pnl.f, px + 12, pnl.y + 7);
       // 中ボスは残り時間
       if (!odai.boss) {
         const r = Math.max(0, 1 - odai.t / BATTLE.odaiTimeLimit);

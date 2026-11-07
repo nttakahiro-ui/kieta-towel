@@ -43,16 +43,25 @@ const Cards = (() => {
     } else wd.textContent = w.word;
     return wd;
   }
+  // 11/7-18: ふりがな（ルビ）もつける。ルビのついた語の途中では折り返さない
   function phraseHTML(text) {
-    if (!seg) return esc(text);
-    const parts = [];
+    text = text == null ? "" : String(text);
+    if (!seg) return Ruby.html(text);
+    const parts = [];   // [始め, 終わり]
     let open = false;   // 直前が「 （「 のすぐあとでも折り返さない。「 が行の終わりに残らないように）
-    for (const { segment } of seg.segment(text)) {
+    for (const { segment, index } of seg.segment(text)) {
       // 10/31-3: かぎかっこ（「）の直前では折り返さない（「 を前のかたまりにつける）。端末ごとの制御はしない
-      if (parts.length && (open || segment[0] === "「" || GLUE.has(segment) || GLUE.has(segment[0]))) parts[parts.length - 1] += segment; else parts.push(segment);
+      if (parts.length && (open || segment[0] === "「" || GLUE.has(segment) || GLUE.has(segment[0]))) parts[parts.length - 1][1] = index + segment.length; else parts.push([index, index + segment.length]);
       open = segment.endsWith("「");
     }
-    return parts.map(esc).join("<wbr>");
+    const rs = Ruby.spans(text);
+    const merged = [];
+    for (const pt of parts) {
+      const last = merged[merged.length - 1];
+      if (last && rs.some(([p, l]) => p < pt[0] && p + l > pt[0])) last[1] = pt[1]; else merged.push(pt);
+    }
+    // ルビの語は、すぐあとの送りがなと離れないように（行の途中で「吸／う」と切れないように）
+    return merged.map(([a, b]) => Ruby.html(text, a, b, true)).join("<wbr>");
   }
   // 名前をならべる（3つまで。4つ以上は「〇〇、〇〇ほか○つのことば」）
   function names(ws) {
@@ -102,9 +111,9 @@ const Cards = (() => {
     // 結果の3段（10/22-1）: 今回助けたことば／正解してカードになった／このステージのカード
     const tiers = $("cards-tiers");
     tiers.innerHTML = "";
-    const tier = (label, value, cls) => { const d = document.createElement("div"); d.className = "tier " + (cls || ""); d.innerHTML = `<span class="lb">${label}</span><span class="vl">${value}</span>`; tiers.appendChild(d); };
+    const tier = (label, value, cls) => { const d = document.createElement("div"); d.className = "tier " + (cls || ""); d.innerHTML = `<span class="lb">${phraseHTML(label)}</span><span class="vl">${value}</span>`; tiers.appendChild(d); };
     // 10/25-1: 「このステージのカード ○/10枚」だけを大きく出す（今回助けたことば・正解してカードになった の段は出さない）
-    tier(tx("results.stageCards"), `${ownedCount} <small>/ ${o.words.length} ${tx("results.unitCard")}</small>`, "total");
+    tier(tx("results.stageCards"), `${ownedCount} <small>/ ${o.words.length} ${phraseHTML(tx("results.unitCard"))}</small>`, "total");
     // 次は〇〇（足りないカードの名前）。クイズでまちがえたことば（受け直せる）と、まだ助けていないことばに分ける
     const missing = o.words.filter(w => !o.owned[w.id]);
     const wrong = missing.filter(w => o.retakeIds && o.retakeIds[w.id]);
@@ -133,16 +142,16 @@ const Cards = (() => {
     rk.innerHTML = "";
     if (o.stats) {
       const st = o.stats;
-      $("cards-summary").textContent = [tx("results.summary", { hits: st.hits }), st.downs ? tx("results.summaryDown", { n: st.downs }) : "", st.gameOvers ? tx("results.summaryRetry", { n: st.gameOvers }) : "", tx("results.summaryCombo", { n: st.maxCombo })].filter(Boolean).join("　");   // バトルの時間は出さない（調整パネルの中だけ）
+      $("cards-summary").innerHTML = [tx("results.summary", { hits: st.hits }), st.downs ? tx("results.summaryDown", { n: st.downs }) : "", st.gameOvers ? tx("results.summaryRetry", { n: st.gameOvers }) : "", tx("results.summaryCombo", { n: st.maxCombo })].filter(Boolean).map(s => phraseHTML(s)).join("　");   // バトルの時間は出さない（調整パネルの中だけ）
       // 点数とランク
       const r = rankOf(st.score);
       const sc = document.createElement("div"); sc.className = "rank-score"; sc.textContent = `${st.score} 点`;
-      const nm = document.createElement("div"); nm.className = "rank-name"; nm.textContent = `ランク：${r.name}`;
-      if (st.missN) { const mp = document.createElement("div"); mp.className = "miss-penalty"; mp.textContent = tx("results.missPenalty", { n: st.missN, pts: st.missN * st.missPts }); rk.append(mp); }   // 取り逃しの減点（11/7-10。赤）
+      const nm = document.createElement("div"); nm.className = "rank-name"; nm.innerHTML = phraseHTML(`ランク：${r.name}`);
+      if (st.missN) { const mp = document.createElement("div"); mp.className = "miss-penalty"; mp.innerHTML = phraseHTML(tx("results.missPenalty", { n: st.missN, pts: st.missN * st.missPts })); rk.append(mp); }   // 取り逃しの減点（11/7-10。赤）
       rk.append(sc, nm);
       // ベスト更新と、今回とれた印
       if (o.record) {
-        if (o.record.newBest) { const nb = document.createElement("div"); nb.className = "best-new"; nb.textContent = "ベスト更新！"; rk.appendChild(nb); }
+        if (o.record.newBest) { const nb = document.createElement("div"); nb.className = "best-new"; nb.innerHTML = phraseHTML("ベスト更新！"); rk.appendChild(nb); }
         // （今回とれた印は 10/25-17 にやめた）
       }
     }
@@ -167,8 +176,8 @@ const Cards = (() => {
       // まだカードになっていない語句には、理由を出す
       if (!owned) {
         const why = document.createElement("div"); why.className = "why";
-        if (wrongIds.includes(w.id)) { why.textContent = "クイズで不正解。あとで受け直せる"; c.classList.add("wrong"); }
-        else if (missedIds.includes(w.id)) { why.textContent = "旅で助けられなかった。もう一度あそんで助けよう"; c.classList.add("lost"); }
+        if (wrongIds.includes(w.id)) { why.innerHTML = phraseHTML("クイズで不正解。あとで受け直せる"); c.classList.add("wrong"); }
+        else if (missedIds.includes(w.id)) { why.innerHTML = phraseHTML("旅で助けられなかった。もう一度あそんで助けよう"); c.classList.add("lost"); }
         else why.textContent = "まだ";
         c.appendChild(why);
       }
