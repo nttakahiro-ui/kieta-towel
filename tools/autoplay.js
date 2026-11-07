@@ -84,6 +84,7 @@ function runOnce(skill, seed) { HUDLOG.rows.push(["--", skill]); HUDLOG.lastK = 
     globalThis.__lesPrev = S.les ? S.les.step : null;
     if (S.les && S.les.step !== "do") { dragging = false; if (S.les.step === "say" && S.les.t >= +(process.env.READ || 2.5)) canvas.onpointerdown(pe(fx, fy, 7)); }   // チュートリアル（11/7-20）: 説明を READ 秒（ふだん2.5秒）読んでからタップ。やってみるあいだは、ふだんどおり遊ぶ
     if (process.env.LESLOG && (S.les ? S.les.id + S.les.step : "") !== (globalThis.__les || "")) { globalThis.__les = S.les ? S.les.id + S.les.step : ""; console.log("LES", (now / 1000).toFixed(1), S.phase, S.les ? S.les.id + " " + S.les.step : "おわり"); }
+    if (S.les && S.les.id === "boost" && S.les.step === "do" && S.skillButtons) { const b = S.skillButtons()[0]; canvas.onpointerdown(pe(b.x, b.y, 2)); }   // パワー全開のチュートリアル（11/7-26）: ボタンを押す
     if (S.tut) { dragging = false; if (rnd() < 0.05) canvas.onpointerdown(pe(fx, fy, 7)); }   // チュートリアルの案内は、少し読んでから閉じる（そのあと指をつけ直す）
     if (S.explore && baseN === null && S.explore.t >= B.exploreTime) baseN = S.reacted;   // 基準の時間までに見つけた数（10/25-17）
     if (S.phase !== "round1" && foundN === null && S.explore) { foundN = S.reacted; exploreSec = S.t; if (baseN === null) baseN = S.reacted; }
