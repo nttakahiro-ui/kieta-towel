@@ -72,6 +72,9 @@ const FILE_MUSIC = {
   withWorld: ["fanfare"],       // ステージに入ったときに、その世界の3曲と一緒に読む
   worlds: { 1: { explore: "w1_hakken", rescue: "w1_kyushutsu", quiz: "w1_quiz" }, 2: { explore: "w2_hakken", rescue: "w2_kyushutsu", quiz: "w2_quiz" }, 3: { explore: "w3_hakken", rescue: "w3_kyushutsu", quiz: "w3_quiz" } },
 };
+// 場面転換の間（11/7-21）: 曲が変わるときは、前の曲を out 秒で小さくして止め、gap 秒の無音をはさみ、次の曲を開始位置から（フェードインなしで）鳴らす
+//   同じ曲が続く場面（救出の旅 ⇄ お題バトル、扉 → その旅など）は止めない。効果音は止めない
+const MUSIC_SWITCH = { out: 0.3, gap: 0.4 };
 const fileOf = k => (FILE_MUSIC.songs[k] && FILE_MUSIC.songs[k].file) || k;   // 曲 → 読むファイルの名前
 
 
@@ -105,6 +108,9 @@ const Sound = (() => {
   const VOLUME = 0.22;
   let muted = false;
   const vol = () => (muted ? 0.0001 : VOLUME);
+  // 曲の切り替えの記録（確かめ用。新しい50件）: [時刻(ms), "out 前の曲" | "silent" | "start 曲" | "se 名前"]
+  const musicLog = [];
+  const logM = s => { musicLog.push([Math.round(performance.now()), s]); if (musicLog.length > 50) musicLog.shift(); };
   function setMuted(m) {
     muted = !!m;
     if (ctx && master) { master.gain.cancelScheduledValues(ctx.currentTime); master.gain.setValueAtTime(vol(), ctx.currentTime); }
@@ -488,9 +494,11 @@ const Sound = (() => {
       if (c.end) { s.start(t0, 0, c.end); try { g.gain.setValueAtTime(g.gain.value, t0 + c.end - 0.12); g.gain.linearRampToValueAtTime(0.0001, t0 + c.end); } catch (e) {} }
       else s.start(t0, 0);
       loopRun = { key: k, g, segs: [s], next: Infinity, off: 0, once: true };
+      logM("start " + k);
       return;
     }
     loopRun = { key: k, g, segs: [], next: ctx.currentTime + 0.05, off: 0 };
+    logM("start " + k);
     addSeg();
     loopTimer = setInterval(() => { if (loopRun && ctx.currentTime > loopRun.next - 3) addSeg(); }, 250);
   }
@@ -557,30 +565,50 @@ const Sound = (() => {
     tick();
   }
 
-  // 前の曲を少しずつ小さくしてから、次の曲に替える（場面の切り替え。11/3-4 から0.5秒。曲だけを小さくし、効果音は小さくしない）
-  function fadeTo(key, sec = 0.5, t, scene) {
+  // 場面の曲に替える（11/7-21。Sound.play と Sound.fadeTo はどちらもこれ）: 前の曲を MUSIC_SWITCH.out 秒で止める → gap 秒の無音 → 次の曲
+  //   前の曲が鳴っていなければ（無音のあと・初めての曲）、無音の残りだけ待って鳴らす。同じ曲なら何もしない
+  let switchTimer = null;
+  let quietUntil = 0;   // この時刻（ctx の秒）まで、次の曲を鳴らさない
+  function fadeOutNow(sec) {
+    let any = false;
+    const now = ctx.currentTime;
+    if (loopTimer) { clearInterval(loopTimer); loopTimer = null; }
+    if (loopRun) {
+      any = true;
+      const r = loopRun; loopRun = null;
+      logM("out " + r.key);
+      try { r.g.gain.cancelScheduledValues(now); r.g.gain.setValueAtTime(r.g.gain.value, now); r.g.gain.linearRampToValueAtTime(0.0001, now + sec); } catch (e) {}
+      for (const s of r.segs) { try { s.stop(now + sec + 0.02); } catch (e) {} }
+      setTimeout(() => { try { r.g.disconnect(); } catch (e) {} }, (sec + 0.3) * 1000);
+    }
+    if (timer) {   // 合成曲（タイトルの曲を読むまでの代わり）
+      any = true;
+      logM("out ♪" + synth);
+      const tm = timer; timer = null; synth = null;
+      musicBus.gain.cancelScheduledValues(now); musicBus.gain.setValueAtTime(musicBus.gain.value, now); musicBus.gain.linearRampToValueAtTime(0.0001, now + sec);
+      setTimeout(() => clearInterval(tm), sec * 1000);
+    }
+    if (fileAudio) { const fa = fileAudio; fileAudio = null; setTimeout(() => fa.pause(), sec * 1000); }
+    if (any) setTimeout(() => logM("silent"), sec * 1000);
+    fileKey = null; fallback = null; current = null;
+    return any;
+  }
+  function change(key, t, scene) {
     const fk = fileKeyOf(key, scene), id = fk ? "♪" + fk : "（無音）";
-    if (current === id || current === "→" + id) return;
-    if (fk && fk === fileKey && current) return;   // 同じ mp3 の曲なら、そのまま流す（救出の旅 ⇄ お題バトル）
+    if (current === "→" + id) return;   // 替わる途中
+    if (fk && fk === fileKey && current) return;   // 同じ mp3 の曲なら、そのまま流す（救出の旅 ⇄ お題バトル、扉 → その旅）
+    if (!fk && !current && !loopRun && !timer && !switchTimer) return;   // もう無音
+    if (switchTimer) { clearTimeout(switchTimer); switchTimer = null; }
     if (!ctx || !musicBus) { play(key, t, scene); return; }
     const now = ctx.currentTime;
-    musicBus.gain.cancelScheduledValues(now);
-    musicBus.gain.setValueAtTime(musicBus.gain.value, now);
-    musicBus.gain.linearRampToValueAtTime(0.0001, now + sec);
-    if (fileAudio) { const fa = fileAudio; setTimeout(() => fa.pause(), sec * 1000); }
-    if (loopRun) { const lr = loopRun; setTimeout(() => { if (loopRun === lr) stopLoop(); }, sec * 1000); }
-    fileKey = null;
-    setTimeout(() => {
-      if (current !== "→" + id) return;   // そのあいだに別の曲になった（play がもとの音量に戻す）
-      play(key, t, scene);
-      const n2 = ctx.currentTime;
-      musicBus.gain.cancelScheduledValues(n2);
-      musicBus.gain.setValueAtTime(0.0001, n2);
-      musicBus.gain.linearRampToValueAtTime(1, n2 + 0.15);
-    }, sec * 1000);
-    if (timer) { const tm = timer; setTimeout(() => clearInterval(tm), sec * 1000); timer = null; }
+    if (fadeOutNow(MUSIC_SWITCH.out)) quietUntil = now + MUSIC_SWITCH.out + MUSIC_SWITCH.gap;
+    if (!fk) { stop(); return; }
+    const wait = quietUntil - now;
+    if (wait <= 0.01) { play(key, t, scene); return; }
     current = "→" + id;   // 替わるまでのあいだ、同じ曲を二重に呼ばない
+    switchTimer = setTimeout(() => { switchTimer = null; if (current !== "→" + id) return; current = null; play(key, t, scene); }, wait * 1000);
   }
+  const fadeTo = (key, sec, t, scene) => change(key, t, scene);   // （前の形の呼び方。sec は使わない）
 
   function stopSynth() { if (timer) { clearInterval(timer); timer = null; } }
   function stop() {
@@ -602,6 +630,7 @@ const Sound = (() => {
   // 効果音。ふわっとした音にする
   function se(name) {
     if (!ctx) return;
+    if (/^door/.test(name)) logM("se " + name);   // 扉の音だけ記録
     const t = ctx.currentTime;
     const sweep = (f1, f2, dur, wave, vol, delay = 0) => {
       const o = ctx.createOscillator();
@@ -729,5 +758,5 @@ const Sound = (() => {
     if (ctx && current && !fileAudio) nextTime = Math.max(nextTime, ctx.currentTime + 0.05);
   }
 
-  return { unlock, play, fadeTo, stop, loadWorld, preloadCommon, get fileState() { return { world, fileKey, playing: loopRun && loopRun.key, from0: loopRun && loopRun.from0, loaded: Object.keys(buffers), loading: Object.keys(loading) }; }, setTempo, setMuted, get voices() { return voiceEnds.length; }, get dropped() { return dropped; }, get muted() { return muted; }, se, suspend, resume, speak };
+  return { unlock, play: change, fadeTo, stop, loadWorld, preloadCommon, get musicLog() { return musicLog.slice(); }, get fileState() { return { world, fileKey, playing: loopRun && loopRun.key, from0: loopRun && loopRun.from0, loaded: Object.keys(buffers), loading: Object.keys(loading) }; }, setTempo, setMuted, get voices() { return voiceEnds.length; }, get dropped() { return dropped; }, get muted() { return muted; }, se, suspend, resume, speak };
 })();

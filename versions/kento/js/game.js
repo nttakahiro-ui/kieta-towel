@@ -2210,7 +2210,7 @@ const Battle = (() => {
     if (!other) return null;
     return opts.words.find(w => w.word === other) || { id: -110, stage: real.stage, word: other, kana: Ruby.kana(other), hp: 1, role: "zako", order: 0 };
   }
-  // 場面の曲へ0.5秒で替える（stages.js の WORLDS の music。11/3-4）
+  // 場面の曲へ替える（11/7-21 から: 前の曲を0.3秒で止め、0.4秒の無音のあと次の曲。js/audio.js の MUSIC_SWITCH）
   function music(scene) {
     Sound.fadeTo(scene, 0.5);   // 場面（explore／rescue／odai）で、その世界の mp3 をえらぶ（11/7-4）
   }
