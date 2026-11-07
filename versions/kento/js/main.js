@@ -253,11 +253,13 @@ const Main = (() => {
   function selectStage(id) {
     stage = window.STAGES.find(s => s.id === id) || window.STAGES[0];
     world = window.WORLDS.find(w => w.id === stage.world);
-    $("screen-quiz").dataset.world = stage.world;   // クイズの画面の色を世界ごとに（11/7-9 決定。css の #screen-quiz[data-world]）
-    $("screen-review").dataset.world = stage.world;   // 「今日あつめたことば」の画面も同じ色づかい（11/7-15）
+    setWorldColor(stage.world);   // 画面の色を世界ごとに（11/7-9・11/7-15・11/7-16 決定）
     words = window.WORDS.filter(w => w.stage === stage.id);
   }
   let stage, world, words, lastStats = null, lastIds = [];
+  // 世界ごとの色（11/7-16 決定。世界1 緑・世界2 青・世界3 紫）: body に今の世界の印。css の body[data-world] で色の変数（--green など）が替わる
+  //   入れるとき: ステージ一覧（出している世界）・ステージに入るとき・ワープ（行き先の世界）。タイトル・図鑑・レシピブックなどは css で緑にもどす
+  function setWorldColor(id) { document.body.dataset.world = id; }
   const tuneMode = /[?&]tune/.test(window.location.search);
   // デバッグ（タイトルの文字を5回続けて押すとオン。このページを開いている間だけ）
   let debugMode = false, openAll = false;
@@ -510,6 +512,7 @@ const Main = (() => {
     Battle.stop();
     Sound.play("stages");   // ステージ一覧の曲（map.mp3。11/7-4）
     const wid = Math.min(window.WORLDS.length, Math.max(1, Save.data.world || 1));
+    setWorldColor(wid);   // ステージ一覧の色は、出している世界の色（11/7-16）
     Sound.loadWorld(wid);   // この世界の3曲（発見・救出・クイズ）と fanfare を、いま読み始める。ステージを押したときには読み終わっているように（11/7-14。世界をまたいで戻ったときも、ここを通る）
     const wd = window.WORLDS.find(w => w.id === wid);
     $("stages-world-title").textContent = tx("worlds.title", { id: wd.id, name: wd.name });
@@ -605,6 +608,7 @@ const Main = (() => {
 
   // ワープの演出: 白く光って、次の世界の背景に切りかわる（約1.6秒）
   function warpTo(id) {
+    setWorldColor(id);   // ワープの会話・「世界○へ」の文字は、行き先の世界の色（11/7-16）
     if (!Save.data.warpSeen[id]) { Save.data.warpSeen[id] = true; Save.store(); warpTalk(id); return; }   // 初めては会話の演出（10/25-18）
     const fx = $("warp");
     fx.style.backgroundImage = `url(assets/bg_world${id}.jpg)`;

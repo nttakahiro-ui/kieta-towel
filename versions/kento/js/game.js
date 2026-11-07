@@ -347,6 +347,16 @@ const WORLD_TINT = {
   2: { frame: "#b6cbe0", kana: "#5a6a7a", zako: "#3c638a" },
   3: { frame: "#ceb6e0", kana: "#6d5a7a", zako: "#693c8a" },
 };
+// 世界ごとの色（11/7-16 決定）: 画面の枠・案内・見出しの緑を、世界2は青・世界3は紫に。明るさ・あざやかさは同じで色合いだけ（210°・275°。css の body[data-world] と同じ計算）
+//   お題バトルの枠ととくいの選択の枠（金色）も、世界2・3は世界の色に（世界1は今のまま）。使う場所で tint() を通す。ふわりの吹き出し・元気のゲージ・敵・木などの絵は変えない
+const UI_TINT = {
+  2: { "#6f9a4a": "#4a729a", "#48693a": "#3a5169", "#9cbf7c": "#7c9dbf", "#b9d39a": "#9ab6d3", "#7a8a68": "#68798a", "#4b5e3a": "#3a4c5e", "#3f5a30": "#30455a",
+       "rgba(72,105,58,0.92)": "rgba(58,81,105,0.92)", "rgba(225,238,212,0.6)": "rgba(212,225,238,0.6)", "rgba(236,244,226,0.93)": "rgba(226,235,244,0.93)",
+       "#e0b03a": "#7c9dbf", "#dcae3c": "#7c9dbf", "rgba(220,174,60,0.35)": "rgba(124,157,191,0.35)", "#b0801a": "#3a5169" },
+  3: { "#6f9a4a": "#794a9a", "#48693a": "#553a69", "#9cbf7c": "#a37cbf", "#b9d39a": "#bb9ad3", "#7a8a68": "#7c688a", "#4b5e3a": "#4f3a5e", "#3f5a30": "#48305a",
+       "rgba(72,105,58,0.92)": "rgba(85,58,105,0.92)", "rgba(225,238,212,0.6)": "rgba(227,212,238,0.6)", "rgba(236,244,226,0.93)": "rgba(236,226,244,0.93)",
+       "#e0b03a": "#a37cbf", "#dcae3c": "#a37cbf", "rgba(220,174,60,0.35)": "rgba(163,124,191,0.35)", "#b0801a": "#553a69" },
+};
 const SKILL_IDS = ["clear", "guard", "rewind"];   // clear ぜんぶ消し／guard 無敵タイム／rewind 巻き戻し（11/6-6 決定。時間止め・光のシャワーはやめた）
 const LOADOUT_VARS = { skill: "" };   // 持ち物「必殺ワザ」の説明の {skill}（選んでいるワザの名前）
 
@@ -509,7 +519,8 @@ const Battle = (() => {
   let blasts = [], orbAng = 0, orbFlash = [0, 0], orbHinted = false;   // 爆発の輪、光の玉の角度（11/6-3）
   let script, absorbed, missed, bossWord, groundIds;
   let P = null;              // このステージの難易度から決まった数値
-  let worldDef = {}, groundOn = true;   // 今の世界（stages.js の WORLDS）。groundOn: 地上の仕組みがあるか
+  let worldDef = {}, groundOn = true;
+  const tint = c => (UI_TINT[worldDef.id] || {})[c] || c;   // 世界1の色 → 今の世界の色（11/7-16）   // 今の世界（stages.js の WORLDS）。groundOn: 地上の仕組みがあるか
   let layout = null;         // 自動で決めた出方（patterns が "auto" のステージ）
   const patOf = w => (layout && layout[w.id]) || { order: w.order || 0, pattern: w.pattern || "normal", lane: w.lane === undefined ? 0.5 : w.lane };
   let phase;                 // "round1" / "round2" / "boss"
@@ -2511,7 +2522,7 @@ const Battle = (() => {
       if (diff >= 0) score += pts; else score = Math.max(0, score - pts);
       ex.settled = true; ex.settledT = ex.t;   // 時間の点を足した（これより前は、画面の点数におくれの−を先に見せる）。時計はこの時刻で止める
       const text = tx(diff >= 0 ? "explore.endEarly" : "explore.endLate", { n: sec, p: pts });
-      post("banner", () => { banner = { text, t: 2.4, color: "rgba(72,105,58,0.92)" }; });
+      post("banner", () => { banner = { text, t: 2.4, color: tint("rgba(72,105,58,0.92)") }; });
     }
   }
 
@@ -2995,7 +3006,7 @@ const Battle = (() => {
       ctx.font = font(fl.kana ? 22 : (fl.big ? 18 : 12));
       ctx.lineWidth = 4; ctx.strokeStyle = "#ffffff";
       ctx.strokeText(fl.text, fl.x, fl.y - fl.age * 30);
-      ctx.fillStyle = fl.wrong ? "#b05068" : (fl.found ? "#6f9a4a" : (fl.kana ? "#5d6b4c" : (fl.big ? "#c98a1e" : "#8a9a78")));   // 砕けた文字の読みは、ふりがなの色
+      ctx.fillStyle = fl.wrong ? "#b05068" : (fl.found ? tint("#6f9a4a") : (fl.kana ? "#5d6b4c" : (fl.big ? "#c98a1e" : "#8a9a78")));   // 砕けた文字の読みは、ふりがなの色
       ctx.fillText(fl.text, fl.x, fl.y - fl.age * 30);
     }
     ctx.globalAlpha = 1;
@@ -3011,7 +3022,7 @@ const Battle = (() => {
       ctx.lineWidth = 5; ctx.strokeStyle = "#ffffff"; ctx.lineJoin = "round";
       const hy = Math.min(H - 24, player.y + 54);
       if (!hintCard) ctx.strokeText(tx("rescue.moveHint"), W / 2, hy);   // 案内が出ているあいだは出さない（同じことを2か所に書かない）
-      ctx.fillStyle = "#48693a";
+      ctx.fillStyle = tint("#48693a");
       if (!hintCard) ctx.fillText(tx("rescue.moveHint"), W / 2, hy);
       ctx.globalAlpha = 1;
     }
@@ -4125,19 +4136,19 @@ const Battle = (() => {
       ctx.font = font(14);
       const hl = odai.hint ? wrapText(odai.hint, W - 72) : [];   // 最初のお題だけ、案内を1行そえる
       const h = lines.length * lh + 50 + hl.length * 20 + (hl.length ? 10 : 0), y = H * 0.4 - h / 2;
-      ctx.fillStyle = "rgba(255,253,245,0.97)"; ctx.strokeStyle = "#e0b03a"; ctx.lineWidth = 3;
+      ctx.fillStyle = "rgba(255,253,245,0.97)"; ctx.strokeStyle = tint("#e0b03a"); ctx.lineWidth = 3;
       roundRect(20, y, W - 40, h, 18); ctx.fill(); ctx.stroke();
-      ctx.font = font(14); ctx.fillStyle = "#b0801a";
+      ctx.font = font(14); ctx.fillStyle = tint("#b0801a");
       ctx.fillText(tx(odai.cols === 2 ? "rescue.odaiPanel2" : "rescue.odaiPanel"), 34, y + 12);   // 2択（「どっち？」「次は？」）は「2つから」
       ctx.font = font(fs); ctx.fillStyle = "#3e4a34";
       lines.forEach((l, i) => ctx.fillText(l, 32, y + 36 + i * lh));
       if (hl.length) {
-        ctx.font = font(14); ctx.fillStyle = "#6f9a4a";
+        ctx.font = font(14); ctx.fillStyle = tint("#6f9a4a");
         hl.forEach((l, i) => ctx.fillText(l, 32, y + 36 + lines.length * lh + 10 + i * 20));
       }
     } else {
       const pnl = odaiPanel();
-      ctx.fillStyle = "rgba(255,253,245,0.92)"; ctx.strokeStyle = "#e0b03a"; ctx.lineWidth = 2;
+      ctx.fillStyle = "rgba(255,253,245,0.92)"; ctx.strokeStyle = tint("#e0b03a"); ctx.lineWidth = 2;
       const px = stripRight() + 6;
       roundRect(px, pnl.y, W - px - 10, pnl.h, 12); ctx.fill(); ctx.stroke();
       ctx.font = font(pnl.fs); ctx.fillStyle = "#3e4a34";
@@ -4146,7 +4157,7 @@ const Battle = (() => {
       if (!odai.boss) {
         const r = Math.max(0, 1 - odai.t / BATTLE.odaiTimeLimit);
         ctx.fillStyle = "rgba(0,0,0,0.08)"; ctx.fillRect(px + 4, pnl.y + pnl.h - 4, W - px - 18, 3);
-        ctx.fillStyle = r > 0.3 ? "#e0b03a" : "#d0607f"; ctx.fillRect(px + 4, pnl.y + pnl.h - 4, (W - px - 18) * r, 3);
+        ctx.fillStyle = r > 0.3 ? tint("#e0b03a") : "#d0607f"; ctx.fillRect(px + 4, pnl.y + pnl.h - 4, (W - px - 18) * r, 3);
       }
     }
     ctx.restore();
@@ -4155,7 +4166,7 @@ const Battle = (() => {
   // 出撃の画面（1945の面の始まりのように）
   function drawSortie() {
     ctx.save();
-    ctx.fillStyle = sortieNo === 1 ? "rgba(236,244,226,0.93)" : "rgba(255,246,220,0.94)";
+    ctx.fillStyle = sortieNo === 1 ? tint("rgba(236,244,226,0.93)") : "rgba(255,246,220,0.94)";
     ctx.fillRect(0, 0, W, H);
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     if (sortieNo === 2 && sortieStep === "say") drawChoiceSay();
@@ -4281,7 +4292,7 @@ const Battle = (() => {
       ctx.font = font(fl.big ? 18 : 14);
       ctx.lineWidth = 4; ctx.strokeStyle = "#ffffff";
       ctx.strokeText(fl.text, fl.x, fl.y - fl.age * 30);
-      ctx.fillStyle = fl.found ? "#6f9a4a" : "#c98a1e";
+      ctx.fillStyle = fl.found ? tint("#6f9a4a") : "#c98a1e";
       ctx.fillText(fl.text, fl.x, fl.y - fl.age * 30);
     }
     ctx.globalAlpha = 1;
@@ -4302,7 +4313,7 @@ const Battle = (() => {
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
       const hy = Math.min(H - 110, bino.y + R + 26);
       if (!hintCard) ctx.strokeText(tx("explore.moveHint"), W / 2, hy);
-      ctx.fillStyle = "#48693a"; if (!hintCard) ctx.fillText(tx("explore.moveHint"), W / 2, hy);
+      ctx.fillStyle = tint("#48693a"); if (!hintCard) ctx.fillText(tx("explore.moveHint"), W / 2, hy);
       ctx.globalAlpha = 1;
     }
     if (banner) drawBanner();
@@ -4481,7 +4492,7 @@ const Battle = (() => {
       ctx.font = font(fl.big ? 18 : 15);
       ctx.lineWidth = 4; ctx.strokeStyle = "#ffffff";
       ctx.strokeText(fl.text, fl.x, fl.y - fl.age * 30);
-      ctx.fillStyle = fl.found ? "#6f9a4a" : "#8a6a4a";
+      ctx.fillStyle = fl.found ? tint("#6f9a4a") : "#8a6a4a";
       ctx.fillText(fl.text, fl.x, fl.y - fl.age * 30);
     }
     ctx.globalAlpha = 1;
@@ -4520,7 +4531,7 @@ const Battle = (() => {
     ctx.font = font(15); ctx.textAlign = "left"; ctx.textBaseline = "middle";
     const px = stripRight() + 8, pw = W - px - 10, lines = wrapText(hintCard.text, pw - 56);
     const ph = 22 + lines.length * 21, py = 46;
-    ctx.fillStyle = hintCard.yellow ? "rgba(255,236,150,0.97)" : "rgba(255,253,245,0.96)"; ctx.strokeStyle = hintCard.yellow ? "#e0b03a" : "#9cbf7c"; ctx.lineWidth = 2.5;
+    ctx.fillStyle = hintCard.yellow ? "rgba(255,236,150,0.97)" : "rgba(255,253,245,0.96)"; ctx.strokeStyle = hintCard.yellow ? "#e0b03a" : tint("#9cbf7c"); ctx.lineWidth = 2.5;
     roundRect(px, py, pw, ph, 14); ctx.fill(); ctx.stroke();
     drawFuwariArt(1, px + 24, py + ph / 2, 34);   // セリフの横の小さなふわり（1のコマ）
     ctx.fillStyle = "#3f4a35";
@@ -4536,17 +4547,17 @@ const Battle = (() => {
     const pw = Math.min(W - 32, 360), px = (W - pw) / 2;
     const picH = 0;
     const ph = 70 + d.lines.length * 26 + picH + 46, py = Math.max(60, H * 0.42 - ph / 2);
-    ctx.fillStyle = "rgba(255,253,245,0.98)"; ctx.strokeStyle = "#9cbf7c"; ctx.lineWidth = 3;
+    ctx.fillStyle = "rgba(255,253,245,0.98)"; ctx.strokeStyle = tint("#9cbf7c"); ctx.lineWidth = 3;
     roundRect(px, py, pw, ph, 18); ctx.fill(); ctx.stroke();
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.font = font(22); ctx.fillStyle = "#48693a";
+    ctx.font = font(22); ctx.fillStyle = tint("#48693a");
     ctx.fillText(d.title, W / 2, py + 32);
     ctx.font = font(17); ctx.fillStyle = "#3f4a35";
     d.lines.forEach((l, i) => ctx.fillText(l, W / 2, py + 70 + i * 26));
     const top = py + 70 + d.lines.length * 26;
     if (tut.t >= BATTLE.tutCloseAfter) {
       ctx.globalAlpha = 0.6 + Math.sin(performance.now() / 250) * 0.4;
-      ctx.font = font(15); ctx.fillStyle = "#6f9a4a";
+      ctx.font = font(15); ctx.fillStyle = tint("#6f9a4a");
       ctx.fillText("タップでつづける", W / 2, py + ph - 22);
     }
     ctx.restore();
@@ -4564,11 +4575,11 @@ const Battle = (() => {
   // 旅の表紙（仮の見た目）: 大きく旅の名前と見出し、ふわりの一言。タップで 3・2・1・「○○の旅へ、出発！」
   function drawCover() {
     const trip = window.TEXTS.trips[sortieNo], green = sortieNo === 1;
-    const main = green ? "#48693a" : "#b0801a", accent = green ? "#6f9a4a" : "#c98a1e", line = green ? "#9cbf7c" : "#e0b03a";
-    ctx.fillStyle = green ? "rgba(225,238,212,0.6)" : "rgba(255,240,200,0.6)"; ctx.fillRect(0, 0, W, H);
+    const main = green ? tint("#48693a") : "#b0801a", accent = green ? tint("#6f9a4a") : "#c98a1e", line = green ? tint("#9cbf7c") : "#e0b03a";   // 発見の旅の表紙は世界の色（11/7-16）。救出の旅の表紙は金色のまま
+    ctx.fillStyle = green ? tint("rgba(225,238,212,0.6)") : "rgba(255,240,200,0.6)"; ctx.fillRect(0, 0, W, H);
     const cy = H * 0.34;
     if (sortieStep === "cover") {
-      ctx.font = font(15); ctx.fillStyle = green ? "#7a8a68" : "#9a7a40";
+      ctx.font = font(15); ctx.fillStyle = green ? tint("#7a8a68") : "#9a7a40";
       ctx.fillText(opts.stageName, W / 2, cy - 128);   // 見出しのふりがなと重ならないように（10/25-5）
       let fs = 50; ctx.font = font(fs);
       while (ctx.measureText(trip.name).width > W - 40 && fs > 30) { fs -= 2; ctx.font = font(fs); }
@@ -4576,12 +4587,12 @@ const Battle = (() => {
       // チュートリアルのステージ（ステージ1）: 発見の旅の表紙の見出しのすぐ下に1行（毎回。10/25-10）。そのぶん下の文を下げる
       const tut = sortieNo === 1 && opts.stage && opts.stage.tutorial ? wrapTextFont(tx("tutorial.cover"), 15, W - 40) : [];
       if (tut.length) {
-        ctx.font = font(15); ctx.fillStyle = "#6f9a4a";
+        ctx.font = font(15); ctx.fillStyle = tint("#6f9a4a");
         tut.forEach((l, i) => ctx.fillText(l, W / 2, cy - 14 + i * 18));
       }
       const dy = tut.length ? tut.length * 18 + 8 : 0;
       if (trip.sub) {   // 見出しの下の1行（毎回。長ければ2行）
-        ctx.font = font(15); ctx.fillStyle = green ? "#4b5e3a" : "#7a6a40";
+        ctx.font = font(15); ctx.fillStyle = green ? tint("#4b5e3a") : "#7a6a40";
         wrapText(trip.sub, W - 48).forEach((l, i, a) => ctx.fillText(l, W / 2, cy + 2 + dy + (i - (a.length - 1) / 2) * 20));
       }
       // ふわり（仮の絵）と吹き出し（表紙の文）
@@ -4592,7 +4603,7 @@ const Battle = (() => {
       drawFuwariArt(1, 40, by + bh / 2, 50);   // セリフの横の小さなふわり（1のコマ）
       ctx.fillStyle = "rgba(255,253,245,0.97)"; ctx.strokeStyle = line; ctx.lineWidth = 2;
       roundRect(bx, by, bw, bh, 14); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = green ? "#3f5a30" : "#6b4a10";
+      ctx.fillStyle = green ? tint("#3f5a30") : "#6b4a10";
       lines.forEach((l, i) => ctx.fillText(l, bx + bw / 2, by + 21 + i * 22));
       if (sortieNo === 1) drawHero("point", 8, H - H / 3 - 8, H / 3);   // 発見の旅の表紙: 主人公の「指さす」絵（左下）
       ctx.globalAlpha = 0.6 + Math.sin(performance.now() / 250) * 0.4;
@@ -4690,9 +4701,9 @@ const Battle = (() => {
     drawFuwariArt(2, a.x + a.w * 0.34, a.y + a.h * 0.375, a.w * 0.26, Math.sin(t * 2.2) * 0.12);
     choiceRects().forEach((r, i) => {
       const l = LOADOUTS[i];
-      ctx.fillStyle = "rgba(255,252,242,0.96)"; ctx.strokeStyle = "#dcae3c"; ctx.lineWidth = 3;
+      ctx.fillStyle = "rgba(255,252,242,0.96)"; ctx.strokeStyle = tint("#dcae3c"); ctx.lineWidth = 3;   // とくいの枠: 世界2・3は世界の色（11/7-16）
       roundRect(r.x, r.y, r.w, r.h, 18); ctx.fill(); ctx.stroke();
-      ctx.strokeStyle = "rgba(220,174,60,0.35)"; ctx.lineWidth = 1.5;
+      ctx.strokeStyle = tint("rgba(220,174,60,0.35)"); ctx.lineWidth = 1.5;
       roundRect(r.x + 4, r.y + 4, r.w - 8, r.h - 8, 14); ctx.stroke();
       const nfs = Math.min(22, r.h * 0.32), dfs = Math.min(14, r.h * 0.2), nx = r.x + r.w * 0.065;
       ctx.textAlign = "left";
@@ -4730,7 +4741,7 @@ const Battle = (() => {
     }
     choiceRects().forEach((r, i) => {
       const l = LOADOUTS[i];
-      ctx.fillStyle = "#fffdf7"; ctx.strokeStyle = "#e0b03a"; ctx.lineWidth = 3;
+      ctx.fillStyle = "#fffdf7"; ctx.strokeStyle = tint("#e0b03a"); ctx.lineWidth = 3;
       roundRect(r.x, r.y, r.w, r.h, 16); ctx.fill(); ctx.stroke();
       ctx.textAlign = "left";
       ctx.font = font(20); ctx.fillStyle = "#8a5a10";
@@ -4928,7 +4939,7 @@ const Battle = (() => {
     ctx.fillText(label, cx, cy + 1);
     // 左下の点数
     const sb = { x: 6, y: H - 80, w: 96, h: 52 };
-    ctx.fillStyle = "rgba(255,253,245,0.94)"; ctx.strokeStyle = "#b9d39a"; ctx.lineWidth = 2;
+    ctx.fillStyle = "rgba(255,253,245,0.94)"; ctx.strokeStyle = tint("#b9d39a"); ctx.lineWidth = 2;
     roundRect(sb.x, sb.y, sb.w, sb.h, 10); ctx.fill(); ctx.stroke();
     ctx.fillStyle = "#4b5e3a"; ctx.font = font(11); ctx.fillText(tx("explore.scoreLabel"), sb.x + sb.w / 2, sb.y + 14);
     const o = over && !explore.settled ? -left : 0;
@@ -5045,7 +5056,7 @@ const Battle = (() => {
     ctx.font = font(30);
     ctx.lineWidth = 8; ctx.strokeStyle = "#ffffff"; ctx.lineJoin = "round";
     ctx.strokeText(big, W / 2, H * 0.32);
-    ctx.fillStyle = "#48693a";
+    ctx.fillStyle = tint("#48693a");
     ctx.fillText(big, W / 2, H * 0.32);
     ctx.font = font(20);
     ctx.strokeText(small, W / 2, H * 0.32 + 40);

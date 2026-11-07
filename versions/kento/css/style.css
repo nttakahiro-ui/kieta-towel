@@ -9,6 +9,8 @@
   --text: #3e4a34;
   --rose: #d07a8c;
   --white: #fffdf7;
+  /* 世界ごとに替わる色（11/7-16。下の body[data-world] で替える）: 背景の上のうすい色・ふわりの印のふち・正解のしるし・うすい灰色の字・枠 */
+  --w-top: #eaf3dc; --w-line: #c9d9b4; --w-line2: #eef3e4; --q-ok: #e5f2d3; --w-gray: #7a8a68; --w-frame: #cfe0b6; --w-link: #a0a890;
   /* ゲーム全体のフォントは、ここ1か所で決める（バトルの画面もここを読む）。本番のフォントに替えるときは、ここを書き換える
      iPhone は「ヒラギノ丸ゴ」、それ以外は Google Fonts の「Zen Maru Gothic」（index.html で読み込み） */
   --font: "Hiragino Maru Gothic ProN", "Hiragino Maru Gothic Pro", "Zen Maru Gothic", sans-serif;
@@ -40,7 +42,7 @@ body { position: fixed; inset: 0; }
   height: var(--app-h);
   margin: 0 auto;
   overflow: hidden;
-  background: linear-gradient(#eaf3dc, var(--cream));
+  background: linear-gradient(var(--w-top), var(--cream));
 }
 
 .screen {
@@ -77,8 +79,8 @@ body { position: fixed; inset: 0; }
   width: 26px; height: 22px;
   border-radius: 8px;
   background: var(--white);
-  border: 2px solid #c9d9b4;
-  box-shadow: inset 0 -5px 0 #eef3e4;
+  border: 2px solid var(--w-line);
+  box-shadow: inset 0 -5px 0 var(--w-line2);
   vertical-align: middle;
   margin-right: 8px;
   flex-shrink: 0;
@@ -173,7 +175,7 @@ body { position: fixed; inset: 0; }
   border: 2px solid var(--green-light);
   animation: card-in .35s ease-out both;
 }
-.review-list .k { display: block; font-size: 12px; color: #7a8a68; min-height: 16px; }
+.review-list .k { display: block; font-size: 12px; color: var(--w-gray); min-height: 16px; }
 .review-list .w { display: block; font-size: 19px; font-weight: bold; color: var(--green-dark); }
 .review-bar { height: 8px; background: var(--cream-dark); border-radius: 4px; margin: 18px 16px 6px; overflow: hidden; }
 .review-bar i { display: block; height: 100%; width: 0; background: var(--green); border-radius: 4px; }
@@ -228,7 +230,7 @@ body { position: fixed; inset: 0; }
   word-break: break-all;
 }
 .choice:active { background: var(--green-light); }
-.choice.correct { border-color: var(--green); background: #e5f2d3; }
+.choice.correct { border-color: var(--green); background: var(--q-ok); }
 .choice.wrong { border-color: var(--rose); background: #f8e3e6; }
 .choice:disabled { color: var(--text); }
 .quiz-feedback {
@@ -247,7 +249,7 @@ body { position: fixed; inset: 0; }
 /* ステージ一覧 */
 .stages-box { max-width: 440px; margin: 0 auto; }
 .stages-title { font-size: 24px; color: var(--green-dark); text-align: center; margin: 8px 0 4px; }
-.stages-note { font-size: 12px; text-align: center; color: #7a8a68; margin: 0 0 8px; line-height: 1.8; }
+.stages-note { font-size: 12px; text-align: center; color: var(--w-gray); margin: 0 0 8px; line-height: 1.8; }
 .stages-world { font-size: 15px; color: var(--green); margin: 16px 4px 6px; }
 .stage-row {
   display: flex; align-items: center; gap: 10px; width: 100%;
@@ -261,7 +263,7 @@ body { position: fixed; inset: 0; }
 .stage-row .no { width: 30px; height: 30px; border-radius: 50%; background: var(--green-light); display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0; }
 .stage-row .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 .stage-row .nm { font-size: 17px; font-weight: bold; }
-.stage-row .sub { font-size: 12px; color: #7a8a68; line-height: 1.45; }   /* 10/31-7: 「難易度」「ベスト」「カード」のかたまりごとに折り返す（かたまりの途中では割れない・消えない） */
+.stage-row .sub { font-size: 12px; color: var(--w-gray); line-height: 1.45; }   /* 10/31-7: 「難易度」「ベスト」「カード」のかたまりごとに折り返す（かたまりの途中では割れない・消えない） */
 .stage-row .sub .si { white-space: nowrap; }
 .stage-row .sub .si + .si { margin-left: 0.9em; }
 .stage-row .marks { display: flex; flex-direction: row; flex-wrap: wrap; gap: 4px; margin-top: 3px; }   /* 印は下の段に横に並べる（10/31-7） */
@@ -373,7 +375,7 @@ body { position: fixed; inset: 0; }
   margin-top: 26px;
   background: none; border: none;
   font-family: var(--font); font-size: 13px;
-  color: #a0a890; text-decoration: underline;
+  color: var(--w-link); text-decoration: underline;
   cursor: pointer;
 }
 
@@ -399,7 +401,7 @@ body { position: fixed; inset: 0; }
 #screen-battle .pause-btn {
   position: absolute; right: 12px; bottom: max(14px, env(safe-area-inset-bottom));
   width: 46px; height: 46px; border-radius: 50%;
-  border: 2px solid #cfe0b6; background: rgba(255,253,245,0.85);
+  border: 2px solid var(--w-frame); background: rgba(255,253,245,0.85);
   color: var(--green-dark); font-size: 18px; font-weight: bold; font-family: var(--font);
   touch-action: manipulation; cursor: pointer; z-index: 5;
 }
@@ -462,7 +464,7 @@ body { position: fixed; inset: 0; }
 .intro-heroes .hero-img { width: 132px; height: 235px; }
 .intro-lines { margin: 18px 0 10px; }
 .intro-lines p { margin: 10px 0; font-size: 17px; line-height: 1.5; color: #3f4a35; }
-.intro-tap { margin-top: 18px; font-size: 16px; color: #6f9a4a; animation: introBlink 1.6s ease-in-out infinite; }
+.intro-tap { margin-top: 18px; font-size: 16px; color: var(--green); animation: introBlink 1.6s ease-in-out infinite; }
 @keyframes introBlink { 50% { opacity: 0.35; } }
 .hero-title { font-size: 20px; color: #48693a; margin: 0 0 18px; }
 .hero-choices { display: flex; gap: 14px; justify-content: center; }
@@ -529,7 +531,7 @@ body { position: fixed; inset: 0; }
 .wt-stage { position: absolute; left: 0; right: 0; bottom: max(40px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; align-items: center; isolation: isolate; }
 .wt-bubble { max-width: 300px; margin: 0 16px 10px; background: rgba(255,253,245,0.97); border: 2.5px solid #e0b03a; border-radius: 16px; padding: 12px 16px; font-size: 17px; line-height: 1.5; color: #4b3a1a; text-align: center; opacity: 0; transition: opacity .3s; }
 .wt-bubble.on { opacity: 1; }
-.wt-bubble.hero { border-color: #6f9a4a; }
+.wt-bubble.hero { border-color: var(--green); }
 .wt-chars { position: relative; display: flex; align-items: flex-end; justify-content: center; gap: 4px; padding: 10px 26px 4px; }
 .wt-chars::before { content: ""; position: absolute; inset: -10px -20px -14px; background: radial-gradient(ellipse at center, #fff7ea 55%, rgba(255,247,234,0.85) 66%, rgba(255,247,234,0) 74%); z-index: -1; }   /* 主人公の絵の紙の地が、明るい背景の上で四角く見えないように */
 .wt-chars > img { position: relative; }
@@ -541,7 +543,7 @@ body { position: fixed; inset: 0; }
 .wt-title.on { opacity: 1; }
 .wt-flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; transition: opacity .6s; }
 .wt-flash.on { opacity: 1; }
-#warp p { position: relative; font-size: 28px; font-weight: bold; color: #48693a; text-shadow: 0 0 8px #fff, 0 0 16px #fff; }
+#warp p { position: relative; font-size: 28px; font-weight: bold; color: var(--green-dark); text-shadow: 0 0 8px #fff, 0 0 16px #fff; }
 @keyframes warpFx { 0% { opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; } }
 @keyframes warpFlash { 0% { opacity: 0; } 30% { opacity: 1; } 60% { opacity: 0.2; } 100% { opacity: 0; } }
 .stage-row.notready .sub { color: #a3a396; }
@@ -733,16 +735,14 @@ body { position: fixed; inset: 0; }
 .card .w { overflow-wrap: anywhere; }
 @media (max-width: 350px) { .card .w { font-size: 16px; } }   /* 細い画面では語を少し小さく（7文字の語が1行に入るように） */
 
-/* 11/7-9 決定: クイズの画面の色を世界ごとに（世界1 緑・世界2 青・世界3 紫）。緑と同じ明るさ・あざやかさで色合いだけ変えた。タイムバー・ボタン・正解のしるし・枠など、緑を使うところすべて */
-#screen-quiz[data-world="2"], #screen-review[data-world="2"] { --green: #4a729a; --green-dark: #3a5169; --green-light: #c6d8eb; --q-ok: #d3e2f2; }
-#screen-quiz[data-world="3"], #screen-review[data-world="3"] { --green: #794a9a; --green-dark: #553a69; --green-light: #dcc6eb; --q-ok: #e5d3f2; }
-#screen-quiz .choice.correct { background: var(--q-ok, #e5f2d3); }
-#screen-quiz[data-world="2"], #screen-review[data-world="2"] { background: linear-gradient(#dce8f3, var(--cream)); }   /* 背景の帯（上のうすい色。世界1は #app の #eaf3dc のまま） */
-#screen-quiz[data-world="3"], #screen-review[data-world="3"] { background: linear-gradient(#e9dcf3, var(--cream)); }
-#screen-quiz[data-world="2"] .fuwari-icon, #screen-quiz[data-world="3"] .fuwari-icon { border-color: var(--green-light); }   /* ふわりの小さな印のふちも世界の色（世界1は今の #c9d9b4） */
-/* 11/7-15 決定: 「今日あつめたことば」の画面（救出の旅→クイズの間）も世界ごとの色（上の --green などをクイズと共通に。帯・枠・ことば・バー）。ふりがなの灰色も世界の色合いに */
-#screen-review[data-world="2"] .review-list .k { color: #68798a; }
-#screen-review[data-world="3"] .review-list .k { color: #7c688a; }
+/* 世界ごとの色（11/7-9 クイズ → 11/7-15 今日あつめたことば → 11/7-16 できる限りすべての画面）。世界1 緑・世界2 青・世界3 紫
+   緑と同じ明るさ・あざやかさで、色合いだけ 210°（青）・275°（紫）に変えた。body の data-world（main.js の setWorldColor）で替わる */
+body[data-world="2"] { --green: #4a729a; --green-dark: #3a5169; --green-light: #c6d8eb; --q-ok: #d3e2f2; --w-top: #dce8f3; --w-line: #b4c6d9; --w-line2: #e4ecf3; --w-gray: #68798a; --w-frame: #b6cbe0; --w-link: #909ca8; }
+body[data-world="3"] { --green: #794a9a; --green-dark: #553a69; --green-light: #dcc6eb; --q-ok: #e5d3f2; --w-top: #e9dcf3; --w-line: #cab4d9; --w-line2: #ede4f3; --w-gray: #7c688a; --w-frame: #ceb6e0; --w-link: #9e90a8; }
+/* 世界によらない画面とカードは、いつも世界1の緑（11/7-16 決定: カード図鑑のカード・タイトル・レシピブックは共通。オープニング・主人公えらび・エンディングも共通） */
+#screen-title, #screen-zukan, #screen-recipebook, #screen-ending, #screen-opening, #screen-intro, #screen-hero, .card {
+  --green: #6f9a4a; --green-dark: #48693a; --green-light: #dcebc6; --q-ok: #e5f2d3; --w-top: #eaf3dc; --w-line: #c9d9b4; --w-line2: #eef3e4; --w-gray: #7a8a68; --w-frame: #cfe0b6; --w-link: #a0a890;
+}
 /* 取り逃しの減点（11/7-10）: 点数の上に赤く */
 .miss-penalty { font-size: 18px; font-weight: bold; color: #c0392b; }
 /* 宝石まであと○こ（11/7-10） */
