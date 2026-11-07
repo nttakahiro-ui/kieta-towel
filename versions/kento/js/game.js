@@ -350,6 +350,7 @@ const WORLD_TINT = {
 // 世界ごとの色（11/7-16 決定）: 画面の枠・案内・見出しの緑を、世界2は青・世界3は紫に。明るさ・あざやかさは同じで色合いだけ（210°・275°。css の body[data-world] と同じ計算）
 //   お題バトルの枠ととくいの選択の枠（金色）も、世界2・3は世界の色に（世界1は今のまま）。使う場所で tint() を通す。ふわりの吹き出し・元気のゲージ・敵・木などの絵は変えない
 const UI_TINT = {
+  1: { "#e0b03a": "#9cbf7c", "#dcae3c": "#9cbf7c", "rgba(220,174,60,0.35)": "rgba(156,191,124,0.35)", "#b0801a": "#48693a" },   // 世界1も、とくい・お題の枠は緑（11/7-17）。金色は救出の旅の見出しと点数・宝石だけ
   2: { "#6f9a4a": "#4a729a", "#48693a": "#3a5169", "#9cbf7c": "#7c9dbf", "#b9d39a": "#9ab6d3", "#7a8a68": "#68798a", "#4b5e3a": "#3a4c5e", "#3f5a30": "#30455a",
        "rgba(72,105,58,0.92)": "rgba(58,81,105,0.92)", "rgba(225,238,212,0.6)": "rgba(212,225,238,0.6)", "rgba(236,244,226,0.93)": "rgba(226,235,244,0.93)",
        "#e0b03a": "#7c9dbf", "#dcae3c": "#7c9dbf", "rgba(220,174,60,0.35)": "rgba(124,157,191,0.35)", "#b0801a": "#3a5169" },
@@ -4701,7 +4702,7 @@ const Battle = (() => {
     drawFuwariArt(2, a.x + a.w * 0.34, a.y + a.h * 0.375, a.w * 0.26, Math.sin(t * 2.2) * 0.12);
     choiceRects().forEach((r, i) => {
       const l = LOADOUTS[i];
-      ctx.fillStyle = "rgba(255,252,242,0.96)"; ctx.strokeStyle = tint("#dcae3c"); ctx.lineWidth = 3;   // とくいの枠: 世界2・3は世界の色（11/7-16）
+      ctx.fillStyle = "rgba(255,252,242,0.96)"; ctx.strokeStyle = tint("#dcae3c"); ctx.lineWidth = 3;   // とくいの枠: 世界の色（11/7-16、世界1も 11/7-17）
       roundRect(r.x, r.y, r.w, r.h, 18); ctx.fill(); ctx.stroke();
       ctx.strokeStyle = tint("rgba(220,174,60,0.35)"); ctx.lineWidth = 1.5;
       roundRect(r.x + 4, r.y + 4, r.w - 8, r.h - 8, 14); ctx.stroke();
