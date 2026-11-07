@@ -1,9 +1,10 @@
 // 画面の切り替えとセーブ
-const SAVE_KEY = "kietaTowel.save.20261106";   // 検討版 11/6 は、完全版・試作（kietaTowel.save.w23）とも別の名前で保存する（11/6-1）。前の説明: 世界2・3の試作（10/31-10）: 公開版（kietaTowel.save.v1）と同じサイトなので、記録を別の名前で保存する
+const SAVE_KEY = "kietaTowel.save.20261106";   // 11/7-10 に versions/kento/ へ改名したが、保存名は変えない（前に遊んだ記録をそのまま使う）。検討版 11/6 は、完全版・試作（kietaTowel.save.w23）とも別の名前で保存する（11/6-1）。前の説明: 世界2・3の試作（10/31-10）: 公開版（kietaTowel.save.v1）と同じサイトなので、記録を別の名前で保存する
 
 // チュートリアルを「見た」の記録（10/7-1）。版（versions/ のフォルダ）ごとに分けて保存する
 // 置き場所（URL のパス）を名前に入れるので、別の版を開くと、チュートリアルがもう一度出る
-const TUT_KEY = "kietaTowel.tutorial." + window.location.pathname.replace(/index\.html$/, "");
+// 11/7-10: 検討版は versions/20261106/ から versions/kento/ に改名した。前に見た記録をそのまま使うため、名前は前の場所のまま
+const TUT_KEY = "kietaTowel.tutorial." + window.location.pathname.replace(/index\.html$/, "").replace(/\/versions\/kento\/$/, "/versions/20261106/");
 const TutSave = {
   load() { try { return JSON.parse(window.localStorage.getItem(TUT_KEY) || "{}") || {}; } catch (e) { return {}; } },
   mark(id) { const o = TutSave.load(); o[id] = true; try { window.localStorage.setItem(TUT_KEY, JSON.stringify(o)); } catch (e) {} },
