@@ -404,11 +404,21 @@ const Main = (() => {
         $("quizintro-text").innerHTML = tx("quiz.intro").replace(/\n/g, "<br>");
         $("quizintro-tap").textContent = tx("quiz.introTap");
         showScreen("quizintro");
-        $("screen-quizintro").onclick = () => { $("screen-quizintro").onclick = null; startQuiz(); };
+        $("screen-quizintro").onclick = () => { $("screen-quizintro").onclick = null; quizDoor(); };
         return;
       }
-      startQuiz();
+      quizDoor();
     });
+    // クイズの扉（11/7-19）: 「今日助けたことば」（ステージ1はクイズの説明も）のあと、1問目の前。押すか10秒で1問目へ。曲は扉からクイズの曲
+    function quizDoor() {
+      showScreen("door");
+      Sound.play("quiz");
+      Door.mount($("door-canvas"), { kind: "quiz", world: stage.world, stageId: stage.id, stageName: stage.name, tap: tx("tapToGo") }, () => {
+        startQuiz();
+        const f = document.createElement("div"); f.className = "door-fade"; $("app").appendChild(f);   // 光が消えていく
+        setTimeout(() => f.remove(), 450);
+      });
+    }
     function startQuiz() {
       showScreen("quiz");
       $("quiz-hero").src = heroSrc("think");   // クイズは「考える」の絵
@@ -541,13 +551,12 @@ const Main = (() => {
       const main = document.createElement("span"); main.className = "main";
       const nm = document.createElement("span"); nm.className = "nm"; nm.textContent = s.name;
       const sub = document.createElement("span"); sub.className = "sub";
-      if (open) sub.innerHTML = [`難易度 ${s.difficulty || 1}`, `ベスト ${b ? b.score : 0}点`, `カード ${got}/10`].map(t => `<span class="si">${t}</span> `).join("");   // かたまりごとに折り返す（10/31-7）
+      if (open) sub.innerHTML = `<span class="si">${tx("results.cardsLine", { got, n: 10 })}</span>`;   // 11/7-19: 難易度とベストの点数の表記はやめた。そろったカードの数だけ
       else sub.textContent = tx("worlds.notReady");
       // 10/25-17: 印はやめた。クリアした（救出の旅を最後まで終えた）ステージは枠が光り「ステージクリア」。カードが10枚そろったステージは「10のことば」と宝石の絵（10/25-19）
       if (b) row.classList.add("cleared");
       const marks = document.createElement("span"); marks.className = "marks";
-      if (litSet.has(s.id)) marks.innerHTML += `<svg class="row-gem" viewBox="-22 -22 44 44">${GEM_ART(s.gem, true, 19, s.id)}</svg><span class="row-tag full">${tx("stagesTag.full")}</span>`;
-      if (b) marks.innerHTML += `<span class="row-tag clear">${tx("stagesTag.clear")}</span>`;
+      if (litSet.has(s.id)) marks.innerHTML += `<svg class="row-gem" viewBox="-22 -22 44 44">${GEM_ART(s.gem, true, 19, s.id)}</svg>`;   // 宝石があれば宝石の絵（11/7-19: 「10のことば」「ステージクリア」の札はやめた。クリアした枠が光るのはそのまま）
       main.append(nm, sub);
       if (open) main.appendChild(marks);   // 印は名前と数字の下の段に（10/31-7）
       row.append(no, main);

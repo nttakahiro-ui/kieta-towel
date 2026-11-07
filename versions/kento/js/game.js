@@ -190,8 +190,7 @@ const BATTLE = {
 
   // 旅の名前と表紙の文は data/texts.js の trips（10/21-1 に移した）
   // 本番の表紙（10/3-9）
-  countStep: 0.45,             // 表紙のあとのカウント「3」「2」「1」のそれぞれの時間（秒）
-  countGo: 0.5,                // 「出撃！」の時間（秒）。カウントの合計は2秒以内
+  doorFade: 0.35,              // 扉を押して場面に入ったあと、白い光が消えていく時間（秒）。扉の動きの数値は js/door.js の DOOR（11/7-19）
   choiceTime: 10,              // （10/25-14 から使っていない。持ち物選択は時間制限なし）
   bigBombMul: 2,               // （10/25-1 から使っていない。前の「大きなふわりタイフーン」のゲージの倍率）
 
@@ -575,8 +574,9 @@ const Battle = (() => {
   let loadout = null;        // 本番に持っていくもの（LOADOUTS の id）
   let choiceT = 0;           // 選ぶ時間の残り（秒）
   let choiceFree = false;    // 持ち物選択に時間制限がないか（初めて選ぶとき。main.js の opts.firstChoice）
-  let sortieStep = "choice"; // 出撃2の画面の段階: "say" ふわりの一言（10/25-5。タップで次へ）→ "choice" 持っていく物を選ぶ → "cover" 表紙（タップ待ち）→ "count" 3・2・1・出撃！
-  let countT = 0;            // カウントの経過（秒）
+  let sortieStep = "choice"; // 出撃2の画面の段階: "say" ふわりの一言（10/25-5。タップで次へ）→ "choice" 持っていく物を選ぶ → "door" 扉（タップ待ち。11/7-19）
+  let door = null;           // 扉（11/7-19。js/door.js）の時間 { t, go, popped, goX, goY }。表紙とカウント「3・2・1」は、この扉にかえた
+  let doorFade = 0;          // 扉から場面に入ったあとの白い光の残り（秒）
   let freed = [];            // 殻から助けられて、ふわりのところへ飛んでいく語句
   let tut = null;            // 出ているチュートリアルの案内（出ているあいだはゲームが止まる）{ id, t, rest(紙芝居のつづき) }
   let hintOpts = null, hintShown = {};   // 案内: main.js から { seen, mark, all }（ステージ1だけ。all ＝ おさらいで全部出す）と、このバトルで出したもの
@@ -660,10 +660,10 @@ const Battle = (() => {
           const c = choiceRects().find(r => px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h);
           if (!c) return;   // 選ぶまで出撃しない（10秒で「つよい弾」）
           chooseLoadout(c.id);
-          sortieStep = "cover";   // 選んだら表紙へ
-        } else if (sortieStep === "cover") {
-          sortieStep = "count"; countT = 0;   // タップで 3・2・1・出撃！
-          Sound.se("odai");
+          openDoor();   // 選んだら扉へ
+        } else if (sortieStep === "door" && door) {
+          const rect = canvas.getBoundingClientRect();
+          if (!Door.tap(door, e.clientX - rect.left, e.clientY - rect.top)) return;   // 押したら光が広がって出発（文字が出る前のタップは受けない）
           const ex = sortieNo === 1;   // 発見の旅は双眼鏡、救出の旅は自機
           drag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, px: ex ? bino.x : player.x, py: ex ? bino.y : player.y };   // 指をつけたままなら、出発してすぐ動かせる
           try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
@@ -763,7 +763,7 @@ const Battle = (() => {
       exMove = Object.assign({ move: type }, EXPLORE_MOVES[type], se);
     }
     bino = { x: W / 2 + 10, y: H * 0.42 };
-    state = "sortie"; sortieNo = 1; reacted = 0; sortieStep = "cover";   // 発見の旅の表紙から始める   // 「出撃1 探検」の画面から始める
+    state = "sortie"; sortieNo = 1; reacted = 0; openDoor();   // 発見の旅の扉から始める（11/7-19）
     loadout = null; powerBonus = basePower(); shield = 0; gaugeMul = 1;
     stopT = 0; guardT = 0; rewindUsed = false; rewindSaid = false; rewindHintWait = false; rewindFx = null; skillUse = { clear: 0, guard: 0, rewind: 0, fullAcc: 0, fullBoss: 0, firstAcc: -1 }; baseScript = script; rescueT = 0; evShown = {}; evPlans = {}; bgOff = 0; bgGo = false; press = null;
     events = (opts.stage && opts.stage.event) ? [].concat(opts.stage.event) : [];
@@ -935,7 +935,11 @@ const Battle = (() => {
   }
   // カウントの今の段階（0〜2 ＝「3」「2」「1」、3 ＝「出撃！」）
   const holdOn = () => enemies.some(e => e.hold && e.hp > 0);   // 1語目を待っているあいだ（弾も虫も出さない。台本も進めない）
-  const countStepNo = () => Math.min(3, Math.floor(countT / BATTLE.countStep));
+  // 扉を出す（11/7-19）: 発見の旅・救出の旅の前。救出の旅の曲は扉の時点から鳴らす（発見の旅の曲は、ステージに入ったときから鳴っている）
+  function openDoor() {
+    sortieStep = "door"; door = { t: 0, go: null, popped: false };
+    if (sortieNo === 2) music("rescue");
+  }
   const roundInterval = () => phase === "round1" ? BATTLE.roundInterval1 : BATTLE.roundInterval2 * ((opts.stage && opts.stage.rescueLen) || 1);   // rescueLen ＝ 救出の旅の長さの倍率（11/1-3 決定: 3つ目 1.25、4つ目 1.5。ことばの出る間隔を広げる）
   // 坂: 今の出撃の弾の量の倍率（大きいほど撃つ間隔が短い）
   const fireRamp = () => Math.max(0.1, (BATTLE.ramp[phase] || BATTLE.ramp.round2).fire);
@@ -1040,8 +1044,7 @@ const Battle = (() => {
   // 出撃の画面をタップ: 出撃する
   function startSortie() {
     state = "play";
-    retryMain = false;
-    Sound.se("start");
+    retryMain = false;   // （出発の音は、扉を押したときの「ぱっ」。11/7-19）
     if (sortieNo === 1) {
       player.x = W / 2; player.y = H - 70;   // 1回目の旅: ふわりは下のまん中で待つ（動かない・撃たない）
       // （始まりのふわりの一言は、表紙と案内に同じことがあるので出さない。10/25-1）
@@ -1369,14 +1372,13 @@ const Battle = (() => {
     if (tut) { tut.t += realDt; return; }   // チュートリアルの案内のあいだは止まる
     if (state === "sortie") {   // 出撃の画面のあいだは止まっている
       // （持ち物選択の時間制限は、10/25-14 になくした。選ぶまで待つ）
-      if (sortieStep === "count") {
-        const prev = countStepNo();
-        countT += realDt;
-        if (countT >= BATTLE.countStep * 3 + BATTLE.countGo) startSortie();
-        else if (countStepNo() !== prev && countStepNo() < 3) Sound.se("odai");
+      if (sortieStep === "door" && door && Door.step(door, realDt, sortieNo === 1 ? "explore" : "rescue", W, H)) {   // 押して光が広がりきった（10秒で自動）
+        door = null; doorFade = BATTLE.doorFade;
+        startSortie();
       }
       return;
     }
+    doorFade = Math.max(0, doorFade - realDt);
     // 本番が始まったら、コクピットの枠が外れていく
     stripFlash = Math.max(0, stripFlash - realDt);
     // 吸い込む瞬間は、画面全体がゆっくりになる
@@ -3071,6 +3073,7 @@ const Battle = (() => {
     // 状態の文字
     if (hintCard) drawHintCard();
     if (state === "sortie") drawSortie();
+    if (doorFade > 0) { ctx.fillStyle = `rgba(255,253,240,${doorFade / BATTLE.doorFade})`; ctx.fillRect(0, 0, W, H); }   // 扉から入ったあとの白い光が消えていく
     if (tut) drawTut();
     if (state === "clear") centerText(`${absorbed.length}のことばを助けた！`, `${score}点`);
     if (paused) drawSleep();
@@ -4198,7 +4201,7 @@ const Battle = (() => {
     ctx.fillRect(0, 0, W, H);
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     if (sortieNo === 2 && sortieStep === "say") drawChoiceSay();
-    else if (sortieNo === 2 && sortieStep === "choice") drawChoice(); else drawCover();
+    else if (sortieNo === 2 && sortieStep === "choice") drawChoice(); else if (door) drawDoor();
     ctx.restore();
   }
 
@@ -4347,6 +4350,7 @@ const Battle = (() => {
     if (banner) drawBanner();
     if (hintCard) drawHintCard();
     if (state === "sortie") drawSortie();
+    if (doorFade > 0) { ctx.fillStyle = `rgba(255,253,240,${doorFade / BATTLE.doorFade})`; ctx.fillRect(0, 0, W, H); }   // 扉から入ったあとの白い光が消えていく
     if (tut) drawTut();
     if (paused) drawSleep();
   }
@@ -4547,6 +4551,7 @@ const Battle = (() => {
     if (banner) drawBanner();
     if (hintCard) drawHintCard();
     if (state === "sortie") drawSortie();
+    if (doorFade > 0) { ctx.fillStyle = `rgba(255,253,240,${doorFade / BATTLE.doorFade})`; ctx.fillRect(0, 0, W, H); }   // 扉から入ったあとの白い光が消えていく
     if (tut) drawTut();
     if (paused) drawSleep();
   }
@@ -4600,58 +4605,14 @@ const Battle = (() => {
     ctx.drawImage(img, x, y, w, h);
   }
 
-  // 旅の表紙（仮の見た目）: 大きく旅の名前と見出し、ふわりの一言。タップで 3・2・1・「○○の旅へ、出発！」
-  function drawCover() {
-    const trip = window.TEXTS.trips[sortieNo], green = sortieNo === 1;
-    const main = green ? tint("#48693a") : "#b0801a", accent = green ? tint("#6f9a4a") : "#c98a1e", line = green ? tint("#9cbf7c") : "#e0b03a";   // 発見の旅の表紙は世界の色（11/7-16）。救出の旅の表紙は金色のまま
-    ctx.fillStyle = green ? tint("rgba(225,238,212,0.6)") : "rgba(255,240,200,0.6)"; ctx.fillRect(0, 0, W, H);
-    const cy = H * 0.34;
-    if (sortieStep === "cover") {
-      ctx.font = font(15); ctx.fillStyle = green ? tint("#7a8a68") : "#9a7a40";
-      ctx.fillText(opts.stageName, W / 2, cy - 128);   // 見出しのふりがなと重ならないように（10/25-5）
-      let fs = 50; ctx.font = font(fs);
-      while (ctx.measureText(trip.name).width > W - 40 && fs > 30) { fs -= 2; ctx.font = font(fs); }
-      drawHeading(trip.name, trip.kana, W / 2, cy - 56, fs, main);
-      // チュートリアルのステージ（ステージ1）: 発見の旅の表紙の見出しのすぐ下に1行（毎回。10/25-10）。そのぶん下の文を下げる
-      const tut = sortieNo === 1 && opts.stage && opts.stage.tutorial ? wrapTextFont(tx("tutorial.cover"), 15, W - 40) : [];
-      if (tut.length) {
-        ctx.font = font(15); ctx.fillStyle = tint("#6f9a4a");
-        tut.forEach((l, i) => ctx.fillText(l, W / 2, cy - 14 + i * 18));
-      }
-      const dy = tut.length ? tut.length * 18 + 8 : 0;
-      if (trip.sub) {   // 見出しの下の1行（毎回。長ければ2行）
-        ctx.font = font(15); ctx.fillStyle = green ? tint("#4b5e3a") : "#7a6a40";
-        wrapText(trip.sub, W - 48).forEach((l, i, a) => ctx.fillText(l, W / 2, cy + 2 + dy + (i - (a.length - 1) / 2) * 20));
-      }
-      // ふわり（仮の絵）と吹き出し（表紙の文）
-      ctx.font = font(16);
-      // {sec} ＝ そのステージの発見の旅の基準の時間（stages.js の値。10/25-21）
-      const lines = trip.cover.replace("{sec}", Math.round(BATTLE.exploreTime)).split("\n").flatMap(t => wrapText(t, W - 110)),   // \n で改行（10/31-3）
-            bw = W - 92, bh = lines.length * 22 + 20, bx = 70, by = cy + 40 + dy;
-      drawFuwariArt(1, 40, by + bh / 2, 50);   // セリフの横の小さなふわり（1のコマ）
-      ctx.fillStyle = "rgba(255,253,245,0.97)"; ctx.strokeStyle = line; ctx.lineWidth = 2;
-      roundRect(bx, by, bw, bh, 14); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = green ? tint("#3f5a30") : "#6b4a10";
-      lines.forEach((l, i) => ctx.fillText(l, bx + bw / 2, by + 21 + i * 22));
-      if (sortieNo === 1) drawHero("point", 8, H - H / 3 - 8, H / 3);   // 発見の旅の表紙: 主人公の「指さす」絵（左下）
-      ctx.globalAlpha = 0.6 + Math.sin(performance.now() / 250) * 0.4;
-      ctx.font = font(22); ctx.fillStyle = accent;
-      ctx.fillText(tx("tapToGo"), W / 2, by + bh + 70);
-      ctx.globalAlpha = 1;
-      return;
-    }
-    // カウント
-    const n = countStepNo(), local = n < 3 ? (countT % BATTLE.countStep) / BATTLE.countStep : (countT - BATTLE.countStep * 3) / BATTLE.countGo;
-    const txt = n < 3 ? String(3 - n) : window.TEXTS.trips[sortieNo].go;   // 「発見の旅へ、出発！」（2行）
-    ctx.save();
-    ctx.globalAlpha = Math.max(0, 1 - local * 0.6);
-    ctx.font = font(n < 3 ? 110 : 40);
-    const sc = 1.4 - Math.min(1, local * 3) * 0.4;
-    ctx.translate(W / 2, H * 0.42); ctx.scale(n < 3 ? sc : Math.min(sc, 1.15), n < 3 ? sc : Math.min(sc, 1.15));
-    ctx.lineWidth = 10; ctx.strokeStyle = "#ffffff"; ctx.lineJoin = "round";
-    ctx.fillStyle = n < 3 ? main : "#e07a3a";
-    txt.split("\n").forEach((l, i, a) => { const yy = (i - (a.length - 1) / 2) * 50; ctx.strokeText(l, 0, yy); ctx.fillText(l, 0, yy); });
-    ctx.restore();
+  // 扉（11/7-19）: 「発見の旅へ、出発！」「救出の旅へ、出発！」。描き方は js/door.js。旅の表紙にあった一言（目安の秒など）を小さくそえる
+  function drawDoor() {
+    const trip = window.TEXTS.trips[sortieNo];
+    ctx.font = font(15);
+    const sub = [];
+    if (sortieNo === 1 && opts.stage && opts.stage.tutorial) sub.push(...wrapText(tx("tutorial.cover"), W - 40));   // ステージ1: やり方をおぼえようの1行
+    if (trip.cover) sub.push(...trip.cover.replace("{sec}", Math.round(BATTLE.exploreTime)).split("\n").flatMap(t => wrapText(t, W - 40)));
+    Door.draw(ctx, W, H, door.t, { kind: sortieNo === 1 ? "explore" : "rescue", world: worldDef.id, stageId: opts.stage ? opts.stage.id : "", stageName: opts.stageName, sub, tap: tx("tapToGo"), go: door.go, goX: door.goX, goY: door.goY });
   }
 
   // 救出の旅の前のふわりの一言（10/25-5）: 持ち物選択の前に、画面の真ん中に単独で出す。タップで持ち物選択へ

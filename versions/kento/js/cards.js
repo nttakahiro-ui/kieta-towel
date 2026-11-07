@@ -3,18 +3,7 @@ const CARDS = {
   clearCount: 7,   // ステージクリアに必要なカードの枚数（7割）
 };
 
-// バトルの点数によるランク（仮）。min 点以上でそのランク
-const RANKS = [
-  { min: 0,     name: "タオル見習い" },
-  { min: 20000, name: "タオル職人" },
-  { min: 30000, name: "タオル名人" },
-  { min: 40000, name: "タオル博士" },
-];
-function rankOf(score) {
-  let r = RANKS[0];
-  for (const x of RANKS) if (score >= x.min) r = x;
-  return r;
-}
+// （バトルの点数によるランクは 11/7-19 にやめた。結果画面は点数と「カード ○/10」「取り逃し ○こ」だけ）
 
 const Cards = (() => {
   const $ = id => document.getElementById(id);
@@ -143,11 +132,11 @@ const Cards = (() => {
     if (o.stats) {
       const st = o.stats;
       $("cards-summary").innerHTML = [tx("results.summary", { hits: st.hits }), st.downs ? tx("results.summaryDown", { n: st.downs }) : "", st.gameOvers ? tx("results.summaryRetry", { n: st.gameOvers }) : "", tx("results.summaryCombo", { n: st.maxCombo })].filter(Boolean).map(s => phraseHTML(s)).join("　");   // バトルの時間は出さない（調整パネルの中だけ）
-      // 点数とランク
-      const r = rankOf(st.score);
+      // 点数と、「カード ○/10」「取り逃し ○こ」（11/7-19: ランクのかわり。取り逃しが1こ以上なら赤）
       const sc = document.createElement("div"); sc.className = "rank-score"; sc.textContent = `${st.score} 点`;
-      const nm = document.createElement("div"); nm.className = "rank-name"; nm.innerHTML = phraseHTML(`ランク：${r.name}`);
-      if (st.missN) { const mp = document.createElement("div"); mp.className = "miss-penalty"; mp.innerHTML = phraseHTML(tx("results.missPenalty", { n: st.missN, pts: st.missN * st.missPts })); rk.append(mp); }   // 取り逃しの減点（11/7-10。赤）
+      const nm = document.createElement("div"); nm.className = "rank-line";
+      const miss = st.missN || 0;
+      nm.innerHTML = `<span>${phraseHTML(tx("results.cardsLine", { got: ownedCount, n: o.words.length }))}</span><span class="${miss ? "miss" : ""}">${phraseHTML(tx("results.missLine", { n: miss }))}</span>`;
       rk.append(sc, nm);
       // ベスト更新と、今回とれた印
       if (o.record) {

@@ -32,7 +32,7 @@ function align(surface, reading) {
 
 const tokenizer = await new Promise((ok, ng) => kuromoji.builder({ dicPath: path.join(path.dirname(require.resolve("kuromoji")), "../dict") }).build((e, t) => e ? ng(e) : ok(t)));
 // 辞書がまちがえる・読めない語（手で入れた読み）。一覧では「手で入れた」と出る
-const MANUAL = { "吸水速乾": "きゅうすいそっかん", "綿あめ": "わたあめ", "後染め": "あとぞめ", "強撚り": "つよより", "後晒し": "あとざらし", "日本独特": "にほんどくとく", "混打綿": "こんだめん", "混綿": "こんめん", "梳綿": "そめん" };
+const MANUAL = { "吸水速乾": "きゅうすいそっかん", "綿あめ": "わたあめ", "後染め": "あとぞめ", "強撚糸": "きょうねんし", "後晒し": "あとざらし", "日本独特": "にほんどくとく", "混打綿": "こんだめん", "混綿": "こんめん", "梳綿": "そめん" };
 const byWord = [...WORDS.map(w => ({ word: w.word, kana: w.kana, src: "120語の kana" })), ...Object.entries(MANUAL).map(([word, kana]) => ({ word, kana, src: "手で入れた" }))]
   .sort((a, b) => b.word.length - a.word.length);
 

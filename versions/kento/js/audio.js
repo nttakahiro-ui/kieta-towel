@@ -685,6 +685,19 @@ const Sound = (() => {
     } else if (name === "item") {    // 綿のたねを拾う
       tone(freq("G5"), t, 0.15, "sine", 0.25);
       tone(freq("D6"), t + 0.06, 0.25, "sine", 0.25);
+    } else if (name === "doorExplore") {   // 扉（11/7-19）: 発見の旅「キラッ」（高い音がきらきらと上がる）
+      ["E6", "B6", "E7", "G#7"].forEach((n, i) => tone(freq(n), t + i * 0.045, 0.45 - i * 0.05, "sine", 0.2));
+      sweep(2400, 5200, 0.25, "triangle", 0.05, 0.05);
+    } else if (name === "doorRescue") {    // 扉: 救出の旅「ドン」（低く重い音と、上にひびく和音）
+      sweep(150, 42, 0.45, "sine", 0.9);
+      sweep(320, 90, 0.18, "triangle", 0.35);
+      ["C5", "G5", "C6"].forEach(n => tone(freq(n), t + 0.04, 0.5, "triangle", 0.14));
+    } else if (name === "doorQuiz") {      // 扉: クイズ「ジャーン」（明るい和音をのばす）
+      ["C5", "E5", "G5", "C6", "E6"].forEach((n, i) => { tone(freq(n), t + i * 0.012, 1.1, "sawtooth", 0.05); tone(freq(n), t + i * 0.012, 1.2, "triangle", 0.13); });
+      sweep(200, 60, 0.3, "sine", 0.5);
+    } else if (name === "doorGo") {        // 扉を押した: 光がぱっと広がる
+      sweep(500, 2200, 0.3, "sine", 0.18);
+      ["G6", "C7"].forEach((n, i) => tone(freq(n), t + 0.08 + i * 0.05, 0.35, "sine", 0.12));
     } else if (name === "start") {
       tone(freq("C5"), t, 0.3, "triangle", 0.35);
       tone(freq("G5"), t + 0.1, 0.4, "triangle", 0.35);

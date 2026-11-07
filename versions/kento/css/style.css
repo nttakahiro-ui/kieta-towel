@@ -54,6 +54,11 @@ body { position: fixed; inset: 0; }
 .screen.active { display: block; }
 .screen.scroll { overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
 .hidden { display: none !important; }
+/* 扉（11/7-19）: 画面いっぱいの絵。扉から入ったあとの白い光 */
+#screen-door { padding: 0; }
+.door-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.door-fade { position: absolute; inset: 0; background: #fffdf0; pointer-events: none; z-index: 50; animation: doorFade .35s ease-out both; }
+@keyframes doorFade { from { opacity: 1; } to { opacity: 0; } }
 
 /* ボタン */
 .btn {
@@ -283,14 +288,17 @@ body { position: fixed; inset: 0; }
 .marks-now { margin-top: 8px; }
 .marks-now .mark { font-size: 13px; padding: 3px 10px; }
 
-/* 点数とランク */
+/* 点数と「カード ○/10　取り逃し ○こ」（ランクは 11/7-19 にやめた） */
 .cards-rank { margin: 4px 0 6px; }
 .rank-score { font-size: 30px; font-weight: bold; color: #c98a1e; }
-.rank-name {
-  display: inline-block; margin-top: 4px; font-size: 20px; color: var(--white);
+/* 11/7-19: ランクのかわりの「カード ○/10　取り逃し ○こ」（前のランクの札と同じ形） */
+.rank-line {
+  display: inline-flex; gap: 1em; margin-top: 4px; font-size: 18px; color: var(--white);
   background: var(--green); border-radius: 999px; padding: 6px 18px;
   animation: rank-in .5s ease-out both;
 }
+.rank-line .miss { color: #ffd6dc; }
+#cards-p2 .rank-line { font-size: 15px; padding: 4px 14px; }
 @keyframes rank-in { from { transform: scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
 
 /* カード */
@@ -611,7 +619,6 @@ body { position: fixed; inset: 0; }
 .cards-list.compact .card .new { font-size: 10px; }
 #cards-p2 .cards-rank { margin-top: 8px; }
 #cards-p2 .rank-score { font-size: 22px; }
-#cards-p2 .rank-name { font-size: 15px; padding: 4px 14px; }
 #cards-p2 .marks-now .mark { font-size: 11px; }
 #cards-p2 .cards-summary { margin: 4px 0 0; }
 

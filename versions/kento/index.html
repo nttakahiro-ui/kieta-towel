@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap">
-  <link rel="stylesheet" href="css/style.css?v=98">
+  <link rel="stylesheet" href="css/style.css?v=99">
 </head>
 <body>
   <div id="app">
@@ -116,6 +116,9 @@
     <section id="screen-quizintro" class="screen">
       <div class="quizintro-box"><p id="quizintro-text" class="quizintro-text"></p><p id="quizintro-tap" class="intro-tap"></p></div>
     </section>
+
+    <!-- クイズの扉（11/7-19）: 「クイズに、ちょうせん！」。描き方は js/door.js（発見の旅・救出の旅の扉と同じ） -->
+    <section id="screen-door" class="screen"><canvas id="door-canvas" class="door-canvas"></canvas></section>
 
     <!-- クイズ -->
     <section id="screen-quiz" class="screen scroll">
@@ -288,16 +291,17 @@
   <!-- 横向きのとき -->
   <div id="rotate"><div><div class="rotate-icon"></div><p>縦にしてね</p></div></div>
 
-  <script src="data/words.js?v=98"></script>
-  <script src="data/stages.js?v=98"></script>
-  <script src="data/texts.js?v=98"></script>
-  <script src="data/ruby.js?v=98"></script>
-  <script src="js/ruby.js?v=98"></script>
-  <script src="js/audio.js?v=98"></script>
-  <script src="js/game.js?v=98"></script>
-  <script src="js/quiz.js?v=98"></script>
-  <script src="js/cards.js?v=98"></script>
-  <script src="js/recipebook.js?v=98"></script>
-  <script src="js/main.js?v=98"></script>
+  <script src="data/words.js?v=99"></script>
+  <script src="data/stages.js?v=99"></script>
+  <script src="data/texts.js?v=99"></script>
+  <script src="data/ruby.js?v=99"></script>
+  <script src="js/ruby.js?v=99"></script>
+  <script src="js/audio.js?v=99"></script>
+  <script src="js/door.js?v=99"></script>
+  <script src="js/game.js?v=99"></script>
+  <script src="js/quiz.js?v=99"></script>
+  <script src="js/cards.js?v=99"></script>
+  <script src="js/recipebook.js?v=99"></script>
+  <script src="js/main.js?v=99"></script>
 </body>
 </html>
