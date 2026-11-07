@@ -2104,11 +2104,11 @@ const Battle = (() => {
   // 世界3「どっち？」（10/31-10 試作）: stages.js の which: true のステージで、choices が2つ、1つ目が本物のことば（かっこの中をのぞいて同じ）のときだけ。
   //   2つ目のことばを、もう1つの候補にする（同じステージにあることばなら、それを使う）。そうでないときは世界1と同じ「どれ？」
   const plainWord = c => String(c).replace(/[（(][^）)]*[）)]/g, "").trim();
+  //   11/7-11 決定: 世界1・2もすべて、正解の語とCSVの「はずれ」の2択（自動で選ぶ odaiDummies は使わない）。ボスの問い（bossQ）のある中ボスは、はずれも bossMiss
   function whichPair(real) {
-    if (!(opts.stage && opts.stage.which)) return null;
     const ch = real.choices || [];
-    if (ch.length !== 2 || plainWord(ch[0]) !== real.word || !/[?？]\s*$/.test(real.question || "")) return null;
-    const other = plainWord(ch[1]);
+    const other = real.bossQ && real.bossMiss ? real.bossMiss : ch.length === 2 && plainWord(ch[0]) === real.word ? plainWord(ch[1]) : null;
+    if (!other) return null;
     return opts.words.find(w => w.word === other) || { id: -110, stage: real.stage, word: other, kana: "", hp: 1, role: "zako", order: 0 };
   }
   // 場面の曲へ0.5秒で替える（stages.js の WORLDS の music。11/3-4）
@@ -2119,13 +2119,13 @@ const Battle = (() => {
     if (phase !== "round1") fillGauge();   // 中ボス・大ボスが出た瞬間に、ゲージが満タン（11/6-6）
     const role = isBoss ? "boss" : "mid";
     const seq = isBoss && orderSet(real);   // 大ボス「3つを順に」
-    const prev = !isBoss && nextPrev(real);   // 中ボス「次は？」（世界2。10/31-10 試作）: 1つ前の工程
+    const prev = !isBoss && !real.bossQ && nextPrev(real);   // ボスの問いのある中ボスは「次は？」にしない（11/7-11）   // 中ボス「次は？」（世界2。10/31-10 試作）: 1つ前の工程
     const pair = !seq && !prev && whichPair(real);   // 世界3「どっち？」
     const after = prev && nextAfter(real, prev);   // 「次は？」は2択（10/31-13 決定）: 正解と、工程の順で1つあとのことば
     const cands = seq ? shuffle(seq.slice()) : pair ? shuffle([real, pair]) : after ? shuffle([real, after]) : shuffle([real, ...odaiDummies(real, prev)]);   // ならびは毎回入れかえ
     // 3つとも同じ大きさ（いちばん長い語句が、縦書きで画面に入る大きさ。24px より小さくしない）
     clearMsgs(9); msgQ = [];   // お題が始まるときは、出ているメッセージと待っているものを、すべて消してから問題文を出す
-    const q = seq ? tx("odaiForm.orderLead." + opts.stage.id) : pair ? real.question.replace(/[?？]\s*$/, "") + tx("odaiForm.which") : prev ? tx("odaiForm.next", { prev: prev.word + (hasKanji(prev.word) && prev.kana ? `（${prev.kana}）` : "") }) : (real.odaiQuestion || real.question);
+    const q = seq ? (real.bossQ ? real.bossQ + tx("odaiForm.orderTail") : tx("odaiForm.orderLead." + opts.stage.id)) : pair && real.bossQ ? real.bossQ : pair ? (/は[?？]\s*$/.test(real.question) ? real.question.replace(/[?？]\s*$/, "") + tx("odaiForm.which") : real.question) :   /* 「〜は？」だけ「〜はどっち？」に。「何という？」などはそのまま（11/7-11） */ prev ? tx("odaiForm.next", { prev: prev.word + (hasKanji(prev.word) && prev.kana ? `（${prev.kana}）` : "") }) : (real.odaiQuestion || real.question);
     // 問題文を読む時間（10/25-16）: 文の長さに合わせる。1文字あたり odaiReadPerChar 秒＋odaiReadBase 秒（最短 odaiReadMin、最長 odaiReadMax）
     const read = Math.min(BATTLE.odaiReadMax, Math.max(BATTLE.odaiReadMin, Array.from(q).length * BATTLE.odaiReadPerChar + BATTLE.odaiReadBase));
     odai = { real, boss: isBoss, t: 0, intro: read, firstHit: null, q, wrongRun: 0, mode: seq ? "order" : "pick", step: 0, show: 0, slip: false, seq: seq || null, cols: pair || after ? 2 : 3 };
