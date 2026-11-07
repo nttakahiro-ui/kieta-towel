@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap">
-  <link rel="stylesheet" href="css/style.css?v=108">
+  <link rel="stylesheet" href="css/style.css?v=109">
 </head>
 <body>
   <div id="app">
@@ -122,16 +122,16 @@
 
     <!-- クイズ -->
     <section id="screen-quiz" class="screen scroll">
+      <!-- 11/7-27: 上から「手に入れたカードの置き場」→「タイムバー」→「問題文」→「選択肢2つ」。375×667 でスクロールなしに入るように -->
       <div class="quiz-box">
-        <div id="quiz-time" class="quiz-time"><i></i></div>
-        <div class="quiz-head"><span id="quiz-count"></span><span id="quiz-dots" class="quiz-dots"></span><button id="btn-quiz-quit" class="link-btn quiz-quit">とちゅうでやめる</button></div>
-        <div class="fuwari-talk"><img id="quiz-hero" class="hero-img hero-small" alt=""><span class="fuwari-icon"></span><p id="quiz-say" class="say">助けたことばを思い出そう！</p></div>
+        <div id="quiz-slots" class="quiz-slots"></div>
+        <div class="quiz-bar-row"><span id="quiz-count"></span><div id="quiz-time" class="quiz-time"><i></i></div><button id="btn-quiz-quit" class="link-btn quiz-quit">とちゅうでやめる</button></div>
         <p id="quiz-question" class="quiz-question"></p>
-        <div class="quiz-get-anchor"><div id="quiz-get" class="quiz-get hidden"></div></div>
         <div id="quiz-choices" class="quiz-choices"></div>
-        <div id="quiz-feedback" class="quiz-feedback hidden"></div>
-
+        <div class="fuwari-talk quiz-talk"><img id="quiz-hero" class="hero-img hero-tiny" alt=""><p id="quiz-say" class="say">助けたことばを思い出そう！</p></div>
       </div>
+      <div id="quiz-get" class="quiz-get-fly hidden"></div>
+      <div id="quiz-feedback" class="quiz-feedback hidden"></div>
     </section>
 
     <!-- カード -->
@@ -291,17 +291,17 @@
   <!-- 横向きのとき -->
   <div id="rotate"><div><div class="rotate-icon"></div><p>縦にしてね</p></div></div>
 
-  <script src="data/words.js?v=108"></script>
-  <script src="data/stages.js?v=108"></script>
-  <script src="data/texts.js?v=108"></script>
-  <script src="data/ruby.js?v=108"></script>
-  <script src="js/ruby.js?v=108"></script>
-  <script src="js/audio.js?v=108"></script>
-  <script src="js/door.js?v=108"></script>
-  <script src="js/game.js?v=108"></script>
-  <script src="js/quiz.js?v=108"></script>
-  <script src="js/cards.js?v=108"></script>
-  <script src="js/recipebook.js?v=108"></script>
-  <script src="js/main.js?v=108"></script>
+  <script src="data/words.js?v=109"></script>
+  <script src="data/stages.js?v=109"></script>
+  <script src="data/texts.js?v=109"></script>
+  <script src="data/ruby.js?v=109"></script>
+  <script src="js/ruby.js?v=109"></script>
+  <script src="js/audio.js?v=109"></script>
+  <script src="js/door.js?v=109"></script>
+  <script src="js/game.js?v=109"></script>
+  <script src="js/quiz.js?v=109"></script>
+  <script src="js/cards.js?v=109"></script>
+  <script src="js/recipebook.js?v=109"></script>
+  <script src="js/main.js?v=109"></script>
 </body>
 </html>

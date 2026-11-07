@@ -773,3 +773,36 @@ rt { font-size: 0.5em; font-weight: normal; line-height: 1; letter-spacing: 0; c
 .quiz-feedback { line-height: 1.85; }
 .card .m { line-height: 1.8; }
 .cards-next p { line-height: 1.8; }
+
+/* クイズの並び（11/7-27 決定）: 上から カードの置き場 → タイムバー → 問題文 → 選択肢2つ。375×667 でスクロールなしに入るように */
+#screen-quiz { padding-top: max(10px, env(safe-area-inset-top)); }
+.quiz-slots { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; margin: 0 0 8px; padding: 5px; background: rgba(255,253,245,0.85); border-radius: 12px; border: 2px solid var(--green-light); }
+.quiz-slots .slot { position: relative; aspect-ratio: 3 / 4; border-radius: 5px; border: 1.5px dashed #c9d8b4; background: #fbf8ee; overflow: hidden; }
+.quiz-slots .slot.q { border-color: #e0b03a; background: #fff8e2; }   /* このクイズで手に入るかもしれない枠 */
+.quiz-slots .slot.had { border-style: solid; border-color: #c9d8b4; opacity: .55; }   /* 前から持っているカード */
+.quiz-slots .slot.got { border-style: solid; border-color: #e0b03a; opacity: 1; animation: slotGot .5s ease-out both; }
+.quiz-slots .slot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.quiz-slots .slot .t { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; color: var(--green-dark); line-height: 1.1; text-align: center; word-break: break-all; }
+@keyframes slotGot { 0% { transform: scale(1.5); box-shadow: 0 0 14px 6px rgba(255,220,110,.95); } 100% { transform: none; box-shadow: 0 0 0 rgba(255,220,110,0); } }
+.quiz-bar-row { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; }
+.quiz-bar-row .quiz-time { flex: 1; position: static; margin: 0; }
+.quiz-bar-row #quiz-count { font-size: 14px; color: var(--green-dark); }
+.quiz-bar-row .quiz-quit { font-size: 11px; opacity: .8; margin: 0; white-space: nowrap; flex-shrink: 0; }
+#screen-quiz .quiz-question { padding: 14px 16px; margin: 0 0 12px; min-height: 0; }
+#screen-quiz .quiz-choices { gap: 10px; }
+#screen-quiz .choice { padding: 14px 18px; }
+.quiz-talk { margin: 10px 0 0; }
+.quiz-talk .say { font-size: 14px; min-height: 0; padding: 7px 12px; }
+.hero-tiny { width: 34px; height: 60px; flex: none; margin-right: 6px; }
+/* まちがえたとき: 正解とメモは、画面の下に重ねて出す（スクロールしないように） */
+#screen-quiz .quiz-feedback { position: absolute; left: 12px; right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); margin: 0; z-index: 6; box-shadow: 0 6px 24px rgba(60,50,20,.25); animation: fbUp .25s ease-out both; max-height: 60%; overflow-y: auto; }
+@keyframes fbUp { from { transform: translateY(30px); opacity: 0; } to { transform: none; opacity: 1; } }
+/* 正解: カードが絵つきで大きく中央に出て（カード図鑑と同じ見た目）、1秒見せてから上の帯の自分の枠へ飛ぶ */
+.quiz-get-fly { position: absolute; inset: 0; z-index: 8; pointer-events: none; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(255,250,232,.55); }
+.quiz-get-fly .get-label { font-size: 24px; font-weight: bold; color: #b0801a; margin-bottom: 10px; text-shadow: 0 0 8px #fff, 0 0 8px #fff; transition: opacity .25s; }
+.quiz-get-fly .card { width: 190px; box-sizing: border-box; text-align: center; padding: 10px 10px 12px; border-color: #e0b03a; animation: cardShine 1.0s ease-out both; transform-origin: center center; }
+.quiz-get-fly .card .pic { max-width: none; width: 100%; }
+.quiz-get-fly .card .w { font-size: 24px; margin: 0; }
+.quiz-get-fly .card .w .kn { font-size: 12px; }
+.quiz-get-fly.fly { background: rgba(255,250,232,0); transition: background .4s; }
+.quiz-get-fly.fly .get-label { opacity: 0; }

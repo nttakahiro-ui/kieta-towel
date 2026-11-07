@@ -5,7 +5,9 @@ const QUIZ = {
   tempoUpAt: { 2: 140 / 128, 7: 152 / 128 },   // 何問目（0から数える）で音楽のテンポを上げるか。3問目と8問目（11/3-6: クイズの曲 128 → 140 → 152）
   timeLimit: 25,                     // 1問の制限時間（秒。11/7-4 決定）。時間切れは、まちがえたときと同じ（正解を見せて、受け直しに回る）
   warnAt: 5,                         // 残りこの秒数で、バーが赤くなり「カチカチ」が鳴る（1秒ごと）
-  nextDelay: 1.6,                    // 正解のあと、次の問題へ進むまでの秒数（10/25-1: カードゲットの演出を見せるため 1.1 → 1.6）
+  nextDelay: 2.1,                    // 正解のあと、次の問題へ進むまでの秒数（10/25-1: 1.1 → 1.6。11/7-27: カードが中央に出て帯へ飛ぶので 2.1）
+  getShow: 1.25,                     // 正解のカードを中央に見せる秒数（出てくる0.25秒＋見せる1秒。11/7-27）
+  getFly: 0.5,                       //   そのあと、上の帯の自分の枠へ小さくなって飛ぶ秒数
 };
 
 // ふわりのセリフ（仮）。data/words.js の sayCorrect / sayWrong が空のときは、この中からえらぶ
@@ -20,15 +22,20 @@ const FUWARI_SAY = {
 const pick = a => a[Math.floor(Math.random() * a.length)];
 
 const Quiz = (() => {
-  let list = [], idx = 0, results = [], onEnd = null, locked = false, streak = 0, preview = false, previewTimer = 0;
+  let list = [], idx = 0, results = [], onEnd = null, locked = false, streak = 0, preview = false, previewTimer = 0, flyTimers = [];
+  let slotWords = [], owned = {};   // 上の帯（11/7-27）: そのステージの10のことば（順に）と、クイズの前から持っているカード
   let timer = null;   // 制限時間 { left: 残り秒, last: 前の時刻, tick: 次に「カチ」を鳴らす残り秒, raf }
   const $ = id => document.getElementById(id);
 
   // words: 吸い込んだ順の語句、end(results): 終わったときに呼ぶ。results は [{ id, correct }]
   // o.preview: 受け直しクイズ（出題の前に、その語句のカードを3秒見せる）
+  // o.slots: そのステージの10のことば（上の帯の枠。11/7-27）、o.owned: クイズの前から持っているカード（id → true）
   function start(words, end, o) {
     list = words; idx = 0; results = []; onEnd = end; streak = 0; preview = !!(o && o.preview);
-    clearTimeout(previewTimer); stopTimer();
+    slotWords = ((o && o.slots) || words).slice().sort((a, b) => (a.order || 0) - (b.order || 0)); owned = Object.assign({}, (o && o.owned) || {});
+    clearTimeout(previewTimer); stopTimer(); flyTimers.forEach(clearTimeout); flyTimers = [];
+    $("quiz-get").classList.add("hidden"); $("quiz-feedback").classList.add("hidden");
+    slots();
     Sound.play("quiz");
     Sound.setTempo(1);
     say(pick(FUWARI_SAY.start));
@@ -42,16 +49,25 @@ const Quiz = (() => {
 
   function say(text) { $("quiz-say").textContent = text; }
 
-  function dots() {
-    const box = $("quiz-dots");
+  // 上の帯（11/7-27）: そのステージの10枚ぶんの枠。前から持っているカードはうすく、このクイズで手に入るかもしれない枠は黄色
+  function slots() {
+    const box = $("quiz-slots");
     box.innerHTML = "";
-    list.forEach((_, i) => {
-      const d = document.createElement("i");
-      if (results[i]) d.className = results[i].correct ? "ok" : "ng";
-      if (i === idx) d.className += " now";
+    const qIds = new Set(list.map(w => w.id));
+    slotWords.forEach(w => {
+      const d = document.createElement("div"); d.className = "slot"; d.dataset.id = w.id;
+      if (owned[w.id]) { d.classList.add("had"); fillSlot(d, w); }
+      else if (qIds.has(w.id)) d.classList.add("q");
       box.appendChild(d);
     });
   }
+  function fillSlot(d, w) {
+    d.innerHTML = "";
+    const src = Cards.artSrc(w);
+    if (src) { const im = document.createElement("img"); im.alt = ""; im.src = src; im.onerror = () => { im.remove(); fillText(d, w); }; d.appendChild(im); }
+    else fillText(d, w);
+  }
+  function fillText(d, w) { const t = document.createElement("span"); t.className = "t"; t.textContent = w.word.replace(/\([^)]*\)/g, "").slice(0, 4); d.appendChild(t); }
 
   function show() {
     if (idx >= list.length) { onEnd(results); return; }
@@ -59,8 +75,7 @@ const Quiz = (() => {
     if (idx === list.length - 1 && idx > 0) say(pick(FUWARI_SAY.last));
     const w = list[idx];
     locked = false;
-    $("quiz-count").textContent = `クイズ ${idx + 1} / ${list.length}`;
-    dots();
+    $("quiz-count").textContent = `${idx + 1} / ${list.length}`;
     $("quiz-feedback").classList.add("hidden");
     stopTimer(); setBar(1, false); $("quiz-time").classList.add("off");   // （受け直しのカードを見せているあいだは、バーを出さない）
     const box = $("quiz-choices");
@@ -134,24 +149,37 @@ const Quiz = (() => {
       b.disabled = true;
       if (Number(b.dataset.i) === w.answer) b.classList.add("correct");
     });
-    dots();
     if (ok) {
       Sound.se("correct");
       setTimeout(() => Sound.se("card"), 250);
       streak++;
       say(w.sayCorrect || (streak >= 3 ? pick(FUWARI_SAY.streak).replace("{n}", streak) : pick(FUWARI_SAY.correct)));
-      // 正解した語句がカードになる
+      // 正解した語句がカードになる（11/7-27）: カードが絵つきで大きく中央に出て（カード図鑑と同じ見た目）、1秒ほど見せてから、上の帯の自分の枠へ小さくなって飛ぶ
       const get = $("quiz-get");
-      // カードゲット（10/25-1）: 「カードゲット！」と、そのことばのカードが光る（毎回）
-      get.innerHTML = "";
+      get.innerHTML = ""; get.classList.remove("fly");
       const lb = document.createElement("div"); lb.className = "get-label"; lb.textContent = window.TEXTS.quiz.cardGet;
-      const cd = document.createElement("div"); cd.className = "card get-card";
-      const cw = Cards.wordEl(w);
-      cd.appendChild(cw); get.append(lb, cd);
+      const cd = document.createElement("div"); cd.className = "card";
+      const art = Cards.artEl(w, true); if (art) { cd.appendChild(art); cd.classList.add("has-pic"); }
+      cd.appendChild(Cards.wordEl(w));
+      get.append(lb, cd);
       get.classList.remove("hidden");
-      get.style.animation = "none"; void get.offsetWidth; get.style.animation = "";
-      setTimeout(() => get.classList.add("hidden"), QUIZ.nextDelay * 1000);
-      setTimeout(next, QUIZ.nextDelay * 1000);
+      const at = (sec, fn) => flyTimers.push(setTimeout(fn, sec * 1000));
+      at(QUIZ.getShow, () => {
+        const slot = $("quiz-slots").querySelector(`.slot[data-id="${w.id}"]`);
+        get.classList.add("fly");
+        if (!slot) return;
+        const cr = cd.getBoundingClientRect(), sr = slot.getBoundingClientRect();
+        cd.style.animation = "none";
+        cd.style.transition = `transform ${QUIZ.getFly}s cubic-bezier(.5,0,.8,.6), opacity ${QUIZ.getFly}s`;
+        cd.style.transform = `translate(${sr.left + sr.width / 2 - (cr.left + cr.width / 2)}px, ${sr.top + sr.height / 2 - (cr.top + cr.height / 2)}px) scale(${sr.width / cr.width})`;
+      });
+      at(QUIZ.getShow + QUIZ.getFly, () => {
+        get.classList.add("hidden");
+        const slot = $("quiz-slots").querySelector(`.slot[data-id="${w.id}"]`);
+        if (slot) { slot.classList.remove("q", "had", "got"); void slot.offsetWidth; slot.classList.add("got"); fillSlot(slot, w); }
+        Sound.se("stack");
+      });
+      at(QUIZ.nextDelay, next);
     } else {
       // 不正解: 正解と一言メモをその場で見せてから次へ
       Sound.se("wrong");
@@ -167,7 +195,6 @@ const Quiz = (() => {
       b.addEventListener("click", next);
       fb.append(p1, p2, p3, b);
       fb.classList.remove("hidden");
-      setTimeout(() => fb.scrollIntoView({ behavior: "smooth", block: "nearest" }), 50);
     }
   }
 
@@ -195,5 +222,6 @@ const Quiz = (() => {
     setTimeout(done, QUIZ.reviewTime * 1000);
   }
 
-  return { start, review, stop: stopTimer };
+  function stop() { stopTimer(); clearTimeout(previewTimer); flyTimers.forEach(clearTimeout); flyTimers = []; }
+  return { start, review, stop };
 })();

@@ -394,6 +394,7 @@ const Main = (() => {
     const ordered = ids.map(id => words.find(w => w.id === id));
     // クイズは吸い込めた語句の分だけ。1語もなければクイズを飛ばす
     if (!ordered.length) { toCards([]); return; }
+    Cards.preloadArt(words);   // そのステージの10枚の絵を、クイズの前に読んでおく（11/7-27）
     // クイズの前に「今日あつめたことば」を3秒見せる
     showScreen("review");
     Sound.play("review");   // 今日あつめたことば: ステージ一覧の曲（11/7-4）。クイズの説明もそのまま
@@ -422,7 +423,7 @@ const Main = (() => {
     function startQuiz() {
       showScreen("quiz");
       $("quiz-hero").src = heroSrc("think");   // クイズは「考える」の絵
-      Quiz.start(ordered, results => toCards(results));
+      Quiz.start(ordered, results => toCards(results), { slots: words, owned: Save.data.cards });
     }
   }
 
@@ -433,7 +434,8 @@ const Main = (() => {
   function startRetake(list) {
     showScreen("quiz");
     $("quiz-hero").src = heroSrc("think");
-    Quiz.start(list, results => toCards(results, true), { preview: true });
+    Cards.preloadArt(words);
+    Quiz.start(list, results => toCards(results, true), { preview: true, slots: words, owned: Save.data.cards });
   }
 
   function toCards(results, retake) {
