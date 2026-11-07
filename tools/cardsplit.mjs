@@ -7,6 +7,9 @@
 //   --paper               すき間が白でなく紙の色（クリーム色など）のとき、白に加えて、左上の角の色もすき間の色とみなす（11/7-5 の s12）
 //   --crop                ふぞろいなマスを、地の色で足すかわりに、まん中を正方形に切りぬく（絵がマスの端まで描いてあるとき。11/7-4 の s02）
 // 出すファイル: s<ステージ2けた>_<順2けた>.png（例 s01_01.png）。マスの高さ・幅がふぞろいなときは、足りない分をそのマスの地の色（クリーム色）で足して正方形にする
+// 切り分けの記録（versions/20261106/assets/cards）: s01 は --map 1=1,2=2,3=3,4=5,5=4,6=7,7=6,8=10,9=8,10=9。s02〜s05 は --crop。s12 は --paper。ほかは オプションなし
+//   s11 の8・9は s11_0809.png から（--paper --only 8、--only 9。ほかの8枚は s11.png から。11/7-6・11/7-7）
+//   できた PNG は、そのあと JPEG（画質70）にして置く（11/7-7。macOS の sips: sips -s format jpeg -s formatOptions 70 s01_01.png --out s01_01.jpg）
 // 読めるのは 8bit の RGB / RGBA の PNG（インターレースなし）。ほかの道具は使わない（node だけ）
 import { readFileSync, writeFileSync, mkdirSync } from "fs";
 import { inflateSync, deflateSync } from "zlib";
