@@ -198,14 +198,14 @@ function runOnce(skill, seed) { HUDLOG.rows.push(["--", skill]); HUDLOG.lastK = 
       if (S.gauge >= 100) {
         bombWait += 1 / 60;
         if (rnd() < skill.bomb / 60) {
-          // 必殺ワザが3つ（11/6-6）: 取り逃しが2語以上（大ボスのときは1語以上）なら巻き戻し（1回だけ）、元気が7割より少ないか弾が近くに3つ以上なら無敵タイム、ほかはぜんぶ消し
+          // 必殺ワザが3つ（11/6-6）: 取り逃しが2語以上（大ボスのときは1語以上）なら巻き戻し（1回だけ）、元気が7割より少ないか弾が近くに3つ以上なら無敵タイム、ほかはパワー全開（11/7-25。前の版は1つ目のワザ clear）
           let b = S.bombButton();
           if (S.skillButtons) {
             const bs = S.skillButtons(), by = id => bs.find(q => q.id === id);
             const near = S.ebullets.filter(q => Math.hypot(q.x - p.x, q.y - p.y) < 120).length;
             if (!process.env.NOREWIND && !S.rewindUsed && (S.missed.length >= 2 || (S.phase === "boss" && S.missed.length >= 1))) b = by("rewind");
             else if (p.hp < S.maxHp * 0.7 || near >= 3) b = by("guard");
-            else b = by("clear");
+            else b = by("boost") || by("clear");
           }
           canvas.onpointerdown(pe(b.x, b.y, 2)); bombWait = 0;
         }
@@ -239,7 +239,7 @@ for (const [name, rs] of Object.entries(out)) {
   const rc = {}; ok.forEach(r => { const k = rk(r.stats.score); rc[k] = (rc[k] || 0) + 1; });
   const lc = {}; ok.forEach(r => lc[r.loadout] = (lc[r.loadout] || 0) + 1);
   console.log(`${name}(${rs.length}回): 持ちもの${JSON.stringify(lc)} 中ボス取り逃がし${avg(r => r.odaiMiss).toFixed(2)} 時間${avg(r => r.stats.time).toFixed(0)}秒 回収${avg(r => r.ids.length).toFixed(1)}語 被弾${avg(r => r.stats.hits).toFixed(1)} 失った機体${avg(r => r.stats.downs).toFixed(2)} 本番やり直し${avg(r => r.stats.gameOvers).toFixed(2)}回(${ok.filter(r => r.stats.gameOvers > 0).length}/${ok.length}回で発生) 点${avg(r => r.stats.score).toFixed(0)} 光${avg(r => r.stats.bombsUsed).toFixed(1)} 10語${ok.filter(r => r.ids.length >= 10).length} 無事${ok.filter(r => r.stats.downs === 0).length} 無傷${ok.filter(r => r.stats.hits === 0).length} ランク${JSON.stringify(rc)} 終わらない${rs.length - ok.length} 見つけた${avg(r => r.foundN || 0).toFixed(1)}語 基準内${avg(r => r.baseN || 0).toFixed(1)}語 発見${avg(r => r.exploreSec || 0).toFixed(0)}秒 救出${avg(r => (r.bossSec || r.stats.time) - (r.exploreSec || 0)).toFixed(0)}秒 さいご${avg(r => r.bossSec ? r.stats.time - r.bossSec : 0).toFixed(0)}秒`);
-  if (ok[0] && ok[0].skillUse) { const su = k => avg(r => r.skillUse[k] || 0).toFixed(2), ff = ok.filter(r => r.firstFull !== null); console.log(`  必殺ワザ ${name}: 1ステージ ${avg(r => r.stats.bombsUsed).toFixed(2)}回（ぜんぶ消し ${su("clear")}・無敵タイム ${su("guard")}・巻き戻し ${su("rewind")}） ${ok[0].skillUse.kills !== undefined ? `虫${su("kills")}匹・被弾${su("hitN")} ` : ""}満タン ためて${su("fullAcc")}回・中ボスと大ボスで${su("fullBoss")}回 ためて初めて満タン 救出の時計${(ok.filter(r => r.skillUse.firstAcc >= 0).reduce((a, r) => a + r.skillUse.firstAcc, 0) / Math.max(1, ok.filter(r => r.skillUse.firstAcc >= 0).length)).toFixed(1)}秒 ゲージが初めて満タン ${ff.length ? (ff.reduce((a, r) => a + r.firstFull, 0) / ff.length).toFixed(1) : "-"}秒（救出の旅から。${ff.length}/${ok.length}回） 救出の旅〜クリア ${avg(r => r.rescueSec || 0).toFixed(0)}秒 元気がなくなった ${avg(r => r.stats.downs).toFixed(2)}回（各回 ${ok.map(r => r.stats.downs).join(",")}）`); }
+  if (ok[0] && ok[0].skillUse) { const su = k => avg(r => r.skillUse[k] || 0).toFixed(2), ff = ok.filter(r => r.firstFull !== null); console.log(`  必殺ワザ ${name}: 1ステージ ${avg(r => r.stats.bombsUsed).toFixed(2)}回（パワー全開 ${(+su("boost") + +su("clear")).toFixed(2)}・無敵タイム ${su("guard")}・巻き戻し ${su("rewind")}） ${ok[0].skillUse.kills !== undefined ? `虫${su("kills")}匹・被弾${su("hitN")} ` : ""}満タン ためて${su("fullAcc")}回・中ボスと大ボスで${su("fullBoss")}回 ためて初めて満タン 救出の時計${(ok.filter(r => r.skillUse.firstAcc >= 0).reduce((a, r) => a + r.skillUse.firstAcc, 0) / Math.max(1, ok.filter(r => r.skillUse.firstAcc >= 0).length)).toFixed(1)}秒 ゲージが初めて満タン ${ff.length ? (ff.reduce((a, r) => a + r.firstFull, 0) / ff.length).toFixed(1) : "-"}秒（救出の旅から。${ff.length}/${ok.length}回） 救出の旅〜クリア ${avg(r => r.rescueSec || 0).toFixed(0)}秒 元気がなくなった ${avg(r => r.stats.downs).toFixed(2)}回（各回 ${ok.map(r => r.stats.downs).join(",")}）`); }
   { const L = ok.filter(r => r.lcN > 0); const nN = L.reduce((a, r) => a + r.lcN, 0), nG = L.reduce((a, r) => a + r.lcGot, 0); console.log(`  ラストチャンス ${name}: 入った ${L.length}/${ok.length}回、出たことば ${nN}語、取れたことば ${nG}語（${nN ? Math.round(100 * nG / nN) : '-'}%）` + (L.length ? `（1回ごと 取れた/出た: ${L.map(r => r.lcGot + '/' + r.lcN).join(' ')}）` : '')); }
   console.log(`  地上 ${name}: 爆弾を投げた ${avg(r => r.ground.bombs).toFixed(1)}回（各回 ${ok.map(r => r.ground.bombs).join(",")}） 地上の雑魚を倒した ${avg(r => r.ground.kills).toFixed(1)} 地上のことばを助けた ${avg(r => r.ground.saved).toFixed(2)}/${avg(r => r.ground.words).toFixed(2)}`);   // 11/7-23
   if (process.env.TUT === "first" || process.env.TUT === "again") console.log(`  チュートリアル ${name}: クリアまで ${avg(r => r.wall).toFixed(1)}秒（実時間。各回 ${ok.map(r => r.wall.toFixed(0)).join(",")}） OK まで行ったもの ${[...new Set(ok.flatMap(r => r.lesSeen))].join("・") || "なし"}（1回あたり ${avg(r => r.lesSeen.length).toFixed(1)}こ）`);
