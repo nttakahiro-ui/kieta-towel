@@ -252,6 +252,7 @@ const Main = (() => {
   function selectStage(id) {
     stage = window.STAGES.find(s => s.id === id) || window.STAGES[0];
     world = window.WORLDS.find(w => w.id === stage.world);
+    $("screen-quiz").dataset.world = stage.world;   // クイズの画面の色を世界ごとに（11/7-9 決定。css の #screen-quiz[data-world]）
     words = window.WORDS.filter(w => w.stage === stage.id);
   }
   let stage, world, words, lastStats = null, lastIds = [];

@@ -46,13 +46,13 @@ const FILE_MUSIC = {
   dir: "assets/music/", xfade: 0.12, lufs: -11, level: 0.33,   // level 0.33: 合成曲（発見 −24〜−26、救出 −18〜−20、クイズ −16。同じはかり方）のまん中 −20 くらいに合わせた
   songs: {
     w1_hakken:    { loop: [23.088, 67.088], lufs: -10.37 },   // 120拍/分、22小節
-    w1_kyushutsu: { loop: [21.807, 62.950], lufs: -10.43 },   // 140、24小節
+    w1_kyushutsu: { loop: [21.807, 62.950], lufs: -10.43, skipIntro: true },   // skipIntro ＝ イントロを飛ばして、くり返し区間の始まりから鳴らす（11/7-9 決定: 救出の曲3つ）   // 140、24小節
     w1_quiz:      { loop: [8.858, 55.676], lufs: -12.05 },   // 164、32小節
     w2_hakken:    { loop: [10.838, 58.838], lufs: -11.58 },   // 120、24小節
-    w2_kyushutsu: { loop: [20.303, 52.735], lufs: -10.98 },   // 148、20小節
+    w2_kyushutsu: { loop: [20.303, 52.735], lufs: -10.98, skipIntro: true },   // 148、20小節
     w2_quiz:      { loop: [18.190, 54.190], lufs: -11.50 },   // 160、24小節
     w3_hakken:    { loop: [23.834, 55.834], lufs: -10.08 },   // 120、16小節
-    w3_kyushutsu: { loop: [24.623, 51.289], lufs: -10.61 },   // 144、16小節
+    w3_kyushutsu: { loop: [24.623, 51.289], lufs: -10.61, skipIntro: true },   // 144、16小節
     w3_quiz:      { loop: [6.397, 61.898], lufs: -10.57 },   // 160、37小節
     title:        { loop: [17.146, 55.546], lufs: -11.18 },   // 100、16小節（11/6-6）。11/7: 大きさを今の区間で測り直した（前の -10.82 は前の区間の値）
     recipe:       { once: true, lufs: -11.22 },               // 90.9秒（11/7-2）。lufs は曲の全体
@@ -475,7 +475,7 @@ const Sound = (() => {
     const s = ctx.createBufferSource(), sg = ctx.createGain();
     s.buffer = buf; s.connect(sg); sg.connect(r.g);
     const t = r.next, first = r.off === 0;
-    const from = first ? 0 : a - X / 2;            // 2回目からは、始まりの少し前から重ねる
+    const from = first ? (FILE_MUSIC.songs[r.key].skipIntro ? a : 0) : a - X / 2;            // 2回目からは、始まりの少し前から重ねる。skipIntro の曲は1回目も区間の始まりから
     const seam = t + (b - from) - X / 2;           // 次の回を重ね始める時刻
     const N = 32, fin = new Float32Array(N), fout = new Float32Array(N);
     for (let i = 0; i < N; i++) { fin[i] = Math.sin(i / (N - 1) * Math.PI / 2); fout[i] = Math.cos(i / (N - 1) * Math.PI / 2); }   // 同じ大きさに聞こえる重ね方
@@ -485,6 +485,7 @@ const Sound = (() => {
     } catch (e) {}
     s.start(t, from);
     s.stop(seam + X + 0.02);
+    if (first) { r.from0 = from; r.t0 = t; }   // 鳴らし始めた曲の位置（秒）と時刻（確かめ用）
     r.segs.push(s); if (r.segs.length > 3) r.segs.shift();
     r.next = seam; r.off = 1;
   }
@@ -691,5 +692,5 @@ const Sound = (() => {
     if (ctx && current && !fileAudio) nextTime = Math.max(nextTime, ctx.currentTime + 0.05);
   }
 
-  return { unlock, play, fadeTo, stop, loadWorld, preloadCommon, get fileState() { return { world, fileKey, playing: loopRun && loopRun.key, loaded: Object.keys(buffers), loading: Object.keys(loading) }; }, setTempo, setMuted, get voices() { return voiceEnds.length; }, get dropped() { return dropped; }, get muted() { return muted; }, se, suspend, resume, speak };
+  return { unlock, play, fadeTo, stop, loadWorld, preloadCommon, get fileState() { return { world, fileKey, playing: loopRun && loopRun.key, from0: loopRun && loopRun.from0, loaded: Object.keys(buffers), loading: Object.keys(loading) }; }, setTempo, setMuted, get voices() { return voiceEnds.length; }, get dropped() { return dropped; }, get muted() { return muted; }, se, suspend, resume, speak };
 })();

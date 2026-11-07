@@ -723,3 +723,20 @@ body { position: fixed; inset: 0; }
 
 /* カードの絵（11/6-6）: 語句の上に正方形の絵。いちばん大きくて 160px（絵のファイルはその2倍の 320px） */
 .card .pic { display: block; width: 100%; max-width: 160px; aspect-ratio: 1 / 1; margin: 0 auto 6px; border-radius: 10px; object-fit: cover; background: #feecc6; }
+
+/* 11/7-9 決定: カードの解説（メモ）の文字を0.9倍に（13px → 11.7px、受け直しの前に見せるカードは 15px → 13.5px）。語・ふりがな・問題文は変えない */
+.card .m { font-size: 11.7px; }
+.card.preview .m { font-size: 13.5px; }
+/* 11/7-9 決定: カード（図鑑・結果画面）の幅を全部同じに。列は2つで同じ幅（長い語でも広がらない）、同じ並びのカードは高さもそろえる */
+.cards-list { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; }
+.cards-list .card { min-width: 0; }
+.card .w { overflow-wrap: anywhere; }
+@media (max-width: 350px) { .card .w { font-size: 16px; } }   /* 細い画面では語を少し小さく（7文字の語が1行に入るように） */
+
+/* 11/7-9 決定: クイズの画面の色を世界ごとに（世界1 緑・世界2 青・世界3 紫）。緑と同じ明るさ・あざやかさで色合いだけ変えた。タイムバー・ボタン・正解のしるし・枠など、緑を使うところすべて */
+#screen-quiz[data-world="2"] { --green: #4a729a; --green-dark: #3a5169; --green-light: #c6d8eb; --q-ok: #d3e2f2; }
+#screen-quiz[data-world="3"] { --green: #794a9a; --green-dark: #553a69; --green-light: #dcc6eb; --q-ok: #e5d3f2; }
+#screen-quiz .choice.correct { background: var(--q-ok, #e5f2d3); }
+#screen-quiz[data-world="2"] { background: linear-gradient(#dce8f3, var(--cream)); }   /* 背景の帯（上のうすい色。世界1は #app の #eaf3dc のまま） */
+#screen-quiz[data-world="3"] { background: linear-gradient(#e9dcf3, var(--cream)); }
+#screen-quiz[data-world="2"] .fuwari-icon, #screen-quiz[data-world="3"] .fuwari-icon { border-color: var(--green-light); }   /* ふわりの小さな印のふちも世界の色（世界1は今の #c9d9b4） */

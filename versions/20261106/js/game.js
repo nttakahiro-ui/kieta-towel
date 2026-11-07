@@ -271,7 +271,8 @@ const BATTLE = {
   groundMark: true,            // 左の帯で、地上に出ることばの枠に小さな地面の絵のマーク（10/31-12 決定。文字の「地」ではない）
   // 必殺ワザ（11/6-6 決定）: 「ぜんぶ消し」「無敵タイム」「巻き戻し」の3つ。最初から全部持っていて、左下に3つのボタン。ゲージは3つで1本（使うと0にもどる）
   loosePad: 18,   // ぜんぶ消しでほどけたことばに、ふわりがさわったとみなす広さ（ことばの外側 px。11/7-1）
-  skillGuardTime: 15,          // 「無敵タイム」の秒数（自機が大きく光り、ぶつかった虫と弾が消える。元気は減らない）
+  skillGuardTime: 10,          // 「無敵タイム」の秒数（11/7-9 決定: 15 → 10）。（自機が大きく光り、ぶつかった虫と弾が消える。元気は減らない）
+  rewindHintTime: 2.6,         // ゲージが初めて満タンになったときの、ふわりの巻き戻しの一言の秒数（11/7-9 決定: 2〜3秒）
   skillGuardR: 44,             //   無敵タイムの光の半径（px。この中に入った虫と弾が消える）
   clearBossDmg: 0.5,           // 「ぜんぶ消し」: 中ボス・大ボスの文字ごとの硬さを、もとの硬さの何倍けずるか（大ダメージ。最後の1は残す）。ザコのことばの殻はぜんぶほどける
   gaugeKill: 3,                // ゲージのたまり方（100で満タン）: 虫を1匹倒す。虫の多いステージでたまりすぎないように、gaugeKillHalf 匹倒すごとに減る（10匹目で半分、20匹目で3分の1…）
@@ -337,6 +338,12 @@ const EXPLORE_MOVES = {
 };
 
 // ===== 必殺ワザ（11/6-6 決定）: 3つ。名前と説明は texts.js の skills。最初から全部持っている
+// 世界ごとの色（11/7-9 決定）: 助けたことばを大きく見せる帯（ことばの色・枠・ふりがな。ことばの色は ENEMY_COLOR の緑のところ＝ザコだけ。中ボスの茶・大ボスのピンクはそのまま）。世界1は今の緑。青・紫は緑と同じ明るさ・あざやかさで色合いだけ変えた
+const WORLD_TINT = {
+  1: { frame: "#cfe0b6", kana: "#6b7a5a", zako: "#5f8a3c" },
+  2: { frame: "#b6cbe0", kana: "#5a6a7a", zako: "#3c638a" },
+  3: { frame: "#ceb6e0", kana: "#6d5a7a", zako: "#693c8a" },
+};
 const SKILL_IDS = ["clear", "guard", "rewind"];   // clear ぜんぶ消し／guard 無敵タイム／rewind 巻き戻し（11/6-6 決定。時間止め・光のシャワーはやめた）
 const LOADOUT_VARS = { skill: "" };   // 持ち物「必殺ワザ」の説明の {skill}（選んでいるワザの名前）
 
@@ -580,6 +587,7 @@ const Battle = (() => {
   let wave = null;           // 吸い込んだときに広がる光
   // 世界2・3の試作（10/31-10）
   let stopT = 0, guardT = 0;   // 時間止め（いまは使わない。0のまま）・無敵タイムの残り秒
+  let rewindSaid = false, rewindHintWait = false;   // そのステージで「巻き戻し」の一言を出したか・出すのを待っているか（11/7-9）
   let rewindUsed = false, rewindFx = null, baseScript = [], killN = 0;   // 巻き戻しを使ったか（1ステージ1回）、その演出、救出の旅の最初の台本
   let skillUse = { clear: 0, guard: 0, rewind: 0, fullAcc: 0, fullBoss: 0, firstAcc: -1 };   // 必殺ワザを使った回数と、ゲージが満タンになった回数（ためて／中ボス・大ボスで）、ためて初めて満タンになった救出の旅の時計（調べる用）
   let meteorT = 0;   // 流星雨の次の1つまで（世界3。10/31-10 試作）
@@ -747,7 +755,7 @@ const Battle = (() => {
     bino = { x: W / 2 + 10, y: H * 0.42 };
     state = "sortie"; sortieNo = 1; reacted = 0; sortieStep = "cover";   // 発見の旅の表紙から始める   // 「出撃1 探検」の画面から始める
     loadout = null; powerBonus = basePower(); shield = 0; gaugeMul = 1;
-    stopT = 0; guardT = 0; rewindUsed = false; rewindFx = null; skillUse = { clear: 0, guard: 0, rewind: 0, fullAcc: 0, fullBoss: 0, firstAcc: -1 }; baseScript = script; rescueT = 0; evShown = {}; evPlans = {}; bgOff = 0; bgGo = false; press = null;
+    stopT = 0; guardT = 0; rewindUsed = false; rewindSaid = false; rewindHintWait = false; rewindFx = null; skillUse = { clear: 0, guard: 0, rewind: 0, fullAcc: 0, fullBoss: 0, firstAcc: -1 }; baseScript = script; rescueT = 0; evShown = {}; evPlans = {}; bgOff = 0; bgGo = false; press = null;
     events = (opts.stage && opts.stage.event) ? [].concat(opts.stage.event) : [];
     // 救出の旅をもう一度（10/25-14。結果画面のボタン）: 発見の旅をとばして、持ち物選択から。発見で見つけたことばの記録（opts.foundIds）は残す
     if (opts.foundIds) {
@@ -1368,6 +1376,7 @@ const Battle = (() => {
     if (showWord) { showWord.t -= realDt; if (showWord.t <= 0) showWord = null; }
     if (wave) { wave.age += realDt; if (wave.age > 0.6) wave = null; }
     if (fsay) { fsay.t -= realDt; if (fsay.t <= 0) fsay = null; }
+    if (rewindHintWait && msgBusy() < 0 && msgGap <= 0 && !odai && state === "play") { rewindHintWait = false; fsay = { text: tx("skills.rewindHint"), t: BATTLE.rewindHintTime }; }   // 巻き戻しの一言（11/7-9）
     if (hintCard) { hintCard.t -= realDt; if (hintCard.t <= 0) hintCard = null; }
     bombFlash = Math.max(0, bombFlash - realDt);
     updateMsgs(realDt);
@@ -1521,8 +1530,8 @@ const Battle = (() => {
     if (lock && bombTimer <= 0) {
       const aim = lock.word ? Math.min(lock.x + lock.w / 2 - 4, Math.max(lock.x - lock.w / 2 + 4, player.x)) : lock.x;
       const pair = { hit: new Set() };   // 左右の2個で同じ敵に2回当てない（倒す速さは前のたねと同じ）
-      // 真正面に1個。パワーが「その世界のスタート時（とくいのパワーアップを含む）」より1段上がったら、左右45度に2個（11/7-8 決定。前は2本以上で2個）。左右45度へ山なりに（11/6-3）
-      for (const side of (POWER_LEVELS.indexOf(level) >= powerBonus + 1 ? [-1, 1] : [0])) bombs.push({ sx: player.x, sy: player.y - 24, tx: player.x + side * BATTLE.bombSide, ty: lock.y, age: 0, tg: lock, side, pair });
+      // 真正面に1個。その世界の最大パワー（世界1は2本、世界2は3本、世界3は4本 ＝ 初期値の段＋1）で左右45度に2個。とくいのパワーアップで最初から最大なら最初から2個（11/7-9 決定。11/7-8 は「スタートより1段上」だった）。左右45度へ山なりに（11/6-3）
+      for (const side of (POWER_LEVELS.indexOf(level) >= basePower() + 1 ? [-1, 1] : [0])) bombs.push({ sx: player.x, sy: player.y - 24, tx: player.x + side * BATTLE.bombSide, ty: lock.y, age: 0, tg: lock, side, pair });
       bombTimer = BATTLE.bombInterval;
       Sound.se("seedThrow");
     }
@@ -2237,9 +2246,14 @@ const Battle = (() => {
     if (phase === "round1" || bombing) return;
     const before = gauge;
     gauge = Math.min(100, gauge + v * gaugeMul);
-    if (before < 100 && gauge >= 100) { skillUse.fullAcc++; if (skillUse.firstAcc < 0) skillUse.firstAcc = rescueT; bombReady(); }
+    if (before < 100 && gauge >= 100) { skillUse.fullAcc++; if (skillUse.firstAcc < 0) skillUse.firstAcc = rescueT; bombReady(); firstFullSay(); }
   }
-  function fillGauge() { if (gauge < 100) { gauge = 100; skillUse.fullBoss++; bombReady(); } }
+  function fillGauge() { if (gauge < 100) { gauge = 100; skillUse.fullBoss++; bombReady(); firstFullSay(); } }
+  // ゲージが初めて満タンになったとき（そのステージで1回だけ）: ふわりの一言で巻き戻しを教える（11/7-9 決定）
+  function firstFullSay() {
+    if (rewindSaid || rewindUsed) return;
+    rewindSaid = true; rewindHintWait = true;   // ほかの表示（助けたことば・案内など）が消えてから出す（順番待ちで捨てられないように）
+  }
   // 必殺ワザを使う（11/6-6 決定）: ゲージを全部使う
   function useSkill(id) {
     if (!skillOk(id)) return;
@@ -4718,14 +4732,17 @@ const Battle = (() => {
       return;
     }
     ctx.font = font(fsay.small ? 12 : 15);
-    const tw = ctx.measureText(fsay.text).width, pad = fsay.small ? 7 : 10, bw = tw + pad * 2, bh = fsay.small ? 22 : 30;
+    // 画面に入らない長い一言は2行に（「、」で分ける。11/7-9 の巻き戻しの一言）
+    let lines = [fsay.text];
+    if (ctx.measureText(fsay.text).width > W - 24) { const cs = Array.from(fsay.text), mid = cs.length / 2; let cut = Math.round(mid), best = 99; cs.forEach((c, i) => { if (c === "、" && Math.abs(i + 1 - mid) < best) { best = Math.abs(i + 1 - mid); cut = i + 1; } }); lines = [cs.slice(0, cut).join(""), cs.slice(cut).join("")]; }
+    const lh = fsay.small ? 15 : 20, tw = Math.max(...lines.map(l => ctx.measureText(l).width)), pad = fsay.small ? 7 : 10, bw = tw + pad * 2, bh = (fsay.small ? 22 : 30) + (lines.length - 1) * lh;
     const bx = Math.min(Math.max(fx - bw / 2, 8), W - bw - 8), by = fy - 30 - bh;
     ctx.fillStyle = "rgba(255,253,245,0.96)"; ctx.strokeStyle = "#cfe0b6"; ctx.lineWidth = 2;
     roundRect(bx, by, bw, bh, 12); ctx.fill(); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(fx - 6, by + bh); ctx.lineTo(fx, by + bh + 8); ctx.lineTo(fx + 6, by + bh); ctx.closePath();
     ctx.fillStyle = "rgba(255,253,245,0.96)"; ctx.fill();
     ctx.fillStyle = "#4b5e3a"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
-    ctx.fillText(fsay.text, bx + pad, by + bh / 2 + 1);
+    lines.forEach((l, i) => ctx.fillText(l, bx + pad, by + bh / 2 + 1 + (i - (lines.length - 1) / 2) * lh));
     ctx.restore();
   }
 
@@ -4843,6 +4860,11 @@ const Battle = (() => {
     const ly = b.y - r - (full ? 9 : 7);
     ctx.lineWidth = 3; ctx.strokeStyle = "#ffffff"; ctx.strokeText(label, b.x, ly);
     ctx.fillStyle = full ? C : "#7a8a68"; ctx.fillText(label, b.x, ly);
+    if (b.id === "rewind" && !used) {   // 下に小さく「はじめから」（11/7-9 決定）
+      ctx.font = font(9); const sy = b.y + b.r + 9;
+      ctx.lineWidth = 3; ctx.strokeText(tx("skills.rewindSub"), b.x, sy);
+      ctx.fillStyle = full ? C : "#7a8a68"; ctx.fillText(tx("skills.rewindSub"), b.x, sy);
+    }
     ctx.restore();
   }
 
@@ -4937,19 +4959,20 @@ const Battle = (() => {
     const w = Math.max(ctx.measureText(word.word).width, 160) + 48;
     const h = size + (showKana ? 56 : 36);
     const cy = H * 0.45;
+    const wc = WORLD_TINT[worldDef.id] || WORLD_TINT[1];   // 世界ごとの色（11/7-9 決定: 世界1 緑・世界2 青・世界3 紫）
     ctx.fillStyle = "rgba(255,253,245,0.95)";
-    ctx.strokeStyle = "#cfe0b6";
+    ctx.strokeStyle = wc.frame;
     ctx.lineWidth = 3;
     roundRect(W / 2 - w / 2, cy - h / 2, w, h, 22);
     ctx.fill(); ctx.stroke();
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     if (showKana) {
       ctx.font = font(20);
-      ctx.fillStyle = "#6b7a5a";
+      ctx.fillStyle = wc.kana;
       ctx.fillText(word.kana, W / 2, cy - size / 2 - 4);
     }
     ctx.font = font(size);
-    ctx.fillStyle = ENEMY_COLOR[word.role];
+    ctx.fillStyle = word.role === "zako" ? wc.zako : ENEMY_COLOR[word.role];   // ザコのことばは世界の色（11/7-9）
     ctx.fillText(word.word, W / 2, cy + (showKana ? 12 : 0));
     ctx.globalAlpha = 1;
   }
