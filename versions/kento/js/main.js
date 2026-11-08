@@ -525,14 +525,14 @@ const Main = (() => {
     back.classList.toggle("hidden", wid <= 1);
     back.textContent = tx("worlds.back", { id: wid - 1 });
     back.onclick = () => { Save.data.world = wid - 1; Save.store(); toStages(); };
-    $("btn-zukan").textContent = tx("zukan.buttonCount", { n: Save.cardCount(), total: window.WORDS.length });   // 下の「タイトルへ」の横（10/25-20）
+    $("btn-zukan").innerHTML = `${tx("zukan.button")}<small>${Save.cardCount()}/${window.WORDS.length}</small>`;   // 11/7-33: 数は2行目に小さく（3つ並べても入るように）   // 下の「タイトルへ」の横（10/25-20）
     // いちばん上に、今いる世界の帯の絵（11/1。前は台座の扇形）。宝石が枠にはまる。タップでレシピブックへ
     const litSet = RecipeBook.litIds(Save.data.cards);
     $("stages-lead").textContent = tx("recipeBook.lead");
     RecipeBook.renderBand($("stages-gems"), { lit: litSet, world: wid });
     $("stages-gems-head").textContent = tx("recipeBook.head"); $("stages-gems-count").textContent = `${litSet.size}/12`;   // 見出し「宝石 ○/12」（10/25-20・10/31-3）
     $("stages-gems").onclick = toRecipeBook;
-    $("stages-total").innerHTML = totalChip();   // 合計点の札（11/7-31 決定: 12ステージの最高得点の合計。11/7-32: 右上に小さく）
+    $("stages-total").innerHTML = totalChip();   // 合計点の札（11/7-31 決定: 12ステージの最高得点の合計。11/7-33: 下の帯の左。押せない）
     const box = $("stages-list");
     box.innerHTML = "";
     worldStages(wid).forEach(s => {
@@ -709,7 +709,7 @@ const Main = (() => {
     Sound.play("zukan");   // カード図鑑はタイトルの曲（11/7-4）
     const wid = Save.data.world || 1;
     // 見出しは制作側の絵 g_title（11/1）。絵が読めなければ今までの文字
-    const sub = `<span class="zk-sub-row"><small>${tx("worlds.title", { id: wid, name: window.WORLDS.find(w => w.id === wid).name })}</small><span class="score-chip">${totalChip()}</span></span>`;   // 11/7-32: 世界の行の右端に合計点の札
+    const sub = `<span class="zk-sub-row"><small>${tx("worlds.title", { id: wid, name: window.WORLDS.find(w => w.id === wid).name })}</small><span class="score-chip wdeco">${totalChip()}</span></span>`;   // 11/7-32: 世界の行の右端に合計点の札
     $("zukan-title").innerHTML = `<img class="zk-title-img" src="assets/zukan_title.png" alt="${tx("zukan.title")}"><br>${sub}`;
     $("zukan-title").querySelector("img").onerror = () => { $("zukan-title").innerHTML = `${tx("zukan.title")}<br>${sub}`; };
     const box = $("zukan-list");

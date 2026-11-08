@@ -854,4 +854,26 @@ rt { font-size: 0.5em; font-weight: normal; line-height: 1; letter-spacing: 0; c
 @keyframes bn-burst { 0% { opacity: 1; transform: translate(0,0) scale(1.2); } 100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(.4); } }
 .rank-line > span { white-space: nowrap; }
 #cards-p2 .rank-line { gap: .8em; font-size: 14px; }
-.stages-nav .score-chip { margin-top: 26px; }   /* 「◀ 世界○」（.link-btn の上の余白 26px）と同じ高さに中心をそろえる */
+
+/* 11/7-33 決定: ステージ一覧の下の帯（合計得点・カード図鑑・タイトルへ）と、図鑑の合計点の札は、世界の色の飾り（扉の見出しと同じ系統: 上が明るいグラデーション・濃いふち・下の影・上の光沢）。ボタンは押すと少しへこむ */
+body { --wc-top: #86b35e; --wc-main: #6f9a4a; --wc-dark: #3f5f2e; --wc-light: #dcebc6; }
+body[data-world="2"] { --wc-top: #5e8bb8; --wc-main: #4a729a; --wc-dark: #2f4760; --wc-light: #c6d8eb; }
+body[data-world="3"] { --wc-top: #9563b8; --wc-main: #794a9a; --wc-dark: #4c3360; --wc-light: #dcc6eb; }
+.wdeco { position: relative; overflow: hidden; color: #fff; text-shadow: 0 1px 0 var(--wc-dark), 0 0 3px rgba(0,0,0,.25);
+  background: linear-gradient(180deg, var(--wc-top) 0%, var(--wc-main) 62%, var(--wc-dark) 140%);
+  border: 2px solid var(--wc-dark); border-radius: 14px; box-shadow: 0 4px 0 var(--wc-dark), 0 6px 10px rgba(0,0,0,.18), inset 0 0 0 2px rgba(255,255,255,.22); }
+.wdeco::before { content: ""; position: absolute; left: 6%; right: 6%; top: 2px; height: 42%; border-radius: 10px 10px 40% 40% / 10px 10px 14px 14px; background: linear-gradient(rgba(255,255,255,.45), rgba(255,255,255,.05)); pointer-events: none; }
+button.wdeco:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--wc-dark), 0 2px 4px rgba(0,0,0,.18), inset 0 0 0 2px rgba(255,255,255,.22); }
+.stages-bottom { gap: 8px !important; }
+.stages-bottom > .wdeco { flex: 1 1 0; min-width: 0; margin: 0; padding: 6px 4px 7px; font-size: 15px; font-weight: bold; line-height: 1.15; white-space: nowrap; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.stages-bottom > .wdeco small { display: block; font-size: 12px; font-weight: bold; opacity: .95; }
+.score-chip.wdeco { max-width: none; border-radius: 14px; }
+.score-chip.wdeco .lb { color: var(--wc-light); font-size: 11px; text-shadow: 0 1px 0 var(--wc-dark); }
+.score-chip.wdeco b { color: #fff; font-size: 17px; }
+.score-chip.wdeco b small { font-size: 11px; display: inline; color: #fff; }
+.zk-sub-row .score-chip.wdeco { padding: 3px 12px 5px; }
+/* 11/7-33: 上の文字も世界の色に（帯の上の一言・「宝石 ○/12」・「◀ 世界○」）。帯の絵は世界ごとの絵のまま */
+#screen-stages .stages-lead { color: var(--wc-dark); }
+#screen-stages .gems-head { color: var(--wc-dark); }
+#screen-stages .gems-head b { color: var(--wc-main); }
+#screen-stages .stages-nav .link-btn { color: var(--wc-main); text-decoration-color: var(--wc-main); }
