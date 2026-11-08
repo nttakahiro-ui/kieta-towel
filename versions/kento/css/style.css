@@ -883,3 +883,10 @@ button.wdeco:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--wc-d
 /* 11/7-36 決定: 結果画面の「カード ○/10　取り逃し ○こ　種 ○こ ＋○点」は1行に収める（文字を少し小さく、折り返さない） */
 #cards-p2 .rank-line { gap: .5em; font-size: 12.5px; padding: 4px 10px; white-space: nowrap; }
 #cards-p2 .rank-line > span { flex-shrink: 0; }
+/* 11/7-39 決定: ステージの枠は2行（ステージ名／カード ○/10　最高 ○点）にして少し低く。宝石の絵は枠の右端・縦の中央。まだないステージは、うすい宝石の影 */
+.stage-row { padding: 7px 10px 7px 12px; }
+.stage-row .nm { line-height: 1.3; }
+.stage-row .sub { line-height: 1.35; }
+.stage-row .marks { margin: 0; flex-shrink: 0; display: flex; align-items: center; justify-content: center; width: 30px; }
+.stage-row .row-gem { width: 28px; height: 28px; }
+.stage-row .row-gem.ghost { opacity: .22; filter: grayscale(1) brightness(.75); }
