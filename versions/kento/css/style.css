@@ -158,6 +158,14 @@ body { position: fixed; inset: 0; }
   background: transparent; box-shadow: none; color: transparent; border-radius: 999px;
 }
 #screen-title.art #btn-start:active { transform: none; background: rgba(30,60,20,0.18); }
+/* 11/7-30: 絵の「始める」の上に「スタート」のボタンを重ねて隠す（絵のボタンと同じ緑の形） */
+#screen-title.art #btn-start {
+  left: 29.5%; width: 41%; top: 78.4%; height: 7.4%;
+  background: linear-gradient(#86bd58, #5a9a37 55%, #4b8a2c); color: #fffdf2; border: 2px solid #f6f0d4;
+  box-shadow: 0 3px 0 #3d6e24, 0 4px 10px rgba(40,60,20,.25), inset 0 2px 0 rgba(255,255,255,.35);
+  font-size: 26px; font-size: max(20px, 7.4cqw); font-weight: bold; letter-spacing: .06em; text-shadow: 0 2px 0 rgba(40,70,20,.45);
+}
+#screen-title.art #btn-start:active { transform: translateY(2px); background: linear-gradient(#78ad4c, #4b8a2c); }
 #screen-title.art .title-note { position: absolute; left: 0; right: 0; top: 86.9%; margin: 0; font-size: 10px; font-size: max(10px, 2.7cqw); color: #5b6650; text-shadow: 0 0 3px #fffbe8; }
 /* いちばん下の1行（音・主人公を選びなおす・記録を消す）: 見本より一段小さく薄く、絵のじゃまをしない */
 #screen-title.art .title-links { position: absolute; left: 0; right: 0; top: min(calc(86.9% + 16px), calc(100% - 40px - env(safe-area-inset-bottom))); display: grid; grid-template-columns: auto auto; justify-content: center; gap: 0 6cqw; white-space: nowrap; }   /* 10/31-7: 4つを2つずつ2行に。Safari の下のバーに隠れないよう「音が出ます」のすぐ下（safe-area より上）に置く */
@@ -499,7 +507,10 @@ body { position: fixed; inset: 0; }
 .tier.retake .lb { font-size: 15px; color: #b05068; }
 .cards-next p { margin: 6px 0; font-size: 16px; font-weight: bold; color: #b0801a; word-break: keep-all; overflow-wrap: break-word; }
 .cards-rule { font-size: 13px; color: #6b7a5a; margin: 4px 0 8px; }
-#cards-retake.hidden, #cards-rescue.hidden { display: none; }
+#cards-retake.hidden, #cards-rescue.hidden, .cards-miss-note.hidden { display: none; }
+/* 11/7-30: 取り逃しがあるときの「救出の旅をはじめからやり直す」（強い色）と、その上の一言 */
+.cards-miss-note { margin: 6px 0 -2px; font-size: 15px; font-weight: bold; color: #c0392b; text-align: center; }
+#cards-rescue.cards-miss { background: #e0663a; box-shadow: 0 4px 0 #a8431f; color: #fff; }
 .cards-summary { font-size: 13px; color: #6b7a5a; }
 
 /* 受け直しクイズ: 出題の前に見せるカード */
@@ -581,7 +592,8 @@ body { position: fixed; inset: 0; }
   40% { transform: scale(1.12) rotate(2deg); box-shadow: 0 0 34px 10px rgba(255,220,110,0.95); }
   100% { transform: scale(1); box-shadow: 0 0 16px 4px rgba(255,220,110,0.6); }
 }
-.cards-main { font-size: 19px; padding: 14px 12px; width: min(100%, 250px); white-space: nowrap; }   /* 10/31-7: 「救出の旅をもう一度」「クイズをもう一度」を同じ幅で1行に */
+.cards-main { font-size: 19px; padding: 14px 12px; width: min(100%, 250px); white-space: nowrap; }
+#cards-rescue.cards-main { font-size: 17px; width: min(100%, 300px); }   /* 11/7-30: 「救出の旅をはじめからやり直す」を1行に */   /* 10/31-7: 「救出の旅をもう一度」「クイズをもう一度」を同じ幅で1行に */
 .quiz-get { min-width: 210px; }
 .quiz-get .get-label { white-space: nowrap; }
 /* 10/25-19: 「カードゲット！」は問題文と選択肢のあいだ（選択肢の上）に出す。「とちゅうでやめる」は右上（正解数のそば）に小さく */
@@ -698,7 +710,8 @@ body { position: fixed; inset: 0; }
 /* 宝石ができた画面・レシピブック・12個そろった画面の背景（11/2: 制作側の bg_c01。上に空、下に雲）。本の絵は地が透明 */
 #screen-recipe, #screen-recipebook, #screen-ending { background: #fbf4e2 url(../assets/recipe_bg.jpg) center / cover no-repeat; }
 #screen-ending .rb-box.small:has(.art-book) { width: 100%; max-width: 440px; }   /* 12個そろった画面も本は幅いっぱい近く（見本の大きさ） */
-.btn-row.stages-bottom { justify-content: flex-end; }   /* 下の（カード図鑑）（タイトルへ）は見本どおり右寄せ */
+.btn-row.stages-bottom { justify-content: stretch; align-items: stretch; width: 100%; }   /* 11/7-30: 下の（カード図鑑）（タイトルへ）は横にならべて画面の幅いっぱいに（前は右寄せ） */
+.stages-bottom .btn { flex: 1 1 0; min-width: 0; white-space: nowrap; }
 .pause-btn.sleep-hide { visibility: hidden; }   /* ひと休み中の絵に「Ⅱ」が描いてあるあいだ（11/1） */
 
 /* カード図鑑の絵（11/1）: 地は制作側の bg_g01、見出しは g_title、世界1のステージ見出しは gw1_1〜4 */
@@ -806,3 +819,7 @@ rt { font-size: 0.5em; font-weight: normal; line-height: 1; letter-spacing: 0; c
 .quiz-get-fly .card .w .kn { font-size: 12px; }
 .quiz-get-fly.fly { background: rgba(255,250,232,0); transition: background .4s; }
 .quiz-get-fly.fly .get-label { opacity: 0; }
+
+/* クイズでまちがえたときの大きな赤い「✕」（11/7-30）: 中央に0.6秒。そのあと正解とメモ */
+.quiz-x { position: absolute; left: 50%; top: 45%; transform: translate(-50%, -50%); z-index: 8; pointer-events: none; font-size: 170px; line-height: 1; font-weight: bold; color: #e2364b; text-shadow: 0 0 0 #fff, 0 0 10px rgba(255,255,255,.95), 0 6px 18px rgba(120,20,30,.35); animation: quizX .6s ease-out both; }
+@keyframes quizX { 0% { transform: translate(-50%, -50%) scale(.3); opacity: 0; } 25% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; } 40% { transform: translate(-50%, -50%) scale(1); } 85% { opacity: 1; } 100% { opacity: 0; } }

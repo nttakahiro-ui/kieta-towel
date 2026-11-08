@@ -12,7 +12,7 @@ const Cards = (() => {
   // カードの一言メモの改行（10/22-1）: 日本語の区切り（Intl.Segmenter）でかたまりに分け、かたまりの途中や助詞の前では折り返さない
   // （かたまりのあいだにだけ <wbr> を入れ、CSS の word-break: keep-all と組み合わせる）
   const seg = (typeof Intl !== "undefined" && Intl.Segmenter) ? new Intl.Segmenter("ja", { granularity: "word" }) : null;
-  const GLUE = new Set(["を", "は", "が", "に", "の", "と", "で", "へ", "も", "や", "よ", "ね", "て", "た", "か", "な", "、", "。", "!", "！", "?", "？", ")", "）", "」"]);   // 「」の閉じかっこも前につける（10/25-14）
+  const GLUE = new Set(["を", "は", "が", "に", "の", "と", "で", "へ", "も", "や", "よ", "ね", "て", "た", "か", "な", "、", "。", "!", "！", "?", "？", ")", "）", "」", "―", "—", "…"]);   // 11/7-30: 「――」「……」も前の語につける（行の頭に来ないように）   // 「」の閉じかっこも前につける（10/25-14）
   const esc = t => t.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   // カードの絵（11/6-6）: 絵があるステージ（stages）だけ、持っているカードの上に出す。絵は tools/cardsplit.mjs で切り分けた assets/cards/s<ステージ>_<順>.jpg（1辺 320px。表示の2倍。11/7-7 で PNG から JPEG 画質70に）
   const CARD_ART = { dir: "assets/cards/", stages: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], v: "1107-7" };   // v ＝ 絵を差し替えたら変える（前の絵がブラウザに残らないように）。11/7-5 で120枚そろった。絵が読めなかったときは onerror で「絵がないカード」の表示にもどる（保険として残す）
@@ -127,9 +127,12 @@ const Cards = (() => {
     rb.classList.remove("hidden");
     if (wrong.length && o.onRetake) { rb.textContent = tx("results.retakeButton"); rb.onclick = () => o.onRetake(wrong); }
     else { rb.textContent = tx("results.nextButton"); rb.onclick = () => (done ? o.onRecipe() : o.onShort ? o.onShort(o.words.length - ownedCount) : o.onNext()); }   // そろっていなければ「宝石まであと○こ」（11/7-10）
-    // 救出の旅をもう一度（10/25-14）: 助けられなかったことばがあるとき。「クイズをもう一度」（または「次へ」）の下に
-    const rs = $("cards-rescue");
-    rs.classList.toggle("hidden", !(notHelped.length && o.onRescue));
+    // 救出の旅をはじめからやり直す（10/25-14。11/7-30: 「クイズをもう一度」（または「次へ」）の上に、いつも出す）。
+    //   取り逃したことばがあるときは強い色にして、上に「取り逃したことばがあるよ」
+    const rs = $("cards-rescue"), miss = !!(notHelped.length && o.onRescue);
+    rs.classList.toggle("hidden", !o.onRescue);
+    rs.classList.toggle("btn-main", miss); rs.classList.toggle("btn-sub", !miss); rs.classList.toggle("cards-miss", miss);
+    $("cards-miss-note").textContent = tx("results.missNote"); $("cards-miss-note").classList.toggle("hidden", !miss);
     rs.textContent = tx("results.rescueButton"); rs.onclick = () => o.onRescue && o.onRescue();
     const qb = $("cards-quit");
     qb.textContent = tx("results.quitButton");

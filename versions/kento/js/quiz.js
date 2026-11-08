@@ -1,5 +1,6 @@
 // クイズ。バトルで吸い込んだ順に出題する
 const QUIZ = {
+  xShow: 0.6,                        // まちがえたとき、中央の大きな赤い「✕」を出す秒数（11/7-30）。そのあと正解とメモ
   reviewTime: 3,
   previewTime: 3,                    // 受け直しクイズで、出題の前にカード（語句＋一言メモ）を見せる秒数                     // クイズの前に「今日あつめたことば」を見せる秒数
   tempoUpAt: { 2: 140 / 128, 7: 152 / 128 },   // 何問目（0から数える）で音楽のテンポを上げるか。3問目と8問目（11/3-6: クイズの曲 128 → 140 → 152）
@@ -33,7 +34,7 @@ const Quiz = (() => {
   function start(words, end, o) {
     list = words; idx = 0; results = []; onEnd = end; streak = 0; preview = !!(o && o.preview);
     slotWords = ((o && o.slots) || words).slice().sort((a, b) => (a.order || 0) - (b.order || 0)); owned = Object.assign({}, (o && o.owned) || {});
-    clearTimeout(previewTimer); stopTimer(); flyTimers.forEach(clearTimeout); flyTimers = [];
+    clearTimeout(previewTimer); stopTimer(); flyTimers.forEach(clearTimeout); flyTimers = []; document.querySelectorAll(".quiz-x").forEach(e => e.remove());
     $("quiz-get").classList.add("hidden"); $("quiz-feedback").classList.add("hidden");
     slots();
     Sound.play("quiz");
@@ -194,7 +195,10 @@ const Quiz = (() => {
       const b = document.createElement("button"); b.className = "btn"; b.textContent = "次へ";
       b.addEventListener("click", next);
       fb.append(p1, p2, p3, b);
-      fb.classList.remove("hidden");
+      // 11/7-30: まず画面の中央に大きな赤い「✕」を0.6秒。そのあと正解とメモ
+      const mk = document.createElement("div"); mk.className = "quiz-x"; mk.textContent = "✕";
+      $("screen-quiz").appendChild(mk);
+      flyTimers.push(setTimeout(() => { mk.remove(); fb.classList.remove("hidden"); }, QUIZ.xShow * 1000));
     }
   }
 

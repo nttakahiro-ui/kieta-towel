@@ -4,6 +4,7 @@
 //   Ruby.html(文, [始め, 終わり], glue) … 文字をエスケープして <ruby> をつけた HTML（始め〜終わりの部分だけも作れる）
 //     glue: ルビの語と、すぐあとの送りがな・閉じかっこ（4字まで）を、折り返さない1つのかたまり（span.rbw）にする
 //   Ruby.kana(語) … お題のはずれの語（120語にない語）の読み。ルビをつけない語は ""
+//   Ruby.inline(文) … 「洗（あら）った」のかっこ書きを消した文を返し、その文にルビをつける（11/7-30）
 const Ruby = (() => {
   const R = window.RUBY || { text: {}, dict: {}, kana: {} };
   const keys = Object.keys(R.dict).sort((a, b) => b.length - a.length);
@@ -37,5 +38,15 @@ const Ruby = (() => {
     return out + esc(text.slice(i, b));
   }
   const kana = w => (R.kana && R.kana[w]) || "";
-  return { spans, html, kana };
+  // 文の中の「漢字（よみ）」のかっこ書きを、ルビにする（11/7-30。オープニングの文）: かっこを消した文を返し、その文のルビを表に入れる
+  function inline(text) {
+    text = text == null ? "" : String(text);
+    if (!/（[ぁ-ゖー]+）/.test(text)) return text;
+    let plain = "", last = 0; const sp = [];
+    text.replace(/([㐀-鿿々]+)（([ぁ-ゖー]+)）/g, (m, kj, rd, at) => { plain += text.slice(last, at); sp.push([plain.length, kj.length, rd]); plain += kj; last = at + m.length; return m; });
+    plain += text.slice(last);
+    R.text[plain] = sp; cache.delete(plain);
+    return plain;
+  }
+  return { spans, html, kana, inline };
 })();

@@ -399,22 +399,14 @@ const Main = (() => {
     showScreen("review");
     Sound.play("review");   // 今日あつめたことば: ステージ一覧の曲（11/7-4）。クイズの説明もそのまま
     Quiz.review(ordered, () => {
-      // クイズの1問目の前に、大きく1画面（ステージ1の初回だけ。おさらいのときも出す）
-      if (stage.id === 1 && (reviewing || !TutSave.load().quizIntro)) {
-        TutSave.mark("quizIntro");
-        $("quizintro-text").innerHTML = tx("quiz.intro").replace(/\n/g, "<br>");
-        $("quizintro-tap").textContent = tx("quiz.introTap");
-        showScreen("quizintro");
-        $("screen-quizintro").onclick = () => { $("screen-quizintro").onclick = null; quizDoor(); };
-        return;
-      }
+      // （クイズの1問目の前の説明の画面「クイズに正解すると…」は 11/7-30 にやめた。その文はクイズの扉の見出しの下に毎回出す）
       quizDoor();
     });
     // クイズの扉（11/7-19）: 「今日助けたことば」（ステージ1はクイズの説明も）のあと、1問目の前。押すか10秒で1問目へ。曲は扉からクイズの曲
     function quizDoor() {
       showScreen("door");
       Sound.play("quiz");
-      Door.mount($("door-canvas"), { kind: "quiz", world: stage.world, stageId: stage.id, stageName: stage.name, tap: tx("tapToGo") }, () => {
+      Door.mount($("door-canvas"), { kind: "quiz", world: stage.world, stageId: stage.id, stageName: stage.name, tap: tx("tapToGo"), sub: window.TEXTS.quiz.doorSub }, () => {
         startQuiz();
         const f = document.createElement("div"); f.className = "door-fade"; $("app").appendChild(f);   // 光が消えていく
         setTimeout(() => f.remove(), 450);
@@ -461,7 +453,7 @@ const Main = (() => {
       record: retake ? null : { newBest, best: Save.data.best[stage.id] },
       retake, helpedCount: lastIds.length, retakeIds: Save.data.retake,
       onRetake: startRetake,
-      onRescue: Save.data.found[stage.id] ? () => toBattle(true) : null,   // 救出の旅をもう一度（10/25-14。発見の記録があるステージだけ。記録はブラウザに保存 10/25-15）
+      onRescue: () => (Save.data.found[stage.id] ? toBattle(true) : toBattle()),   // 救出の旅をもう一度（10/25-14。発見の記録がないときは発見の旅から 11/7-30。記録はブラウザに保存 10/25-15）
       onRecipe: toRecipe,
       onShort: toShort,
       onRetry: toBattle,
@@ -649,9 +641,9 @@ const Main = (() => {
     if (cur.length) out.push(cur);
     return out;
   }
-  // 1行の文: 「男の子「…」」の形なら、話す人の名前を小さく色つきに。改行はことばのかたまりの途中でしない
+  // 1行の文（「——」は前の語につけて、行の頭に来ないように。11/7-30）: 「男の子「…」」の形なら、話す人の名前を小さく色つきに。改行はことばのかたまりの途中でしない
   function opLineHTML(l) {
-    const ph = t => Cards.phraseHTML(t).replace(/([\u4e00-\u9fff々])<wbr>(?=[ぁ-ん（])/g, "$1");   // 漢字と、そのあとの送りがな・ふりがなのあいだでは折り返さない
+    const ph = t => Cards.phraseHTML(Ruby.inline(t))   /* 「洗（あら）った」のかっこ書きは、漢字の上のルビに（11/7-30） */.replace(/([\u4e00-\u9fff々]|<\/ruby><\/span>)<wbr>(?=[ぁ-ん（])/g, "$1").replace(/([^\s<>;])(―+|—+)/g, '<span class="rbw">$1$2</span>');   // 「——」は前の1字とくっつける   // 漢字と、そのあとの送りがな・ふりがなのあいだでは折り返さない
     const m = l.match(/^([^「」、。！？\s]{1,6})(「[\s\S]*」)$/);
     return m ? `<p><span class="op-who">${ph(m[1])}</span>${ph(m[2])}</p>` : `<p>${ph(l)}</p>`;
   }
@@ -814,7 +806,7 @@ const Main = (() => {
     // タイトルの曲（mp3）は、最初の画面が出たあと（load のあと）に読む。読めるまでは合成曲（11/6-6）
     const nextWorld = () => Math.min(window.WORLDS.length, Math.max(1, Save.data.world || 1));   // 次に遊ぶ世界（ステージ一覧で出す世界）。そのあとに、その世界の発見の曲も（11/7-14）
     if (document.readyState === "complete") Sound.preloadCommon(nextWorld()); else window.addEventListener("load", () => Sound.preloadCommon(nextWorld()));
-    // 音は「はじめる」をタップしたときに解禁する（iOSの制限）
+    // 音は「スタート」をタップしたときに解禁する（iOSの制限）
     $("btn-start").addEventListener("click", () => {
       Sound.unlock();
       Sound.se("start");
@@ -829,7 +821,7 @@ const Main = (() => {
     const refreshSound = () => document.querySelectorAll(".sound-btn").forEach(b => {
       b.textContent = window.TEXTS.sound[Sound.muted ? "off" : "on"];
       b.classList.toggle("muted", Sound.muted);
-    });
+    }) || (document.querySelector(".title-note").style.visibility = Sound.muted ? "hidden" : "");   // 「音が出ます」は音がオフなら消す（11/7-30）
     const toggleSound = () => { Sound.setMuted(!Sound.muted); SoundPref.set(Sound.muted); refreshSound(); };
     $("btn-sound").addEventListener("click", toggleSound);
     $("pm-sound").addEventListener("click", toggleSound);

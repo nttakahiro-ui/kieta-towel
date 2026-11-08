@@ -1,4 +1,4 @@
-// ===== 扉（11/7-19）: 「発見の旅へ、出発！」「救出の旅へ、出発！」「クイズに、ちょうせん！」の画面 =====
+// ===== 扉（11/7-19）: 「発見の旅へ、出発！」「救出の旅へ、出発！」「クイズに挑戦！」の画面 =====
 // 3つとも同じ見た目。背景にその世界の背景の絵（発見の旅・救出の旅で流している絵）をうすく敷き、
 // カード図鑑の見出しと同じデコ文字（ふわふわの太い文字に白いふち）を世界の色で大きく出す。
 //   動き: 背景 → 0.3秒後に文字がドンと飛び出して光の粒がはじける → アイコンが下からぽん → 「タップで出発！」
@@ -27,7 +27,7 @@ const Door = (() => {
     2: { top: "#5e8bb8", main: "#4a729a", dark: "#2f4760", light: "#c6d8eb" },
     3: { top: "#9563b8", main: "#794a9a", dark: "#4c3360", light: "#dcc6eb" },
   };
-  const TEXT = { explore: ["発見の旅へ、", "出発！"], rescue: ["救出の旅へ、", "出発！"], quiz: ["クイズに、", "ちょうせん！"] };
+  const TEXT = { explore: ["発見の旅へ、", "出発！"], rescue: ["救出の旅へ、", "出発！"], quiz: ["クイズに挑戦（ちょうせん）！"] };   // 11/7-30: 「クイズに挑戦！」1行（挑戦にルビ）。「漢字（よみ）」はルビになる
   const SE = { explore: "doorExplore", rescue: "doorRescue", quiz: "doorQuiz" };   // 発見はキラッ、救出はドン、クイズはジャーン（js/audio.js）
   const fam = () => (typeof FONT_FAMILY !== "undefined" ? FONT_FAMILY : '"Hiragino Maru Gothic ProN","Zen Maru Gothic",sans-serif');
   const font = s => `bold ${s}px ${fam()}`;
@@ -37,6 +37,20 @@ const Door = (() => {
     if (!src || typeof Image === "undefined") return null;
     const im = imgs[src] || (imgs[src] = Object.assign(new Image(), { src }));
     return im.complete && im.naturalWidth ? im : null;
+  }
+  // 「漢字（よみ）」のかっこ書きをルビに（11/7-30）: [かっこを消した文, [[位置, 文字数, 読み], ...]]
+  const rubyOf = l => { if (typeof Ruby === "undefined" || !Ruby.inline) return [l.replace(/（[ぁ-ゖー]+）/g, ""), []]; const p = Ruby.inline(l); return [p, Ruby.spans(p)]; };
+  // 中央そろえの1行の上に、ルビを描く（cx ＝ 行のまん中、y ＝ 行のまん中。ctx.font は行の字）
+  function drawRuby(ctx, text, sp, cx, y, size, color, stroke) {
+    if (!sp.length) return;
+    const w = ctx.measureText(text).width, x0 = cx - w / 2, rf = Math.max(9, Math.round(size * 0.42)), base = ctx.font;
+    for (const [p, n, r] of sp) {
+      const bx = x0 + ctx.measureText(text.slice(0, p)).width, bw = ctx.measureText(text.slice(p, p + n)).width;
+      ctx.font = font(rf); const ry = y - size * 0.62 - rf * 0.55;
+      if (stroke) { ctx.lineWidth = Math.max(3, rf * 0.35); ctx.strokeStyle = stroke; ctx.strokeText(r, bx + bw / 2, ry); }
+      ctx.fillStyle = color; ctx.fillText(r, bx + bw / 2, ry);
+      ctx.font = base;
+    }
   }
   const easeOut = k => 1 - Math.pow(1 - k, 3);
   const easeBack = k => { const c = 1.7; return 1 + (c + 1) * Math.pow(k - 1, 3) + c * Math.pow(k - 1, 2); };
@@ -178,14 +192,15 @@ const Door = (() => {
       // ステージの番号と名前（見出しの上に小さく）
       ctx.globalAlpha = clamp01(kp * 2);
       ctx.font = font(15); ctx.fillStyle = col.dark;
-      const lines = TEXT[o.kind] || TEXT.explore;
+      const rl = (TEXT[o.kind] || TEXT.explore).map(rubyOf), lines = rl.map(q => q[0]), hasRuby = rl.some(q => q[1].length);
       let size = DOOR.textSize; const mc = ctx; mc.font = font(size);
       while (size > 26 && Math.max(...lines.map(l => mc.measureText(l).width)) + size * 0.7 > W - 24) { size -= 2; mc.font = font(size); }
       const th = size * 1.18 * lines.length;
       ctx.font = font(15);
       ctx.lineWidth = 4; ctx.strokeStyle = "rgba(255,253,245,0.9)"; ctx.lineJoin = "round";
       const lab = `ステージ${o.stageId}　${o.stageName || ""}`.trim();
-      ctx.strokeText(lab, W / 2, cy - th / 2 - 26); ctx.fillText(lab, W / 2, cy - th / 2 - 26);
+      const ly = cy - th / 2 - 26 - (hasRuby ? 14 : 0);   // 見出しにルビがあるときは、そのぶん上に
+      ctx.strokeText(lab, W / 2, ly); ctx.fillText(lab, W / 2, ly);
       // デコ文字: ドンと大きく飛び出す（大きく → 少しもどる）
       const sc = kp < 0.6 ? 0.25 + (1.22 - 0.25) * easeOut(kp / 0.6) : 1.22 - 0.22 * easeOut((kp - 0.6) / 0.4);
       ctx.globalAlpha = clamp01(kp * 3);
@@ -193,6 +208,7 @@ const Door = (() => {
       ctx.translate(W / 2, cy); ctx.scale(sc, sc);
       if (d) ctx.drawImage(d.c, -d.w / 2, -d.h / 2, d.w, d.h);
       else { ctx.font = font(size); ctx.fillStyle = col.main; lines.forEach((l, i) => ctx.fillText(l, 0, (i - (lines.length - 1) / 2) * size * 1.18)); }
+      ctx.font = font(size); rl.forEach(([l, sp], i) => drawRuby(ctx, l, sp, 0, (i - (lines.length - 1) / 2) * size * 1.18, size, col.dark, "#ffffff"));
       ctx.restore(); ctx.save(); ctx.textAlign = "center"; ctx.textBaseline = "middle";   // 拡大をもどす（最初の save にもどして、もう一度 save）
     }
     // アイコン: 文字のあとに下からぽん
@@ -208,14 +224,15 @@ const Door = (() => {
     if (o.sub && o.sub.length && t > DOOR.icon + 0.2) {
       ctx.globalAlpha = clamp01((t - DOOR.icon - 0.2) / 0.3);
       ctx.font = font(15); ctx.fillStyle = col.dark; ctx.lineWidth = 4; ctx.strokeStyle = "rgba(255,253,245,0.92)"; ctx.lineJoin = "round";
-      o.sub.forEach((l, i) => { const yy = H * 0.73 + i * 21; ctx.strokeText(l, W / 2, yy); ctx.fillText(l, W / 2, yy); });
+      const subR = o.sub.some(l => /（[ぁ-ゖー]+）/.test(l)), sl = subR ? 29 : 21;   // ルビがあるときは行の間を広く
+      o.sub.forEach((l, i) => { const [pl, sp] = rubyOf(l), yy = H * 0.73 + i * sl + (subR ? 8 : 0); ctx.font = font(15); ctx.lineWidth = 4; ctx.strokeStyle = "rgba(255,253,245,0.92)"; ctx.strokeText(pl, W / 2, yy); ctx.fillStyle = col.dark; ctx.fillText(pl, W / 2, yy); drawRuby(ctx, pl, sp, W / 2, yy, 15, col.dark, "rgba(255,253,245,0.92)"); });
       ctx.globalAlpha = 1;
     }
     // 「タップで出発！」（点めつ）
     if (t >= DOOR.tapShow && o.go == null) {
       ctx.globalAlpha = clamp01((t - DOOR.tapShow) / 0.3) * (0.6 + Math.sin(t * 4) * 0.4);
       ctx.font = font(24); ctx.lineWidth = 6; ctx.strokeStyle = "#ffffff"; ctx.lineJoin = "round";
-      const ty = H * 0.73 + (o.sub && o.sub.length ? o.sub.length * 21 + 30 : 20);
+      const ty = H * 0.73 + (o.sub && o.sub.length ? o.sub.length * (o.sub.some(l => /（[ぁ-ゖー]+）/.test(l)) ? 29 : 21) + 38 : 20);
       ctx.strokeText(o.tap || "タップで出発！", W / 2, ty); ctx.fillStyle = col.main; ctx.fillText(o.tap || "タップで出発！", W / 2, ty);
       ctx.globalAlpha = 1;
     }
