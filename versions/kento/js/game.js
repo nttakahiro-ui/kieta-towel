@@ -64,6 +64,7 @@ const BATTLE = {
   fillerAlpha: 0.72,           // 雑魚の濃さ（1でふつう。小さいほど薄い）
   fillerAvoid: 90,             // 語句のまわり、この距離（px）には雑魚を出さない
   fillerFireScale: 1.5,         // 雑魚が撃つ間隔の倍率（大きいほど撃たない）
+  seedScore: 200,             // 森の種（世界2・3も同じ役の回復アイテム）を取ったときの点（11/7-35 決定）。元気の回復は今のまま
   dropRate: 0.15,              // 雑魚が「綿のたね」を落とす確率（0〜1）。雑魚が増えたので下げた
   popScale: 1.6,               // 雑魚を倒したときの花の大きさ
   healItem: 8,                 // 綿のたねで回復する体力
@@ -617,7 +618,7 @@ const Battle = (() => {
   let typhoon = null;        // パワー全開を使った瞬間の演出（白いうずと大きなふわり。11/7-25）
   let extraUsed = false;     // 延長戦をしたか（1回だけ。10/25-19）
   let extraRound = false;    // いまラストチャンスか
-  let seedsGot = 0;          // 拾った種の数（結果画面に出す。11/7-31）
+  let seedsGot = 0, seedsDropped = 0;   // 拾った種の数（結果画面に出す。11/7-31）・落ちた種の数（自動プレイヤーで確かめる。11/7-35）
   let lastT = 0;             // ラストチャンスの残り秒（0 ＝ ラストチャンスではない）
   let lcWords = [], lcQueue = [], lcClock = 0;   // ラストチャンスに出すことばと、出す順番待ち、始まってからの秒
   let againFx = null;        // 大ボス2段階目の「まだだ！ もう一度！」（11/1-4）{ age }
@@ -779,7 +780,7 @@ const Battle = (() => {
     fpsT0 = 0; fpsN = 0; fpsNow = 0; fpsMin = 0;
     msgQ = []; msgGap = 0; msgWasBusy = false;
     choiceFree = !!opts.firstChoice;
-    tut = null; les = null; hintOpts = opts.hints || null; hintShown = {}; hintCard = null; bombHinted = false; bombFlash = 0; powerFx = null; wrongFx = null; againFx = null; extraUsed = false; extraRound = false; lastT = 0; seedsGot = 0; lcQueue = []; lcWords = [];
+    tut = null; les = null; hintOpts = opts.hints || null; hintShown = {}; hintCard = null; bombHinted = false; bombFlash = 0; powerFx = null; wrongFx = null; againFx = null; extraUsed = false; extraRound = false; lastT = 0; seedsGot = 0; seedsDropped = 0; lcQueue = []; lcWords = [];
     stripFlash = 0; sortieStep = "choice"; freed = [];
     explore = { t: 0, next: 0, nextAt: BATTLE.exploreFirst, again: [], list: [], bugs: [], bugT: 2, endT: 0, flies: [], streaks: [] };
     {
@@ -1955,6 +1956,8 @@ const Battle = (() => {
       if (!it.lesTried && it.y > LES_TOP + 14 && lesson("seed", { ty: it.y, target: it, done: () => it.got || it.y >= H + 20 })) it.lesTried = true;   /* 11/7-30: ほかの説明が出ているあいだは、出せるまで待つ */   // チュートリアル: 初めてたねが落ちた → 拾う（11/7-20）。上の帯より下に来てから（11/7-28）
       if (Math.hypot(it.x - player.x, it.y - player.y) < 28) {
         it.got = true; seedsGot++;
+        score += BATTLE.seedScore;   // 11/7-35 決定: 種を取ると＋200点。種の場所に大きめに（敵の「＋100」より目立つ色）
+        floats.push({ x: it.x, y: it.y - 8, text: `+${BATTLE.seedScore}`, xl: true, seed: true, age: 0 });
         player.hp = Math.min(maxHp(), player.hp + BATTLE.healItem);
         player.glow = 0.3;
         player.healFlash = 1;   // 体力ゲージが光って「+回復」
@@ -2519,7 +2522,7 @@ const Battle = (() => {
     // 11/7-30 不具合: チュートリアル「虫をやっつけると種が落ちる」のあとでも、種は15%でしか落ちず、出ないことが多かった。
     //   虫のチュートリアルのあと、種のチュートリアルがまだのあいだは、やっつけた虫が必ず種を落とす（画面に種がないとき）
     const lesSeed = hintShown.bug && lessonOn("seed") && !items.length;
-    if (lesSeed || Math.random() < BATTLE.dropRate) items.push({ x: Math.max(stripRight() + 14, Math.min(W - 14, f.x)), y: f.y, age: 0 });   // たねは、左の帯の下や画面の端に落ちないように（11/7-28）
+    if (lesSeed || Math.random() < BATTLE.dropRate) seedsDropped++, items.push({ x: Math.max(stripRight() + 14, Math.min(W - 14, f.x)), y: Math.min(f.y, H - 90), age: 0 });   // たねは、左の帯の下や画面の端に落ちないように（11/7-28）。下のボタンの帯の中にも生まれない（うしろから来た虫など。11/7-35）
   }
 
   // 地上の雑魚が割れる（11/7-23）: とがったかけらが回りながら飛び散り、光の粒も散る。音は「パリン」
@@ -2879,7 +2882,7 @@ const Battle = (() => {
   }
 
   function finishBattle() {
-    stop(); opts.onEnd(absorbed.map(w => w.id), { time: t, hits, downs, gameOvers, score, maxCombo, bombsUsed, missed: missed.map(w => w.id), found: [...found], seeds: seedsGot });
+    stop(); opts.onEnd(absorbed.map(w => w.id), { time: t, hits, downs, gameOvers, score, maxCombo, bombsUsed, missed: missed.map(w => w.id), found: [...found], seeds: seedsGot, seedPts: seedsGot * BATTLE.seedScore, seedsDropped });
   }
   // 延長戦に出すことば: 助けられなかったことば（同じことばは1回。大ボスはもう助けたので出ない）
   function extraWords() {
@@ -3211,9 +3214,9 @@ const Battle = (() => {
     for (const fl of floats) {
       ctx.globalAlpha = 1 - fl.age / 0.9;
       ctx.font = font(fl.xl ? 26 : fl.kana ? 22 : (fl.big ? 18 : 12));   // xl: 地上の雑魚を倒した「＋100」（11/7-23）
-      ctx.lineWidth = 4; ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = fl.seed ? 6 : 4; ctx.strokeStyle = fl.seed ? "#fff6c8" : "#ffffff";
       ctx.strokeText(fl.text, fl.x, fl.y - fl.age * 30);
-      ctx.fillStyle = fl.wrong ? "#b05068" : (fl.found ? tint("#6f9a4a") : (fl.kana ? "#5d6b4c" : (fl.big ? "#c98a1e" : "#8a9a78")));   // 砕けた文字の読みは、ふりがなの色
+      ctx.fillStyle = fl.seed ? "#e8541e" : fl.wrong ? "#b05068" : (fl.found ? tint("#6f9a4a") : (fl.kana ? "#5d6b4c" : (fl.big ? "#c98a1e" : "#8a9a78")));   // 砕けた文字の読みは、ふりがなの色
       ctx.fillText(fl.text, fl.x, fl.y - fl.age * 30);
     }
     ctx.globalAlpha = 1;

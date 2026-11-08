@@ -155,7 +155,7 @@ const Cards = (() => {
         + `<div class="rs best${o.record && o.record.newBest ? " up" : ""}"><span class="lb">${phraseHTML(tx("results.scoreBest"))}</span><b>${best.toLocaleString()}</b><small>点</small></div>`;
       const nm = document.createElement("div"); nm.className = "rank-line";
       const miss = st.missN || 0;
-      nm.innerHTML = `<span>${phraseHTML(tx("results.cardsLine", { got: ownedCount, n: o.words.length }))}</span><span class="${miss ? "miss" : ""}">${phraseHTML(tx("results.missLine", { n: miss }))}</span><span>${phraseHTML(tx("results.seedLine", { n: st.seeds || 0 }))}</span>`;
+      nm.innerHTML = `<span>${phraseHTML(tx("results.cardsLine", { got: ownedCount, n: o.words.length }))}</span><span class="${miss ? "miss" : ""}">${phraseHTML(tx("results.missLine", { n: miss }))}</span><span>${phraseHTML(tx("results.seedLine", { n: st.seeds || 0, p: (st.seedPts || 0).toLocaleString() }))}</span>`;
       rk.append(sc, nm);
       // ベスト更新と、今回とれた印
       if (o.record) {

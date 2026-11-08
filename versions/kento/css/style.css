@@ -877,3 +877,6 @@ button.wdeco:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--wc-d
 #screen-stages .gems-head { color: var(--wc-dark); }
 #screen-stages .gems-head b { color: var(--wc-main); }
 #screen-stages .stages-nav .link-btn { color: var(--wc-main); text-decoration-color: var(--wc-main); }
+
+/* 11/7-34 決定: カード図鑑は共通の画面（緑）。図鑑の合計点の札も緑で固定（世界の色にするのはステージ一覧の帯だけ） */
+.zukan-title .score-chip.wdeco { --wc-top: #86b35e; --wc-main: #6f9a4a; --wc-dark: #3f5f2e; --wc-light: #dcebc6; }
