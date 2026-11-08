@@ -880,3 +880,6 @@ button.wdeco:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--wc-d
 
 /* 11/7-34 決定: カード図鑑は共通の画面（緑）。図鑑の合計点の札も緑で固定（世界の色にするのはステージ一覧の帯だけ） */
 .zukan-title .score-chip.wdeco { --wc-top: #86b35e; --wc-main: #6f9a4a; --wc-dark: #3f5f2e; --wc-light: #dcebc6; }
+/* 11/7-36 決定: 結果画面の「カード ○/10　取り逃し ○こ　種 ○こ ＋○点」は1行に収める（文字を少し小さく、折り返さない） */
+#cards-p2 .rank-line { gap: .5em; font-size: 12.5px; padding: 4px 10px; white-space: nowrap; }
+#cards-p2 .rank-line > span { flex-shrink: 0; }

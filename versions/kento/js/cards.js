@@ -155,7 +155,8 @@ const Cards = (() => {
         + `<div class="rs best${o.record && o.record.newBest ? " up" : ""}"><span class="lb">${phraseHTML(tx("results.scoreBest"))}</span><b>${best.toLocaleString()}</b><small>点</small></div>`;
       const nm = document.createElement("div"); nm.className = "rank-line";
       const miss = st.missN || 0;
-      nm.innerHTML = `<span>${phraseHTML(tx("results.cardsLine", { got: ownedCount, n: o.words.length }))}</span><span class="${miss ? "miss" : ""}">${phraseHTML(tx("results.missLine", { n: miss }))}</span><span>${phraseHTML(tx("results.seedLine", { n: st.seeds || 0, p: (st.seedPts || 0).toLocaleString() }))}</span>`;
+      // 11/7-36: この札は1行に収める（折り返しの印 <wbr> を入れない Ruby.html を使う）
+      nm.innerHTML = `<span>${Ruby.html(tx("results.cardsLine", { got: ownedCount, n: o.words.length }))}</span><span class="${miss ? "miss" : ""}">${Ruby.html(tx("results.missLine", { n: miss }))}</span><span>${Ruby.html(tx("results.seedLine", { n: st.seeds || 0, p: (st.seedPts || 0).toLocaleString() }))}</span>`;
       rk.append(sc, nm);
       // ベスト更新と、今回とれた印
       if (o.record) {
