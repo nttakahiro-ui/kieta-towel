@@ -13,6 +13,7 @@
 // 雑魚（語句ではない敵）は小さく薄く。倒すとぽんっと花になり、ときどき体力が回復する「綿のたね」を落とす
 
 // ===== 調整用の数値（速さ・弾の量・硬さなど）はここにまとめる =====
+const WORD_EDGE = 4;   // 11/7-42: 空のことばの白いふち（線の幅8）が字の外へ出る太さ。ふりがなはこの外がわ＋4px に置く
 const BATTLE = {
   // --- 台本（2周＋大ボス） ---
   roundInterval1: 3.2,         // 探検（出撃1）で語句が出てくる間隔（秒）
@@ -4111,8 +4112,8 @@ const Battle = (() => {
     if (hasKanji(e.word.word)) {
       ctx.globalAlpha = alpha;
       const ks = Math.max(9, Math.min(BATTLE.kanaSize, Math.floor(e.h / Math.max(1, Array.from(e.word.kana).length))));
-      ctx.font = font(ks); ctx.lineWidth = 3; ctx.strokeStyle = "#ffffff"; ctx.fillStyle = "#5d6b4c";
-      const kx = x + e.w / 2 + ks / 2 + 2;
+      ctx.font = font(ks); ctx.lineWidth = 3; ctx.strokeStyle = "#ffffff"; ctx.fillStyle = "#5d6b4c"; ctx.lineJoin = "round";
+      const kx = x + e.w / 2 + WORD_EDGE + 4 + ks / 2;   // 11/7-42: 文字の幅＋ふち＋すき間4px の右
       Array.from(e.word.kana).forEach((ch, i) => {
         const c = VERTICAL_GLYPH[ch] || ch, ky = y - e.h / 2 + ks / 2 + i * ks;
         ctx.strokeText(c, kx, ky); ctx.fillText(c, kx, ky);
@@ -4240,7 +4241,7 @@ const Battle = (() => {
       const f = 0.6 + Math.sin(t * 18) * 0.4;
       ctx.shadowColor = `rgba(255,255,230,${f})`; ctx.shadowBlur = 26;
     }
-    ctx.lineWidth = 8;
+    ctx.lineWidth = WORD_EDGE * 2;
     ctx.strokeStyle = wrongBlink(e) ? "#ff6b6b" : e.flash > 0 ? "#fff6c8" : (theme.wordStroke || (e.last ? "#fff6d8" : "#ffffff"));   // 縁取りの色は時間帯で変えられる（ちがうことばは赤く点滅）
     if (e.parts) {
       for (const p of e.parts) if (!p.broken) ctx.strokeText(p.ch, x + p.ox, y);
@@ -4275,8 +4276,8 @@ const Battle = (() => {
     if (cocoon > 0) { ctx.save(); ctx.globalAlpha = alpha; drawCocoon(e, x, y, cocoon, true); ctx.restore(); ctx.globalAlpha = alpha; }
     if (hasKanji(word.word)) {
       ctx.font = font(BATTLE.kanaSize);
-      ctx.lineWidth = 4; ctx.strokeStyle = "#ffffff";
-      const ky = y - e.size / 2 - BATTLE.kanaSize / 2 - 1;
+      ctx.lineWidth = 3; ctx.strokeStyle = "#ffffff"; ctx.lineJoin = "round";
+      const ky = y - e.size / 2 - WORD_EDGE - 4 - BATTLE.kanaSize / 2;   // 11/7-42: 文字の高さ＋ふち（線の幅8 → 外へ4px）＋すき間4px の上
       ctx.strokeText(word.kana, x, ky);
       ctx.fillStyle = "#5d6b4c";
       ctx.fillText(word.kana, x, ky);
@@ -4376,7 +4377,7 @@ const Battle = (() => {
     if (e.parts || e.maxHp <= 1) return;
     if (hasShell(e)) return;   // 2回目の旅は、硬さを丸ではなく殻の厚みで見せる   // 1文字ずつ壊す敵は、文字ごとの帯で出す
     const n = e.maxHp, gap = 10, x0 = e.x - (n - 1) * gap / 2;
-    const dy = e.y - e.h / 2 - 10 - (hasKanji(e.word.word) ? BATTLE.kanaSize + 4 : 0);   // ふりがなより上に出す
+    const dy = e.y - e.h / 2 - 10 - (hasKanji(e.word.word) ? BATTLE.kanaSize + WORD_EDGE + 4 : 0);   // ふりがなより上に出す（11/7-42: ルビが上がったぶん）
     for (let i = 0; i < n; i++) {
       ctx.beginPath();
       ctx.arc(x0 + i * gap, dy, 3.5, 0, Math.PI * 2);
@@ -5466,7 +5467,7 @@ const Battle = (() => {
     const d = Door.deco([word.word], size, wid);
     const tw = d ? d.w : ctx.measureText(word.word).width + size * 0.7;
     const w = Math.min(W - 16, Math.max(tw, 170) + 36);
-    const h = size + (showKana ? 62 : 40);
+    const h = size + (showKana ? 66 : 40);
     const cy = H * 0.45;
     const pop = t < 0.25 ? 0.6 + 0.55 * (t / 0.25) : t < 0.4 ? 1.15 - 0.15 * ((t - 0.25) / 0.15) : 1;   // ぽんと大きく出て、少しもどる
     ctx.translate(W / 2, cy); ctx.scale(pop, pop);
@@ -5477,11 +5478,12 @@ const Battle = (() => {
     ctx.fill(); ctx.stroke();
     ctx.strokeStyle = col.light; ctx.lineWidth = 2; roundRect(-w / 2 + 5, -h / 2 + 5, w - 10, h - 10, 18); ctx.stroke();
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    const wy = showKana ? 12 : 0;
-    if (showKana) {
-      ctx.font = font(19); ctx.lineJoin = "round"; ctx.lineWidth = 4; ctx.strokeStyle = "#ffffff";
-      ctx.strokeText(word.kana, 0, wy - size / 2 - 14);
-      ctx.fillStyle = col.dark; ctx.fillText(word.kana, 0, wy - size / 2 - 14);
+    const wy = showKana ? 13 : 0;
+    if (showKana) {   // 11/7-42 決定: ルビは「文字の高さ＋ふちの太さ＋すき間4px」の上（デコ文字の濃いふちの上端より上）。ルビにも細い白いふち
+      const edge = d ? size * Door.DECO_EDGE : 0, ky = wy - size / 2 - edge - 4 - 19 / 2;
+      ctx.font = font(19); ctx.lineJoin = "round"; ctx.lineWidth = 3; ctx.strokeStyle = "#ffffff";
+      ctx.strokeText(word.kana, 0, ky);
+      ctx.fillStyle = col.dark; ctx.fillText(word.kana, 0, ky);
     }
     if (d) ctx.drawImage(d.c, -d.w / 2, wy - d.h / 2, d.w, d.h);
     else { ctx.font = font(size); ctx.fillStyle = col.main; ctx.fillText(word.word, 0, wy); }

@@ -41,13 +41,17 @@ const Door = (() => {
   // 「漢字（よみ）」のかっこ書きをルビに（11/7-30）: [かっこを消した文, [[位置, 文字数, 読み], ...]]
   const rubyOf = l => { if (typeof Ruby === "undefined" || !Ruby.inline) return [l.replace(/（[ぁ-ゖー]+）/g, ""), []]; const p = Ruby.inline(l); return [p, Ruby.spans(p)]; };
   // 中央そろえの1行の上に、ルビを描く（cx ＝ 行のまん中、y ＝ 行のまん中。ctx.font は行の字）
-  function drawRuby(ctx, text, sp, cx, y, size, color, stroke) {
+  //   11/7-42 決定: ルビの位置は「文字の高さ＋ふちの太さ＋すき間4px」。edge ＝ 文字の外へ出るふちの太さ（px）。ルビのいちばん下が、ふちの上端より4px上
+  //   ルビにも細い白いふち（線の幅3px ＝ 外へ1.5px）
+  const RUBY_GAP = 4;
+  const rubyY = (y, size, edge, rf) => y - size / 2 - (edge || 0) - RUBY_GAP - rf / 2;
+  function drawRuby(ctx, text, sp, cx, y, size, color, stroke, edge) {
     if (!sp.length) return;
     const w = ctx.measureText(text).width, x0 = cx - w / 2, rf = Math.max(9, Math.round(size * 0.42)), base = ctx.font;
     for (const [p, n, r] of sp) {
       const bx = x0 + ctx.measureText(text.slice(0, p)).width, bw = ctx.measureText(text.slice(p, p + n)).width;
-      ctx.font = font(rf); const ry = y - size * 0.62 - rf * 0.55;
-      if (stroke) { ctx.lineWidth = Math.max(3, rf * 0.35); ctx.strokeStyle = stroke; ctx.strokeText(r, bx + bw / 2, ry); }
+      ctx.font = font(rf); const ry = rubyY(y, size, edge, rf);
+      if (stroke) { ctx.lineJoin = "round"; ctx.lineWidth = 3; ctx.strokeStyle = stroke; ctx.strokeText(r, bx + bw / 2, ry); }
       ctx.fillStyle = color; ctx.fillText(r, bx + bw / 2, ry);
       ctx.font = base;
     }
@@ -60,6 +64,7 @@ const Door = (() => {
   // デコ文字（カード図鑑の見出しと同じ作り）: 世界の色のグラデーションに、ふわふわの毛羽の点。白い太いふち、外に濃いふちと影
   //   一度作った絵はとっておく（毎こま作り直さない）
   const decoCache = {};
+  const DECO_EDGE = 0.18;   // デコ文字の濃いふち（線の幅 size×0.36）が字の外へ出る太さ ＝ size×0.18（11/7-42）
   function deco(lines, size, world) {
     const key = lines.join("|") + size + "|" + world;
     if (decoCache[key]) return decoCache[key];
@@ -85,7 +90,7 @@ const Door = (() => {
     // ふちと影
     const [c, x] = make();
     x.shadowColor = "rgba(40,30,10,0.32)"; x.shadowBlur = size * 0.16; x.shadowOffsetY = size * 0.07;
-    x.strokeStyle = col.dark; x.lineWidth = size * 0.36; lines.forEach((l, i) => x.strokeText(l, w / 2, ys[i]));
+    x.strokeStyle = col.dark; x.lineWidth = size * DECO_EDGE * 2; lines.forEach((l, i) => x.strokeText(l, w / 2, ys[i]));
     x.shadowColor = "transparent";
     x.strokeStyle = "#ffffff"; x.lineWidth = size * 0.25; lines.forEach((l, i) => x.strokeText(l, w / 2, ys[i]));
     x.setTransform(1, 0, 0, 1, 0, 0); x.drawImage(fc, 0, 0);
@@ -199,7 +204,7 @@ const Door = (() => {
       ctx.font = font(15);
       ctx.lineWidth = 4; ctx.strokeStyle = "rgba(255,253,245,0.9)"; ctx.lineJoin = "round";
       const lab = `ステージ${o.stageId}　${o.stageName || ""}`.trim();
-      const ly = cy - th / 2 - 26 - (hasRuby ? 14 : 0);   // 見出しにルビがあるときは、そのぶん上に
+      const ly = cy - th / 2 - 26 - (hasRuby ? 24 : 0);   // 見出しにルビがあるときは、そのぶん上に（11/7-42: ルビをふちの上に出したので 14→24）
       ctx.strokeText(lab, W / 2, ly); ctx.fillText(lab, W / 2, ly);
       // デコ文字: ドンと大きく飛び出す（大きく → 少しもどる）
       const sc = kp < 0.6 ? 0.25 + (1.22 - 0.25) * easeOut(kp / 0.6) : 1.22 - 0.22 * easeOut((kp - 0.6) / 0.4);
@@ -208,7 +213,7 @@ const Door = (() => {
       ctx.translate(W / 2, cy); ctx.scale(sc, sc);
       if (d) ctx.drawImage(d.c, -d.w / 2, -d.h / 2, d.w, d.h);
       else { ctx.font = font(size); ctx.fillStyle = col.main; lines.forEach((l, i) => ctx.fillText(l, 0, (i - (lines.length - 1) / 2) * size * 1.18)); }
-      ctx.font = font(size); rl.forEach(([l, sp], i) => drawRuby(ctx, l, sp, 0, (i - (lines.length - 1) / 2) * size * 1.18, size, col.dark, "#ffffff"));
+      ctx.font = font(size); rl.forEach(([l, sp], i) => drawRuby(ctx, l, sp, 0, (i - (lines.length - 1) / 2) * size * 1.18, size, col.dark, "#ffffff", DECO_EDGE * size));   // ふち＝デコ文字の濃いふちの外がわ（11/7-42）
       ctx.restore(); ctx.save(); ctx.textAlign = "center"; ctx.textBaseline = "middle";   // 拡大をもどす（最初の save にもどして、もう一度 save）
     }
     // アイコン: 文字のあとに下からぽん
@@ -224,15 +229,15 @@ const Door = (() => {
     if (o.sub && o.sub.length && t > DOOR.icon + 0.2) {
       ctx.globalAlpha = clamp01((t - DOOR.icon - 0.2) / 0.3);
       ctx.font = font(15); ctx.fillStyle = col.dark; ctx.lineWidth = 4; ctx.strokeStyle = "rgba(255,253,245,0.92)"; ctx.lineJoin = "round";
-      const subR = o.sub.some(l => /（[ぁ-ゖー]+）/.test(l)), sl = subR ? 29 : 21;   // ルビがあるときは行の間を広く
-      o.sub.forEach((l, i) => { const [pl, sp] = rubyOf(l), yy = H * 0.73 + i * sl + (subR ? 8 : 0); ctx.font = font(15); ctx.lineWidth = 4; ctx.strokeStyle = "rgba(255,253,245,0.92)"; ctx.strokeText(pl, W / 2, yy); ctx.fillStyle = col.dark; ctx.fillText(pl, W / 2, yy); drawRuby(ctx, pl, sp, W / 2, yy, 15, col.dark, "rgba(255,253,245,0.92)"); });
+      const subR = o.sub.some(l => /（[ぁ-ゖー]+）/.test(l)), sl = subR ? 33 : 21;   // 11/7-42: ルビをふちの上に出したので 29→33   // ルビがあるときは行の間を広く
+      o.sub.forEach((l, i) => { const [pl, sp] = rubyOf(l), yy = H * 0.73 + i * sl + (subR ? 12 : 0); ctx.font = font(15); ctx.lineWidth = 4; ctx.strokeStyle = "rgba(255,253,245,0.92)"; ctx.strokeText(pl, W / 2, yy); ctx.fillStyle = col.dark; ctx.fillText(pl, W / 2, yy); drawRuby(ctx, pl, sp, W / 2, yy, 15, col.dark, "rgba(255,253,245,0.92)", 2); });
       ctx.globalAlpha = 1;
     }
     // 「タップで出発！」（点めつ）
     if (t >= DOOR.tapShow && o.go == null) {
       ctx.globalAlpha = clamp01((t - DOOR.tapShow) / 0.3) * (0.6 + Math.sin(t * 4) * 0.4);
       ctx.font = font(24); ctx.lineWidth = 6; ctx.strokeStyle = "#ffffff"; ctx.lineJoin = "round";
-      const ty = H * 0.73 + (o.sub && o.sub.length ? o.sub.length * (o.sub.some(l => /（[ぁ-ゖー]+）/.test(l)) ? 29 : 21) + 38 : 20);
+      const ty = H * 0.73 + (o.sub && o.sub.length ? o.sub.length * (o.sub.some(l => /（[ぁ-ゖー]+）/.test(l)) ? 33 : 21) + 38 : 20);
       ctx.strokeText(o.tap || "タップで出発！", W / 2, ty); ctx.fillStyle = col.main; ctx.fillText(o.tap || "タップで出発！", W / 2, ty);
       ctx.globalAlpha = 1;
     }
@@ -285,5 +290,5 @@ const Door = (() => {
     raf = requestAnimationFrame(loop);
     return { stop, state: st };
   }
-  return { draw, step, tap, mount, deco, COLORS };   // deco はチュートリアルの「OK！」でも使う（11/7-20）
+  return { draw, step, tap, mount, deco, COLORS, DECO_EDGE };   // deco はチュートリアルの「OK！」でも使う（11/7-20）
 })();

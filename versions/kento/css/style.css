@@ -914,3 +914,9 @@ button.wdeco:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--wc-d
 .zk-door-btn .zd-name { font-size: 16px; }
 .zk-door-btn .zd-nums { font-size: 14px; }
 #screen-zukan.door .zukan-box > .btn-row { margin-top: 10px; }
+/* 11/7-42 決定: ふち取りつきの文字のルビは「文字の高さ＋ふちの太さ＋すき間4px」の上に出し、ルビにも細い白いふち（1px）。
+   HTML の文字では、ふち取りつきでルビがあるのは結果画面の「ベスト更新！」の札だけ（ほかは canvas: js/door.js の drawRuby・js/game.js の drawBigWord と空のことば）。
+   札の上の余白をふやして、ルビが札のふちにかからないように */
+.best-new .bn-txt { padding-top: 11px; padding-bottom: 3px; }
+.best-new rt { padding-bottom: 3px; color: #a3262f; opacity: 1; font-weight: bold;
+  text-shadow: 1px 0 0 #fff, -1px 0 0 #fff, 0 1px 0 #fff, 0 -1px 0 #fff, 1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff; }
