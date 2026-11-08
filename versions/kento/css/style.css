@@ -825,7 +825,16 @@ rt { font-size: 0.5em; font-weight: normal; line-height: 1; letter-spacing: 0; c
 @keyframes quizX { 0% { transform: translate(-50%, -50%) scale(.3); opacity: 0; } 25% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; } 40% { transform: translate(-50%, -50%) scale(1); } 85% { opacity: 1; } 100% { opacity: 0; } }
 
 /* 11/7-31: 点数は「自分の記録を伸ばす」形。合計点（ステージ一覧・カード図鑑のいちばん上）、ステージの枠の最高得点、結果画面の今回と最高 */
-.score-total { text-align: center; margin: 2px auto 4px; font-size: 26px; font-weight: bold; color: #b5791a; text-shadow: 0 2px 0 #fff, 0 0 8px #fff7dc; letter-spacing: .04em; }
+/* 11/7-32: 合計点の札。救出の旅の左下の「スコア」の札と同じ見た目（クリーム色・丸い角・緑のふち、小さく「合計」、その下に数字） */
+.score-chip { margin-left: auto; max-width: 33vw; box-sizing: border-box; display: inline-flex; flex-direction: column; align-items: center; line-height: 1.1;
+  background: rgba(255,253,245,0.94); border: 2px solid #b9d39a; border-radius: 10px; padding: 3px 10px 4px; color: #2f3d2a; }
+.score-chip .lb { font-size: 11px; color: #4b5e3a; }
+.score-chip b { font-size: 17px; font-weight: bold; white-space: nowrap; }
+.score-chip b small { font-size: 11px; margin-left: 1px; font-weight: normal; }
+.zk-sub-row { display: flex; align-items: center; gap: 8px; }
+.zk-sub-row > small { flex: 1; text-align: center; }
+.zk-sub-row .score-chip { flex: 0 0 auto; }
+.zukan-title .score-chip b small { font-size: 11px; color: inherit; }
 .stage-row .sub .row-best { margin-left: .9em; color: #b5791a; }
 .rank-scores { display: flex; justify-content: center; gap: 10px; margin: 2px auto 4px; }
 .rank-scores .rs { flex: 0 1 150px; background: rgba(255,250,232,.95); border: 2px solid #e2c27a; border-radius: 14px; padding: 4px 6px 6px; color: #8a5d10; }
@@ -845,3 +854,4 @@ rt { font-size: 0.5em; font-weight: normal; line-height: 1; letter-spacing: 0; c
 @keyframes bn-burst { 0% { opacity: 1; transform: translate(0,0) scale(1.2); } 100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(.4); } }
 .rank-line > span { white-space: nowrap; }
 #cards-p2 .rank-line { gap: .8em; font-size: 14px; }
+.stages-nav .score-chip { margin-top: 26px; }   /* 「◀ 世界○」（.link-btn の上の余白 26px）と同じ高さに中心をそろえる */

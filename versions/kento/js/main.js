@@ -532,7 +532,7 @@ const Main = (() => {
     RecipeBook.renderBand($("stages-gems"), { lit: litSet, world: wid });
     $("stages-gems-head").textContent = tx("recipeBook.head"); $("stages-gems-count").textContent = `${litSet.size}/12`;   // 見出し「宝石 ○/12」（10/25-20・10/31-3）
     $("stages-gems").onclick = toRecipeBook;
-    $("stages-total").textContent = tx("results.totalScore", { n: totalBest().toLocaleString() });   // 合計点（11/7-31 決定: 12ステージの最高得点の合計）
+    $("stages-total").innerHTML = totalChip();   // 合計点の札（11/7-31 決定: 12ステージの最高得点の合計。11/7-32: 右上に小さく）
     const box = $("stages-list");
     box.innerHTML = "";
     worldStages(wid).forEach(s => {
@@ -703,13 +703,13 @@ const Main = (() => {
 
   // カード図鑑（10/22-1）: 今いる世界の、ステージごとの10枚。持っているカードは語句と一言メモ、ないものは「？」
   // 12ステージの最高得点の合計（11/7-31）
+  function totalChip() { return `<span class="lb">${tx("results.totalLabel")}</span><b>${totalBest().toLocaleString()}<small>点</small></b>`; }   // 救出の旅の「スコア」の札と同じ見た目（11/7-32）
   function totalBest() { return Object.entries(Save.data.best).filter(([id]) => +id >= 1 && +id <= 12).reduce((a, [, b]) => a + ((b && b.score) || 0), 0); }
   function toZukan() {
-    $("zukan-total").textContent = tx("results.totalScore", { n: totalBest().toLocaleString() });   // 合計点（11/7-31）
     Sound.play("zukan");   // カード図鑑はタイトルの曲（11/7-4）
     const wid = Save.data.world || 1;
     // 見出しは制作側の絵 g_title（11/1）。絵が読めなければ今までの文字
-    const sub = `<small>${tx("worlds.title", { id: wid, name: window.WORLDS.find(w => w.id === wid).name })}</small>`;
+    const sub = `<span class="zk-sub-row"><small>${tx("worlds.title", { id: wid, name: window.WORLDS.find(w => w.id === wid).name })}</small><span class="score-chip">${totalChip()}</span></span>`;   // 11/7-32: 世界の行の右端に合計点の札
     $("zukan-title").innerHTML = `<img class="zk-title-img" src="assets/zukan_title.png" alt="${tx("zukan.title")}"><br>${sub}`;
     $("zukan-title").querySelector("img").onerror = () => { $("zukan-title").innerHTML = `${tx("zukan.title")}<br>${sub}`; };
     const box = $("zukan-list");
