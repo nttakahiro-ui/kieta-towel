@@ -939,3 +939,5 @@ button.wdeco:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--wc-d
 .white-flash { position: fixed; inset: 0; z-index: 60; background: #fff; opacity: 0; pointer-events: none; transition: opacity .35s ease-out; }
 .white-flash.on { opacity: 1; }
 .white-flash.off { opacity: 0; transition: opacity .45s ease-in; }
+/* 11/7-45 決定: ワープのボタンはステージ4つの下、下の帯（合計・カード図鑑・タイトルへ）の上 */
+.stages-warps { margin: 4px 0 0; }
