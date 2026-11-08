@@ -521,10 +521,6 @@ const Main = (() => {
     const wd = window.WORLDS.find(w => w.id === wid);
     $("stages-world-title").textContent = tx("worlds.title", { id: wd.id, name: wd.name });
     $("screen-stages").style.backgroundImage = `url(assets/bg_world${wd.id}.jpg)`;
-    const back = $("btn-world-back");
-    back.classList.toggle("hidden", wid <= 1);
-    back.textContent = tx("worlds.back", { id: wid - 1 });
-    back.onclick = () => { Save.data.world = wid - 1; Save.store(); toStages(); };
     $("btn-zukan").innerHTML = `${tx("zukan.button")}<small>${Save.cardCount()}/${window.WORDS.length}</small>`;   // 11/7-33: 数は2行目に小さく（3つ並べても入るように）   // 下の「タイトルへ」の横（10/25-20）
     // いちばん上に、今いる世界の帯の絵（11/1。前は台座の扇形）。宝石が枠にはまる。タップでレシピブックへ
     const litSet = RecipeBook.litIds(Save.data.cards);
@@ -560,12 +556,32 @@ const Main = (() => {
       box.appendChild(row);
     });
     // （初めて光ったときの案内は、10/25-19 に「ステージクリア」の表記にかえてやめた）
-    // ワープ: この世界のカードがそろったら、次の世界へのボタン（ボタンが出る＝進める）
-    const warp = $("btn-warp");
-    const canWarp = wid < window.WORLDS.length && (worldDone(wid) || openAll);
-    warp.classList.toggle("hidden", !canWarp);
-    warp.textContent = tx("worlds.warp", { id: wid + 1 });
-    warp.onclick = () => warpTo(wid + 1);
+    // 11/7-43 決定: 世界の行き来は、画面の上のワープのボタン（「◀ 世界○へワープ」「世界○へワープ ▶」）。行き先の世界の色・帯の絵・宝石のアイコン、まわりに光の粒。
+    //   次の世界へ進めるのは今までどおり、この世界のカードがそろったとき（宝石4つ）。まだなら灰色で「宝石があと○こ」。前の世界へはいつでも
+    const nav = $("stages-warps"); nav.innerHTML = "";
+    const gemsHere = worldStages(wid).filter(s => litSet.has(s.id)).length;
+    [[wid - 1, "prev"], [wid + 1, "next"]].forEach(([to, dir]) => {
+      const slot = document.createElement("div"); slot.className = "wp-slot " + dir;
+      const wd2 = window.WORLDS.find(w => w.id === to);
+      if (wd2) {
+        const open = dir === "prev" || worldDone(wid) || openAll, s0 = worldStages(to)[0];
+        const b = document.createElement("button");
+        b.className = "wp-btn wdeco" + (open ? "" : " locked"); b.dataset.w = to; b.disabled = !open;
+        const gem = `<svg class="wp-gem" viewBox="-22 -22 44 44">${GEM_ART(s0.gem, true, 19, s0.id)}</svg>`;
+        b.innerHTML = `<span class="wp-txt">${dir === "prev" ? "◀ " : ""}${tx("worlds.warpTo", { id: to })}${dir === "next" ? " ▶" : ""}</span>`
+          + `<span class="wp-band"><img src="assets/world_band${to}.jpg" alt="">${gem}</span>`
+          + (open ? "" : `<span class="wp-need">${tx("worlds.warpNeed", { n: Math.max(1, worldStages(wid).length - gemsHere) })}</span>`);
+        if (open) b.addEventListener("click", () => { Sound.se("start"); warpTo(to); });
+        slot.appendChild(b);
+        if (open) for (let i = 0; i < 8; i++) {   // まわりに小さな光の粒がゆっくり舞う（常に）
+          const sp = document.createElement("i"); sp.className = "wp-spark";
+          const P = [[8, -4], [38, -6], [72, -3], [98, 30], [90, 104], [50, 106], [14, 103], [1, 45]][i];   // ボタンのふちのまわり（上・右・下・左）
+          sp.style.left = `${P[0]}%`; sp.style.top = `${P[1]}%`; sp.style.animationDelay = `${-(i * 0.71).toFixed(2)}s`; sp.style.animationDuration = `${3.2 + (i % 3) * 0.7}s`;
+          slot.appendChild(sp);
+        }
+      }
+      nav.appendChild(slot);
+    });
     showScreen("stages");
     $("screen-stages").scrollTop = 0;
   }
@@ -611,10 +627,19 @@ const Main = (() => {
     at(T.end, finish);
   }
 
+  // 11/7-43: 画面がさっと白く光る（0.35秒で白く → 次へ → 0.45秒で消える）
+  function whiteFlash(next) {
+    const f = document.createElement("div"); f.className = "white-flash"; document.body.appendChild(f);
+    Sound.se("power");
+    requestAnimationFrame(() => f.classList.add("on"));
+    setTimeout(() => { next(); f.classList.add("off"); setTimeout(() => f.remove(), 500); }, 380);
+  }
   // ワープの演出: 白く光って、次の世界の背景に切りかわる（約1.6秒）
   function warpTo(id) {
+    const from = Save.data.world || 1;
     setWorldColor(id);   // ワープの会話・「世界○へ」の文字は、行き先の世界の色（11/7-16）
-    if (!Save.data.warpSeen[id]) { Save.data.warpSeen[id] = true; Save.store(); warpTalk(id); return; }   // 初めては会話の演出（10/25-18）
+    // 初めては会話の演出（10/25-18）。11/7-43: 画面が白く光ってから会話に入る。前の世界へ戻るときは会話なし（下の短い光）
+    if (id > from && !Save.data.warpSeen[id]) { Save.data.warpSeen[id] = true; Save.store(); whiteFlash(() => warpTalk(id)); return; }
     const fx = $("warp");
     fx.style.backgroundImage = `url(assets/bg_world${id}.jpg)`;
     $("warp-text").textContent = tx("worlds.warping", { id });

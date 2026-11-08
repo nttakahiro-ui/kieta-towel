@@ -323,6 +323,7 @@ window.TEXTS = {
   worlds: {
     title: "世界{id}　{name}",
     warp: "世界{id}へワープ",
+    warpTo: "世界{id}へワープ", warpNeed: "宝石があと{n}こ",   // 11/7-43: ステージ一覧の上のワープのボタン
     back: "◀ 世界{id}",
     warping: "世界{id}へ！",
     // ワープの会話（10/25-18）: その世界へ初めてワープするときの、ふわり（fuwari）と主人公（hero）の会話。行き先の世界の番号ごと

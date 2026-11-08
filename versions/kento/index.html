@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap">
-  <link rel="stylesheet" href="css/style.css?v=123">
+  <link rel="stylesheet" href="css/style.css?v=124">
 </head>
 <body>
   <div id="app">
@@ -75,13 +75,12 @@
     <!-- ステージ一覧（10/25-17: 上に今いる世界の4つの宝石。クリアしたステージは枠が光る） -->
     <section id="screen-stages" class="screen scroll">
       <div class="stages-box">
-        <div class="stages-nav"><button id="btn-world-back" class="link-btn hidden"></button></div>
+        <div id="stages-warps" class="stages-warps"></div>   <!-- 11/7-43: 世界の行き来はワープのボタン（前は「◀ 世界○」の文字と、下の「世界○へワープ」） -->
         <p id="stages-lead" class="stages-lead"></p>
         <p class="gems-head"><span id="stages-gems-head"></span> <b id="stages-gems-count"></b></p>
         <div id="stages-gems" class="world-gems" role="button" aria-label="レシピブック"></div>
         <h2 id="stages-world-title" class="stages-title">ステージを選ぶ</h2>
         <div id="stages-list"></div>
-        <button id="btn-warp" class="btn btn-main warp-btn hidden"></button>
         <!-- 11/7-33: 下の帯は「合計得点」（押せない札）「カード図鑑」「タイトルへ」の3つ。世界の色の飾り -->
         <div class="btn-row stages-bottom"><span id="stages-total" class="score-chip wdeco"></span><button id="btn-zukan" class="btn wdeco"></button><button id="btn-stages-back" class="btn wdeco">タイトルへ</button></div>
       </div>
@@ -289,17 +288,17 @@
   <!-- 横向きのとき -->
   <div id="rotate"><div><div class="rotate-icon"></div><p>縦にしてね</p></div></div>
 
-  <script src="data/words.js?v=123"></script>
-  <script src="data/stages.js?v=123"></script>
-  <script src="data/texts.js?v=123"></script>
-  <script src="data/ruby.js?v=123"></script>
-  <script src="js/ruby.js?v=123"></script>
-  <script src="js/audio.js?v=123"></script>
-  <script src="js/door.js?v=123"></script>
-  <script src="js/game.js?v=123"></script>
-  <script src="js/quiz.js?v=123"></script>
-  <script src="js/cards.js?v=123"></script>
-  <script src="js/recipebook.js?v=123"></script>
-  <script src="js/main.js?v=123"></script>
+  <script src="data/words.js?v=124"></script>
+  <script src="data/stages.js?v=124"></script>
+  <script src="data/texts.js?v=124"></script>
+  <script src="data/ruby.js?v=124"></script>
+  <script src="js/ruby.js?v=124"></script>
+  <script src="js/audio.js?v=124"></script>
+  <script src="js/door.js?v=124"></script>
+  <script src="js/game.js?v=124"></script>
+  <script src="js/quiz.js?v=124"></script>
+  <script src="js/cards.js?v=124"></script>
+  <script src="js/recipebook.js?v=124"></script>
+  <script src="js/main.js?v=124"></script>
 </body>
 </html>

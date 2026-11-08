@@ -920,3 +920,22 @@ button.wdeco:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--wc-d
 .best-new .bn-txt { padding-top: 11px; padding-bottom: 3px; }
 .best-new rt { padding-bottom: 3px; color: #a3262f; opacity: 1; font-weight: bold;
   text-shadow: 1px 0 0 #fff, -1px 0 0 #fff, 0 1px 0 #fff, 0 -1px 0 #fff, 1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff; }
+/* 11/7-43 決定: ステージ一覧の上に、ワープのボタン（行き先の世界の色・帯の絵・宝石のアイコン・扉の見出しと同じ飾り）。まわりに光の粒。まだ行けない世界は灰色で「宝石があと○こ」 */
+.stages-warps { display: flex; gap: 10px; margin: 0 0 6px; }
+.wp-slot { flex: 1 1 0; min-width: 0; position: relative; }
+.wp-btn[data-w="1"] { --wc-top: #86b35e; --wc-main: #6f9a4a; --wc-dark: #3f5f2e; --wc-light: #dcebc6; }
+.wp-btn[data-w="2"] { --wc-top: #5e8bb8; --wc-main: #4a729a; --wc-dark: #2f4760; --wc-light: #c6d8eb; }
+.wp-btn[data-w="3"] { --wc-top: #9563b8; --wc-main: #794a9a; --wc-dark: #4c3360; --wc-light: #dcc6eb; }
+.wp-btn { display: flex; flex-direction: column; align-items: stretch; gap: 3px; width: 100%; padding: 5px 7px 6px; font-family: var(--font); font-weight: bold; font-size: 14px; line-height: 1.2; cursor: pointer; border-radius: 14px; }
+.wp-btn .wp-txt { white-space: nowrap; text-align: center; position: relative; }
+.wp-btn .wp-band { position: relative; display: block; height: 24px; border-radius: 7px; overflow: hidden; background: rgba(255,255,255,.4); }
+.wp-btn .wp-band img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: 0 50%; }
+.wp-btn .wp-gem { position: absolute; right: 4px; top: 50%; width: 20px; height: 20px; margin-top: -10px; filter: drop-shadow(0 1px 1px rgba(0,0,0,.35)); }
+.wp-btn.locked { filter: grayscale(1); opacity: .7; cursor: default; }
+.wp-btn.locked .wp-band { opacity: .6; }
+.wp-btn .wp-need { position: absolute; left: 0; right: 0; bottom: 5px; text-align: center; font-size: 12px; color: #fff; text-shadow: 0 1px 0 #333, 0 0 3px #333; }
+.wp-spark { position: absolute; width: 7px; height: 7px; margin: -3.5px; border-radius: 50%; background: #fff3a8; box-shadow: 0 0 6px 2px rgba(255,205,70,.9); pointer-events: none; opacity: 0; animation: wpSpark 3.6s ease-in-out infinite; z-index: 1; }
+@keyframes wpSpark { 0% { opacity: 0; transform: translate(0, 6px) scale(.5); } 30% { opacity: .95; } 70% { opacity: .6; } 100% { opacity: 0; transform: translate(6px, -16px) scale(1); } }
+.white-flash { position: fixed; inset: 0; z-index: 60; background: #fff; opacity: 0; pointer-events: none; transition: opacity .35s ease-out; }
+.white-flash.on { opacity: 1; }
+.white-flash.off { opacity: 0; transition: opacity .45s ease-in; }
