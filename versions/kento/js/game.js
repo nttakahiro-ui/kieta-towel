@@ -319,6 +319,16 @@ Object.assign(FILLER_TYPES, {
   bat:         { layer: "air", hp: 1, r: 14, fire: 2.0, move: "bee", speed: 1.3 },       // コウモリ（夜）: 速い
   firefly:     { layer: "air", hp: 1, r: 12, fire: 3.4, move: "ghost", glow: true },     // ホタル（夜）: 光る
 });
+// 11/7-31 決定: 世界2・3の新しい敵（絵はプログラム描きの仮。本番は制作側に）。world ＝ 出る世界、from ＝ 出始めるステージ、touch ＝ ぶつかると元気が減る
+Object.assign(FILLER_TYPES, {
+  gearRun:  { layer: "ground", hp: 1, r: 17, fire: 0, world: 2, from: 6,  touch: true },   // 走る歯車: 地上をコンベアに乗って横に速く走る。爆弾でしか倒せない
+  screwer:  { layer: "air",    hp: 3, r: 17, fire: 0, world: 2, from: 7 },                 // ねじ投げ機: 空中で一度止まり、ねじを3本扇に投げてから去る。硬さ3
+  fuwaStar: { layer: "air",    hp: 2, r: 15, fire: 0, world: 3, from: 10, touch: true },   // ふわふわ星: ゆっくり自機に近づく。回る玉に当たると押し返される。光で倒せる
+  meteor:   { layer: "air",    hp: 1, r: 12, fire: 0, world: 3, from: 11, touch: true },   // 流れ星: 画面を斜めに速く横切る。撃たない。1発で倒せる
+});
+// 出る数（11/7-31 決定）: 今のザコの群れの2割を、新しい敵の群れに置きかえる（敵の総数は増やさない）。group ＝ 1回に出る数
+const NEW_FOES = { rate: 0.2, group: { gearRun: 2, screwer: 1, fuwaStar: 2, meteor: 3 }, gearRunSpeed: 3, screwer: { down: 150, wait: 0.7, after: 0.5, spread: [-0.38, 0, 0.38], leave: 170 },
+  fuwaStar: { speed: 46, push: 230, pushT: 0.45, life: 16 }, meteor: { vx: 230, vy: 330, gap: 0.45 } };
 const moveOf = type => FILLER_TYPES[type].move || type;
 // 雑魚の群れの出やすさ（数が大きいほどよく出る）。stages.js の theme.bugs がないステージで使う
 const FILLER_WAVES = { ladybugs: 3, bees: 2, ghost: 2, weeds: 3, thorn: 1 };
@@ -607,6 +617,7 @@ const Battle = (() => {
   let typhoon = null;        // パワー全開を使った瞬間の演出（白いうずと大きなふわり。11/7-25）
   let extraUsed = false;     // 延長戦をしたか（1回だけ。10/25-19）
   let extraRound = false;    // いまラストチャンスか
+  let seedsGot = 0;          // 拾った種の数（結果画面に出す。11/7-31）
   let lastT = 0;             // ラストチャンスの残り秒（0 ＝ ラストチャンスではない）
   let lcWords = [], lcQueue = [], lcClock = 0;   // ラストチャンスに出すことばと、出す順番待ち、始まってからの秒
   let againFx = null;        // 大ボス2段階目の「まだだ！ もう一度！」（11/1-4）{ age }
@@ -768,7 +779,7 @@ const Battle = (() => {
     fpsT0 = 0; fpsN = 0; fpsNow = 0; fpsMin = 0;
     msgQ = []; msgGap = 0; msgWasBusy = false;
     choiceFree = !!opts.firstChoice;
-    tut = null; les = null; hintOpts = opts.hints || null; hintShown = {}; hintCard = null; bombHinted = false; bombFlash = 0; powerFx = null; wrongFx = null; againFx = null; extraUsed = false; extraRound = false; lastT = 0; lcQueue = []; lcWords = [];
+    tut = null; les = null; hintOpts = opts.hints || null; hintShown = {}; hintCard = null; bombHinted = false; bombFlash = 0; powerFx = null; wrongFx = null; againFx = null; extraUsed = false; extraRound = false; lastT = 0; seedsGot = 0; lcQueue = []; lcWords = [];
     stripFlash = 0; sortieStep = "choice"; freed = [];
     explore = { t: 0, next: 0, nextAt: BATTLE.exploreFirst, again: [], list: [], bugs: [], bugT: 2, endT: 0, flies: [], streaks: [] };
     {
@@ -1332,7 +1343,31 @@ const Battle = (() => {
     return null;
   }
 
+  // 新しい敵（11/7-31）: この世界・このステージで出られる種類
+  function newFoeKinds() {
+    const sid = (opts.stage && opts.stage.id) || 0;
+    return Object.keys(FILLER_TYPES).filter(k => { const d = FILLER_TYPES[k]; return d.world === worldDef.id && sid >= d.from && (d.layer !== "ground" || groundOn); });
+  }
+  function spawnNewFoe(kind) {
+    const n = NEW_FOES.group[kind];
+    if (kind === "gearRun") {
+      for (let i = 0; i < n; i++) { const x = freeX(0, "ground", 40); if (x !== null) spawnFiller(kind, x, -24 - i * 70, { slide: x < W / 2 ? 1 : -1 }); }
+    } else if (kind === "screwer") {
+      const x = freeX(0, "air", 50); if (x === null) return;
+      spawnFiller(kind, x, -24, { st: 0, stopY: H * rand(0.2, 0.32) });
+      const f = fillers[fillers.length - 1]; f.hp = f.maxHp = FILLER_TYPES.screwer.hp;   // 硬さ3（難易度の線で変えない）
+    } else if (kind === "fuwaStar") {
+      for (let i = 0; i < n; i++) { const x = freeX(0, "air", 40); if (x !== null) spawnFiller(kind, x, -24 - i * 60, {}); }
+    } else if (kind === "meteor") {
+      const fromLeft = Math.random() < 0.5, M = NEW_FOES.meteor;
+      for (let i = 0; i < n; i++) { const x = fromLeft ? rand(-30, W * 0.35) : rand(W * 0.65, W + 30); spawnFiller(kind, x, -20, { vx: (fromLeft ? 1 : -1) * M.vx, vy: M.vy, delay: i * M.gap }); }
+    }
+  }
+
   function spawnWave() {
+    // 11/7-31 決定: 世界2・3では、群れの2割を新しい敵にする
+    const nf = newFoeKinds();
+    if (nf.length && Math.random() < NEW_FOES.rate) { spawnNewFoe(nf[Math.floor(Math.random() * nf.length)]); return; }
     // 世界3: うしろ（画面の下）から綿毛おばけが2匹（10/31-10 試作。WORLDS の rear）。出る前に下のはしに「！」
     if (worldDef.rear && Math.random() < ((opts.stage && opts.stage.rearRate) || BATTLE.rearRate)) {
       for (let i = 0; i < 2; i++) { const x = freeX(H, "air", 40); if (x !== null) spawnFiller("ghost", x, H + 30 + i * 50, { bx: 0, rear: true, delay: 0.9 }); }
@@ -1774,6 +1809,20 @@ const Battle = (() => {
         if (f.y < f.hy && !f.leave) f.y += Math.min(90, (f.hy - f.y) * 1.5 + 20) * dt;
         else if (!f.leave) { f.stayT -= dt; f.x += Math.sin(f.age * 1.2) * 30 * dt; if (f.stayT <= 0) f.leave = true; }
         else f.y -= 120 * dt;
+      } else if (f.type === "screwer") {   // ねじ投げ機（11/7-31）: 降りて止まる → ねじを3本扇に → 少し待って上へ去る
+        const C = NEW_FOES.screwer;
+        if (f.st === 0) { f.y += C.down * dt; if (f.y >= f.stopY) { f.st = 1; f.wait = C.wait; } }
+        else if (f.st === 1) { f.wait -= dt; if (f.wait <= 0) { fireAt(f.x, f.y + 8, C.spread, "screw"); f.st = 2; f.wait = C.after; } }
+        else if (f.st === 2) { f.wait -= dt; if (f.wait <= 0) f.st = 3; }
+        else { f.y -= C.leave * dt; f.x += (f.x < W / 2 ? -1 : 1) * 50 * dt; }
+      } else if (f.type === "fuwaStar") {   // ふわふわ星（11/7-31）: ゆっくり自機に近づく。玉に当たると押し返される
+        const C = NEW_FOES.fuwaStar;
+        if (f.pushT > 0) { f.pushT -= dt; f.x += f.pvx * dt; f.y += f.pvy * dt; }
+        else if (f.age > C.life) f.y -= C.speed * 2 * dt;   // 長くいたら上へ帰る
+        else { const a = Math.atan2(player.y - f.y, player.x - f.x); f.x += Math.cos(a) * C.speed * dt; f.y += Math.sin(a) * C.speed * dt + Math.sin(f.age * 2) * 8 * dt; }
+        f.x = Math.min(Math.max(f.x, stripRight() + f.r), W - f.r);
+      } else if (f.type === "meteor") {   // 流れ星（11/7-31）: 斜めに速く横切る
+        f.x += f.vx * dt; f.y += f.vy * dt;
       } else if (moveOf(f.type) === "ghost") {
         f.y += (f.rear ? -1 : 1) * H / 11 * BATTLE.fillerSpeed * (def.speed || 1) * dt;   // うしろから来たものは上へ
         f.x += Math.sin(f.age * 1.3) * 40 * dt;
@@ -1781,12 +1830,17 @@ const Battle = (() => {
         f.y += sc * dt;     // 地上の雑魚は地面といっしょに流れる
         if (worldDef.id === 2) {   // 世界2の地上の雑魚（11/1 決定）: コンベアに乗って横にすべる。はしで折り返す。「コンベアが逆」では逆向き
           if (!f.slide) f.slide = f.x < W / 2 ? 1 : -1;
-          f.x += f.slide * BATTLE.groundSlide * (evActive("reverse") ? -1 : 1) * convFast() * dt;
+          f.x += f.slide * BATTLE.groundSlide * (f.type === "gearRun" ? NEW_FOES.gearRunSpeed : 1) * (evActive("reverse") ? -1 : 1) * convFast() * dt;   // 走る歯車は3倍の速さ（11/7-31）
           const lo = stripRight() + f.r + 6, hi = W - f.r - 6;
           if (f.x < lo) { f.x = lo; f.slide = -f.slide; } else if (f.x > hi) { f.x = hi; f.slide = -f.slide; }
         }
       }
       if (def.wind && windOn()) f.x += windDirNow() * BATTLE.windStrength * 1.6 * dt;   // 夕暮れの虫は風に流される
+      // 新しい敵（11/7-31）: ぶつかると元気が減る。走る歯車はそのまま走り続け、星はぶつかると消える
+      if (def.touch && f.hp > 0 && player.inv <= 0 && !showWord && !(odai && odai.intro > 0) && !(player.rising > 0) && Math.hypot(f.x - player.x, f.y - player.y) < f.r * 0.85 + 14) {
+        player.red = 0.5; hurt();
+        if (f.type !== "gearRun") { f.hp = 0; addPop(f.x, f.y, "#ffb0b8", 0.7); }
+      }
       if (def.fire) {
         f.fire -= dt;
         if (f.fire <= 0 && f.y > 0 && f.y < H * 0.68) {
@@ -1805,7 +1859,10 @@ const Battle = (() => {
         if (f.les && !(les && les.id === "s9rear")) continue;   // 練習の虫は、説明が出るまで玉が当たらない（11/7-28）
         f.orbCd = Math.max(0, (f.orbCd || 0) - dt);
         const oi = f.orbCd <= 0 ? orbPos().findIndex(o => Math.hypot(o.x - f.x, o.y - f.y) < f.r + BATTLE.orbs.r) : -1;
-        if (oi >= 0) { f.orbCd = BATTLE.orbs.cd; orbFlash[oi] = 0.3; Sound.se("orbHit"); damageFiller(f); }   // 当たった玉がはっきり光って、音が鳴る（11/6-6）
+        if (oi >= 0 && f.type === "fuwaStar") {   // ふわふわ星は玉では倒れず、押し返される（11/7-31）
+          const C = NEW_FOES.fuwaStar, a = Math.atan2(f.y - player.y, f.x - player.x);
+          f.orbCd = BATTLE.orbs.cd; orbFlash[oi] = 0.3; Sound.se("boing"); f.pushT = C.pushT; f.pvx = Math.cos(a) * C.push; f.pvy = Math.sin(a) * C.push; f.flash = 0.12;
+        } else if (oi >= 0) { f.orbCd = BATTLE.orbs.cd; orbFlash[oi] = 0.3; Sound.se("orbHit"); damageFiller(f); }   // 当たった玉がはっきり光って、音が鳴る（11/6-6）
         if (f.rear && !f.les && f.hp > 0 && !frozen() && Math.hypot(f.x - player.x, f.y - player.y) < f.r + 14 && player.inv <= 0 && !showWord && !(odai && odai.intro > 0)) {
           f.hp = 0;   // ぶつかった虫は消える（点は入らない。＋100 も出さない）
           addPop(f.x, f.y, "#ffb0b8", 0.7);
@@ -1897,7 +1954,7 @@ const Battle = (() => {
       it.y += (sc * 0.7 + 12) * dt;
       if (!it.lesTried && it.y > LES_TOP + 14 && lesson("seed", { ty: it.y, target: it, done: () => it.got || it.y >= H + 20 })) it.lesTried = true;   /* 11/7-30: ほかの説明が出ているあいだは、出せるまで待つ */   // チュートリアル: 初めてたねが落ちた → 拾う（11/7-20）。上の帯より下に来てから（11/7-28）
       if (Math.hypot(it.x - player.x, it.y - player.y) < 28) {
-        it.got = true;
+        it.got = true; seedsGot++;
         player.hp = Math.min(maxHp(), player.hp + BATTLE.healItem);
         player.glow = 0.3;
         player.healFlash = 1;   // 体力ゲージが光って「+回復」
@@ -2822,7 +2879,7 @@ const Battle = (() => {
   }
 
   function finishBattle() {
-    stop(); opts.onEnd(absorbed.map(w => w.id), { time: t, hits, downs, gameOvers, score, maxCombo, bombsUsed, missed: missed.map(w => w.id), found: [...found] });
+    stop(); opts.onEnd(absorbed.map(w => w.id), { time: t, hits, downs, gameOvers, score, maxCombo, bombsUsed, missed: missed.map(w => w.id), found: [...found], seeds: seedsGot });
   }
   // 延長戦に出すことば: 助けられなかったことば（同じことばは1回。大ボスはもう助けたので出ない）
   function extraWords() {
@@ -3715,6 +3772,8 @@ const Battle = (() => {
     const { x, y } = f;
     const r = FILLER_TYPES[f.type].r;
     const hasFilter = "filter" in ctx;
+    if (drawNewFoe(f)) { fillerHpDots(f); return; }   // 新しい敵4種（11/7-31）
+    if (f.layer === "air" && worldDef.id >= 2) { drawAirSkin(f); fillerHpDots(f); return; }   // 世界2・3の空の敵は、世界1の虫と別の絵（11/7-31）
     if (f.layer === "ground" && worldDef.id >= 2) { drawGroundJunk(f); fillerHpDots(f); return; }   // 世界2・3の地上の雑魚は、虫とは別の種類（11/1 決定）
     if (bugSprites && hasFilter) {   // 前もって作った絵を置くだけ（毎フレームの filter と輪郭のぼかしをやめる。10/31-14、世界1も 11/3-8）
       const sp = bugSprite(f, f.flash > 0);
@@ -3742,6 +3801,106 @@ const Battle = (() => {
       ctx.beginPath(); ctx.arc(x, y, r * BATTLE.fillerDrawScale * 0.9, 0, Math.PI * 2); ctx.fill();
     }
     fillerHpDots(f);
+  }
+
+  // ===== 世界2・3の敵の絵（11/7-31。プログラム描きの仮。本番は制作側に頼む） =====
+  // 空の敵は、動き方（横の列／急降下／ゆらゆら）ごとに世界の絵: 世界2 糸巻き・はさみ・ボタン、世界3 星くず・小さなUFO・宇宙くらげ
+  function foeStroke(lit) { ctx.lineJoin = "round"; ctx.lineCap = "round"; ctx.lineWidth = 2; ctx.strokeStyle = lit ? "#ffffff" : "#2e2a3a"; }
+  function drawAirSkin(f) {
+    const mv = moveOf(f.type), lit = f.flash > 0, w2 = worldDef.id === 2, r = FILLER_TYPES[f.type].r * BATTLE.fillerDrawScale * 1.15;   // 世界1の虫と同じくらいの大きさ
+    ctx.save(); ctx.translate(f.x, f.y);
+    if (lit) ctx.translate((Math.random() - 0.5) * 3, 0);
+    foeStroke(lit);
+    const F = c => (lit ? "#fff6dc" : c);
+    if (w2 && mv === "ladybug") {   // 糸巻き（羽つき）: 列で横切る
+      ctx.rotate((f.ang || 0) * 0.5);
+      const fl = Math.sin(t * 22) * 0.5 + 0.5;
+      ctx.fillStyle = F("rgba(220,235,255,0.85)"); for (const s of [-1, 1]) { ctx.beginPath(); ctx.ellipse(s * r * 0.55, -r * 0.55, r * 0.5, r * (0.18 + 0.12 * fl), s * 0.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+      ctx.fillStyle = F("#c9925a"); ctx.fillRect(-r * 0.75, -r * 0.5, r * 1.5, r * 0.22); ctx.strokeRect(-r * 0.75, -r * 0.5, r * 1.5, r * 0.22); ctx.fillRect(-r * 0.75, r * 0.3, r * 1.5, r * 0.22); ctx.strokeRect(-r * 0.75, r * 0.3, r * 1.5, r * 0.22);
+      ctx.fillStyle = F("#e2465a"); ctx.fillRect(-r * 0.55, -r * 0.28, r * 1.1, r * 0.58); ctx.strokeRect(-r * 0.55, -r * 0.28, r * 1.1, r * 0.58);
+      ctx.strokeStyle = lit ? "#fff" : "#a32a3c"; ctx.lineWidth = 1; for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(-r * 0.55, i * r * 0.1); ctx.lineTo(r * 0.55, i * r * 0.1 + r * 0.05); ctx.stroke(); }
+    } else if (w2 && mv === "bee") {   // はさみ: 開いたり閉じたりしながら急降下
+      const op = 0.4 + 0.22 * Math.sin(t * 14), R = r * 1.25;
+      for (const s of [-1, 1]) {
+        ctx.save(); ctx.rotate(Math.PI / 2 + s * op);
+        ctx.fillStyle = F("#dfe5ec"); ctx.beginPath(); ctx.moveTo(0, -R * 0.2); ctx.lineTo(R * 1.2, 0); ctx.lineTo(0, R * 0.22); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = F(s < 0 ? "#3a7bd5" : "#e0663a"); ctx.beginPath(); ctx.ellipse(-R * 0.55, 0, R * 0.45, R * 0.32, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.ellipse(-R * 0.55, 0, R * 0.22, R * 0.14, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      }
+      ctx.fillStyle = F("#5a5a64"); ctx.beginPath(); ctx.arc(0, 0, r * 0.13, 0, Math.PI * 2); ctx.fill();
+    } else if (w2) {   // ボタン（ゆらゆら降りる）
+      ctx.rotate(Math.sin(f.age * 2) * 0.5);
+      ctx.fillStyle = F("#f2b33d"); ctx.beginPath(); ctx.arc(0, 0, r * 0.95, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = lit ? "#fff" : "#b77d16"; ctx.beginPath(); ctx.arc(0, 0, r * 0.7, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = "#6b4a10"; for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { ctx.beginPath(); ctx.arc(dx * r * 0.24, dy * r * 0.24, r * 0.12, 0, Math.PI * 2); ctx.fill(); }
+    } else if (mv === "ladybug") {   // 星くず（世界3）: きらきらの4つ角の星が列で
+      ctx.rotate(f.age * 3);
+      ctx.fillStyle = F("#9fe3ff"); ctx.beginPath();
+      for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2, rr = i % 2 ? r * 0.32 : r * 1.0; ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); }
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(0, 0, r * 0.2, 0, Math.PI * 2); ctx.fill();
+    } else if (mv === "bee") {   // 小さなUFO（世界3）: 急降下
+      ctx.rotate(Math.sin(f.age * 6) * 0.15);
+      ctx.fillStyle = F("rgba(180,240,255,0.9)"); ctx.beginPath(); ctx.ellipse(0, -r * 0.2, r * 0.45, r * 0.45, 0, Math.PI, 0); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = F("#8a7ad8"); ctx.beginPath(); ctx.ellipse(0, r * 0.05, r * 1.05, r * 0.36, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      for (let i = -1; i <= 1; i++) { ctx.fillStyle = (Math.floor(t * 6) + i) % 2 ? "#ffe066" : "#ff7a9a"; ctx.beginPath(); ctx.arc(i * r * 0.5, r * 0.08, r * 0.11, 0, Math.PI * 2); ctx.fill(); }
+    } else {   // 宇宙くらげ（世界3）: ゆらゆら。うしろから来るのもこれ
+      const sw = Math.sin(f.age * 4);
+      ctx.fillStyle = F("rgba(255,150,220,0.92)"); ctx.beginPath(); ctx.arc(0, -r * 0.1, r * 0.8, Math.PI, 0); ctx.quadraticCurveTo(0, r * 0.25, -r * 0.8, -r * 0.1); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = lit ? "#fff" : "#b0408a"; ctx.lineWidth = 2;
+      for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(i * r * 0.3, r * 0.1); ctx.quadraticCurveTo(i * r * 0.3 + sw * 5, r * 0.6, i * r * 0.3, r * 1.0); ctx.stroke(); }
+      ctx.fillStyle = "#3a2040"; for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(s * r * 0.28, -r * 0.3, r * 0.1, 0, Math.PI * 2); ctx.fill(); }
+    }
+    ctx.restore();
+  }
+  // 新しい敵4種（11/7-31）。描いたら true
+  function drawNewFoe(f) {
+    const T = f.type;
+    if (T !== "gearRun" && T !== "screwer" && T !== "fuwaStar" && T !== "meteor") return false;
+    const lit = f.flash > 0, r = FILLER_TYPES[T].r * 0.9, F = c => (lit ? "#fff6dc" : c);
+    ctx.save(); ctx.translate(f.x, f.y);
+    if (lit) ctx.translate((Math.random() - 0.5) * 3, 0);
+    foeStroke(lit);
+    if (T === "gearRun") {   // 走る歯車: 赤い目の歯車が速く回り、うしろに走った線
+      const dir = f.slide || 1;
+      ctx.strokeStyle = "rgba(60,50,40,0.55)"; ctx.lineWidth = 2;
+      for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(-dir * (r + 4 + i * 2), -r * 0.5 + i * r * 0.5); ctx.lineTo(-dir * (r + 14 + i * 4), -r * 0.5 + i * r * 0.5); ctx.stroke(); }
+      ctx.fillStyle = "rgba(25,20,15,0.5)"; ctx.beginPath(); ctx.ellipse(2, r * 0.8, r * 0.9, r * 0.3, 0, 0, Math.PI * 2); ctx.fill();
+      foeStroke(lit); ctx.save(); ctx.rotate(f.age * 9 * dir);
+      ctx.fillStyle = F("#c96a2b"); ctx.beginPath();
+      for (let i = 0; i < 20; i++) { const a = i / 20 * Math.PI * 2, rr = i % 2 ? r * 0.76 : r; ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); }
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = F("#7a3a12"); for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2; ctx.beginPath(); ctx.arc(Math.cos(a) * r * 0.45, Math.sin(a) * r * 0.45, r * 0.12, 0, Math.PI * 2); ctx.fill(); }
+      ctx.restore();
+      ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(0, 0, r * 0.3, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "#e2364b"; ctx.beginPath(); ctx.arc(dir * r * 0.08, 0, r * 0.15, 0, Math.PI * 2); ctx.fill();
+    } else if (T === "screwer") {   // ねじ投げ機: プロペラつきの箱。投げる前はランプが赤く点滅
+      const warn = f.st === 1 && Math.floor(t * 10) % 2 === 0;
+      ctx.strokeStyle = lit ? "#fff" : "#2e2a3a"; ctx.beginPath(); ctx.moveTo(0, -r * 0.7); ctx.lineTo(0, -r * 1.0); ctx.stroke();
+      const pw = r * 0.9 * Math.abs(Math.cos(t * 25)); ctx.fillStyle = F("#c8d0da"); ctx.beginPath(); ctx.ellipse(0, -r * 1.05, pw + 2, r * 0.12, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = F("#6f7f92"); ctx.beginPath(); ctx.roundRect ? ctx.roundRect(-r * 0.85, -r * 0.7, r * 1.7, r * 1.25, 5) : ctx.rect(-r * 0.85, -r * 0.7, r * 1.7, r * 1.25); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = F("#4a5566"); for (const s of [-1, 0, 1]) { ctx.save(); ctx.translate(s * r * 0.45, r * 0.62); ctx.rotate(s * 0.38); ctx.fillRect(-r * 0.1, 0, r * 0.2, r * 0.35); ctx.strokeRect(-r * 0.1, 0, r * 0.2, r * 0.35); ctx.restore(); }
+      ctx.fillStyle = warn ? "#ff3a3a" : "#ffd23a"; ctx.beginPath(); ctx.arc(0, -r * 0.15, r * 0.24, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      if (warn) { ctx.fillStyle = "rgba(255,60,60,0.25)"; ctx.beginPath(); ctx.arc(0, -r * 0.15, r * 0.6, 0, Math.PI * 2); ctx.fill(); }
+    } else if (T === "fuwaStar") {   // ふわふわ星: ふっくらした黄色い星に顔。光の輪
+      const pul = 1 + Math.sin(f.age * 3) * 0.06;
+      ctx.scale(pul, pul);
+      ctx.fillStyle = "rgba(255,240,150,0.28)"; ctx.beginPath(); ctx.arc(0, 0, r * 1.45, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = F("#ffe27a"); ctx.lineWidth = 2.5; ctx.beginPath();
+      for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2 - Math.PI / 2, rr = i % 2 ? r * 0.55 : r * 1.1; ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); }
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "#4a3a20"; for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(s * r * 0.24, -r * 0.05, r * 0.09, 0, Math.PI * 2); ctx.fill(); }
+      ctx.fillStyle = "#ff9aa8"; for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(s * r * 0.42, r * 0.15, r * 0.1, 0, Math.PI * 2); ctx.fill(); }
+    } else {   // 流れ星: 明るい頭と、進む向きの反対に長い尾
+      const a = Math.atan2(f.vy || 1, f.vx || 0), L = r * 4.5;
+      ctx.rotate(a);
+      const g = ctx.createLinearGradient(-L, 0, 0, 0); g.addColorStop(0, "rgba(255,255,255,0)"); g.addColorStop(1, "rgba(255,230,140,0.95)");
+      ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(-L, 0); ctx.lineTo(0, -r * 0.7); ctx.lineTo(0, r * 0.7); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = F("#fff8d0"); ctx.beginPath(); ctx.arc(0, 0, r * 0.8, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = lit ? "#fff" : "#e09a2a"; ctx.stroke();
+    }
+    ctx.restore();
+    return true;
   }
   // 世界2・3の地上の雑魚（11/1 決定。仮の図形）: 色は灰・茶（空中の虫は青・紫）。硬さ・数・弾は世界1の からまり草（weed）・いばらの株（thorn）と同じ
   //   世界2: 歯車・ねじ・糸くずの玉（weed の3種を x で決める）、大きい歯車（thorn）。床に貼りついて影が濃い

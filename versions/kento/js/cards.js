@@ -81,7 +81,11 @@ const Cards = (() => {
   function showHero(id, src) { const el = $(id); if (src) el.src = src; el.classList.toggle("hidden", !src); }
 
   // 結果画面の2ページ（10/25-3）: 1ページ目＝カードの枚数と次にすること、2ページ目＝今回のカードの一覧とランク
-  function setPage(n) { $("cards-pages").classList.toggle("p2", n === 2); }
+  let bestFx = false;   // ベスト更新の演出を、2ページ目を初めて開いたときに1回だけ（11/7-31）
+  function setPage(n) {
+    $("cards-pages").classList.toggle("p2", n === 2);
+    if (n === 2 && bestFx) { bestFx = false; const nb = document.querySelector("#cards-rank .best-new"); if (nb) { nb.classList.remove("go"); void nb.offsetWidth; nb.classList.add("go"); } Sound.se("gem"); }
+  }
   let swipeBound = false;
   function bindSwipe() {
     if (swipeBound) return; swipeBound = true;
@@ -139,19 +143,29 @@ const Cards = (() => {
     qb.onclick = () => o.onTitle();
     $("cards-summary").textContent = "";
     const rk = $("cards-rank");
-    rk.innerHTML = "";
+    rk.innerHTML = ""; bestFx = false;
     if (o.stats) {
       const st = o.stats;
       $("cards-summary").innerHTML = [tx("results.summary", { hits: st.hits }), st.downs ? tx("results.summaryDown", { n: st.downs }) : "", st.gameOvers ? tx("results.summaryRetry", { n: st.gameOvers }) : "", tx("results.summaryCombo", { n: st.maxCombo })].filter(Boolean).map(s => phraseHTML(s)).join("　");   // バトルの時間は出さない（調整パネルの中だけ）
       // 点数と、「カード ○/10」「取り逃し ○こ」（11/7-19: ランクのかわり。取り逃しが1こ以上なら赤）
-      const sc = document.createElement("div"); sc.className = "rank-score"; sc.textContent = `${st.score} 点`;
+      // 11/7-31: 「今回の点数」と「最高得点」を並べる
+      const best = o.record && o.record.best ? o.record.best.score : st.score;
+      const sc = document.createElement("div"); sc.className = "rank-scores";
+      sc.innerHTML = `<div class="rs now"><span class="lb">${phraseHTML(tx("results.scoreNow"))}</span><b>${st.score.toLocaleString()}</b><small>点</small></div>`
+        + `<div class="rs best${o.record && o.record.newBest ? " up" : ""}"><span class="lb">${phraseHTML(tx("results.scoreBest"))}</span><b>${best.toLocaleString()}</b><small>点</small></div>`;
       const nm = document.createElement("div"); nm.className = "rank-line";
       const miss = st.missN || 0;
-      nm.innerHTML = `<span>${phraseHTML(tx("results.cardsLine", { got: ownedCount, n: o.words.length }))}</span><span class="${miss ? "miss" : ""}">${phraseHTML(tx("results.missLine", { n: miss }))}</span>`;
+      nm.innerHTML = `<span>${phraseHTML(tx("results.cardsLine", { got: ownedCount, n: o.words.length }))}</span><span class="${miss ? "miss" : ""}">${phraseHTML(tx("results.missLine", { n: miss }))}</span><span>${phraseHTML(tx("results.seedLine", { n: st.seeds || 0 }))}</span>`;
       rk.append(sc, nm);
       // ベスト更新と、今回とれた印
       if (o.record) {
-        if (o.record.newBest) { const nb = document.createElement("div"); nb.className = "best-new"; nb.innerHTML = phraseHTML("ベスト更新！"); rk.appendChild(nb); }
+        // 11/7-31: 更新したときは派手に（光の粒＋効果音）。2ページ目を開いたときに、はじける
+        if (o.record.newBest) {
+          const nb = document.createElement("div"); nb.className = "best-new"; nb.innerHTML = `<span class="bn-txt">${phraseHTML(tx("results.bestNew"))}</span>`;
+          for (let i = 0; i < 18; i++) { const p = document.createElement("i"); const a = i / 18 * Math.PI * 2, d = 70 + (i * 29 % 50); p.style.setProperty("--dx", `${Math.cos(a) * d}px`); p.style.setProperty("--dy", `${Math.sin(a) * d * 0.6}px`); p.style.animationDelay = `${(i % 3) * 0.05}s`; p.className = "bn-p c" + (i % 3); nb.appendChild(p); }
+          rk.insertBefore(nb, rk.firstChild);
+          bestFx = true;
+        }
         // （今回とれた印は 10/25-17 にやめた）
       }
     }

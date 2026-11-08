@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap">
-  <link rel="stylesheet" href="css/style.css?v=112">
+  <link rel="stylesheet" href="css/style.css?v=113">
 </head>
 <body>
   <div id="app">
@@ -76,6 +76,7 @@
     <section id="screen-stages" class="screen scroll">
       <div class="stages-box">
         <div class="stages-nav"><button id="btn-world-back" class="link-btn hidden"></button></div>
+        <p id="stages-total" class="score-total"></p><!-- 11/7-31: 12ステージの最高得点の合計 -->
         <p id="stages-lead" class="stages-lead"></p>
         <p class="gems-head"><span id="stages-gems-head"></span> <b id="stages-gems-count"></b></p>
         <div id="stages-gems" class="world-gems" role="button" aria-label="レシピブック"></div>
@@ -89,6 +90,7 @@
     <!-- カード図鑑（10/22-1）。今いる世界のステージごとに、集めたカードを読み返す -->
     <section id="screen-zukan" class="screen scroll">
       <div class="zukan-box">
+        <p id="zukan-total" class="score-total"></p><!-- 11/7-31 -->
         <h2 id="zukan-title" class="zukan-title"></h2>
         <div id="zukan-list"></div>
         <div class="btn-row"><button id="btn-zukan-back" class="btn btn-sub"></button></div>
@@ -287,17 +289,17 @@
   <!-- 横向きのとき -->
   <div id="rotate"><div><div class="rotate-icon"></div><p>縦にしてね</p></div></div>
 
-  <script src="data/words.js?v=112"></script>
-  <script src="data/stages.js?v=112"></script>
-  <script src="data/texts.js?v=112"></script>
-  <script src="data/ruby.js?v=112"></script>
-  <script src="js/ruby.js?v=112"></script>
-  <script src="js/audio.js?v=112"></script>
-  <script src="js/door.js?v=112"></script>
-  <script src="js/game.js?v=112"></script>
-  <script src="js/quiz.js?v=112"></script>
-  <script src="js/cards.js?v=112"></script>
-  <script src="js/recipebook.js?v=112"></script>
-  <script src="js/main.js?v=112"></script>
+  <script src="data/words.js?v=113"></script>
+  <script src="data/stages.js?v=113"></script>
+  <script src="data/texts.js?v=113"></script>
+  <script src="data/ruby.js?v=113"></script>
+  <script src="js/ruby.js?v=113"></script>
+  <script src="js/audio.js?v=113"></script>
+  <script src="js/door.js?v=113"></script>
+  <script src="js/game.js?v=113"></script>
+  <script src="js/quiz.js?v=113"></script>
+  <script src="js/cards.js?v=113"></script>
+  <script src="js/recipebook.js?v=113"></script>
+  <script src="js/main.js?v=113"></script>
 </body>
 </html>

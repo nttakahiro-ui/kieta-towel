@@ -823,3 +823,25 @@ rt { font-size: 0.5em; font-weight: normal; line-height: 1; letter-spacing: 0; c
 /* クイズでまちがえたときの大きな赤い「✕」（11/7-30）: 中央に0.6秒。そのあと正解とメモ */
 .quiz-x { position: absolute; left: 50%; top: 45%; transform: translate(-50%, -50%); z-index: 8; pointer-events: none; font-size: 170px; line-height: 1; font-weight: bold; color: #e2364b; text-shadow: 0 0 0 #fff, 0 0 10px rgba(255,255,255,.95), 0 6px 18px rgba(120,20,30,.35); animation: quizX .6s ease-out both; }
 @keyframes quizX { 0% { transform: translate(-50%, -50%) scale(.3); opacity: 0; } 25% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; } 40% { transform: translate(-50%, -50%) scale(1); } 85% { opacity: 1; } 100% { opacity: 0; } }
+
+/* 11/7-31: 点数は「自分の記録を伸ばす」形。合計点（ステージ一覧・カード図鑑のいちばん上）、ステージの枠の最高得点、結果画面の今回と最高 */
+.score-total { text-align: center; margin: 2px auto 4px; font-size: 26px; font-weight: bold; color: #b5791a; text-shadow: 0 2px 0 #fff, 0 0 8px #fff7dc; letter-spacing: .04em; }
+.stage-row .sub .row-best { margin-left: .9em; color: #b5791a; }
+.rank-scores { display: flex; justify-content: center; gap: 10px; margin: 2px auto 4px; }
+.rank-scores .rs { flex: 0 1 150px; background: rgba(255,250,232,.95); border: 2px solid #e2c27a; border-radius: 14px; padding: 4px 6px 6px; color: #8a5d10; }
+.rank-scores .rs .lb { display: block; font-size: 13px; color: #6d5a2e; }
+.rank-scores .rs b { font-size: 26px; color: #c98a1e; }
+.rank-scores .rs small { font-size: 13px; margin-left: 2px; }
+.rank-scores .rs.best.up { border-color: #f0a51e; box-shadow: 0 0 0 3px #ffe39a, 0 0 18px #ffd54a; }
+#cards-p2 .rank-scores .rs b { font-size: 22px; }
+.best-new { position: relative; display: inline-block; margin: 2px auto 4px; font-size: 24px; }
+.best-new .bn-txt { display: inline-block; padding: 2px 16px; border-radius: 999px; color: #fff; background: linear-gradient(#ff8a3d, #e2364b); box-shadow: 0 3px 0 #a3262f, 0 0 16px #ffcf5a; text-shadow: 0 1px 0 #a3262f; }
+.best-new.go .bn-txt { animation: bn-pop .6s cubic-bezier(.2,1.6,.4,1) both, bn-glow 1.2s .6s ease-in-out 2; }
+.best-new .bn-p { position: absolute; left: 50%; top: 50%; width: 10px; height: 10px; margin: -5px; border-radius: 50%; opacity: 0; pointer-events: none; }
+.best-new .bn-p.c0 { background: #ffd23a; } .best-new .bn-p.c1 { background: #fff; box-shadow: 0 0 6px #ffd23a; } .best-new .bn-p.c2 { background: #ff8a3d; }
+.best-new.go .bn-p { animation: bn-burst 1.1s ease-out both; }
+@keyframes bn-pop { 0% { transform: scale(.3); opacity: 0; } 100% { transform: none; opacity: 1; } }
+@keyframes bn-glow { 50% { box-shadow: 0 3px 0 #a3262f, 0 0 28px #ffe27a; transform: scale(1.06); } }
+@keyframes bn-burst { 0% { opacity: 1; transform: translate(0,0) scale(1.2); } 100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(.4); } }
+.rank-line > span { white-space: nowrap; }
+#cards-p2 .rank-line { gap: .8em; font-size: 14px; }
