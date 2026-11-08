@@ -706,11 +706,42 @@ const Main = (() => {
   // 12ステージの最高得点の合計（11/7-31）
   function totalChip() { return `<span class="lb">${tx("results.totalLabel")}</span><b>${totalBest().toLocaleString()}<small>点</small></b>`; }   // 救出の旅の「スコア」の札と同じ見た目（11/7-32）
   function totalBest() { return Object.entries(Save.data.best).filter(([id]) => +id >= 1 && +id <= 12).reduce((a, [, b]) => a + ((b && b.score) || 0), 0); }
+  // 11/7-40 決定: 図鑑を開くと、まず「扉」（世界1〜3の大きなボタン。世界の色・帯の絵・集めた数・宝石の数）。いちばん上に合計点の札（緑）。
+  //   今いる世界のボタンを少し強調。ボタンを押すと、その世界の4ステージ分のカード（上に「◀ 図鑑の扉へ」）
   function toZukan() {
     Sound.play("zukan");   // カード図鑑はタイトルの曲（11/7-4）
-    const wid = Save.data.world || 1;
+    const here = Save.data.world || 1, lit = RecipeBook.litIds(Save.data.cards);
+    const img = `<img class="zk-title-img" src="assets/zukan_title.png" alt="${tx("zukan.title")}">`;
+    $("zukan-title").innerHTML = `${img}<br><span class="zk-door-total score-chip wdeco">${totalChip()}</span>`;
+    $("zukan-title").querySelector("img").onerror = e => e.target.replaceWith(document.createTextNode(tx("zukan.title")));
+    $("zukan-nav").innerHTML = "";
+    const box = $("zukan-list");
+    box.innerHTML = "";
+    const door = document.createElement("div"); door.className = "zk-door";
+    window.WORLDS.forEach(w => {
+      const sts = worldStages(w.id), ids = new Set(sts.map(s => s.id));
+      const words = window.WORDS.filter(x => ids.has(x.stage)), got = words.filter(x => Save.data.cards[x.id]).length;
+      const gems = sts.filter(s => lit.has(s.id)).length;
+      const b = document.createElement("button");
+      b.className = "zk-door-btn wdeco" + (w.id === here ? " here" : ""); b.dataset.w = w.id;
+      b.innerHTML = `<span class="zd-name">${tx("worlds.title", { id: w.id, name: w.name })}</span>`
+        + `<span class="zd-band"></span>`
+        + `<span class="zd-nums">${w.id === here ? `<span class="zd-here">${tx("zukan.here")}</span>` : ""}<span>${tx("zukan.doorCards", { got, n: words.length })}</span><span>${tx("zukan.doorGems", { got: gems, n: sts.length })}</span></span>`;
+      RecipeBook.renderBand(b.querySelector(".zd-band"), { lit, world: w.id });
+      b.addEventListener("click", () => { Sound.se("start"); toZukanWorld(w.id); });
+      door.appendChild(b);
+    });
+    box.appendChild(door);
+    $("btn-zukan-back").textContent = tx("zukan.back");
+    showScreen("zukan");
+    $("screen-zukan").scrollTop = 0;
+  }
+  function toZukanWorld(wid) {
     // 見出しは制作側の絵 g_title（11/1）。絵が読めなければ今までの文字
     const sub = `<span class="zk-sub-row"><small>${tx("worlds.title", { id: wid, name: window.WORLDS.find(w => w.id === wid).name })}</small><span class="score-chip wdeco">${totalChip()}</span></span>`;   // 11/7-32: 世界の行の右端に合計点の札
+    $("zukan-nav").innerHTML = "";
+    const bk = document.createElement("button"); bk.className = "link-btn"; bk.textContent = tx("zukan.toDoor"); bk.addEventListener("click", toZukan);   // 11/7-40
+    $("zukan-nav").appendChild(bk);
     $("zukan-title").innerHTML = `<img class="zk-title-img" src="assets/zukan_title.png" alt="${tx("zukan.title")}"><br>${sub}`;
     $("zukan-title").querySelector("img").onerror = () => { $("zukan-title").innerHTML = `${tx("zukan.title")}<br>${sub}`; };
     const box = $("zukan-list");

@@ -890,3 +890,21 @@ button.wdeco:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--wc-d
 .stage-row .marks { margin: 0; flex-shrink: 0; display: flex; align-items: center; justify-content: center; width: 30px; }
 .stage-row .row-gem { width: 28px; height: 28px; }
 .stage-row .row-gem.ghost { opacity: .22; filter: grayscale(1) brightness(.75); }
+/* 11/7-40 決定: カード図鑑の扉。世界1〜3の大きなボタン（世界の色・帯の絵・集めた数・宝石の数）。今いる世界は少し強調。いちばん上に合計点の札（緑） */
+.zukan-nav { min-height: 0; text-align: left; }
+.zukan-nav:empty { display: none; }
+.zukan-nav .link-btn { color: #4d7a33; text-decoration-color: #4d7a33; margin: 4px 0 0; }
+.zukan-title .zk-door-total { display: inline-flex; flex-direction: column; align-items: center; padding: 3px 18px 5px; margin-top: 2px; }
+.zk-door { display: flex; flex-direction: column; gap: 16px; margin: 8px 0 18px; }
+.zk-door-btn[data-w="1"] { --wc-top: #86b35e; --wc-main: #6f9a4a; --wc-dark: #3f5f2e; --wc-light: #dcebc6; }
+.zk-door-btn[data-w="2"] { --wc-top: #5e8bb8; --wc-main: #4a729a; --wc-dark: #2f4760; --wc-light: #c6d8eb; }
+.zk-door-btn[data-w="3"] { --wc-top: #9563b8; --wc-main: #794a9a; --wc-dark: #4c3360; --wc-light: #dcc6eb; }
+.zk-door-btn { display: flex; flex-direction: column; align-items: stretch; gap: 6px; width: 100%; padding: 9px 10px 10px; font-family: var(--font); font-weight: bold; cursor: pointer; text-align: center; border-radius: 18px; }
+.zk-door-btn .zd-name { font-size: 18px; line-height: 1.25; }
+.zk-door-btn .zd-band { display: block; border-radius: 10px; overflow: hidden; background: rgba(255,255,255,.35); pointer-events: none; text-shadow: none; }
+.zk-door-btn .zd-band > * { display: block; }
+.zk-door-btn .zd-nums { display: flex; justify-content: center; gap: 1.4em; font-size: 15px; }
+.zk-door-btn .zd-nums { align-items: center; }
+.zk-door-btn .zd-here { font-size: 12px; padding: 2px 9px; border-radius: 999px; background: #fff3b8; color: #6b4a10; text-shadow: none; }
+.zk-door-btn.here { box-shadow: 0 0 0 3px #ffd75e, 0 0 16px rgba(255,205,70,.8), 0 4px 0 var(--wc-dark), inset 0 0 0 2px rgba(255,255,255,.22); transform: scale(1.02); }
+.zk-door-btn.here:active { transform: scale(1.02) translateY(3px); }

@@ -317,7 +317,8 @@ window.TEXTS = {
     cardGet: "カードゲット！",
   },
   // カード図鑑（10/22-1）
-  zukan: { buttonCount: "カード図鑑 {n}/{total}", button: "カード図鑑", title: "カード図鑑", recipe: "宝石：{name}", recipeYet: "宝石：？", back: "ステージ一覧へ", empty: "？" },
+  zukan: { buttonCount: "カード図鑑 {n}/{total}", button: "カード図鑑", title: "カード図鑑", recipe: "宝石：{name}", recipeYet: "宝石：？", back: "ステージ一覧へ", empty: "？",
+    toDoor: "◀ 図鑑の扉へ", here: "いまの世界", doorCards: "カード {got}/{n}", doorGems: "宝石 {got}/{n}" },   // 11/7-40: 図鑑の扉
   // 世界のページとワープ（10/22-1）
   worlds: {
     title: "世界{id}　{name}",
