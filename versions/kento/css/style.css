@@ -908,3 +908,9 @@ button.wdeco:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--wc-d
 .zk-door-btn .zd-here { font-size: 12px; padding: 2px 9px; border-radius: 999px; background: #fff3b8; color: #6b4a10; text-shadow: none; }
 .zk-door-btn.here { box-shadow: 0 0 0 3px #ffd75e, 0 0 16px rgba(255,205,70,.8), 0 4px 0 var(--wc-dark), inset 0 0 0 2px rgba(255,255,255,.22); transform: scale(1.02); }
 .zk-door-btn.here:active { transform: scale(1.02) translateY(3px); }
+/* 11/7-41 決定: 図鑑の扉は、合計点の札・3つの世界のボタン・「ステージ一覧へ」が 375×667 でスクロールなしに1画面に入るよう、ボタンを少し低く */
+.zk-door { gap: 10px; margin: 6px 0 4px; }
+.zk-door-btn { gap: 3px; padding: 6px 10px 7px; }
+.zk-door-btn .zd-name { font-size: 16px; }
+.zk-door-btn .zd-nums { font-size: 14px; }
+#screen-zukan.door .zukan-box > .btn-row { margin-top: 10px; }

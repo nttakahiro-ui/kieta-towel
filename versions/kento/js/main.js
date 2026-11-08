@@ -732,6 +732,7 @@ const Main = (() => {
       door.appendChild(b);
     });
     box.appendChild(door);
+    $("screen-zukan").classList.add("door");   // 11/7-41: 扉は1画面に入るよう、下のボタンの上の余白をつめる
     $("btn-zukan-back").textContent = tx("zukan.back");
     showScreen("zukan");
     $("screen-zukan").scrollTop = 0;
@@ -742,6 +743,7 @@ const Main = (() => {
     $("zukan-nav").innerHTML = "";
     const bk = document.createElement("button"); bk.className = "link-btn"; bk.textContent = tx("zukan.toDoor"); bk.addEventListener("click", toZukan);   // 11/7-40
     $("zukan-nav").appendChild(bk);
+    $("screen-zukan").classList.remove("door");
     $("zukan-title").innerHTML = `<img class="zk-title-img" src="assets/zukan_title.png" alt="${tx("zukan.title")}"><br>${sub}`;
     $("zukan-title").querySelector("img").onerror = () => { $("zukan-title").innerHTML = `${tx("zukan.title")}<br>${sub}`; };
     const box = $("zukan-list");
