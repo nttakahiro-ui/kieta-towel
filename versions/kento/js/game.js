@@ -1852,7 +1852,7 @@ const Battle = (() => {
         }
       }
       if (def.wind && windOn()) f.x += windDirNow() * BATTLE.windStrength * 1.6 * dt;   // 夕暮れの虫は風に流される
-      if (f.layer === "air" && gravDir()) f.x += gravDir() * BATTLE.gravityDrift * dt;   // 11/7-37: 出来事「重力が変わる」で、空の敵も同じ向きに流される（地上の敵・自機・弾は流されない）
+      if (f.layer === "air" && gravDir()) f.x = Math.max(stripRight() + f.r, Math.min(W - f.r, f.x + gravDir() * BATTLE.gravityDrift * dt));   // 11/7-37: 出来事「重力が変わる」で、空の敵も同じ向きに流される（地上の敵・自機・弾は流されない）。11/7-38: 左の帯と右の端の内側で止める（流されて消えない）
       // 新しい敵（11/7-31）: ぶつかると元気が減る。走る歯車はそのまま走り続け、星はぶつかると消える
       if (def.touch && f.hp > 0 && player.inv <= 0 && !showWord && !(odai && odai.intro > 0) && !(player.rising > 0) && Math.hypot(f.x - player.x, f.y - player.y) < f.r * 0.85 + 14) {
         player.red = 0.5; hurt();
