@@ -689,6 +689,10 @@ const Sound = (() => {
     } else if (name === "light") {   // 必殺ワザを使った瞬間
       ["C5", "G5", "C6", "E6", "G6", "C7"].forEach((n, i) => tone(freq(n), t + i * 0.05, 0.8, "sine", 0.18));
       sweep(300, 1600, 0.6, "triangle", 0.12);
+    } else if (name === "gravWarn") {   // 11/7-37: 重力が変わる予告（低く、ゆれながら下がる「ぶうん」）
+      sweep(150, 70, 1.1, "sine", 0.35);
+      sweep(110, 55, 1.2, "triangle", 0.18, 0.15);
+      sweep(160, 80, 0.9, "sine", 0.12, 0.35);
     } else if (name === "odai") {    // お題が出た
       ["E5", "A5", "C6"].forEach((n, i) => tone(freq(n), t + i * 0.12, 0.4, "triangle", 0.22));
     } else if (name === "boing") {   // ダミーで弾がはね返る（ぼよん）

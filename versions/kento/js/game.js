@@ -142,7 +142,8 @@ const BATTLE = {
   //   rainSlant ＝ ななめ雨の傾き（横の速さ ÷ 縦の速さ）、speed ＝ 形ごとの速さの倍率
   odaiShots: { aimGap: 0.18, sweepCols: 7, sweepGap: 0.12, ringN: 6, rainSlant: 0.45, speed: { aim: 1, sweep: 1, ring: 0.85, rain: 1 }, gap: { fan: 1.4, aim: 1.4, sweep: 1.4, ring: 1.4, rain: 1.4 } },
   rearRate: 0.2,               // 世界3: 雑魚の群れのうち、うしろ（画面の下）から来る割合（stages.js の rearRate でステージごとに）。11/6-4: 0.35→0.2（うしろの虫がぶつかると元気が減るようになったので、数を減らした。ステージ12 0.5→0.25）
-  gravityDrift: 46,             // 出来事「重力が変わる」: ことばが横に流される速さ（px/秒）（10/31-10 試作）
+  gravityDrift: 60,             // 出来事「重力が変わる」: 空のことば・敵・種が横に流される速さ（px/秒）（10/31-10 試作。11/7-37 決定で 46→60。向きは回ごとに右か左）
+  gravityWarn: 1.5,             // 11/7-37: 始まる何秒前に予告の帯「重力がかわる…！」と低い音を出すか
   // 出来事「ねじが飛んでくる」（世界2）と「星がはじける」（世界3）（11/1-2 決定）。warn ＝ 先に出す印の秒数
   screwEvent: { n: [3, 5], warn: 1.5, gap: 0.35, vx: 210, vy: 120 },
   burstEvent: { every: 3, warn: 2, n: 8, speed: 140 },
@@ -632,6 +633,7 @@ const Battle = (() => {
   let rewindUsed = false, rewindFx = null, baseScript = [], killN = 0;   // 巻き戻しを使ったか（1ステージ1回）、その演出、救出の旅の最初の台本
   let skillUse = { boost: 0, guard: 0, rewind: 0, fullAcc: 0, fullBoss: 0, firstAcc: -1 };   // 必殺ワザを使った回数と、ゲージが満タンになった回数（ためて／中ボス・大ボスで）、ためて初めて満タンになった救出の旅の時計（調べる用）
   let meteorT = 0;   // 流星雨の次の1つまで（世界3。10/31-10 試作）
+  let bgOffX = 0, gravStreaks = [];   // 11/7-37: 出来事「重力が変わる」のあいだ、背景の絵を横にも流した量と、ななめに流れる星の筋
   let bgOff = 0, bgGo = false;   // 救出の旅の背景の絵の流れた量と、流しはじめたか（1語目が出てから。11/1-2 決定）
   let evPlans = {};   // 出来事「ねじ」「星がはじける」の段取り（11/1-2）
   let events = [], rescueT = 0, evShown = {};   // このステージの出来事（stages.js の event）、救出の旅の経過秒、出来事の帯を出したか
@@ -791,7 +793,7 @@ const Battle = (() => {
     state = "sortie"; sortieNo = 1; reacted = 0; openDoor();   // 発見の旅の扉から始める（11/7-19）
     loadout = null; powerBonus = basePower(); shield = 0; gaugeMul = 1;
     stopT = 0; guardT = 0; boostT = 0; rewindUsed = false; rewindGuide = null; rewindGuided = false; rewindSaid = false; rewindHintWait = false; guardSayWait = false; rewindFx = null; skillUse = { boost: 0, guard: 0, rewind: 0, fullAcc: 0, fullBoss: 0, firstAcc: -1 }; baseScript = script; rescueT = 0; evShown = {}; evPlans = {}; bgOff = 0; bgGo = false; press = null;
-    events = (opts.stage && opts.stage.event) ? [].concat(opts.stage.event) : [];
+    events = (opts.stage && opts.stage.event) ? [].concat(opts.stage.event).map(e => Object.assign({}, e)) : [];   // 11/7-37: 回ごとの向き・予告の印を持たせるので写しにする
     // 救出の旅をもう一度（10/25-14。結果画面のボタン）: 発見の旅をとばして、持ち物選択から。発見で見つけたことばの記録（opts.foundIds）は残す
     if (opts.foundIds) {
       found = new Set(opts.foundIds); reacted = found.size;
@@ -1016,6 +1018,8 @@ const Battle = (() => {
   function evActive(kind) {
     return events.some(e => e.kind === kind && evOn(e));
   }
+  // 11/7-37: 出来事「重力が変わる」の向き（右 1・左 -1。いま起きていなければ 0）。向きは回ごとに、予告のときに決める
+  const gravDir = () => { const e = events.find(q => q.kind === "gravity" && evOn(q)); return e ? (e.dir || (e.dir = Math.random() < 0.5 ? -1 : 1)) : 0; };
   const convFast = () => evActive("fast") ? BATTLE.fastConveyor : 1;   // 出来事「コンベアが急に速くなる」（11/1-2）
   // 出来事「ねじが飛んでくる」「星がはじける」の段取り（11/1-2 決定）。時刻は出来事が始まってからの秒（救出の旅の時計。お題のあいだは進まない）
   //   ねじ: 3〜5個。横のはし（左右どちらか）に warn 秒「！」を出してから、ななめに飛んでくる。地上の雑魚と同じ金属の色
@@ -1095,6 +1099,13 @@ const Battle = (() => {
   }
   // 出来事が始まった瞬間に帯を1回（発見の旅と救出の旅で、それぞれ1回）
   function evBanners() {
+    // 11/7-37: 「重力が変わる」は 1.5秒前に予告（青い帯「重力がかわる…！」と低い音）。救出の旅のはじめ1.5秒より前に始まる回は、救出の旅が始まったときに予告
+    if (phase !== "round1" && !odai) for (const e of events) if (e.kind === "gravity" && e.sortie === 2 && !e.warned && rescueT >= e.at - BATTLE.gravityWarn && rescueT < e.at) {
+      e.warned = true; e.dir = Math.random() < 0.5 ? -1 : 1;
+      Sound.se("gravWarn");
+      const text = tx("events.gravityWarn");
+      post("banner", () => { banner = { text, t: 1.5, color: "rgba(60,80,130,0.92)" }; });
+    }
     for (const e of events) if (!evShown[e.kind + e.sortie + "@" + e.at] && evOn(e)) {   // 同じ出来事が2回あれば、2回とも知らせる（11/1-3）
       evShown[e.kind + e.sortie + "@" + e.at] = true;
       Sound.se("odai");
@@ -1517,7 +1528,11 @@ const Battle = (() => {
 
     // 地面・雲の影・綿毛（奥行きのために、速さを変えて流す）
     for (const s of terrain) s.y += sc * dt;
-    if (bgGo && !odai && state === "play" && phase !== "round1") bgOff += sc * dt;   // 背景の絵: 1語目が出るまでと、お題のあいだ・終わりは止める（11/1-2 決定）
+    if (bgGo && !odai && state === "play" && phase !== "round1") bgOff += sc * dt;
+    { const gd = state === "play" && phase !== "round1" && !frozen() ? gravDir() : 0;   // 11/7-37: 重力が変わるあいだ、星空がななめに流れる（終わったら横の流れは止まり、ふつうの縦の流れに戻る）
+      if (gd) { bgOffX += gd * BATTLE.gravityDrift * dt; if (Math.random() < dt * 22) gravStreaks.push({ x: Math.random() * W, y: -20 + Math.random() * H * 0.9, age: 0, dir: gd }); }
+      for (const g of gravStreaks) { g.age += dt; g.x += g.dir * 220 * dt; g.y += 260 * dt; }
+      gravStreaks = gravStreaks.filter(g => g.age < 0.9); }   // 背景の絵: 1語目が出るまでと、お題のあいだ・終わりは止める（11/1-2 決定）
     fillTerrain();
     for (const c of cloudShadows) { c.y += sc * 1.5 * dt; c.x += 8 * dt; if (c.y - c.ry > H) { c.y = -c.ry - rand(0, 200); c.x = rand(0, W); } }
     for (const f of fluff) { f.y += f.v * dt; f.x += Math.sin(t + f.p) * 8 * dt; if (f.y > H + 10) { f.y = -10; f.x = Math.random() * W; } }
@@ -1736,7 +1751,7 @@ const Battle = (() => {
       } else {
         e.y += (H + e.size * 2) / BATTLE.fallTime[e.role] * dt * e.spd;
         if (e.hold) e.y = Math.min(e.y, H * BATTLE.firstHoldY);   // ステージ1の救出の旅の1語目: 中ほどで止まって待つ
-        if (evActive("gravity")) e.bx = Math.min(W - e.w / 2 - 20, Math.max(stripRight() + e.w / 2 + 20, e.bx + BATTLE.gravityDrift * dt));   // 出来事「重力が変わる」（世界3）: 右へ流される
+        if (gravDir()) e.bx = Math.min(W - e.w / 2 - 20, Math.max(stripRight() + e.w / 2 + 20, e.bx + gravDir() * BATTLE.gravityDrift * dt));   // 出来事「重力が変わる」（世界3）: 右か左へ流される（11/7-37）
         e.x = e.bx + Math.sin(e.age * BATTLE.swaySpeed + e.phase) * BATTLE.sway;
       }
       // ラストチャンスの引き寄せ（11/7-10・11/7-12）: ふわりから pullR px 以内のことば。空のことばは横だけ、ふわりの真上へ寄る（光が当たりやすくなる）。地上のことばは動かさない
@@ -1837,6 +1852,7 @@ const Battle = (() => {
         }
       }
       if (def.wind && windOn()) f.x += windDirNow() * BATTLE.windStrength * 1.6 * dt;   // 夕暮れの虫は風に流される
+      if (f.layer === "air" && gravDir()) f.x += gravDir() * BATTLE.gravityDrift * dt;   // 11/7-37: 出来事「重力が変わる」で、空の敵も同じ向きに流される（地上の敵・自機・弾は流されない）
       // 新しい敵（11/7-31）: ぶつかると元気が減る。走る歯車はそのまま走り続け、星はぶつかると消える
       if (def.touch && f.hp > 0 && player.inv <= 0 && !showWord && !(odai && odai.intro > 0) && !(player.rising > 0) && Math.hypot(f.x - player.x, f.y - player.y) < f.r * 0.85 + 14) {
         player.red = 0.5; hurt();
@@ -1953,6 +1969,7 @@ const Battle = (() => {
     for (const it of items) {
       it.age += dt;
       it.y += (sc * 0.7 + 12) * dt;
+      if (gravDir() && !frozen()) it.x = Math.max(stripRight() + 14, Math.min(W - 14, it.x + gravDir() * BATTLE.gravityDrift * dt));   // 11/7-37: 種も流される（帯の下・画面の外へは出ない）
       if (!it.lesTried && it.y > LES_TOP + 14 && lesson("seed", { ty: it.y, target: it, done: () => it.got || it.y >= H + 20 })) it.lesTried = true;   /* 11/7-30: ほかの説明が出ているあいだは、出せるまで待つ */   // チュートリアル: 初めてたねが落ちた → 拾う（11/7-20）。上の帯より下に来てから（11/7-28）
       if (Math.hypot(it.x - player.x, it.y - player.y) < 28) {
         it.got = true; seedsGot++;
@@ -2483,7 +2500,7 @@ const Battle = (() => {
     gapT = 0; typhoon = null; wave = null; wrongFx = null; againFx = null; showWord = null;
     clearMsgs(9); msgQ = [];
     player.hp = maxHp(); player.inv = Math.max(player.inv, 1.5);
-    rescueT = 0; evShown = {}; evPlans = {}; meteorT = 0; bgOff = 0; bgGo = false;
+    rescueT = 0; evShown = {}; evPlans = {}; meteorT = 0; bgOff = 0; bgGo = false; bgOffX = 0; gravStreaks = []; for (const e of events) { e.warned = false; e.dir = 0; }
     startPhase("round2");
     rewindFx = { age: 0 };
     Sound.se("power");
@@ -3059,6 +3076,13 @@ const Battle = (() => {
     // 照準
     if (state === "play" && groundOn) drawGroundSpot();   // 真上の薄い丸と光の筋は、地上のある世界だけ
 
+    // 11/7-37: 重力が変わるあいだの、ななめに流れる星の筋
+    if (gravStreaks.length) { ctx.save(); ctx.lineCap = "round";
+      for (const g of gravStreaks) { const a = Math.sin(Math.PI * g.age / 0.9);   // うすい背景でも見えるよう、紫の筋に白い芯
+        ctx.beginPath(); ctx.moveTo(g.x, g.y); ctx.lineTo(g.x - g.dir * 34, g.y - 40);
+        ctx.lineWidth = 4; ctx.strokeStyle = `rgba(110,80,170,${0.32 * a})`; ctx.stroke();
+        ctx.lineWidth = 1.5; ctx.strokeStyle = `rgba(255,255,255,${0.8 * a})`; ctx.stroke(); }
+      ctx.restore(); }
     // 雲の影（地面の上を流れる）
     ctx.fillStyle = theme.cloudShadow;
     for (const c of cloudShadows) { ctx.beginPath(); ctx.ellipse(c.x, c.y, c.rx, c.ry, 0, 0, Math.PI * 2); ctx.fill(); }
@@ -3237,6 +3261,7 @@ const Battle = (() => {
       if (!hintCard && !rewindGuide) ctx.fillText(tx("rescue.moveHint"), W / 2, hy);
       ctx.globalAlpha = 1;
     }
+    if (state === "play" && phase !== "round1") drawGravArrows();   // 11/7-37
     if (banner) drawBanner();
 
     if (odai) drawOdai();
@@ -3293,7 +3318,12 @@ const Battle = (() => {
         const wbg = worldBgImg();
         if (wbg) {   // 11/1-2 決定: 救出の旅は、世界の繰り返し背景を絵ごと縦に流す（幅いっぱい。速さは地面と同じ。1語目が出るまでと、お題のあいだ・終わりは止まる）
           const ih = wbg.naturalHeight * W / wbg.naturalWidth, off = ((bgOff % ih) + ih) % ih;
-          for (let y = off - ih; y < H; y += ih) ctx.drawImage(wbg, 0, y, W, ih + 1);
+          if (!bgOffX) for (let y = off - ih; y < H; y += ih) ctx.drawImage(wbg, 0, y, W, ih + 1);
+          else {   // 11/7-37: 横にも流れたあと。となりの絵は左右を裏返して、つなぎ目が合うように
+            const k0 = Math.floor(-bgOffX / W), ox = bgOffX + k0 * W;
+            for (let k = 0; k < 2; k++) { const x = ox + k * W, flip = ((k0 + k) % 2 + 2) % 2 === 1;
+              for (let y = off - ih; y < H; y += ih) { if (flip) { ctx.save(); ctx.translate(x + W, 0); ctx.scale(-1, 1); ctx.drawImage(wbg, 0, y, W, ih + 1); ctx.restore(); } else ctx.drawImage(wbg, x, y, W, ih + 1); } }
+          }
         } else {   // 読み込めないときは、今までの止まった絵
           const sc = Math.max(W / img.naturalWidth, H / img.naturalHeight), iw = img.naturalWidth * sc, ih = img.naturalHeight * sc;
           ctx.drawImage(img, (W - iw) / 2, (H - ih) / 2, iw, ih);
@@ -4355,6 +4385,20 @@ const Battle = (() => {
     }
   }
 
+  // 11/7-37: 重力が変わるあいだ、流れる向きのふちに、ななめ下を向いた矢印をうすく3つ
+  function drawGravArrows() {
+    const gd = gravDir(); if (!gd) return;
+    const x = gd > 0 ? W - 24 : stripRight() + 24;
+    for (let i = 0; i < 3; i++) {
+      const y = H * (0.28 + i * 0.2), a = 0.28 + 0.14 * Math.sin(t * 5 - i * 0.9);
+      ctx.save(); ctx.lineCap = "round"; ctx.lineJoin = "round";
+      ctx.translate(x, y); ctx.rotate(gd > 0 ? Math.PI / 4 : Math.PI * 3 / 4);
+      ctx.beginPath(); ctx.moveTo(-16, 0); ctx.lineTo(10, 0); ctx.moveTo(0, -11); ctx.lineTo(12, 0); ctx.lineTo(0, 11);
+      ctx.lineWidth = 9; ctx.strokeStyle = `rgba(30,40,90,${a * 0.6})`; ctx.stroke();
+      ctx.lineWidth = 5; ctx.strokeStyle = `rgba(255,255,255,${a})`; ctx.stroke();
+      ctx.restore();
+    }
+  }
   function drawBanner() {
     const total = banner.total || (banner.total = banner.t);
     const a = Math.min(1, banner.t / 0.3, (total - banner.t) / 0.2);
