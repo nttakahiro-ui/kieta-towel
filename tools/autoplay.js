@@ -62,7 +62,7 @@ function runOnce(skill, seed) { HUDLOG.rows.push(["--", skill]); HUDLOG.lastK = 
   // 1回目の旅（双眼鏡）: 見えるのは円の中と、きらっと光ったときだけ。気づいた語句を追いかけて見つめる。なければジグザグに見回す
   const B = vm.runInContext("BATTLE", sb);
   let bossSec = null, bossClock = null;
-  let odaiNow = null, odaiT0 = 0, odaiH0 = 0, odaiHits = 0; const midSecs = [];
+  let odaiNow = null, odaiT0 = 0, odaiH0 = 0, odaiHits = 0; const midSecs = []; let bossT0 = null, bossEnd = null;   // 大ボス戦の秒数 ＝ 大ボスの問題文が初めて出てから、大ボスのお題が最後に終わるまで（11/8。「どっち？」のやり直しも含める）
   let lcN = 0, lcKill = 0;   // ラストチャンス（11/7-10）: 出たことばの数、倒した虫の数
   let extraAsked = 0; let exTarget = null, exWay = 0, exNoticed = new Set(), exQuitT = 0, foundN = null, exploreSec = null, baseN = null;
   const WAYS = [[110, 160], [300, 160], [300, 300], [110, 300], [110, 440], [300, 440], [300, 300], [110, 300]];
@@ -90,8 +90,9 @@ function runOnce(skill, seed) { HUDLOG.rows.push(["--", skill]); HUDLOG.lastK = 
     if (S.phase !== "round1" && foundN === null && S.explore) { foundN = S.reacted; exploreSec = S.t; if (baseN === null) baseN = S.reacted; }
     if (S.phase === "boss" && bossSec === null) { bossSec = S.t; bossClock = S.rescueT; }   // bossClock ＝ 大ボスまでの救出の旅の時計（出来事の時刻。お題のあいだは進まない。11/1-3）
     // お題のあいだ（11/1）: 中ボスのお題の秒数（問題文が出てから殻がほどけるまで）と、お題のあいだの被弾
+    if (S.phase !== "boss" && bossT0 !== null) { bossT0 = null; bossEnd = null; }   // 本番やり直しで大ボスの前にもどったら、測り直す（最後の大ボス戦だけ数える）
     if (S.odai && S.odai !== odaiNow) { odaiNow = S.odai; odaiT0 = S.t; odaiH0 = S.hits; }
-    if (odaiNow && S.odai !== odaiNow) { if (!odaiNow.boss) midSecs.push(S.t - odaiT0); odaiHits += S.hits - odaiH0; odaiNow = S.odai || null; if (odaiNow) { odaiT0 = S.t; odaiH0 = S.hits; } }
+    if (odaiNow && S.odai !== odaiNow) { if (!odaiNow.boss) midSecs.push(S.t - odaiT0); else { if (bossT0 === null) bossT0 = odaiT0; bossEnd = S.t; } odaiHits += S.hits - odaiH0; odaiNow = S.odai || null; if (odaiNow) { odaiT0 = S.t; odaiH0 = S.hits; } }
     if (process.env.ODAILIST && S.odai && S.odai !== globalThis.__listOdai) { const es = S.enemies.filter(e => e.pattern === "odai"); if (es.length >= 2) { globalThis.__listOdai = S.odai; console.log("ODAILIST", STAGE, S.odai.boss ? "大ボス" : "中ボス", S.odai.mode === "order" ? "順" : es.length + "択", "「" + S.odai.q + "」", es.map(e => e.word.word + (e.dummy ? "" : "◎")).join(" / ")); } }   // 11/7-11: 実際に出た問いと選ぶことば（◎＝正解。順は正しい順の3つ）
     if (process.env.ODAILOG && S.odai && S.odai !== globalThis.__lastOdai) { globalThis.__lastOdai = S.odai; console.log("ODAI", S.odai.real.word, "→", S.odai.q); }
     if (S.player && S.state === "play" && S.phase === "round1" && S.explore && S.explore.queue) {
@@ -220,7 +221,7 @@ function runOnce(skill, seed) { HUDLOG.rows.push(["--", skill]); HUDLOG.lastK = 
     if (process.env.DBG && i === 60 * 400) { const S2 = sb.Battle.peek(); console.log("止まっている:", S2.state, S2.phase, "odai", !!S2.odai, S2.odai && S2.odai.intro, "敵", S2.enemies.map(e => e.word.word + (e.dummy ? "(ダミー)" : "") + "@" + Math.round(e.x) + "," + Math.round(e.y) + " hp" + e.hp).join(" "), "自機", Math.round(S2.player.x), Math.round(S2.player.y), "体力", S2.player.hp); }
   }
   const gIds = Object.keys(PAT).filter(id => PAT[id].startsWith("ground") && words.find(w => String(w.id) === id)).map(Number);   // 地上のことば（11/7-23）
-  return { ground: { bombs: se.seedThrow || 0, kills: se.__groundKill || 0, words: gIds.length, saved: gIds.filter(id => !((stats && stats.missed) || []).includes(id)).length }, wall: now / 1000, lesSeen, lcN, lcKill, lcGot: lcN ? lcN - ((stats && stats.missed) || []).length : 0, ids: ended || [], stats, words, foundN, baseN, exploreSec, bossSec, bossClock, midSecs, odaiHits: odaiHits + (odaiNow ? (sb.Battle.peek().hits - odaiH0) : 0), loadout: sb.Battle.peek().loadout, skillUse: sb.Battle.peek().skillUse, firstFull, rescueSec: rescueAt === null ? null : (now - rescueAt) / 1000, odaiMiss: (stats && stats.missed || []).filter(id => words.find(w => w.id === id && w.role !== "zako")).length };
+  return { ground: { bombs: se.seedThrow || 0, kills: se.__groundKill || 0, words: gIds.length, saved: gIds.filter(id => !((stats && stats.missed) || []).includes(id)).length }, wall: now / 1000, lesSeen, lcN, lcKill, lcGot: lcN ? lcN - ((stats && stats.missed) || []).length : 0, ids: ended || [], stats, words, foundN, baseN, exploreSec, bossSec, bossClock, midSecs, bossSecs: bossEnd === null ? [] : [bossEnd - bossT0], odaiHits: odaiHits + (odaiNow ? (sb.Battle.peek().hits - odaiH0) : 0), loadout: sb.Battle.peek().loadout, skillUse: sb.Battle.peek().skillUse, firstFull, rescueSec: rescueAt === null ? null : (now - rescueAt) / 1000, odaiMiss: (stats && stats.missed || []).filter(id => words.find(w => w.id === id && w.role !== "zako")).length };
 }
 const ABSY_ALL = {}, PAT = {}, SLOW_ALL = {}; let curSkill = "";
 const out = {};
@@ -244,6 +245,7 @@ for (const [name, rs] of Object.entries(out)) {
   { const L = ok.filter(r => r.lcN > 0); const nN = L.reduce((a, r) => a + r.lcN, 0), nG = L.reduce((a, r) => a + r.lcGot, 0); console.log(`  ラストチャンス ${name}: 入った ${L.length}/${ok.length}回、出たことば ${nN}語、取れたことば ${nG}語（${nN ? Math.round(100 * nG / nN) : '-'}%）` + (L.length ? `（1回ごと 取れた/出た: ${L.map(r => r.lcGot + '/' + r.lcN).join(' ')}）` : '')); }
   console.log(`  地上 ${name}: 爆弾を投げた ${avg(r => r.ground.bombs).toFixed(1)}回（各回 ${ok.map(r => r.ground.bombs).join(",")}） 地上の雑魚を倒した ${avg(r => r.ground.kills).toFixed(1)} 地上のことばを助けた ${avg(r => r.ground.saved).toFixed(2)}/${avg(r => r.ground.words).toFixed(2)}`);   // 11/7-23
   if (process.env.TUT === "first" || process.env.TUT === "again") console.log(`  チュートリアル ${name}: クリアまで ${avg(r => r.wall).toFixed(1)}秒（実時間。各回 ${ok.map(r => r.wall.toFixed(0)).join(",")}） OK まで行ったもの ${[...new Set(ok.flatMap(r => r.lesSeen))].join("・") || "なし"}（1回あたり ${avg(r => r.lesSeen.length).toFixed(1)}こ）`);
+  { const bs = rs.flatMap(r => r.bossSecs || []); console.log(`  大ボス戦 ${name}: ${bs.length ? (bs.reduce((a, b) => a + b, 0) / bs.length).toFixed(1) : '-'}秒（${bs.length}回、各回 ${bs.map(v => v.toFixed(0)).join(',')}）`); }
   { const ms = rs.flatMap(r => r.midSecs || []); console.log(`  お題 ${name}: 中ボスのお題 ${ms.length ? (ms.reduce((a, b) => a + b, 0) / ms.length).toFixed(1) : '-'}秒（${ms.length}回、最長 ${ms.length ? Math.max(...ms).toFixed(1) : '-'}秒） お題のあいだの被弾 ${avg(r => r.odaiHits || 0).toFixed(2)} 大ボスまでの救出の時計 ${avg(r => r.bossClock || 0).toFixed(0)}秒`); }
 }
 // 殻がほどけた高さ（10/25-8）: 平均、上3分の1で消えた割合。パワー★1（段階0）と★2以上（段階1〜）に分けて
