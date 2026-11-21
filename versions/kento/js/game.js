@@ -100,6 +100,8 @@ const BATTLE = {
   //   足元のやわらかい影（黒・だ円）も、どの世界でも常に（11/22-10 は世界3だけ、11/22-11 で世界1・2にも）
   fuwariEdgeW: { w: 2.5, color: { 1: "#1F5F3A", 2: "#1F3A6E", 3: "#4B2C7F" } },
   fuwariShadow: { alpha: 0.25 },
+  // 11/22-12 決定（指摘111）: 世界3の発見の旅で、押し続けているのに どのことばにも当たっていない状態が wait 秒続いたら、指の少し上（lift px）に吹き出し。1回の発見の旅で max 回まで
+  spaceMissHint: { wait: 1, max: 3, lift: 62 },
   // 11/22-10 決定A: とくぎ・必殺ワザの効果中が目で分かるように
   //   powerShot: とくぎ「パワーアップ」中の光（太さの倍率と、濃い色）。shieldRing: とくぎ「守りアップ」中の盾の輪（世界の色、半透明）
   //   gaugeGlow: とくぎ「ゲージ2倍速」中、必殺ワザのボタンの枠を光らせる。edgeRed: 必殺ワザ「パワー全開」中の画面の縁の赤
@@ -4948,6 +4950,12 @@ const Battle = (() => {
         if (Math.abs(lx) < b.w / 2 + 8 && Math.abs(ly) < b.h / 2 + 12 && (!pressed || d < pressedD)) { pressed = b; pressedD = d; }
       }
     }
+    // 11/22-12（指摘111）: 押しているのに、どのことばにも当たっていない → 1秒で吹き出し（当たる・はなすと消える）
+    { const mh = BATTLE.spaceMissHint;
+      if (press && !pressed && !les && !ex.endT) {
+        ex.missT = (ex.missT || 0) + dt;
+        if (!ex.missOn && ex.missT >= mh.wait && (ex.missN || 0) < mh.max) { ex.missOn = true; ex.missN = (ex.missN || 0) + 1; }
+      } else { ex.missT = 0; ex.missOn = false; } }
     for (const b of ex.boxes) {
       if (b.open) continue;
       if (b !== pressed) { b.hold = 0; b.grab = null; continue; }
@@ -4973,6 +4981,22 @@ const Battle = (() => {
     ex.boxes = ex.boxes.filter(b => !(b.open && b.openT > 1.2));
     exploreOverCheck(words, dt);
     exploreEndCheck(words, !ex.boxes.some(b => b.open));
+  }
+  // 11/22-12（指摘111）: 指の少し上の小さな吹き出し「ことばの真ん中を押し続けて！」（しっぽは指のほうへ）
+  function drawSpaceMiss() {
+    const text = tx("space.missHint");
+    ctx.save(); ctx.font = font(15); ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    const bw = Math.min(W - 16, ctx.measureText(text).width + 28), bh = 34;
+    const cx = Math.max(8 + bw / 2, Math.min(W - 8 - bw / 2, press.x));
+    const by = Math.max(8, press.y - BATTLE.spaceMissHint.lift - bh / 2);
+    const col = BATTLE.fuwariEdgeW.color[worldDef.id] || "#4B2C7F";
+    ctx.fillStyle = "rgba(255,255,255,0.96)"; ctx.strokeStyle = col; ctx.lineWidth = 2;
+    roundRect(cx - bw / 2, by, bw, bh, 12); ctx.fill(); ctx.stroke();
+    const tx0 = Math.max(cx - bw / 2 + 16, Math.min(cx + bw / 2 - 16, press.x));
+    ctx.beginPath(); ctx.moveTo(tx0 - 8, by + bh - 1); ctx.lineTo(tx0, by + bh + 10); ctx.lineTo(tx0 + 8, by + bh - 1); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(tx0 - 8, by + bh); ctx.lineTo(tx0, by + bh + 10); ctx.lineTo(tx0 + 8, by + bh); ctx.stroke();
+    ctx.fillStyle = "#3a2a5a"; ctx.fillText(text, cx, by + bh / 2 + 1, bw - 12);
+    ctx.restore();
   }
   function drawSpaceExplore() {
     const ex = explore;
@@ -5103,13 +5127,20 @@ const Battle = (() => {
       const a = Math.min(1, ex.over / 0.3, (BATTLE.exploreOverMsg - ex.over) / 0.2 + 0.01);
       ctx.save(); ctx.globalAlpha = Math.max(0, a);
       ctx.font = font(18); ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      const text = tx("explore.overTime", { p: BATTLE.exploreTimeScore }), tw = Math.min(W - 24, ctx.measureText(text).width + 32);
+      const text = tx("explore.overTime", { p: BATTLE.exploreTimeScore });
+      const sub = exMove.space ? tx("space.overHint") : "";   // 11/22-12（指摘111）: 世界3は、まだ見つけていないことばがあるので、2行目に見つけ方の一言
+      let tw = ctx.measureText(text).width + 32;
+      if (sub) { ctx.font = font(15); tw = Math.max(tw, ctx.measureText(sub).width + 32); ctx.font = font(18); }
+      tw = Math.min(W - 24, tw);
+      const bh = sub ? 62 : 40;
       ctx.fillStyle = "rgba(255,240,236,0.97)"; ctx.strokeStyle = "#e0483a"; ctx.lineWidth = 2.5;
-      roundRect(W / 2 - tw / 2, 82, tw, 40, 14); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = "#c8382c"; ctx.fillText(text, W / 2, 103, W - 40);
+      roundRect(W / 2 - tw / 2, 82, tw, bh, 14); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "#c8382c"; ctx.fillText(text, W / 2, sub ? 100 : 103, W - 40);
+      if (sub) { ctx.font = font(15); ctx.fillStyle = "#5a3a30"; ctx.fillText(sub, W / 2, 124, W - 40); }
       ctx.restore();
     }
-    if (!moved && state === "play") {   // 操作のヒント
+    if (exMove.space && explore.missOn && press && state === "play") drawSpaceMiss();
+    if (!moved && state === "play" && !(ex.over > 0)) {   // 11/22-12: 時間オーバーの帯が出ているあいだは、上の一行を出さない（重なるため）   // 操作のヒント
       ctx.globalAlpha = hintFadeIn();
       ctx.font = font(16); ctx.lineWidth = 5; ctx.strokeStyle = "#ffffff";
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
