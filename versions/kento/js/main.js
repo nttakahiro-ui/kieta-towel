@@ -550,7 +550,7 @@ const Main = (() => {
       // 11/7-39 決定: 宝石は枠の右端（縦の中央）。まだないステージは、うすい宝石の影
       const marks = document.createElement("span"); marks.className = "marks";
       const lit = litSet.has(s.id);
-      marks.innerHTML = (b ? `<span class="row-clear">${tx("stagesTag.cleared")}</span>` : "") + `<svg class="row-gem${lit ? "" : " ghost"}" viewBox="-22 -22 44 44">${GEM_ART(s.gem, lit, 19, s.id)}</svg>`;   // 宝石があれば宝石の絵（11/7-19: 「10のことば」「ステージクリア」の札はやめた。クリアした枠が光るのはそのまま）
+      marks.innerHTML = (b ? `<span class="row-clear">${tx("stagesTag.cleared")}</span>` : "") + `<span class="row-gem">${gemImg(s.id, lit)}</span>`;   // 宝石があれば宝石の絵（11/7-19: 「10のことば」「ステージクリア」の札はやめた。クリアした枠が光るのはそのまま）
       main.append(nm, sub);   // 枠は2行（ステージ名／カード ○/10　最高 ○点）。11/7-39: 宝石は3行目をやめて右端に
       row.append(no, main, marks);
       if (open) row.addEventListener("click", () => { Sound.se("start"); selectStage(s.id); toBattle(); });

@@ -704,6 +704,15 @@ body { position: fixed; inset: 0; }
 .art-img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; border-radius: 6px; }
 .art-slot { position: absolute; transform: translate(-50%, -50%); aspect-ratio: 1; cursor: pointer; }
 .art-slot svg { width: 100%; height: 100%; display: block; overflow: visible; }
+/* 11/22-4 決定: 宝石は制作側の絵。マスは宝石の形のくぼみ（縁の線なし）。絵に描かれた古い六角形の枠は、地の色の布で隠す */
+.gem-cover { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); border-radius: 34%; filter: blur(1.5px); pointer-events: none; }
+.art-slot .rb-gem { position: absolute; inset: 0; display: grid; grid-template: 100% / 100%; place-items: center; }
+.art-slot .rb-gem > * { grid-area: 1 / 1; }
+.art-slot .gem-pic { height: var(--gh); width: auto; display: block; }
+.gem-hole { height: calc(var(--gh) * 1.14); width: auto; display: block; filter: brightness(0) blur(.5px); opacity: .32; }   /* くぼみ: 宝石の絵を黒くうすく、少し大きく */
+.gem-pic.ghost { filter: grayscale(1); opacity: .4; }   /* まだ取っていない宝石: 同じ絵を灰色・うすく（彩度0、不透明度40%） */
+.gem-halo { width: 105%; height: 105%; border-radius: 50%; pointer-events: none; }
+.gem-next { width: 112%; aspect-ratio: 1; box-sizing: border-box; border: 2px solid #e0b03a; border-radius: 50%; animation: rbNext 1.2s ease-in-out .9s infinite both; }
 .world-gems:has(.art-band) { width: 100%; margin: 4px 0 0; }   /* ステージ一覧の上の帯は、画面の幅いっぱい */
 .stages-lead { margin: 0 0 2px; text-align: center; white-space: pre-line; word-break: keep-all; font-size: 13px; color: #6b5a3a; }   /* 帯の上の一言（見本 sample_wt01） */
 .rb-box:has(.art-book), #screen-recipe .rb-box:has(.art-book) { width: 100%; max-width: 440px; }   /* 本の絵は横長なので幅いっぱい */
@@ -889,7 +898,8 @@ button.wdeco:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--wc-d
 .stage-row .sub { line-height: 1.35; }
 .stage-row .marks { margin: 0; flex-shrink: 0; display: flex; align-items: center; justify-content: center; width: 30px; }
 .stage-row .row-gem { width: 28px; height: 28px; }
-.stage-row .row-gem.ghost { opacity: .22; filter: grayscale(1) brightness(.75); }
+.stage-row .row-gem { display: flex; align-items: center; justify-content: center; }
+.stage-row .row-gem .gem-pic { height: 23px; width: auto; display: block; }   /* 11/22-4: 制作側の宝石の絵（前の図形と同じ高さ） */
 /* 11/7-40 決定: カード図鑑の扉。世界1〜3の大きなボタン（世界の色・帯の絵・集めた数・宝石の数）。今いる世界は少し強調。いちばん上に合計点の札（緑） */
 .zukan-nav { min-height: 0; text-align: left; }
 .zukan-nav:empty { display: none; }

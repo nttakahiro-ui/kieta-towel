@@ -1,31 +1,24 @@
 // レシピブック（10/25-4）: 12色の宝石が時計の文字盤のようにならぶ円い台座。仮の図形（SVG）で描く
 //   ステージ1がいちばん上で、時計回りに12まで。世界ごとに4個ずつのかたまり
 //   ステージのカードが10枚そろうと、そのステージの宝石が光る。光った数が多いほど台座全体が明るくなる
-//   宝石の色は data/stages.js の gem 欄。宝石の絵は下の GEM_ART だけを書きかえれば変わる（本番で制作担当者の絵に差しかえる）
+//   宝石の絵は assets/gems/gem_01〜12.png（11/22-4。制作側の絵）。stages.js の gem 欄の色は、光の玉・光の輪・紙吹雪に使う
 //   使う場面: 目的の画面（空の台座）、レシピ完成の画面（宝石がはまる演出）、ステージ一覧の「レシピブック」、12個そろったときの画面
 
 // ===== 宝石の絵（ここだけ書きかえれば、宝石の見た目が変わる） =====
 // color: 宝石の色、lit: 光っているか。(0, 0) を中心に、半径およそ size の大きさで描く SVG の文字を返す
 // 画像にするときの例: return `<image href="assets/gem_${stageId}.png" x="${-size}" y="${-size}" width="${size * 2}" height="${size * 2}" opacity="${lit ? 1 : 0.25}"/>`;
 // 11/2: 制作側の見本（sample_bg_c01）の宝石に近い見た目に。盾の形（上が平ら、下がとがる）で、カットの面ごとに明るさを変え、白い光を足す（宝石の絵のファイルはまだないので図形）
-const gemShade = (hex, k) => {   // k > 0 で白に、k < 0 で黒に近づける
-  const n = parseInt(hex.slice(1), 16), c = [n >> 16, (n >> 8) & 255, n & 255].map(v => Math.round(k > 0 ? v + (255 - v) * k : v * (1 + k)));
-  return `rgb(${c.join(",")})`;
-};
+// 11/22-4 決定: 宝石は制作側の絵（docs/宝石/ の12枚）。外接枠で切り出して中央そろえ・同じ高さに縮めた assets/gems/gem_01〜12.png（番号＝ステージ）
+//   まだ取っていない宝石は、同じ絵を灰色・うすく（彩度0、不透明度40%）。color は使わない（光の玉・紙吹雪の色には stages.js の gem を使う）
+const GEM_PIC = { v: "1122-4", h: 1.86 };   // h: 前の図形の宝石と同じ高さ（size に対する倍率）
+const gemSrc = stageId => `assets/gems/gem_${String(stageId).padStart(2, "0")}.png?v=${GEM_PIC.v}`;
+// HTML の <img>（ステージ一覧の行・本・帯）
+const gemImg = (stageId, lit, cls = "") => `<img class="gem-pic${lit ? "" : " ghost"}${cls ? " " + cls : ""}" src="${gemSrc(stageId)}" alt="" draggable="false">`;
+// SVG の中（円い台座。本の絵が読めないときだけ）。(0, 0) が中心、高さ size × 1.86
 const GEM_ART = (color, lit, size, stageId) => {
-  const s = size, P = pts => pts.map(([x, y]) => `${(x * s).toFixed(1)},${(y * s).toFixed(1)}`).join(" ");
-  const O = [[-0.62, -0.86], [0.62, -0.86], [0.96, -0.3], [0, 1], [-0.96, -0.3]];        // 外の形（盾）
-  const T = [[-0.34, -0.52], [0.34, -0.52], [0.52, -0.2], [0, 0.42], [-0.52, -0.2]];       // まん中の面
-  if (!lit) return `<polygon points="${P(O)}" fill="rgba(255,255,255,0.35)" stroke="#a9a69a" stroke-width="2" stroke-dasharray="4 3"/>`;
-  const id = `gm${stageId}_${Math.round(s)}`;
-  const face = (a, b, k) => `<polygon points="${P([O[a], O[b], T[b], T[a]])}" fill="${gemShade(color, k)}"/>`;
-  return `<defs><linearGradient id="${id}" x1="0" y1="0" x2="0.3" y2="1"><stop offset="0" stop-color="${gemShade(color, 0.55)}"/><stop offset="0.55" stop-color="${color}"/><stop offset="1" stop-color="${gemShade(color, -0.35)}"/></linearGradient></defs>` +
-    `<polygon points="${P(O)}" fill="${gemShade(color, -0.45)}" stroke="${gemShade(color, -0.6)}" stroke-width="${(s * 0.12).toFixed(1)}" stroke-linejoin="round"/>` +
-    face(0, 1, 0.45) + face(1, 2, 0.1) + face(2, 3, -0.3) + face(3, 4, -0.15) + face(4, 0, 0.25) +
-    `<polygon points="${P(T)}" fill="url(#${id})"/>` +
-    `<polygon points="${P([[-0.3, -0.48], [0.05, -0.48], [-0.32, 0.02], [-0.44, -0.2]])}" fill="rgba(255,255,255,0.55)"/>` +   // 白い光
-    `<polygon points="${P([[-0.55, -0.8], [-0.2, -0.8], [-0.42, -0.58]])}" fill="rgba(255,255,255,0.85)"/>` +
-    `<circle cx="${(s * 0.42).toFixed(1)}" cy="${(-s * 0.62).toFixed(1)}" r="${(s * 0.1).toFixed(1)}" fill="#ffffff" opacity="0.9"/>`;
+  const h = size * GEM_PIC.h;
+  return (lit ? "" : `<defs><filter id="gemGray"><feColorMatrix type="saturate" values="0"/></filter></defs>`) +
+    `<image href="${gemSrc(stageId)}" x="${(-h / 2).toFixed(1)}" y="${(-h / 2).toFixed(1)}" width="${h.toFixed(1)}" height="${h.toFixed(1)}"${lit ? "" : ` filter="url(#gemGray)" opacity="0.4"`}/>`;
 };
 
 // ===== レシピ完成の演出の秒数（10/25-15。初めてそろったときだけ。合計5秒以内、タップで最後に飛ぶ） =====
@@ -123,32 +116,42 @@ const RecipeBook = (() => {
   }
 
   // ===== 制作側の絵（11/1。ステージ一覧の世界の帯と、レシピブックの3世界の本） =====
-  // 宝石は絵に描かれた空の枠の上に、GEM_ART（stages.js の gem の色）で描く。枠の位置は絵の幅・高さの%（元の絵から測った値）
+  // 宝石は絵に描かれた空の枠の上に置く（11/22-4: 制作側の宝石の絵。古い枠は布で隠し、宝石の形のくぼみを重ねる）。枠の位置は絵の幅・高さの%（元の絵から測った値）
   // 絵が読み込めないときは、前の円い台座（render）にもどる
   const ART = {
     band: {   // 世界の帯（world_gs1〜3 の上下の生成りを切った版）。[左からの%, 上からの%]
       1: { src: "assets/world_band1.jpg", aspect: 4.4735, slots: [[56.1, 67.3], [65.0, 67.3], [73.7, 67.6], [82.6, 68.3]] },
       2: { src: "assets/world_band2.jpg", aspect: 5.4573, slots: [[55.2, 59.4], [64.4, 59.4], [73.4, 59.0], [82.2, 59.8]] },
       3: { src: "assets/world_band3.jpg", aspect: 5.0878, slots: [[55.0, 55.9], [63.6, 55.9], [72.1, 56.6], [80.6, 56.2]] },
-      gem: 8.4,   // 宝石の大きさ（帯の幅の%）
+      gem: 8.4,   // 宝石の場所の大きさ（帯の幅の%）
+      gemH: 0.8,   // 11/22-4: 宝石の絵の高さ（場所の大きさに対して）。古い枠とほぼ同じ大きさ（本と同じ割合。前の図形は 0.61 で、枠より小さかった）
+      cover: [1.12, 1.3, -0.04],   // 11/22-4: 絵に描かれた古い六角形の枠を隠す布の大きさ（場所に対する幅・高さ、上下のずれ）
+      bg: { 1: [["#dede9a", "#d6da99"], ["#e6e3a2", "#e6e3a8"], ["#dbdd98", "#d3d89f"], ["#d6d89e", "#e3dba2"]],   // 隠す布の色（枠の上と下の地の色。絵から測った値）
+            2: [["#fcebd0", "#fde9cb"], ["#fde9cc", "#efe8d1"], ["#fdecd3", "#f3e9d0"], ["#fdecd3", "#e4e4cf"]],
+            3: [["#f7e4e7", "#e5d5f5"], ["#f0e0ec", "#f3e1e6"], ["#e9daf3", "#f1e0e4"], ["#dcd8ef", "#e8d8e6"]] },
     },
     book: {   // 3世界の本（world_gall）。ステージ1〜12の順
       src: "assets/recipe_book.webp", aspect: 1672 / 941,   // 11/2: 地を透明にした版（背景 bg_c01 の上に置くため。前は生成りの地の jpg）
       slots: [[55.5, 24.1], [63.2, 24.1], [70.6, 24.2], [78.1, 24.1], [55.4, 50.9], [63.2, 51.0], [70.6, 51.2], [78.1, 51.0], [55.4, 78.4], [63.2, 78.6], [70.6, 78.4], [78.1, 78.3]],
       gem: 6.4,   // 宝石の場所の大きさ（本の幅の%）
-      gemR: 23,   // 宝石の絵の大きさ（場所の大きさ 52 に対して。11/2: 見本のように枠いっぱいに。帯は 17 のまま）
+      gemH: 0.82,   // 11/22-4: 宝石の絵の高さ（場所の大きさに対して。前の図形と同じ高さ）
+      cover: [1.18, 1.36, -0.05],
+      bg: [["#dfddab", "#e4e1b5"], ["#e1dfaf", "#e6e3b8"], ["#e0ddaa", "#cdcd99"], ["#dad8a1", "#dddbad"],
+           ["#f8e6d2", "#f8e6d2"], ["#f7e7d2", "#efe4d2"], ["#f8e7d3", "#ebe1cd"], ["#f6e5d1", "#f3e2ce"],
+           ["#f8e8e2", "#ebdbf0"], ["#f1e2ec", "#f1e0e6"], ["#ede0eb", "#eddfee"], ["#ecdeee", "#ded0f6"]],
     },
   };
-  // 絵の上に宝石をならべる。cls: 外側の class、list: [[stage, [x%, y%]]]、gemW: 宝石の幅（%）
-  function artHTML(cls, src, aspect, list, gemW, o, gemR = 17) {
+  // 絵の上に宝石をならべる。cls: 外側の class、list: [[stage, [x%, y%], [上の色, 下の色]]]、gemW: 宝石の場所の幅（%）、gemH: 宝石の絵の高さ、cover: 古い枠を隠す布
+  // 11/22-4: マスは宝石の形のくぼみ（宝石の絵を黒くうすくして少し大きく。縁の線は引かない）。絵に描かれた古い六角形の枠は、地の色の布でおおって隠す
+  //   取った宝石はくぼみにはまる。まだの宝石は、くぼみの中に同じ絵を灰色でうすく
+  function artHTML(cls, src, aspect, list, gemW, o, gemH, cover) {
     const lit = o.lit || new Set();
-    const gems = list.map(([s, [x, y]]) => {
+    const gems = list.map(([s, [x, y], bg]) => {
       const on = lit.has(s.id) || o.drop === s.id;
-      const halo = on ? `<circle r="25" fill="url(#bkHalo${s.id})"/>` : "";
-      const next = o.next === s.id ? `<circle r="24" class="rb-next"/>` : "";
-      return `<div class="art-slot" style="left:${x}%;top:${y}%;width:${gemW}%">` +
-        `<svg viewBox="-26 -26 52 52"><defs><radialGradient id="bkHalo${s.id}"><stop offset="0" stop-color="${s.gem}" stop-opacity="0.75"/><stop offset="1" stop-color="${s.gem}" stop-opacity="0"/></radialGradient></defs>` +
-        `<g class="rb-gem" data-stage="${s.id}">${next}${on ? `<g class="${o.drop === s.id ? (o.dropClass || "rb-drop") : ""}">${halo}${GEM_ART(s.gem || "#cccccc", true, gemR, s.id)}</g>` : `<rect x="-20" y="-20" width="40" height="40" fill="transparent"/>`}</g></svg></div>`;
+      const cv = `<span class="gem-cover" style="width:${cover[0] * 100}%;height:${cover[1] * 100}%;margin-top:${cover[2] * 100}%;background:linear-gradient(${bg ? bg.join(",") : "#eee,#eee"})"></span>`;
+      const inner = `<img class="gem-hole" src="${gemSrc(s.id)}" alt="" draggable="false">` + (o.next === s.id ? `<span class="gem-next"></span>` : "") +
+        (on ? `<span class="gem-halo" style="background:radial-gradient(closest-side,${s.gem}80,${s.gem}00)"></span>` + gemImg(s.id, true, o.drop === s.id ? (o.dropClass || "rb-drop") : "") : gemImg(s.id, false));
+      return `<div class="art-slot" style="left:${x}%;top:${y}%;width:${gemW}%">${cv}<div class="rb-gem" data-stage="${s.id}" style="--gh:${gemH * 100}%">${inner}</div></div>`;
     }).join("");
     return `<div class="${cls}" style="aspect-ratio:${aspect}"><img class="art-img" src="${src}" alt="">${gems}</div>`;
   }
@@ -161,19 +164,19 @@ const RecipeBook = (() => {
   function renderBand(el, o) {
     const cfg = ART.band[o.world];
     if (!cfg) { render(el, o); return; }
-    const list = stages().filter(s => s.world === o.world).map((s, i) => [s, cfg.slots[i]]).filter(x => x[1]);
-    el.innerHTML = artHTML("art-band", cfg.src, cfg.aspect, list, ART.band.gem, o);
+    const list = stages().filter(s => s.world === o.world).map((s, i) => [s, cfg.slots[i], ART.band.bg[o.world][i]]).filter(x => x[1]);
+    el.innerHTML = artHTML("art-band", cfg.src, cfg.aspect, list, ART.band.gem, o, ART.band.gemH, ART.band.cover);
     bindArt(el, o, () => render(el, o));
   }
   // レシピブック・宝石ができた画面: 3世界の本。12の枠に宝石がはまる
   function renderBook(el, o) {
-    const list = stages().map((s, i) => [s, ART.book.slots[i]]).filter(x => x[1]);
-    el.innerHTML = artHTML("art-book", ART.book.src, ART.book.aspect, list, ART.book.gem, o, ART.book.gemR);
+    const list = stages().map((s, i) => [s, ART.book.slots[i], ART.book.bg[i]]).filter(x => x[1]);
+    el.innerHTML = artHTML("art-book", ART.book.src, ART.book.aspect, list, ART.book.gem, o, ART.book.gemH, ART.book.cover);
     bindArt(el, o, () => render(el, o));
   }
 
   // 11/22-2: 宝石ができた画面の絵（本・背景）を先に読んでおく（遅い回線で、演出のあいだ本が出なかった）
   const pre = [];
-  function preload() { if (pre.length) return pre; ["assets/recipe_book.webp", "assets/recipe_bg.jpg"].forEach(src => { const im = new Image(); im.src = src; pre.push(im); }); return pre; }
+  function preload() { if (pre.length) return pre; ["assets/recipe_book.webp", "assets/recipe_bg.jpg"].concat(stages().map(s => gemSrc(s.id))).forEach(src => { const im = new Image(); im.src = src; pre.push(im); }); return pre; }
   return { render, renderBand, renderBook, litIds, nextId, preload };
 })();
