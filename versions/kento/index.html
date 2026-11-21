@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap">
-  <link rel="stylesheet" href="css/style.css?v=135">
+  <link rel="stylesheet" href="css/style.css?v=136">
 </head>
 <body>
   <div id="app">
@@ -217,7 +217,7 @@
 
   <!-- ワープの演出（10/22-1）: 白く光って、次の世界の背景に切りかわる -->
   <div id="warp"><div class="flash"></div><p id="warp-text"></p></div>
-  <!-- ワープの会話の演出（10/25-18。その世界へ初めてワープするときだけ。約10秒、タップで飛ばせる） -->
+  <!-- ワープの会話の演出（10/25-18。その世界へ初めてワープするときだけ。11/22-11: 紙芝居方式。タップで1画面ずつ進む） -->
   <div id="warp-talk" class="warp-talk hidden">
     <div id="wt-strip" class="wt-strip"><div id="wt-bg1" class="wt-img"></div><div id="wt-bg2" class="wt-img"></div></div>
     <div class="wt-seam"></div>
@@ -225,6 +225,7 @@
     <div class="wt-stage">
       <p id="wt-bubble" class="wt-bubble"></p>
       <div id="wt-chars" class="wt-chars"><img id="wt-hero" class="hero-img wt-hero" alt=""><img id="wt-fuwari" class="wt-fuwari" src="assets/fuwari_1.png" alt=""></div>
+      <p id="wt-next" class="wt-next"></p>
     </div>
     <div class="wt-flash"></div>
   </div>
@@ -288,17 +289,17 @@
   <!-- 横向きのとき -->
   <div id="rotate"><div><div class="rotate-icon"></div><p>縦にしてね</p></div></div>
 
-  <script src="data/words.js?v=135"></script>
-  <script src="data/stages.js?v=135"></script>
-  <script src="data/texts.js?v=135"></script>
-  <script src="data/ruby.js?v=135"></script>
-  <script src="js/ruby.js?v=135"></script>
-  <script src="js/audio.js?v=135"></script>
-  <script src="js/door.js?v=135"></script>
-  <script src="js/game.js?v=135"></script>
-  <script src="js/quiz.js?v=135"></script>
-  <script src="js/cards.js?v=135"></script>
-  <script src="js/recipebook.js?v=135"></script>
-  <script src="js/main.js?v=135"></script>
+  <script src="data/words.js?v=136"></script>
+  <script src="data/stages.js?v=136"></script>
+  <script src="data/texts.js?v=136"></script>
+  <script src="data/ruby.js?v=136"></script>
+  <script src="js/ruby.js?v=136"></script>
+  <script src="js/audio.js?v=136"></script>
+  <script src="js/door.js?v=136"></script>
+  <script src="js/game.js?v=136"></script>
+  <script src="js/quiz.js?v=136"></script>
+  <script src="js/cards.js?v=136"></script>
+  <script src="js/recipebook.js?v=136"></script>
+  <script src="js/main.js?v=136"></script>
 </body>
 </html>

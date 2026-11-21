@@ -614,9 +614,11 @@ const Main = (() => {
     ov.addEventListener("click", () => ov.remove());
     document.body.appendChild(ov);
   }
-  // ワープの会話の演出（10/25-18）: その世界へ初めてワープするときだけ。約10秒、画面のどこをタップしても最後に飛ぶ。2回目からは下の短い光
+  // ワープの会話の演出（10/25-18）: その世界へ初めてワープするときだけ。2回目からは下の短い光
+  //   11/22-11 決定F: 紙芝居方式。1画面ずつ、画面をタップすると次へ（自動では進まない）。文は一度に全部出す。画面の下に小さく「タップで次へ ▶」、最後の画面は「タップで出発！」。
+  //   最後の画面のタップで出発（ふわりがはばたき、背景が次の世界へ流れる。この出発の演出だけは自動で、タップで飛ばせる）
   //   会話の文は texts.js の worlds.warpTalk、秒数はここの WARP_TALK
-  const WARP_TALK = { lines: [1, 3, 5], lineEnd: 6.5, depart: 6.5, title: 9, end: 10, frame: 0.18 };
+  const WARP_TALK = { first: 0.6, title: 2.5, end: 3.5, frame: 0.18 };   // first ＝ 1画面目を出すまでの秒、title・end ＝ 出発してから世界の名前・次の画面までの秒
   let wtTimers = [];
   function warpTalk(id) {
     const T = WARP_TALK, talk = (window.TEXTS.worlds.warpTalk || {})[id] || [];
@@ -636,24 +638,33 @@ const Main = (() => {
       box.onclick = null; box.classList.add("hidden");
       Save.data.world = id; Save.store(); toStages();
     };
-    box.onclick = finish;   // タップで飛ばす
-    talk.forEach((ln, i) => at(T.lines[i] !== undefined ? T.lines[i] : 1 + i * 2, () => {
-      bubble.classList.remove("on");
-      setTimeout(() => {
-        bubble.textContent = ln.text; bubble.classList.toggle("hero", ln.who === "hero"); bubble.classList.add("on");
-        if (ln.who === "hero") hero.src = heroSrc("point");   // 主人公が話すときは「指さす」
-      }, 150);
-    }));
-    at(T.depart, () => {   // 出発: ふわりがはばたき、背景が次の世界へ流れる
-      bubble.classList.remove("on");
+    const next = $("wt-next");
+    next.classList.remove("on");
+    let page = -1, ready = false, departed = false;
+    const show = i => {   // i 画面目を出す（文は一度に全部）
+      page = i; const ln = talk[i];
+      bubble.textContent = ln.text; bubble.classList.toggle("hero", ln.who === "hero"); bubble.classList.add("on");
+      hero.src = heroSrc(ln.who === "hero" ? "point" : "think");   // 主人公が話すときは「指さす」
+      next.textContent = tx(i === talk.length - 1 ? "worlds.warpTalk.talkGo" : "worlds.warpTalk.talkNext"); next.classList.add("on");
+      ready = true;
+    };
+    const depart = () => {   // 出発: ふわりがはばたき、背景が次の世界へ流れる
+      departed = true;
+      bubble.classList.remove("on"); next.classList.remove("on");
       chars.classList.add("fly"); strip.classList.add("go");
       Sound.se("power");
       let f = 0; const iv = setInterval(() => { f = (f + 1) % 3; fu.src = `assets/fuwari_${f + 1}.png`; }, T.frame * 1000);
-      wtTimers.push(setTimeout(() => clearInterval(iv), (T.end - T.depart) * 1000));
-    });
-    at(T.title, () => { $("wt-title").classList.add("on"); Sound.se("shine"); });
-    at(T.end - 0.6, () => box.querySelector(".wt-flash").classList.add("on"));
-    at(T.end, finish);
+      wtTimers.push(setTimeout(() => clearInterval(iv), T.end * 1000));
+      at(T.title, () => { $("wt-title").classList.add("on"); Sound.se("shine"); });
+      at(T.end - 0.6, () => box.querySelector(".wt-flash").classList.add("on"));
+      at(T.end, finish);
+    };
+    box.onclick = () => {
+      if (departed) { finish(); return; }   // 出発の演出はタップで飛ばせる
+      if (!ready) return;
+      if (page < talk.length - 1) { Sound.se("start"); show(page + 1); } else depart();
+    };
+    if (talk.length) at(T.first, () => show(0)); else at(T.first, depart);
   }
 
   // 11/7-43: 画面がさっと白く光る（0.35秒で白く → 次へ → 0.45秒で消える）

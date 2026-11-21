@@ -1025,3 +1025,9 @@ button.ub.ub-s { width: auto; padding: 5px 12px 6px; font-size: 14px; }
 #zukan-tip .zt-bubble img { width: 40px; height: 40px; flex: none; }
 #zukan-tip .zt-bubble p { margin: 0; font-size: 15px; word-break: keep-all; font-weight: bold; color: #3e4a34; line-height: 1.5; }
 @keyframes ztRing { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+
+/* 11/22-11 決定F: ワープの会話（紙芝居方式）の、画面の下の小さな案内 */
+.wt-next { margin: 6px 0 0; font-size: 13px; font-weight: bold; color: #6b5a33; background: rgba(255,253,245,0.85); border-radius: 10px; padding: 3px 10px; opacity: 0; transition: opacity .3s; }
+.wt-next.on { opacity: 1; animation: wtNext 1.4s ease-in-out infinite; }
+@keyframes wtNext { 0%, 100% { opacity: 1; } 50% { opacity: .7; } }
+.warp-talk { cursor: pointer; }

@@ -96,8 +96,10 @@ const BATTLE = {
   rearHp: 3,                   // 世界3でうしろから来る虫の硬さ（回る玉に3回触れると倒れる）。ぶつかると元気が減る（＋100 は出さない）
   groundTextScale: 0.78,       // 地上のことばの文字の高さの倍率（少し平たくして、地面に貼りついて見えるように）
   fuwariEdge: 2,               // 11/22-2: 世界2・3の救出の旅で、ふわりのまわりに出す白い輪郭の太さ（px）
-  fuwariEdge3: { w: 2.5, color: "#4B2C7F" },   // 11/22-10 決定C: 世界3は救出の旅・発見の旅とも、輪郭を濃い紫（2.5px）。世界2は白のまま
-  fuwariShadow3: { alpha: 0.25 },              //   世界3のふわりの足元に、やわらかい影（黒・だ円）を常に
+  // 11/22-10 決定C・11/22-11 決定G: ふわりの輪郭（2.5px）は世界の色（世界1 深緑・世界2 紺・世界3 濃い紫）。救出の旅・発見の旅とも。
+  //   足元のやわらかい影（黒・だ円）も、どの世界でも常に（11/22-10 は世界3だけ、11/22-11 で世界1・2にも）
+  fuwariEdgeW: { w: 2.5, color: { 1: "#1F5F3A", 2: "#1F3A6E", 3: "#4B2C7F" } },
+  fuwariShadow: { alpha: 0.25 },
   // 11/22-10 決定A: とくぎ・必殺ワザの効果中が目で分かるように
   //   powerShot: とくぎ「パワーアップ」中の光（太さの倍率と、濃い色）。shieldRing: とくぎ「守りアップ」中の盾の輪（世界の色、半透明）
   //   gaugeGlow: とくぎ「ゲージ2倍速」中、必殺ワザのボタンの枠を光らせる。edgeRed: 必殺ワザ「パワー全開」中の画面の縁の赤
@@ -4632,7 +4634,7 @@ const Battle = (() => {
     }
     const explore1 = sortieNo === 1;   // 発見の旅: 下のまん中で待つ小さなふわり（1のコマ）
     const glow = player.glow, fy = y + Math.sin(t * 3) * 2;
-    const w3 = worldDef.id === 3;
+    const edgeCol = BATTLE.fuwariEdgeW.color[worldDef.id];   // 11/22-11: 世界の色の輪郭と足元の影（世界のないときは出さない）
     if (loadout === "shield" && !explore1) {   // 11/22-10: とくぎ「守りアップ」中は、ふわりのまわりに薄い盾の輪（世界の色・半透明）を常に
       const S = BATTLE.skillLook.shieldRing, col = worldDef.color || "#3a9a48";
       ctx.save(); ctx.globalAlpha = S.fill; ctx.fillStyle = col;
@@ -4650,15 +4652,14 @@ const Battle = (() => {
     if (player.inv > 0 && Math.floor(t * 12) % 2 === 0) ctx.globalAlpha = 0.4;
     const frame = typhoon ? 3 : glow > 0 && !explore1 ? 2 : explore1 ? 1 : fuwariFrame();
     const size = (explore1 ? BATTLE.fuwariExploreSize : BATTLE.fuwariSize) * (1 + glow * 0.5);
-    if (w3) {   // 11/22-10 決定C: 世界3は足元にやわらかい影（黒25%のだ円。ふちをぼかす）
+    if (edgeCol) {   // 足元にやわらかい影（黒25%のだ円。ふちをぼかす。11/22-10 世界3・11/22-11 世界1・2も）
       const sy = y + size * 0.46, rx = size * 0.36, g = ctx.createRadialGradient(x, sy, 0, x, sy, rx);
-      g.addColorStop(0, `rgba(0,0,0,${BATTLE.fuwariShadow3.alpha})`); g.addColorStop(0.6, `rgba(0,0,0,${BATTLE.fuwariShadow3.alpha * 0.7})`); g.addColorStop(1, "rgba(0,0,0,0)");
+      g.addColorStop(0, `rgba(0,0,0,${BATTLE.fuwariShadow.alpha})`); g.addColorStop(0.6, `rgba(0,0,0,${BATTLE.fuwariShadow.alpha * 0.7})`); g.addColorStop(1, "rgba(0,0,0,0)");
       const a0 = ctx.globalAlpha; ctx.globalAlpha = 1;
       ctx.save(); ctx.translate(x, sy); ctx.scale(1, 0.32); ctx.translate(-x, -sy); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, sy, rx, 0, Math.PI * 2); ctx.fill(); ctx.restore();
       ctx.globalAlpha = a0;
     }
-    if (w3) drawFuwariEdge(frame, x, fy, size, BATTLE.fuwariEdge3.color, BATTLE.fuwariEdge3.w);   // 11/22-10: 世界3は救出の旅・発見の旅とも濃い紫の輪郭（2.5px）
-    else if (!explore1 && worldDef.id >= 2) drawFuwariEdge(frame, x, fy, size);   // 11/22-2: 世界2の救出の旅は白い輪郭（2px）
+    if (edgeCol) drawFuwariEdge(frame, x, fy, size, edgeCol, BATTLE.fuwariEdgeW.w);   // 11/22-11: 救出の旅・発見の旅とも世界の色の輪郭（2.5px。前は世界2・3の救出の旅に白い輪郭2px〔11/22-2〕、11/22-10 で世界3を紫に）
     if (!drawFuwariArt(frame, x, fy, size)) {   // 絵の読みこみ前は、白い四角
       ctx.fillStyle = "#fffdf7"; ctx.strokeStyle = "#c9b98f"; ctx.lineWidth = 2;
       roundRect(x - 18, fy - 16, 36, 32, 6); ctx.fill(); ctx.stroke();
