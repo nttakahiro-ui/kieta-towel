@@ -981,3 +981,7 @@ button.ub.ub-s { width: auto; padding: 5px 12px 6px; font-size: 14px; }
 .fx-card.has-pic { padding: 0; overflow: hidden; align-items: flex-end; }
 .fx-card.has-pic img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .fx-card.has-pic span { position: relative; width: 100%; padding: 1px 2px 2px; background: rgba(255,253,247,.9); font-size: 9px; font-weight: bold; }
+/* 11/22-3: ステージ5〜12のカード絵（制作側・千葉さん）は、角丸の茶色いふちが絵の中にある。表示の角丸・ふち・地の色を重ねない（世界1は今のまま） */
+.card .pic.framed { border-radius: 0; background: none; }
+.quiz-slots .slot.framed:has(img) { border-color: transparent; background: none; border-radius: 0; }
+.fx-card.has-pic.framed { border-color: transparent; background: none; border-radius: 0; }

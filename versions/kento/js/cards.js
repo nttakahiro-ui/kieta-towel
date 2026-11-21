@@ -15,7 +15,8 @@ const Cards = (() => {
   const GLUE = new Set(["を", "は", "が", "に", "の", "と", "で", "へ", "も", "や", "よ", "ね", "て", "た", "か", "な", "、", "。", "!", "！", "?", "？", ")", "）", "」", "―", "—", "…"]);   // 11/7-30: 「――」「……」も前の語につける（行の頭に来ないように）   // 「」の閉じかっこも前につける（10/25-14）
   const esc = t => t.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   // カードの絵（11/6-6）: 絵があるステージ（stages）だけ、持っているカードの上に出す。絵は tools/cardsplit.mjs で切り分けた assets/cards/s<ステージ>_<順>.jpg（1辺 320px。表示の2倍。11/7-7 で PNG から JPEG 画質70に）
-  const CARD_ART = { dir: "assets/cards/", stages: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], v: "1107-7" };   // v ＝ 絵を差し替えたら変える（前の絵がブラウザに残らないように）。11/7-5 で120枚そろった。絵が読めなかったときは onerror で「絵がないカード」の表示にもどる（保険として残す）
+  const CARD_ART = { dir: "assets/cards/", stages: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], v: "1122-3", framed: [5, 6, 7, 8, 9, 10, 11, 12] };   // 11/22-3: ステージ5〜12は制作側（千葉さん）の絵。角丸の茶色いふちが絵の中にあるので、表示の角丸・ふちを重ねない（framed）   // v ＝ 絵を差し替えたら変える（前の絵がブラウザに残らないように）。11/7-5 で120枚そろった。絵が読めなかったときは onerror で「絵がないカード」の表示にもどる（保険として残す）
+  function framed(w) { return CARD_ART.framed.includes(w.stage); }
   function artSrc(w) {
     if (!CARD_ART.stages.includes(w.stage) || !w.order) return null;
     return `${CARD_ART.dir}s${String(w.stage).padStart(2, "0")}_${String(w.order).padStart(2, "0")}.jpg?v=${CARD_ART.v}`;
@@ -26,7 +27,7 @@ const Cards = (() => {
   function artEl(w, eager) {
     const src = artSrc(w);
     if (!src) return null;
-    const im = document.createElement("img"); im.className = "pic"; im.alt = ""; im.decoding = "async"; if (!eager) im.loading = "lazy";   // 図鑑は1度に40枚。見える所から読む
+    const im = document.createElement("img"); im.className = "pic" + (framed(w) ? " framed" : ""); im.alt = ""; im.decoding = "async"; if (!eager) im.loading = "lazy";   // 図鑑は1度に40枚。見える所から読む
     im.src = src;
     im.onerror = () => im.remove();
     return im;
@@ -269,7 +270,7 @@ const Cards = (() => {
     const cards = (o.words || []).slice(0, 10).map((w, i) => {
       const c = document.createElement("div"); c.className = "fx-card";
       const src = artSrc(w);   // 11/22-2: カードの絵も出す（前は語句の字だけ）
-      if (src) { const im = document.createElement("img"); im.alt = ""; im.src = src; im.onerror = () => { im.remove(); c.classList.remove("has-pic"); }; c.appendChild(im); c.classList.add("has-pic"); }
+      if (src) { const im = document.createElement("img"); im.alt = ""; im.src = src; im.onerror = () => { im.remove(); c.classList.remove("has-pic"); }; c.appendChild(im); c.classList.add("has-pic"); if (framed(w)) c.classList.add("framed"); }
       const nm = document.createElement("span"); nm.textContent = w.word; c.appendChild(nm);
       const side = i % 4, r = Math.random();
       const sx = side === 0 ? -40 : side === 1 ? box.width + 40 : r * box.width, sy = side < 2 ? r * box.height : side === 2 ? -50 : box.height + 50;
@@ -318,5 +319,5 @@ const Cards = (() => {
     };
   }
 
-  return { showCards, showRecipe, showShort, phraseHTML, wordEl, artEl, artSrc, preloadArt, names };
+  return { showCards, showRecipe, showShort, phraseHTML, wordEl, artEl, artSrc, preloadArt, names, framed };
 })();

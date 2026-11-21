@@ -70,6 +70,7 @@ const Quiz = (() => {
   function fillSlot(d, w) {
     d.innerHTML = "";
     const src = Cards.artSrc(w);
+    d.classList.toggle("framed", Cards.framed(w));   // 11/22-3: ステージ5〜12の絵はふちが絵の中にある
     if (src) { const im = document.createElement("img"); im.alt = ""; im.src = src; im.onerror = () => { im.remove(); fillText(d, w); }; d.appendChild(im); }
     else fillText(d, w);
   }
