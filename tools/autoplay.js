@@ -98,9 +98,10 @@ function runOnce(skill, seed) { HUDLOG.rows.push(["--", skill]); HUDLOG.lastK = 
     if (S.player && S.state === "play" && S.phase === "round1" && S.explore && S.explore.queue) {
       // 世界2の箱（10/31-10 試作）: 箱はぜんぶ見えている。近い箱へ指を動かして押さえる（空箱かどうかはわからない）。鍵の箱に一度はじかれたら、鍵が見つかるまでさわらない
       const ex = S.explore;
+      const noKey = b => b.lock && (ex.keys != null ? ex.keys <= 0 : !ex.keyFound);   // 11/22-5: ステージ7は、持っているかぎの数（ex.keys）で開けられるかが決まる
       if (now / 1000 >= nextThink) {
         nextThink = now / 1000 + skill.react * (0.7 + rnd() * 0.6);
-        const alive = ex.boxes.filter(b => !b.open && !b.out && b.x > 40 && b.x < 365 && !(b.lock && !ex.keyFound && exNoticed.has(b)));
+        const alive = ex.boxes.filter(b => !b.open && !b.out && b.x > 40 && b.x < 365 && !(noKey(b) && exNoticed.has(b)));
         if (exTarget && !alive.includes(exTarget)) exTarget = null;
         if (exTarget && exTarget.hold > 0 && rnd() < skill.quit) { exTarget = null; exQuitT = now / 1000 + 1; }   // にがて: 開ききる前に指をはなす
         // 世界3の無重力（10/31-14）: 光っている（向きのずれが判定の中の）ことばを先に。なければ近いことば
@@ -111,7 +112,7 @@ function runOnce(skill, seed) { HUDLOG.rows.push(["--", skill]); HUDLOG.lastK = 
         }
         if (!exTarget && now / 1000 >= exQuitT) exTarget = alive.sort((a, q) => Math.hypot(a.x - fx, a.y - fy) - Math.hypot(q.x - fx, q.y - fy))[0] || null;
       }
-      if (exTarget && exTarget.lock && !ex.keyFound && exTarget.warnT > 0) { exNoticed.add(exTarget); exTarget = null; }
+      if (exTarget && noKey(exTarget) && exTarget.warnT > 0) { exNoticed.add(exTarget); exTarget = null; }
       const tx = exTarget ? exTarget.x + (exTarget.speedHint || 0) : 187, ty = exTarget ? exTarget.y : 420;
       const L = Math.hypot(tx - fx, ty - fy), st = Math.min(L, skill.speed / 60);
       if (L > 0.5) { fx += (tx - fx) / L * st; fy += (ty - fy) / L * st; }
