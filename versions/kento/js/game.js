@@ -186,7 +186,8 @@ const BATTLE = {
   hintAlpha: 0.6,              // きらっと光る強さ（0＝光らない〜1）
   bugEvery: 5,                 // 飾りの虫が横切る間隔（秒）
   // 2回目の旅: ことばを包む殻（10/3-11。役割で分ける: ザコ＝綿毛のまゆ、中ボス＝いばら、大ボス＝霧）。見た目はすべて仮
-  thornAlpha: [0.225, 0.25],   // 中ボスのいばら（文字にからむ草のつた）の濃さ [k が 0 のとき, k による増え分]。WORLD_LOOK に書いていない世界1・2はこれ（11/22-7: 文字が読みにくいので [0.45, 0.5] から半分に）
+  thornAlpha: [0.315, 0.35],   // 中ボスのいばら（文字にからむ草のつた）の濃さ [k が 0 のとき, k による増え分]。WORLD_LOOK に書いていない世界1・2はこれ（11/22-7 に [0.45, 0.5] から半分にしたが、11/22-8 決定でその前の7割に戻した。読みやすさは下地 midPlate で）
+  midPlate: { alpha: 0.65, pad: 6, r: 6, thornOut: 10, bigFrom: 4, bigScale: 1.15, minGap: 0.9 },   // 11/22-8 決定（鳥山さんの実機確認: 天然繊維・化学繊維が読みにくい）: 中ボスのことばの字の後ろに白い下地（不透明度 alpha、字の外へ pad px、角丸 r px）。重ね順は いばら → 下地 → 文字。いばらは下地の外へ thornOut px はみ出して、下地を囲んで見える。bigFrom 文字以上のことばは字を bigScale 倍。縦にはみ出すときは字の間隔を詰める（字の大きさの minGap 倍まで）
   charEdgeOver: 4,             // 11/22-7: いばら・霧を描いたあと、文字の上にもう一度ふちを描く線の幅（4 ＝ 字の外へ2px）。WORLD_LOOK の textOver がある世界（世界3）はそちら
   shellVeil: 0.22,             // 殻が語句の上にかかる濃さ（0〜1。読みやすさのため、うすく）
   // ステージ1の案内（10/21-2）。初めてそれが起きた瞬間にだけ、1〜2行で出す。文は data/texts.js の hints
@@ -401,7 +402,7 @@ const LOADOUT_VARS = { skill: "" };   // 持ち物「必殺ワザ」の説明の
 const WORLD_LOOK = {
   2: { cocoon: "rgba(214,232,255,0.8)", fuzz: "#e4f0ff", mid: "#3f6a8f", boss: "#a8bcd8", bullet: { zako: "#1f5f8a", mid: "#2a3f9a", boss: "#2a2a6a", rim: "#bfe6ff" } },
   3: { cocoon: "rgba(238,226,255,0.8)", fuzz: "#f1e8ff", mid: "#8a70b0", boss: "#c4aee4", bullet: { zako: "#6a2a8a", mid: "#8a1f5a", boss: "#2a1a5a", rim: "#ffd6f6" },
-       thornWidth: 1.1, thornAlpha: [0.1, 0.15], textOver: 5 },   // 11/22-7: いばらの濃さを半分に（[0.2, 0.3] → [0.1, 0.15]）   // 10/31-12 決定: 紫のいばらを細く薄く、文字はいばらの上にもう一度縁取りして描く（textOver ＝ その縁取りの太さ px）
+       thornWidth: 1.1, thornAlpha: [0.14, 0.21], textOver: 5 },   // 11/22-8: いばらの濃さは 11/22-7 の前（[0.2, 0.3]）の7割（11/22-7 は半分の [0.1, 0.15] にしていた）   // 10/31-12 決定: 紫のいばらを細く薄く、文字はいばらの上にもう一度縁取りして描く（textOver ＝ その縁取りの太さ px）
 };
 
 // ===== 必殺ワザのボタンの色（10/25-9）: ゲージがたまったら赤橙（画面のほかの場所に使っていない色）。たまっていないときは薄い色のまま
@@ -1255,6 +1256,7 @@ const Battle = (() => {
     const ground = !od && groundIds.has(word.id) && role !== "boss";
     let size = BATTLE.fontSize[role] || 26;
     if (od) size = od.size;
+    if (od && role === "mid" && Array.from(word.word.replace(/\(.*?\)/g, "")).length >= BATTLE.midPlate.bigFrom) size = Math.round(size * BATTLE.midPlate.bigScale);   // 11/22-8: 4文字以上の中ボスのことばは字を1段大きく
     else if (isShortWord(word)) size = Math.round(size * BATTLE.shortScale);   // 短い語句は大きめに
     ctx.font = font(size);
     let w = ctx.measureText(word.word).width;
@@ -1322,6 +1324,7 @@ const Battle = (() => {
       if (od) {
         e.vertical = true;
         e.charH = size * 1.12;
+        if (role === "mid") e.charH = Math.max(size * BATTLE.midPlate.minGap, Math.min(e.charH, (H * 0.66 - odaiTop() - 30) / chars.length));   // 11/22-8: 大きくした字が問題文の下から自機の上まではみ出すときは、字の間隔を詰める
         e.parts.forEach((p, i) => { p.ox = 0; p.oy = (i - (chars.length - 1) / 2) * e.charH; });
         e.w = Math.max(...ws) + 4;
         e.h = chars.length * e.charH;
@@ -4142,6 +4145,7 @@ const Battle = (() => {
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.font = font(e.size); ctx.lineJoin = "round";
     const fillColor = e.last ? GOLD_COLOR : ENEMY_COLOR[e.role];
+    const plate = e.role === "mid" && hasShell(e), later = [];   // 11/22-8: 中ボスは、殻の残っている文字を あとでまとめて いばら → 下地 → 文字 の順に描く
     for (const p of e.parts) {
       const ch = VERTICAL_GLYPH[p.ch] || p.ch, py = y + p.oy;
       if (p.broken || e.open) {   // 殻から解けた文字: 金色に光る（e.open ＝ 大ボス「3つを順に」で正しい順に当てたことば。白い縁どりで、はっきり読めるように。11/2）
@@ -4150,6 +4154,7 @@ const Battle = (() => {
         ctx.shadowColor = "rgba(255,214,90,1)"; ctx.shadowBlur = 12; ctx.fillStyle = GOLD_COLOR; ctx.fillText(ch, x, py); ctx.shadowBlur = 0; continue;
       }
       const wob = p.flash > 0 ? (Math.random() - 0.5) * 3 : 0;
+      if (plate && p.maxHp) { later.push({ p, ch, x: x + wob, y: py }); continue; }
       ctx.globalAlpha = alpha;
       ctx.shadowColor = "rgba(255,214,90,0.9)"; ctx.shadowBlur = 12;
       ctx.lineWidth = 8; ctx.strokeStyle = wrongBlink(e) ? "#ff6b6b" : e.flash > 0 ? "#fff6c8" : (theme.wordStroke || "#fff6d8");
@@ -4161,6 +4166,31 @@ const Battle = (() => {
         const bh = e.charH * 0.7;
         ctx.fillStyle = "rgba(0,0,0,0.12)"; ctx.fillRect(x + e.w / 2 + 2, py - bh / 2, 3, bh);
         ctx.fillStyle = ENEMY_COLOR[e.role]; ctx.fillRect(x + e.w / 2 + 2, py + bh / 2 - bh * p.hp / p.maxHp, 3, bh * p.hp / p.maxHp);
+      }
+    }
+    if (later.length) {   // 11/22-8 決定: いばら → 白い下地（字の外へ6px・角丸・65%。重なる所も同じ濃さになるよう1つの形にして塗る）→ 文字。いばらの線が字の画に重ならない
+      const MP = BATTLE.midPlate;
+      for (const q of later) drawCharShell(e.role, q.x, q.y, e.size, q.p.hp / q.p.maxHp, MP.thornOut);
+      ctx.save(); ctx.globalAlpha = alpha * MP.alpha; ctx.fillStyle = "#ffffff"; ctx.beginPath();
+      for (const q of later) {
+        const m = ctx.measureText(q.ch), l = q.x - m.actualBoundingBoxLeft - MP.pad, tp = q.y - m.actualBoundingBoxAscent - MP.pad;
+        const w = m.actualBoundingBoxLeft + m.actualBoundingBoxRight + MP.pad * 2, h = m.actualBoundingBoxAscent + m.actualBoundingBoxDescent + MP.pad * 2, r = Math.min(MP.r, w / 2, h / 2);
+        ctx.moveTo(l + r, tp); ctx.arcTo(l + w, tp, l + w, tp + h, r); ctx.arcTo(l + w, tp + h, l, tp + h, r); ctx.arcTo(l, tp + h, l, tp, r); ctx.arcTo(l, tp, l + w, tp, r); ctx.closePath();
+      }
+      ctx.fill(); ctx.restore();
+      for (const q of later) {
+        ctx.globalAlpha = alpha;
+        ctx.shadowColor = "rgba(255,214,90,0.9)"; ctx.shadowBlur = 12;
+        ctx.lineWidth = 8; ctx.strokeStyle = wrongBlink(e) ? "#ff6b6b" : e.flash > 0 ? "#fff6c8" : (theme.wordStroke || "#fff6d8");
+        ctx.strokeText(q.ch, q.x, q.y);
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = fillColor; ctx.fillText(q.ch, q.x, q.y);
+        const p = q.p;
+        if (p.hp < p.maxHp) {   // 文字ごとの残りの耐久（右に小さな帯）
+          const bh = e.charH * 0.7;
+          ctx.fillStyle = "rgba(0,0,0,0.12)"; ctx.fillRect(x + e.w / 2 + 2, q.y - bh / 2, 3, bh);
+          ctx.fillStyle = ENEMY_COLOR[e.role]; ctx.fillRect(x + e.w / 2 + 2, q.y + bh / 2 - bh * p.hp / p.maxHp, 3, bh * p.hp / p.maxHp);
+        }
       }
     }
     // ふりがなは列の右に縦書きで（となりの列とぶつからないように）
@@ -4240,7 +4270,7 @@ const Battle = (() => {
     ctx.restore();
   }
   // 1文字ずつの殻（中ボス＝いばら、大ボス＝霧）。k ＝ その文字の殻の残り（1〜0）
-  function drawCharShell(role, cx, cy, sz, k) {
+  function drawCharShell(role, cx, cy, sz, k, out = 0) {   // out ＝ いばらを横へ何 px 長くするか（11/22-8: 中ボスの下地の外へ出す）
     if (k <= 0) return;
     ctx.save();
     if (k <= BATTLE.shellNearDone) {   // あと少し: 文字のまわりが黄色く光る（10/25-16）
@@ -4262,15 +4292,15 @@ const Battle = (() => {
       const lk = WORLD_LOOK[worldDef.id] || {}, ta = lk.thornAlpha || BATTLE.thornAlpha;
       ctx.globalAlpha = ta[0] + ta[1] * k;
       ctx.strokeStyle = lk.mid || SHELL.mid.color; ctx.lineWidth = lk.thornWidth || 2; ctx.lineCap = "round";
-      const n = k > 0.5 ? 2 : 1;
+      const n = k > 0.5 ? 2 : 1, hx = sz * 0.6 + out;
       for (let i = 0; i < n; i++) {
         const s0 = i ? -1 : 1;
         ctx.beginPath();
-        ctx.moveTo(cx - sz * 0.6, cy + s0 * sz * 0.3);
-        ctx.bezierCurveTo(cx - sz * 0.2, cy - s0 * sz * 0.6, cx + sz * 0.2, cy + s0 * sz * 0.6, cx + sz * 0.6, cy - s0 * sz * 0.3);
+        ctx.moveTo(cx - hx, cy + s0 * sz * 0.3);
+        ctx.bezierCurveTo(cx - sz * 0.2, cy - s0 * sz * 0.6, cx + sz * 0.2, cy + s0 * sz * 0.6, cx + hx, cy - s0 * sz * 0.3);
         ctx.stroke();
         for (let j = 1; j <= 3; j++) {   // とげ
-          const u = j / 4, px = cx - sz * 0.6 + sz * 1.2 * u, py = cy + s0 * sz * 0.3 * Math.cos(u * Math.PI);
+          const u = j / 4, px = cx - hx + hx * 2 * u, py = cy + s0 * sz * 0.3 * Math.cos(u * Math.PI);
           ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + 3, py - s0 * 5); ctx.stroke();
         }
       }
