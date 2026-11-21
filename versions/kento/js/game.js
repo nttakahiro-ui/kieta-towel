@@ -300,7 +300,7 @@ const BATTLE = {
   stripWidth: 24,              // 左端の「集めたことば」の縦の帯の幅（px。縦書き1文字分ほど）
 
   // --- 世界2・3の試作（10/31-10。docs/世界2・3の構想メモ.md）。数は仮 ---
-  groundMark: true,            // 左の帯で、地上に出ることばの枠に小さな地面の絵のマーク（10/31-12 決定。文字の「地」ではない）
+  groundMark: false,           // 11/22-14 決定（指摘49の再調整）: 芽のマークは廃止（発見の旅・救出の旅とも出さない。説明 groundMarkHint も、これで出ない）。もとは true: 左の帯で、地上に出ることばの枠に小さな地面の絵のマーク（10/31-12 決定。文字の「地」ではない）
   // 必殺ワザ（11/6-6 決定）: 「パワー全開」「無敵タイム」「巻き戻し」の3つ（11/7-25 決定: 前の1つ目のワザをパワー全開に替えた）。最初から全部持っていて、左下に3つのボタン。ゲージは3つで1本（使うと0にもどる）
   // ラストチャンス（11/7-12 決定で作り直し）: 大ボスのあと、取り逃したことばがあれば15秒。取り逃したことばが本編と同じ姿でもう一度出る（spawnIn 秒以内に全部）。
   //   ふわりが光って、近く（pullR px 以内）のことばを pullSpeed px/秒で引き寄せる。（11/7-10 の「逃げる虫」はやめた）
@@ -2820,7 +2820,7 @@ const Battle = (() => {
   function updateBoxes(dt) {
     const ex = explore, mv = exMove, words = exploreWords();
     if (!ex.queue) boxSetup();
-    if (ex.t > BATTLE.groundMarkHintAt && !lessonOn("s5box")) groundMarkHint();
+    // if (ex.t > BATTLE.groundMarkHintAt && !lessonOn("s5box")) groundMarkHint();   // 11/22-14 決定: 芽のマークの説明は呼び出さない（マーク廃止。文とコードは残す）
     evBanners();
     const dir = convDir(), md = lesDo() ? 0 : dt;   // チュートリアルの「やってみる」のあいだは、コンベアが止まる（押さえる時間は進む）
     ex.belt += dir * mv.speed * md;
