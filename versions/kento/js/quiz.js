@@ -54,13 +54,18 @@ const Quiz = (() => {
   function slots() {
     const box = $("quiz-slots");
     box.innerHTML = "";
+    // 11/22-2: 正解のカードは、左から順に空いている枠に入る（前はことばごとに枠が決まっていて、ばらばらに埋まった）。
+    //   前から持っているカードは左に寄せ、その右の空き枠を、このクイズで手に入るかもしれない数だけ黄色の枠にする
     const qIds = new Set(list.map(w => w.id));
-    slotWords.forEach(w => {
-      const d = document.createElement("div"); d.className = "slot"; d.dataset.id = w.id;
-      if (owned[w.id]) { d.classList.add("had"); fillSlot(d, w); }
-      else if (qIds.has(w.id)) d.classList.add("q");
-      box.appendChild(d);
-    });
+    const had = slotWords.filter(w => owned[w.id]), rest = slotWords.filter(w => !owned[w.id]);
+    let nq = rest.filter(w => qIds.has(w.id)).length;
+    had.forEach(w => { const d = document.createElement("div"); d.className = "slot had"; d.dataset.id = w.id; fillSlot(d, w); box.appendChild(d); });
+    rest.forEach(() => { const d = document.createElement("div"); d.className = "slot"; if (nq-- > 0) d.classList.add("q"); box.appendChild(d); });
+  }
+  // そのことばの枠（入ったあとはその枠。まだなら、いちばん左の空き枠）
+  function slotFor(w) {
+    const box = $("quiz-slots");
+    return box.querySelector(`.slot[data-id="${w.id}"]`) || box.querySelector(".slot:not([data-id])");
   }
   function fillSlot(d, w) {
     d.innerHTML = "";
@@ -166,7 +171,7 @@ const Quiz = (() => {
       get.classList.remove("hidden");
       const at = (sec, fn) => flyTimers.push(setTimeout(fn, sec * 1000));
       at(QUIZ.getShow, () => {
-        const slot = $("quiz-slots").querySelector(`.slot[data-id="${w.id}"]`);
+        const slot = slotFor(w);
         get.classList.add("fly");
         if (!slot) return;
         const cr = cd.getBoundingClientRect(), sr = slot.getBoundingClientRect();
@@ -176,8 +181,8 @@ const Quiz = (() => {
       });
       at(QUIZ.getShow + QUIZ.getFly, () => {
         get.classList.add("hidden");
-        const slot = $("quiz-slots").querySelector(`.slot[data-id="${w.id}"]`);
-        if (slot) { slot.classList.remove("q", "had", "got"); void slot.offsetWidth; slot.classList.add("got"); fillSlot(slot, w); }
+        const slot = slotFor(w);
+        if (slot) { slot.dataset.id = w.id; slot.classList.remove("q", "had", "got"); void slot.offsetWidth; slot.classList.add("got"); fillSlot(slot, w); }
         Sound.se("stack");
       });
       at(QUIZ.nextDelay, next);
@@ -192,7 +197,7 @@ const Quiz = (() => {
       const p1 = document.createElement("p"); p1.style.margin = "0"; p1.innerHTML = Cards.phraseHTML(timeUp ? "時間切れ！ 正解は" : "正解は");
       const p2 = document.createElement("p"); p2.className = "answer"; p2.innerHTML = Cards.phraseHTML(w.choices[w.answer]);
       const p3 = document.createElement("p"); p3.className = "memo"; p3.innerHTML = Cards.phraseHTML(w.memo);
-      const b = document.createElement("button"); b.className = "btn"; b.textContent = "次へ";
+      const b = document.createElement("button"); b.className = "ub"; b.textContent = "次へ";
       b.addEventListener("click", next);
       fb.append(p1, p2, p3, b);
       // 11/7-30: まず画面の中央に大きな赤い「✕」を0.6秒。そのあと正解とメモ

@@ -68,7 +68,7 @@ const Cards = (() => {
 
   function button(text, cls, fn) {
     const b = document.createElement("button");
-    b.className = "btn " + (cls || "");
+    b.className = "ub " + (cls || "");   // 11/22-2: ボタンは1種類（ub。もどる系は back）
     b.textContent = text;
     b.addEventListener("click", fn);
     return b;
@@ -135,7 +135,7 @@ const Cards = (() => {
     //   取り逃したことばがあるときは強い色にして、上に「取り逃したことばがあるよ」
     const rs = $("cards-rescue"), miss = !!(notHelped.length && o.onRescue);
     rs.classList.toggle("hidden", !o.onRescue);
-    rs.classList.toggle("btn-main", miss); rs.classList.toggle("btn-sub", !miss); rs.classList.toggle("cards-miss", miss);
+    // 11/22-2: 色はいつも世界の色（前は取り逃しがあるとだいだい色）。取り逃しは上の赤い一言で知らせる
     $("cards-miss-note").textContent = tx("results.missNote"); $("cards-miss-note").classList.toggle("hidden", !miss);
     rs.textContent = tx("results.rescueButton"); rs.onclick = () => o.onRescue && o.onRescue();
     const qb = $("cards-quit");
@@ -220,7 +220,7 @@ const Cards = (() => {
     $("short-label").textContent = tx("short.label", { n: o.n });
     const btns = $("short-buttons");
     btns.innerHTML = "";
-    btns.append(button(tx("short.rescue"), "btn-main", o.onRescue), button(tx("short.stages"), "btn-sub", o.onStages));
+    btns.append(button(tx("short.rescue"), "", o.onRescue), button(tx("short.stages"), "back", o.onStages));
   }
   function showRecipe(o) {
     Sound.play("gem");   // 宝石ができた: fanfare.mp3 の頭だけ1回（11/7-4）
@@ -233,7 +233,7 @@ const Cards = (() => {
     $("recipe-remain").textContent = o.isNew ? (remain > 0 ? tx("recipe.remain", { n: remain }) : tx("recipe.allDone")) : "";
     const btns = $("recipe-buttons");
     btns.innerHTML = "";
-    btns.append(button(tx("recipe.next"), "btn-main", o.onNext));
+    btns.append(button(tx("recipe.next"), "", o.onNext));
     const fx = $("recipe-fx"), book = $("recipe-book"), screen = $("screen-recipe");
     fx.innerHTML = "";
     const late = ["recipe-name", "recipe-hero", "recipe-fuwari", "recipe-remain", "recipe-buttons"].map($);
@@ -253,13 +253,24 @@ const Cards = (() => {
     const lit = new Set(o.lit); lit.delete(o.stage.id);
     RecipeBook.renderBook(book, { lit });   // 11/1: 3世界の本の枠にはまる（前は円い台座）
     late.forEach(el => show(el, false));
+    // 11/22-2: 本の絵・背景・カードの絵が読み終わってから演出を始める（遅い回線で本が出ない・カードの絵が出ない、を直す）
+    let skipped = false, started = false;
+    const cardImgs = (o.words || []).slice(0, 10).map(w => { const src = artSrc(w); if (!src) return null; const im = new Image(); im.src = src; return im; });
+    const pend = RecipeBook.preload().concat([book.querySelector(".art-img")], cardImgs).filter(im => im && !im.complete);
+    const go = () => { if (started || skipped) return; started = true; run(); };
+    const check = () => { if (pend.every(im => im.complete)) go(); };
+    if (!pend.length) go(); else { pend.forEach(im => { im.addEventListener("load", check); im.addEventListener("error", check); }); fxTimers.push(setTimeout(go, RECIPE_FX.waitMax * 1000)); }
+    function run() {
     const F = RECIPE_FX, at = (sec, fn) => fxTimers.push(setTimeout(fn, sec * 1000));
     const box = screen.getBoundingClientRect(), br = book.getBoundingClientRect();
     const cx = br.left + br.width / 2 - box.left, cy = br.top + br.height / 2 - box.top;
     const place = (el, x, y, sc) => { el.style.transform = `translate(${x}px, ${y}px) scale(${sc === undefined ? 1 : sc})`; };
     // ① ためる: 10枚のカードが画面の端から飛んできて、1枚ずつ光りながら重なる
     const cards = (o.words || []).slice(0, 10).map((w, i) => {
-      const c = document.createElement("div"); c.className = "fx-card"; c.textContent = w.word;
+      const c = document.createElement("div"); c.className = "fx-card";
+      const src = artSrc(w);   // 11/22-2: カードの絵も出す（前は語句の字だけ）
+      if (src) { const im = document.createElement("img"); im.alt = ""; im.src = src; im.onerror = () => { im.remove(); c.classList.remove("has-pic"); }; c.appendChild(im); c.classList.add("has-pic"); }
+      const nm = document.createElement("span"); nm.textContent = w.word; c.appendChild(nm);
       const side = i % 4, r = Math.random();
       const sx = side === 0 ? -40 : side === 1 ? box.width + 40 : r * box.width, sy = side < 2 ? r * box.height : side === 2 ? -50 : box.height + 50;
       place(c, sx, sy, 0.9); fx.appendChild(c);
@@ -295,9 +306,11 @@ const Cards = (() => {
     });
     at(F.remainAt, () => show($("recipe-remain"), true));
     at(F.total, () => { show($("recipe-buttons"), true); screen.onclick = null; });
+    }
     // タップで最後の状態に飛ぶ
     screen.onclick = e => {
       if (e.target.closest("button")) return;
+      skipped = true;
       fxTimers.forEach(clearTimeout); fxTimers = [];
       fx.innerHTML = ""; finalBook(false);
       late.forEach(el => show(el, true));

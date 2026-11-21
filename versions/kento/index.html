@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap">
-  <link rel="stylesheet" href="css/style.css?v=126">
+  <link rel="stylesheet" href="css/style.css?v=127">
 </head>
 <body>
   <div id="app">
@@ -82,7 +82,7 @@
         <div id="stages-list"></div>
         <div id="stages-warps" class="stages-warps"></div>   <!-- 11/7-43: 世界の行き来はワープのボタン。11/7-45: ステージ4つの下（下の帯の上）に移した -->
         <!-- 11/7-33: 下の帯は「合計得点」（押せない札）「カード図鑑」「タイトルへ」の3つ。世界の色の飾り -->
-        <div class="btn-row stages-bottom"><span id="stages-total" class="score-chip wdeco"></span><button id="btn-zukan" class="btn wdeco"></button><button id="btn-stages-back" class="btn wdeco">タイトルへ</button></div>
+        <div class="btn-row stages-bottom"><span id="stages-total" class="score-chip flat"></span><button id="btn-zukan" class="ub"></button><button id="btn-stages-back" class="ub back">タイトルへ</button></div>
       </div>
     </section>
 
@@ -92,7 +92,7 @@
         <div id="zukan-nav" class="zukan-nav"></div>
         <h2 id="zukan-title" class="zukan-title"></h2>
         <div id="zukan-list"></div>
-        <div class="btn-row"><button id="btn-zukan-back" class="btn btn-sub"></button></div>
+        <div class="btn-row"><button id="btn-zukan-back" class="ub back"></button></div>
       </div>
     </section>
 
@@ -120,7 +120,7 @@
       <!-- 11/7-27: 上から「手に入れたカードの置き場」→「タイムバー」→「問題文」→「選択肢2つ」。375×667 でスクロールなしに入るように -->
       <div class="quiz-box">
         <div id="quiz-slots" class="quiz-slots"></div>
-        <div class="quiz-bar-row"><span id="quiz-count"></span><div id="quiz-time" class="quiz-time"><i></i></div><button id="btn-quiz-quit" class="link-btn quiz-quit">とちゅうでやめる</button></div>
+        <div class="quiz-bar-row"><span id="quiz-count"></span><div id="quiz-time" class="quiz-time"><i></i></div><button id="btn-quiz-quit" class="ub back ub-s">とちゅうでやめる</button></div>
         <p id="quiz-question" class="quiz-question"></p>
         <div id="quiz-choices" class="quiz-choices"></div>
         <div class="fuwari-talk quiz-talk"><img id="quiz-hero" class="hero-img hero-tiny" alt=""><p id="quiz-say" class="say">助けたことばを思い出そう！</p></div>
@@ -134,7 +134,7 @@
     <section id="screen-cards" class="screen">
       <div id="cards-pages" class="cards-pages">
         <div class="cards-page" id="cards-p1">
-          <div class="cards-top"><button id="cards-to-p2" class="link-btn"></button></div>
+          <div class="cards-top"><button id="cards-to-p2" class="ub ub-s"></button></div>
           <img id="cards-hero" class="hero-img hero-mid" alt="">
           <div id="cards-tiers" class="cards-tiers"></div>
           <div id="cards-next" class="cards-next"></div>
@@ -142,12 +142,12 @@
           <p id="cards-hint" class="fuwari-hint hidden"></p>
           <!-- 11/7-30: 上から「救出の旅をはじめからやり直す」「クイズをもう一度」（または「次へ」）。取り逃しがあるときは、やり直すを強い色にして、上に一言 -->
           <p id="cards-miss-note" class="cards-miss-note hidden"></p>
-          <div class="btn-row"><button id="cards-rescue" class="btn btn-sub cards-main hidden"></button></div>
-          <div class="btn-row"><button id="cards-retake" class="btn btn-main cards-main hidden"></button></div>
-          <div class="btn-row"><button id="cards-quit" class="link-btn"></button></div>
+          <div class="btn-row"><button id="cards-rescue" class="ub hidden"></button></div>
+          <div class="btn-row"><button id="cards-retake" class="ub hidden"></button></div>
+          <div class="btn-row"><button id="cards-quit" class="ub back"></button></div>
         </div>
         <div class="cards-page" id="cards-p2">
-          <div class="cards-top left"><button id="cards-to-p1" class="link-btn"></button></div>
+          <div class="cards-top left"><button id="cards-to-p1" class="ub back ub-s"></button></div>
           <h2 id="cards-title" class="cards-title"></h2>
           <div id="cards-list" class="cards-list compact"></div>
           <div id="cards-rank" class="cards-rank"></div>
@@ -195,7 +195,7 @@
     <!-- レシピブック（10/25-4）: ステージ一覧からいつでも -->
     <section id="screen-recipebook" class="screen">
       <div class="rbook-box">
-        <div class="cards-top left"><button id="rbook-back" class="link-btn"></button></div>
+        <div class="cards-top left"><button id="rbook-back" class="ub back ub-s"></button></div>
         <h2 id="rbook-title" class="zukan-title"></h2>
         <p id="rbook-count" class="gems-head"></p>
         <div id="rbook-ring" class="rb-box"></div>
@@ -210,7 +210,7 @@
         <div class="intro-heroes"><img class="hero-img" src="assets/hero_boy_joy.png" alt=""><img class="hero-img" src="assets/hero_girl_joy.png" alt=""></div>
         <div id="ending-book" class="rb-box small"></div>
         <p id="ending-line" class="ending-line"></p>
-        <div class="btn-row"><button id="ending-next" class="btn btn-main"></button></div>
+        <div class="btn-row"><button id="ending-next" class="ub back"></button></div>
       </div>
     </section>
   </div>
@@ -234,12 +234,12 @@
     <div class="overlay-box">
       <h2>ひと休み</h2>
       <div class="btn-row">
-        <button id="pm-continue" class="btn btn-main">続ける</button>
-        <button id="pm-tutorial" class="btn btn-sub">説明をもう一度</button>
-        <button id="pm-sound" class="btn btn-sub sound-btn"></button>
-        <button id="pm-retry" class="btn btn-sub">始めからやり直す</button>
-        <button id="pm-stages" class="btn btn-sub">ステージ一覧へ</button>
-        <button id="pm-title" class="btn btn-sub">タイトルへ</button>
+        <button id="pm-continue" class="ub">続ける</button>
+        <button id="pm-tutorial" class="ub">説明をもう一度</button>
+        <button id="pm-sound" class="ub back sound-btn"></button>
+        <button id="pm-retry" class="ub">始めからやり直す</button>
+        <button id="pm-stages" class="ub back">ステージ一覧へ</button>
+        <button id="pm-title" class="ub back">タイトルへ</button>
       </div>
       <div id="pm-debug" class="debug-box hidden">
         <p class="debug-label">デバッグ</p>
@@ -288,17 +288,17 @@
   <!-- 横向きのとき -->
   <div id="rotate"><div><div class="rotate-icon"></div><p>縦にしてね</p></div></div>
 
-  <script src="data/words.js?v=126"></script>
-  <script src="data/stages.js?v=126"></script>
-  <script src="data/texts.js?v=126"></script>
-  <script src="data/ruby.js?v=126"></script>
-  <script src="js/ruby.js?v=126"></script>
-  <script src="js/audio.js?v=126"></script>
-  <script src="js/door.js?v=126"></script>
-  <script src="js/game.js?v=126"></script>
-  <script src="js/quiz.js?v=126"></script>
-  <script src="js/cards.js?v=126"></script>
-  <script src="js/recipebook.js?v=126"></script>
-  <script src="js/main.js?v=126"></script>
+  <script src="data/words.js?v=127"></script>
+  <script src="data/stages.js?v=127"></script>
+  <script src="data/texts.js?v=127"></script>
+  <script src="data/ruby.js?v=127"></script>
+  <script src="js/ruby.js?v=127"></script>
+  <script src="js/audio.js?v=127"></script>
+  <script src="js/door.js?v=127"></script>
+  <script src="js/game.js?v=127"></script>
+  <script src="js/quiz.js?v=127"></script>
+  <script src="js/cards.js?v=127"></script>
+  <script src="js/recipebook.js?v=127"></script>
+  <script src="js/main.js?v=127"></script>
 </body>
 </html>

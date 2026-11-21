@@ -879,7 +879,7 @@ button.wdeco:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--wc-d
 #screen-stages .stages-nav .link-btn { color: var(--wc-main); text-decoration-color: var(--wc-main); }
 
 /* 11/7-34 決定: カード図鑑は共通の画面（緑）。図鑑の合計点の札も緑で固定（世界の色にするのはステージ一覧の帯だけ） */
-.zukan-title .score-chip.wdeco { --wc-top: #86b35e; --wc-main: #6f9a4a; --wc-dark: #3f5f2e; --wc-light: #dcebc6; }
+.zukan-title .score-chip.flat { --wc-top: #86b35e; --wc-main: #6f9a4a; --wc-dark: #3f5f2e; --wc-light: #dcebc6; }
 /* 11/7-36 決定: 結果画面の「カード ○/10　取り逃し ○こ　種 ○こ ＋○点」は1行に収める（文字を少し小さく、折り返さない） */
 #cards-p2 .rank-line { gap: .5em; font-size: 12.5px; padding: 4px 10px; white-space: nowrap; }
 #cards-p2 .rank-line > span { flex-shrink: 0; }
@@ -945,3 +945,39 @@ button.wdeco:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--wc-d
 /* 11/22-1: クリアしたステージの札の「クリア！」（宝石の左の空き。世界の色に白い字） */
 .stage-row .marks { width: auto; min-width: 30px; gap: 6px; }
 .stage-row .row-clear { font-size: 10.5px; font-weight: bold; line-height: 1; padding: 4px 7px; border-radius: 999px; background: var(--green); color: #fff; white-space: nowrap; }
+
+/* 11/22-2: 押せるボタンを1種類にそろえる（指摘70・73）。形は A「立体の世界色」（角丸14px・ふち2px・下の影4px・上の光）。
+   型は大（字18px）と小（.ub-s 字14px。クイズ・図鑑・結果の上の角）の2つだけ。進む系は世界の色、もどる・やめる系（.back）はクリーム色にこげ茶の字。
+   タイトルの「スタート」、ステージの行・クイズの答えなどの選ぶ札、ゲーム中の丸いボタンは別（今のまま） */
+button.ub { position: relative; overflow: hidden; display: inline-block; box-sizing: border-box; width: min(100%, 300px); margin: 0; padding: 12px 14px;
+  font-family: var(--font); font-size: 18px; font-weight: bold; line-height: 1.25; white-space: nowrap; text-align: center; text-decoration: none; opacity: 1;
+  color: #fff; text-shadow: 0 1px 0 var(--wc-dark), 0 0 3px rgba(0,0,0,.25);
+  background: linear-gradient(180deg, var(--wc-top) 0%, var(--wc-main) 62%, var(--wc-dark) 140%);
+  border: 2px solid var(--wc-dark); border-radius: 14px; box-shadow: 0 4px 0 var(--wc-dark), 0 6px 10px rgba(0,0,0,.18), inset 0 0 0 2px rgba(255,255,255,.22);
+  cursor: pointer; touch-action: manipulation; }
+button.ub::before { content: ""; position: absolute; left: 6%; right: 6%; top: 2px; height: 42%; border-radius: 10px 10px 40% 40% / 10px 10px 14px 14px; background: linear-gradient(rgba(255,255,255,.45), rgba(255,255,255,.05)); pointer-events: none; }
+button.ub:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--wc-dark), 0 2px 4px rgba(0,0,0,.18), inset 0 0 0 2px rgba(255,255,255,.22); }
+button.ub.back { color: #5a4526; text-shadow: 0 1px 0 rgba(255,255,255,.7);
+  background: linear-gradient(180deg, #fffaea 0%, #f1e5c4 62%, #d8c391 140%);
+  border-color: #b59a62; box-shadow: 0 4px 0 #b59a62, 0 6px 10px rgba(0,0,0,.18), inset 0 0 0 2px rgba(255,255,255,.4); }
+button.ub.back:active { box-shadow: 0 1px 0 #b59a62, 0 2px 4px rgba(0,0,0,.18), inset 0 0 0 2px rgba(255,255,255,.4); }
+button.ub.ub-s { width: auto; padding: 5px 12px 6px; font-size: 14px; }
+.btn-row.stages-bottom > button.ub { flex: 1 1 0; min-width: 0; width: auto; padding: 6px 4px 7px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.btn-row.stages-bottom > button.ub small { display: block; font-size: 12px; font-weight: bold; opacity: .95; }
+.overlay-box button.ub { width: 100%; max-width: 280px; }
+.quiz-bar-row button.ub-s { flex-shrink: 0; margin: 0 0 0 4px; }
+.zukan-nav button.ub-s { margin: 4px 0 0; }
+/* 11/22-2: 得点の札（ステージ一覧の「合計」、図鑑の扉・図鑑の「合計」）は押せないので平らに（影・ふちの浮き上がり・上の光なし） */
+.score-chip.flat { max-width: none; border-radius: 12px; padding: 4px 12px 5px; background: rgba(255,253,243,.92); border: 2px solid var(--wc-light); box-shadow: none; text-shadow: none; color: var(--wc-dark); }
+.score-chip.flat .lb { color: var(--wc-main); font-size: 11px; }
+.score-chip.flat b { color: var(--wc-dark); font-size: 17px; }
+.score-chip.flat b small { font-size: 11px; display: inline; color: var(--wc-dark); }
+.stages-bottom > .score-chip.flat { flex: 1 1 0; min-width: 0; margin: 0; padding: 6px 4px 7px; display: flex; flex-direction: column; align-items: center; justify-content: center; white-space: nowrap; }
+/* 11/22-2: ワープのボタンの帯は、絵を切らずに全部入れる（高さは絵の比率まかせ）。宝石は帯の枠にはまる */
+.wp-btn .wp-band { height: auto; padding: 0; background: none; }
+.wp-btn .wp-band > * { display: block; }
+.wp-btn .wp-band .art-band { border-radius: 6px; overflow: hidden; }
+/* 11/22-2: 宝石ができた演出のカードに絵（下に語句の名前を小さく） */
+.fx-card.has-pic { padding: 0; overflow: hidden; align-items: flex-end; }
+.fx-card.has-pic img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.fx-card.has-pic span { position: relative; width: 100%; padding: 1px 2px 2px; background: rgba(255,253,247,.9); font-size: 9px; font-weight: bold; }

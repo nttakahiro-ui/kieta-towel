@@ -88,13 +88,16 @@ const BATTLE = {
   bombSide: 40,                // 爆弾が落ちる場所の、自機からの左右のずれ（px）。左右の輪が真ん中で重なる
   bombRing: 58,                // 爆発の輪の半径（px）。bombSide より大きいので、左右の2つで真正面もおおう
   groundWide: 0.5,             // 地上の雑魚（星など）が画面のこの高さより下にいれば、真上の列でなくても爆弾を投げる（画面の高さの割合。11/7-23 決定「画面の下半分に星があれば投げる」）。ねらうのはその雑魚の位置
-  bombLook: { size: 1.2, arc: 1.35, trail: 0.35, rays: 8 },   // 爆弾の見た目（11/7-23）: 大きさ・山なりの高さ（見た目だけ。落ちる場所と時刻は同じ）、尾の長さ（飛ぶ時間の割合）、着弾で地面を走る光の数
+  bombLook: { size: 1.2, arc: 1.35, trail: 0.35, rays: 8, w2: 0.8 },   // 爆弾の見た目（11/7-23）: 大きさ・山なりの高さ（見た目だけ。落ちる場所と時刻は同じ）、尾の長さ（飛ぶ時間の割合）、着弾で地面を走る光の数
   bombRingTime: 0.35,          // 輪が広がりきるまでの秒数（見た目だけ。当たりは落ちた瞬間）
   // 世界3の光の玉（11/6-3 決定。検討版 11/6 だけ）: 自機のまわりを2つの玉が回る。触れた敵（空中の虫）にダメージ。操作はふえない
   orbs: { max: 3, radius: 50, period: 2, r: 10, cd: 0.3 },   // いちばん多い数（11/7-30。パワーで1〜3つ。orbN）、回る半径（px）、一周の秒数、玉の当たりの大きさ（px）、同じ虫に続けて当たらない秒数
   orbHintTime: 2.6,            // ステージ9の救出の旅の最初の「うしろから虫が来る！…」を出す秒数（11/6-6）
   rearHp: 3,                   // 世界3でうしろから来る虫の硬さ（回る玉に3回触れると倒れる）。ぶつかると元気が減る（＋100 は出さない）
   groundTextScale: 0.78,       // 地上のことばの文字の高さの倍率（少し平たくして、地面に貼りついて見えるように）
+  fuwariEdge: 2,               // 11/22-2: 世界2・3の救出の旅で、ふわりのまわりに出す白い輪郭の太さ（px）
+  darkExplore: 0.62,           // 11/22-2: 発見の旅の「照明が落ちる」の暗さ（前は0.84。箱の輪郭が読める程度）
+  openBob: { fill: "#ffd84a", edge: "#c89a10", amp: 3, speed: 7 },   // 11/22-2: 「あける」が出ている箱の色と、上下の揺れ（px・速さ）
   darkRescue: 0.6,             // 救出の旅の出来事「照明が落ちる」の暗さ（地面と地上のものだけ。発見の旅は0.84）
   powerStartW23: 1,            // 世界2・3のパワーの初期値の段（0 ＝ 1本、1 ＝ 2本。10/31-13 決定: 救出の旅を派手に。世界1は1本のまま）
   powerStartW3: 2,             // 世界3のパワーの初期値の段（2 ＝ 3本。パワーUPで4本。11/3-3 決定: 世界3を最初から1段強く）
@@ -3650,7 +3653,7 @@ const Battle = (() => {
   }
   function drawBomb(b) {
     const L = BATTLE.bombLook, k = Math.min(1, b.age / BATTLE.bombFlight), { x, y, lift } = bombPos(b, k);
-    const r = (6 + lift * 4) * BATTLE.seedSize * 0.9 * L.size;
+    const r = (6 + lift * 4) * BATTLE.seedSize * 0.9 * L.size * (worldDef.id === 2 ? L.w2 : 1);   // 11/22-2: 世界2は80%（見た目だけ。当たりの輪は同じ）
     ctx.fillStyle = "rgba(30,30,40,0.22)";   // 地面の影（落ちる先へまっすぐ進む）
     ctx.beginPath(); ctx.ellipse(x, y + lift * BATTLE.seedArc * L.arc, r * 0.8, r * 0.45, 0, 0, Math.PI * 2); ctx.fill();
     // 光の尾: 少し前までの軌道を、うしろほど細く・うすく
@@ -4505,6 +4508,19 @@ const Battle = (() => {
     ctx.restore();
     return true;
   }
+  // 11/22-2: ふわりの白い輪郭（世界2・3の救出の旅。混み合っても見失わないように）: 絵の形を白くぬった影を、まわり8方向に少しずらして重ねる
+  const fuwariSil = [];
+  function drawFuwariEdge(frame, x, y, size) {
+    const img = fuwariImgs[frame - 1];
+    if (!img.complete || !img.naturalWidth) return;
+    let s = fuwariSil[frame - 1];
+    if (!s) {
+      s = fuwariSil[frame - 1] = document.createElement("canvas"); s.width = img.naturalWidth; s.height = img.naturalHeight;
+      const c = s.getContext("2d"); c.drawImage(img, 0, 0); c.globalCompositeOperation = "source-in"; c.fillStyle = "#ffffff"; c.fillRect(0, 0, s.width, s.height);
+    }
+    const d = BATTLE.fuwariEdge;
+    for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; ctx.drawImage(s, x - size / 2 + Math.cos(a) * d, y - size / 2 + Math.sin(a) * d, size, size); }
+  }
   // 飛んでいるときのコマ: 1→2→3 を順に切り替える
   function fuwariFrame() { return 1 + Math.floor(t / BATTLE.fuwariFrameTime) % 3; }
 
@@ -4535,6 +4551,7 @@ const Battle = (() => {
     if (player.inv > 0 && Math.floor(t * 12) % 2 === 0) ctx.globalAlpha = 0.4;
     const frame = typhoon ? 3 : glow > 0 && !explore1 ? 2 : explore1 ? 1 : fuwariFrame();
     const size = (explore1 ? BATTLE.fuwariExploreSize : BATTLE.fuwariSize) * (1 + glow * 0.5);
+    if (!explore1 && worldDef.id >= 2) drawFuwariEdge(frame, x, fy, size);   // 11/22-2: 世界2・3の救出の旅は白い輪郭（2px）
     if (!drawFuwariArt(frame, x, fy, size)) {   // 絵の読みこみ前は、白い四角
       ctx.fillStyle = "#fffdf7"; ctx.strokeStyle = "#c9b98f"; ctx.lineWidth = 2;
       roundRect(x - 18, fy - 16, 36, 32, 6); ctx.fill(); ctx.stroke();
@@ -4847,12 +4864,13 @@ const Battle = (() => {
 
   // ===== 世界2の発見の旅「箱」の画面（10/31-10 試作。箱とコンベアは仮の図形） =====
   function drawBox(b) {
-    const ex = explore, x = b.x + (b.shake > 0 ? Math.sin(b.shake * 60) * 3 : 0), y = b.y, w = b.w, h = b.h;
     const face = b.fake ? 0 : exMove.open ? boxFace(b) : -1;   // にせOPEN は、いつも OPEN の面
+    const hot = face === 0 && !b.open;   // 11/22-2: 「あける」が出ている箱は明るい黄色にして、上下に小さく揺らす
+    const ex = explore, x = b.x + (b.shake > 0 ? Math.sin(b.shake * 60) * 3 : 0), y = b.y + (hot ? Math.sin((explore.t + (b.phase || 0)) * BATTLE.openBob.speed) * BATTLE.openBob.amp : 0), w = b.w, h = b.h;
     const squash = exMove.open && !b.open ? 1 - 0.12 * Math.abs(Math.sin(((explore.t + b.phase) % 1) * Math.PI)) * (face > 0 ? 1 : 0) : 1;
     ctx.save(); ctx.translate(x, y); ctx.scale(1, squash);
     ctx.fillStyle = "rgba(30,30,40,0.25)"; roundRect(-w / 2 + 4, -h / 2 + 8, w, h, 8); ctx.fill();   // 影
-    ctx.fillStyle = "#c9955a"; ctx.strokeStyle = "#8a6232"; ctx.lineWidth = 2;
+    ctx.fillStyle = hot ? BATTLE.openBob.fill : "#c9955a"; ctx.strokeStyle = hot ? BATTLE.openBob.edge : "#8a6232"; ctx.lineWidth = 2;
     roundRect(-w / 2, -h / 2, w, h, 8); ctx.fill(); ctx.stroke();
     if (b.open) {   // ふたが開いている
       ctx.fillStyle = "#6a4a28"; roundRect(-w / 2 + 6, -h / 2 + 4, w - 12, 14, 4); ctx.fill();
@@ -4909,7 +4927,15 @@ const Battle = (() => {
       ctx.fillStyle = th.color; ctx.beginPath(); ctx.arc(th.x, th.y, 2, 0, Math.PI * 2); ctx.fill();
     }
     ctx.globalAlpha = 1;
-    if (evActive("dark")) { ctx.fillStyle = "rgba(6,10,24,0.84)"; ctx.fillRect(0, 0, W, H); }   // ステージ7の出来事「照明が落ちる」（仮: 画面ぜんたいを暗く）
+    if (evActive("dark")) {   // ステージ7・8の出来事「照明が落ちる」（画面ぜんたいを暗く）
+      ctx.fillStyle = `rgba(6,10,24,${BATTLE.darkExplore})`; ctx.fillRect(0, 0, W, H);
+      // 11/22-2: 暗いあいだも箱の形と鍵の印が読めるように、うすく輪郭を重ねる（前は暗さ0.84で箱が見えなかった）
+      if (ex.boxes) for (const b of ex.boxes) if (!b.out && !b.open) {
+        ctx.save(); ctx.translate(b.x, b.y); ctx.strokeStyle = "rgba(255,236,190,0.55)"; ctx.lineWidth = 2; roundRect(-b.w / 2, -b.h / 2, b.w, b.h, 8); ctx.stroke();
+        if (b.lock && !ex.keyFound) { ctx.strokeStyle = "rgba(220,226,236,0.85)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(b.w / 2 - 14, b.h / 2 - 22, 6, Math.PI, 0); ctx.stroke(); ctx.fillStyle = "rgba(200,206,218,0.85)"; roundRect(b.w / 2 - 22, b.h / 2 - 22, 16, 13, 3); ctx.fill(); }
+        ctx.restore();
+      }
+    }
     drawPlayer();
     ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
     for (const fl of floats) {

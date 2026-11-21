@@ -30,6 +30,7 @@ const GEM_ART = (color, lit, size, stageId) => {
 
 // ===== レシピ完成の演出の秒数（10/25-15。初めてそろったときだけ。合計5秒以内、タップで最後に飛ぶ） =====
 const RECIPE_FX = {
+  waitMax: 6,       // 11/22-2: 本の絵・背景・カードの絵が読み終わるまで、演出を始めずに待つ（最長の秒数）
   cardGap: 0.12,    // ① カードが1枚ずつ飛んでくる間隔（秒）
   cardFly: 0.45,    //    1枚が飛んでくる時間
   gather: 1.5,      //    ①が終わる時刻（ここで②へ）
@@ -171,5 +172,8 @@ const RecipeBook = (() => {
     bindArt(el, o, () => render(el, o));
   }
 
-  return { render, renderBand, renderBook, litIds, nextId };
+  // 11/22-2: 宝石ができた画面の絵（本・背景）を先に読んでおく（遅い回線で、演出のあいだ本が出なかった）
+  const pre = [];
+  function preload() { if (pre.length) return pre; ["assets/recipe_book.webp", "assets/recipe_bg.jpg"].forEach(src => { const im = new Image(); im.src = src; pre.push(im); }); return pre; }
+  return { render, renderBand, renderBook, litIds, nextId, preload };
 })();

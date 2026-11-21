@@ -415,6 +415,7 @@ const Main = (() => {
     function startQuiz() {
       showScreen("quiz");
       $("quiz-hero").src = heroSrc("think");   // クイズは「考える」の絵
+      RecipeBook.preload();   // 11/22-2: 宝石ができた画面の絵を、クイズのあいだに読んでおく
       Quiz.start(ordered, results => toCards(results), { slots: words, owned: Save.data.cards });
     }
   }
@@ -564,13 +565,15 @@ const Main = (() => {
       const slot = document.createElement("div"); slot.className = "wp-slot " + dir;
       const wd2 = window.WORLDS.find(w => w.id === to);
       if (wd2) {
-        const open = dir === "prev" || worldDone(wid) || openAll, s0 = worldStages(to)[0];
+        const open = dir === "prev" || worldDone(wid) || openAll;
         const b = document.createElement("button");
         b.className = "wp-btn wdeco" + (open ? "" : " locked"); b.dataset.w = to; b.disabled = !open;
-        const gem = `<svg class="wp-gem" viewBox="-22 -22 44 44">${GEM_ART(s0.gem, true, 19, s0.id)}</svg>`;
+        // 11/22-2: 帯の絵は切らずに全部見せる（前は高さ24pxで上下が切れていた）。
+        //   宝石は帯の枠にはまった形で出す（上の帯と同じ。その世界でできた宝石だけ）。前の右はしの大きな宝石のアイコンはやめた
         b.innerHTML = `<span class="wp-txt">${dir === "prev" ? "◀ " : ""}${tx("worlds.warpTo", { id: to })}${dir === "next" ? " ▶" : ""}</span>`
-          + `<span class="wp-band"><img src="assets/world_band${to}.jpg" alt="">${gem}</span>`
+          + `<span class="wp-band"></span>`
           + (open ? "" : `<span class="wp-need">${tx("worlds.warpNeed", { n: Math.max(1, worldStages(wid).length - gemsHere) })}</span>`);
+        RecipeBook.renderBand(b.querySelector(".wp-band"), { lit: litSet, world: to });
         if (open) b.addEventListener("click", () => { Sound.se("start"); warpTo(to); });
         slot.appendChild(b);
         if (open) for (let i = 0; i < 8; i++) {   // まわりに小さな光の粒がゆっくり舞う（常に）
@@ -737,7 +740,7 @@ const Main = (() => {
     Sound.play("zukan");   // カード図鑑はタイトルの曲（11/7-4）
     const here = Save.data.world || 1, lit = RecipeBook.litIds(Save.data.cards);
     const img = `<img class="zk-title-img" src="assets/zukan_title.png" alt="${tx("zukan.title")}">`;
-    $("zukan-title").innerHTML = `${img}<br><span class="zk-door-total score-chip wdeco">${totalChip()}</span>`;
+    $("zukan-title").innerHTML = `${img}<br><span class="zk-door-total score-chip flat">${totalChip()}</span>`;
     $("zukan-title").querySelector("img").onerror = e => e.target.replaceWith(document.createTextNode(tx("zukan.title")));
     $("zukan-nav").innerHTML = "";
     const box = $("zukan-list");
@@ -764,9 +767,9 @@ const Main = (() => {
   }
   function toZukanWorld(wid) {
     // 見出しは制作側の絵 g_title（11/1）。絵が読めなければ今までの文字
-    const sub = `<span class="zk-sub-row"><small>${tx("worlds.title", { id: wid, name: window.WORLDS.find(w => w.id === wid).name })}</small><span class="score-chip wdeco">${totalChip()}</span></span>`;   // 11/7-32: 世界の行の右端に合計点の札
+    const sub = `<span class="zk-sub-row"><small>${tx("worlds.title", { id: wid, name: window.WORLDS.find(w => w.id === wid).name })}</small><span class="score-chip flat">${totalChip()}</span></span>`;   // 11/7-32: 世界の行の右端に合計点の札
     $("zukan-nav").innerHTML = "";
-    const bk = document.createElement("button"); bk.className = "link-btn"; bk.textContent = tx("zukan.toDoor"); bk.addEventListener("click", toZukan);   // 11/7-40
+    const bk = document.createElement("button"); bk.className = "ub back ub-s"; bk.textContent = tx("zukan.toDoor"); bk.addEventListener("click", toZukan);   // 11/7-40
     $("zukan-nav").appendChild(bk);
     $("screen-zukan").classList.remove("door");
     $("zukan-title").innerHTML = `<img class="zk-title-img" src="assets/zukan_title.png" alt="${tx("zukan.title")}"><br>${sub}`;
