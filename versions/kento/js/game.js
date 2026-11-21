@@ -188,6 +188,8 @@ const BATTLE = {
   // 2回目の旅: ことばを包む殻（10/3-11。役割で分ける: ザコ＝綿毛のまゆ、中ボス＝いばら、大ボス＝霧）。見た目はすべて仮
   thornAlpha: [0.315, 0.35],   // 中ボスのいばら（文字にからむ草のつた）の濃さ [k が 0 のとき, k による増え分]。WORLD_LOOK に書いていない世界1・2はこれ（11/22-7 に [0.45, 0.5] から半分にしたが、11/22-8 決定でその前の7割に戻した。読みやすさは下地 midPlate で）
   midPlate: { alpha: 0.65, pad: 6, r: 6, thornOut: 10, bigFrom: 4, bigScale: 1.15, minGap: 0.9 },   // 11/22-8 決定（鳥山さんの実機確認: 天然繊維・化学繊維が読みにくい）: 中ボスのことばの字の後ろに白い下地（不透明度 alpha、字の外へ pad px、角丸 r px）。重ね順は いばら → 下地 → 文字。いばらは下地の外へ thornOut px はみ出して、下地を囲んで見える。bigFrom 文字以上のことばは字を bigScale 倍。縦にはみ出すときは字の間隔を詰める（字の大きさの minGap 倍まで）
+  bossMist: 0.6,               // 11/22-9 決定（鳥山さんの実機確認: ステージ1の大ボスの字が霧で読みにくい）: 大ボスの霧（文字のまわりのもやと、字にかかるうすい幕）の濃さの倍率（前は 1）。殻がはがれていく見え方はそのまま
+  bossEdge: { w: 4, color: "#ffffff" },   // 11/22-9 決定: 大ボスの字に、霧のあとで引く白いふち（線の幅4 ＝ 字の外へ2px。どの世界も白）
   charEdgeOver: 4,             // 11/22-7: いばら・霧を描いたあと、文字の上にもう一度ふちを描く線の幅（4 ＝ 字の外へ2px）。WORLD_LOOK の textOver がある世界（世界3）はそちら
   shellVeil: 0.22,             // 殻が語句の上にかかる濃さ（0〜1。読みやすさのため、うすく）
   // ステージ1の案内（10/21-2）。初めてそれが起きた瞬間にだけ、1〜2行で出す。文は data/texts.js の hints
@@ -1256,7 +1258,7 @@ const Battle = (() => {
     const ground = !od && groundIds.has(word.id) && role !== "boss";
     let size = BATTLE.fontSize[role] || 26;
     if (od) size = od.size;
-    if (od && role === "mid" && Array.from(word.word.replace(/\(.*?\)/g, "")).length >= BATTLE.midPlate.bigFrom) size = Math.round(size * BATTLE.midPlate.bigScale);   // 11/22-8: 4文字以上の中ボスのことばは字を1段大きく
+    if (od && (role === "mid" || role === "boss") && Array.from(word.word.replace(/\(.*?\)/g, "")).length >= BATTLE.midPlate.bigFrom) size = Math.round(size * BATTLE.midPlate.bigScale);   // 11/22-8: 4文字以上の中ボスのことばは字を1段大きく（11/22-9 から大ボスも）
     else if (isShortWord(word)) size = Math.round(size * BATTLE.shortScale);   // 短い語句は大きめに
     ctx.font = font(size);
     let w = ctx.measureText(word.word).width;
@@ -1324,7 +1326,7 @@ const Battle = (() => {
       if (od) {
         e.vertical = true;
         e.charH = size * 1.12;
-        if (role === "mid") e.charH = Math.max(size * BATTLE.midPlate.minGap, Math.min(e.charH, (H * 0.66 - odaiTop() - 30) / chars.length));   // 11/22-8: 大きくした字が問題文の下から自機の上まではみ出すときは、字の間隔を詰める
+        if (role === "mid" || role === "boss") e.charH = Math.max(size * BATTLE.midPlate.minGap, Math.min(e.charH, (H * 0.66 - odaiTop() - 30) / chars.length));   // 11/22-8: 大きくした字が問題文の下から自機の上まではみ出すときは、字の間隔を詰める
         e.parts.forEach((p, i) => { p.ox = 0; p.oy = (i - (chars.length - 1) / 2) * e.charH; });
         e.w = Math.max(...ws) + 4;
         e.h = chars.length * e.charH;
@@ -4161,7 +4163,7 @@ const Battle = (() => {
       ctx.strokeText(ch, x + wob, py);
       ctx.shadowBlur = 0;
       ctx.fillStyle = fillColor; ctx.fillText(ch, x + wob, py);
-      if (hasShell(e) && p.maxHp) { drawCharShell(e.role, x + wob, py, e.size, p.hp / p.maxHp); textOverShell(ch, x + wob, py, fillColor, alpha); }
+      if (hasShell(e) && p.maxHp) { drawCharShell(e.role, x + wob, py, e.size, p.hp / p.maxHp); textOverShell(ch, x + wob, py, fillColor, alpha, e.role); }
       if (p.maxHp && p.hp < p.maxHp) {   // 文字ごとの残りの耐久（右に小さな帯）
         const bh = e.charH * 0.7;
         ctx.fillStyle = "rgba(0,0,0,0.12)"; ctx.fillRect(x + e.w / 2 + 2, py - bh / 2, 3, bh);
@@ -4260,12 +4262,13 @@ const Battle = (() => {
     ctx.restore();
   }
   // 殻を描いたあと、文字をもう一度縁取りして上に描く（10/31-12 世界3。11/22-7 から全世界。太さは WORLD_LOOK の textOver か BATTLE.charEdgeOver）
-  function textOverShell(ch, x, y, fillColor, alpha) {
-    const w = (WORLD_LOOK[worldDef.id] || {}).textOver || BATTLE.charEdgeOver;
+  function textOverShell(ch, x, y, fillColor, alpha, role) {
+    const be = role === "boss" && BATTLE.bossEdge;   // 11/22-9: 大ボスは白い2px のふち
+    const w = be ? be.w : (WORLD_LOOK[worldDef.id] || {}).textOver || BATTLE.charEdgeOver;
     if (!w) return;
     ctx.save();
     ctx.globalAlpha = alpha; ctx.lineJoin = "round";
-    ctx.lineWidth = w; ctx.strokeStyle = theme.wordStroke || "#ffffff"; ctx.strokeText(ch, x, y);
+    ctx.lineWidth = w; ctx.strokeStyle = be ? be.color : (theme.wordStroke || "#ffffff"); ctx.strokeText(ch, x, y);
     ctx.fillStyle = fillColor; ctx.fillText(ch, x, y);
     ctx.restore();
   }
@@ -4279,13 +4282,13 @@ const Battle = (() => {
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, sz * 0.9, 0, Math.PI * 2); ctx.fill();
     }
     if (role === "boss") {   // 霧のかたまり: 文字のまわりに、うすいもや
-      ctx.globalAlpha = 0.25 + 0.4 * k;
+      ctx.globalAlpha = (0.25 + 0.4 * k) * BATTLE.bossMist;
       ctx.fillStyle = (WORLD_LOOK[worldDef.id] || {}).boss || SHELL.boss.bit;
       for (let i = 0; i < 5; i++) {
         const a = i / 5 * Math.PI * 2 + t * 0.4;
         ctx.beginPath(); ctx.arc(cx + Math.cos(a) * sz * 0.5, cy + Math.sin(a) * sz * 0.45, sz * (0.22 + 0.12 * k), 0, Math.PI * 2); ctx.fill();
       }
-      ctx.globalAlpha = BATTLE.shellVeil * k * 1.2;
+      ctx.globalAlpha = BATTLE.shellVeil * k * 1.2 * BATTLE.bossMist;
       ctx.fillStyle = SHELL.boss.color;
       ctx.beginPath(); ctx.ellipse(cx, cy, sz * 0.55, sz * 0.5, 0, 0, Math.PI * 2); ctx.fill();
     } else {                 // いばら: 文字にからむ、とげのあるつる
@@ -4346,7 +4349,7 @@ const Battle = (() => {
         }
         const wob = p.flash > 0 ? (Math.random() - 0.5) * 3 : 0;
         ctx.fillText(p.ch, px + wob, y);
-        if (hasShell(e) && p.maxHp) { drawCharShell(e.role, px, y, e.size, p.hp / p.maxHp); textOverShell(p.ch, px + wob, y, fillColor, alpha); ctx.fillStyle = fillColor; }
+        if (hasShell(e) && p.maxHp) { drawCharShell(e.role, px, y, e.size, p.hp / p.maxHp); textOverShell(p.ch, px + wob, y, fillColor, alpha, e.role); ctx.fillStyle = fillColor; }
         // 文字ごとの残りの耐久（小さな帯）
         if (p.hp < p.maxHp) {
           const bw = p.cw * 0.7;
