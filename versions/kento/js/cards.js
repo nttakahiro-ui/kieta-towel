@@ -132,6 +132,12 @@ const Cards = (() => {
     rb.classList.remove("hidden");
     if (wrong.length && o.onRetake) { rb.textContent = tx("results.retakeButton"); rb.onclick = () => o.onRetake(wrong); }
     else { rb.textContent = tx("results.nextButton"); rb.onclick = () => (done ? o.onRecipe() : o.onShort ? o.onShort(o.words.length - ownedCount) : o.onNext()); }   // そろっていなければ「宝石まであと○こ」（11/7-10）
+    // 11/22-10 決定D: 次にすべきボタンを目立たせる（色や形は変えない）。まちがいがあれば「クイズをもう一度」（取り逃しがあっても、こちらを優先）、
+    //   全問正解なら「次へ」に、右上の小さな「おすすめ」の札（だいだい色・白文字）と、ゆっくり脈打つ動き（1.2秒）。ほかのボタンはそのまま
+    const allRight = o.results.length > 0 && o.results.every(r => r.correct);
+    const rec = (wrong.length && o.onRetake) || (!wrong.length && allRight);
+    rb.classList.toggle("recommend", !!rec);
+    if (rec) { const b = document.createElement("span"); b.className = "rec-badge"; b.textContent = tx("results.recommend"); rb.appendChild(b); }
     // 救出の旅をはじめからやり直す（10/25-14。11/7-30: 「クイズをもう一度」（または「次へ」）の上に、いつも出す）。
     //   取り逃したことばがあるときは強い色にして、上に「取り逃したことばがあるよ」
     const rs = $("cards-rescue"), miss = !!(notHelped.length && o.onRescue);

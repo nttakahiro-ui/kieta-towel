@@ -4,6 +4,7 @@
 //   Ruby.html(文, [始め, 終わり], glue) … 文字をエスケープして <ruby> をつけた HTML（始め〜終わりの部分だけも作れる）
 //     glue: ルビの語と、すぐあとの送りがな・閉じかっこ（4字まで）を、折り返さない1つのかたまり（span.rbw）にする
 //   Ruby.kana(語) … お題のはずれの語（120語にない語）の読み。ルビをつけない語は ""
+//   Ruby.hard(語) … ルビをつける語か（小学4年生までに習わない漢字をふくむ。11/22-10: お題の正解・はずれに同じ決まり）
 //   Ruby.inline(文) … 「洗（あら）った」のかっこ書きを消した文を返し、その文にルビをつける（11/7-30）
 const Ruby = (() => {
   const R = window.RUBY || { text: {}, dict: {}, kana: {} };
@@ -38,6 +39,9 @@ const Ruby = (() => {
     return out + esc(text.slice(i, b));
   }
   const kana = w => (R.kana && R.kana[w]) || "";
+  // 11/22-10: ルビをつける語か（小学4年生までに習わない漢字をふくむ）。お題の正解とはずれを同じ決まりで見る
+  const EASY = new Set(Array.from(R.easy || ""));
+  const hard = w => Array.from(String(w == null ? "" : w)).some(c => /[㐀-鿿々〆ヶ]/.test(c) && (!R.easy || !EASY.has(c)));
   // 文の中の「漢字（よみ）」のかっこ書きを、ルビにする（11/7-30。オープニングの文）: かっこを消した文を返し、その文のルビを表に入れる
   function inline(text) {
     text = text == null ? "" : String(text);
@@ -48,5 +52,5 @@ const Ruby = (() => {
     R.text[plain] = sp; cache.delete(plain);
     return plain;
   }
-  return { spans, html, kana, inline };
+  return { spans, html, kana, inline, hard };
 })();

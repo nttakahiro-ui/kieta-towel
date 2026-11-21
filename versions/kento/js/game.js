@@ -96,6 +96,14 @@ const BATTLE = {
   rearHp: 3,                   // 世界3でうしろから来る虫の硬さ（回る玉に3回触れると倒れる）。ぶつかると元気が減る（＋100 は出さない）
   groundTextScale: 0.78,       // 地上のことばの文字の高さの倍率（少し平たくして、地面に貼りついて見えるように）
   fuwariEdge: 2,               // 11/22-2: 世界2・3の救出の旅で、ふわりのまわりに出す白い輪郭の太さ（px）
+  fuwariEdge3: { w: 2.5, color: "#4B2C7F" },   // 11/22-10 決定C: 世界3は救出の旅・発見の旅とも、輪郭を濃い紫（2.5px）。世界2は白のまま
+  fuwariShadow3: { alpha: 0.25 },              //   世界3のふわりの足元に、やわらかい影（黒・だ円）を常に
+  // 11/22-10 決定A: とくぎ・必殺ワザの効果中が目で分かるように
+  //   powerShot: とくぎ「パワーアップ」中の光（太さの倍率と、濃い色）。shieldRing: とくぎ「守りアップ」中の盾の輪（世界の色、半透明）
+  //   gaugeGlow: とくぎ「ゲージ2倍速」中、必殺ワザのボタンの枠を光らせる。edgeRed: 必殺ワザ「パワー全開」中の画面の縁の赤
+  //   rainbow: 「無敵タイム」中のふわりの虹色の点滅（1秒に何回）。blinkLast: 帯を点滅させる残り秒。rewindTime: 巻き戻しの白い光の秒数（前は1.2秒の青白い光）
+  skillLook: { powerShot: { scale: 1.18, shot: "#1f5fc8", halo: "rgba(120,170,250,0.55)" }, shieldRing: { r: 36, w: 2.5, alpha: 0.5, fill: 0.1 },
+    gaugeGlow: "#ffc84a", edgeRed: 0.38, rainbow: 5, blinkLast: 1, rewindTime: 0.5 },
   darkExplore: 0.62,           // 11/22-2: 発見の旅の「照明が落ちる」の暗さ（前は0.84。箱の輪郭が読める程度）
   openBob: { fill: "#ffd84a", edge: "#c89a10", amp: 3, speed: 7 },
   keyBox: { fill: "#8fa2b6", edge: "#55687c", mark: "#f2c234", countY: 0.07 },   // 11/22-5（指摘86）: ステージ7のかぎマークの箱の色・かぎの色。countY ＝「かぎ ×N」の高さ（画面の高さの割合。上の一行の上）   // 11/22-2: 「あける」が出ている箱の色と、上下の揺れ（px・速さ）
@@ -660,6 +668,8 @@ const Battle = (() => {
 
   function font(size) { return `bold ${size}px ${FONT_FAMILY}`; }
   const hasKanji = s => /[一-龯々]/.test(s);
+  // 語句の上（横）にふりがなを出すか。11/22-10: お題（中ボス・大ボス）の語は、正解もはずれも同じ決まり（Ruby.hard: 小学4年生までに習わない漢字をふくむ語）。ほかの語句は漢字があれば
+  const kanaOn = e => !!e.word.kana && (e.pattern === "odai" ? Ruby.hard(e.word.word) : hasKanji(e.word.word));
   const scrollSpeed = () => H / BATTLE.scrollTime;
   const rand = (a, b) => a + Math.random() * (b - a);
 
@@ -1556,7 +1566,7 @@ const Battle = (() => {
     t += dt;
     stopT = Math.max(0, stopT - dt); guardT = Math.max(0, guardT - dt);   // 必殺ワザの残り（10/31-10 試作）
     if (boostT > 0) { boostT = Math.max(0, boostT - dt); if (boostT === 0) level = POWER_LEVELS[levelIdx()]; }   // パワー全開が終わったら元の段にもどる（11/7-25）
-    if (rewindFx) { rewindFx.age += realDt; if (rewindFx.age > 1.2) rewindFx = null; }
+    if (rewindFx) { rewindFx.age += realDt; if (rewindFx.age > BATTLE.skillLook.rewindTime) rewindFx = null; }
     shake = Math.max(0, shake - dt);
     player.glow = Math.max(0, player.glow - dt);
     player.hurt = Math.max(0, player.hurt - dt);
@@ -3158,7 +3168,8 @@ const Battle = (() => {
 
     // 自機の弾（ふわりの光）: 白寄りの明るい桃色の細長い光。敵の弾（濃い色の球）と見分けられるように（10/25-7。色は BULLET_COLORS）
     for (const s of shots) {
-      const k = BATTLE.shotDrawScale * (s.boost ? 1.3 : 1);   // 見た目だけ大きく（当たりは今のまま）。パワー全開の光はひとまわり大きく、金色の尾がつく（11/7-25）
+      const pw = loadout === "power" ? BATTLE.skillLook.powerShot : null;   // 11/22-10: とくぎ「パワーアップ」中は、光を太く・色を濃く（常時なので控えめに）
+      const k = BATTLE.shotDrawScale * (s.boost ? 1.3 : 1) * (pw ? pw.scale : 1);   // 見た目だけ大きく（当たりは今のまま）。パワー全開の光はひとまわり大きく、金色の尾がつく（11/7-25）
       if (s.boost) {
         const g = ctx.createLinearGradient(s.x, s.y, s.x - s.vx * 0.12, s.y + 46);
         g.addColorStop(0, "rgba(255,214,90,0.85)"); g.addColorStop(1, "rgba(255,214,90,0)");
@@ -3167,11 +3178,11 @@ const Battle = (() => {
         ctx.fillStyle = "rgba(255,226,120,0.5)";
         ctx.beginPath(); ctx.ellipse(s.x, s.y, (s.thick ? 16 : 11) * k, (s.thick ? 22 : 15) * k, 0, 0, Math.PI * 2); ctx.fill();
       }
-      ctx.fillStyle = BULLET_COLORS.shotHalo;   // まわりにやわらかい光の輪
+      ctx.fillStyle = pw ? pw.halo : BULLET_COLORS.shotHalo;   // まわりにやわらかい光の輪
       ctx.beginPath(); ctx.ellipse(s.x, s.y, (s.thick ? 12 : 8) * k, (s.thick ? 18 : 12) * k, 0, 0, Math.PI * 2); ctx.fill();
       ctx.beginPath(); ctx.ellipse(s.x, s.y, (s.thick ? 7 : 4) * k, (s.thick ? 13 : 8) * k, 0, 0, Math.PI * 2);
       ctx.lineWidth = 2; ctx.strokeStyle = BULLET_COLORS.shotRim; ctx.stroke();
-      ctx.fillStyle = BULLET_COLORS.shot; ctx.fill();
+      ctx.fillStyle = pw ? pw.shot : BULLET_COLORS.shot; ctx.fill();
     }
 
     // 空中の雑魚
@@ -3302,6 +3313,7 @@ const Battle = (() => {
     drawHud();
     if (lastT > 0) drawLastHud();   // ラストチャンスの帯と残り秒数（いちばん手前。11/7-12）
     drawSkillButtons();
+    drawSkillActive();   // 11/22-10: 必殺ワザの効果中の帯と、パワー全開の赤い縁
     if (rewindGuide) drawRewindGuide();
     if (rewindFx) drawRewind();
     // 操作のヒント（まだ動かしていないとき）
@@ -3541,11 +3553,12 @@ const Battle = (() => {
     ctx.beginPath(); ctx.arc(player.x, player.y, R * (1 + 0.06 * p), 0, Math.PI * 2); ctx.stroke();
     ctx.restore();
   }
-  // 巻き戻し（11/6-6）: 画面が青白く光り、まん中で大きな矢印がぐるっと逆に回る
+  // 巻き戻し（11/6-6）: 画面が光り、まん中で大きな矢印がぐるっと逆に回る
+  //   11/22-10 決定A: 発動時に画面全体が一瞬白く光って巻き戻る（0.5秒）。白い光は最初が強く、すぐ引く。矢印は0.5秒で1回り半
   function drawRewind() {
-    const k = rewindFx.age / 1.2;
+    const k = rewindFx.age / BATTLE.skillLook.rewindTime;
     ctx.save(); ctx.globalAlpha = Math.max(0, 1 - k);
-    ctx.fillStyle = "rgba(210,228,255,0.6)"; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = `rgba(255,255,255,${0.95 * Math.max(0, 1 - k * 1.6) + 0.35})`; ctx.fillRect(0, 0, W, H);
     ctx.translate(W / 2, H * 0.45); ctx.rotate(-k * Math.PI * 3);
     drawRewindArrow(70, "#3f8cf0", 12);
     ctx.restore();
@@ -4196,7 +4209,7 @@ const Battle = (() => {
       }
     }
     // ふりがなは列の右に縦書きで（となりの列とぶつからないように）
-    if (hasKanji(e.word.word)) {
+    if (kanaOn(e)) {
       ctx.globalAlpha = alpha;
       const ks = Math.max(9, Math.min(BATTLE.kanaSize, Math.floor(e.h / Math.max(1, Array.from(e.word.kana).length))));
       ctx.font = font(ks); ctx.lineWidth = 3; ctx.strokeStyle = "#ffffff"; ctx.fillStyle = "#5d6b4c"; ctx.lineJoin = "round";
@@ -4229,7 +4242,7 @@ const Battle = (() => {
   // 綿毛のまゆ（語句全体を包む）。k ＝ 殻の残り（1〜0）。うしろ側（front=false）と、語句の上にかかる側（front=true）
   function drawCocoon(e, x, y, k, front) {
     if (k <= 0) return;
-    const kanaUp = hasKanji(e.word.word) ? BATTLE.kanaSize * 0.6 : 0;
+    const kanaUp = kanaOn(e) ? BATTLE.kanaSize * 0.6 : 0;
     const rx = e.w / 2 + 22, ry = e.size * 0.85 + kanaUp * 0.6, cy = y - kanaUp * 0.5;   // 10/7-1: 白く光る大きなもの
     ctx.save();
     const near = k <= BATTLE.shellNearDone;   // あと少し: 黄色く光る（10/25-16）
@@ -4362,7 +4375,7 @@ const Battle = (() => {
       ctx.fillText(word.word, x, y);
     }
     if (cocoon > 0) { ctx.save(); ctx.globalAlpha = alpha; drawCocoon(e, x, y, cocoon, true); ctx.restore(); ctx.globalAlpha = alpha; }
-    if (hasKanji(word.word)) {
+    if (kanaOn(e)) {
       ctx.font = font(BATTLE.kanaSize);
       ctx.lineWidth = 3; ctx.strokeStyle = "#ffffff"; ctx.lineJoin = "round";
       const ky = y - e.size / 2 - WORD_EDGE - 4 - BATTLE.kanaSize / 2;   // 11/7-42: 文字の高さ＋ふち（線の幅8 → 外へ4px）＋すき間4px の上
@@ -4465,7 +4478,7 @@ const Battle = (() => {
     if (e.parts || e.maxHp <= 1) return;
     if (hasShell(e)) return;   // 2回目の旅は、硬さを丸ではなく殻の厚みで見せる   // 1文字ずつ壊す敵は、文字ごとの帯で出す
     const n = e.maxHp, gap = 10, x0 = e.x - (n - 1) * gap / 2;
-    const dy = e.y - e.h / 2 - 10 - (hasKanji(e.word.word) ? BATTLE.kanaSize + WORD_EDGE + 4 : 0);   // ふりがなより上に出す（11/7-42: ルビが上がったぶん）
+    const dy = e.y - e.h / 2 - 10 - (kanaOn(e) ? BATTLE.kanaSize + WORD_EDGE + 4 : 0);   // ふりがなより上に出す（11/7-42: ルビが上がったぶん）
     for (let i = 0; i < n; i++) {
       ctx.beginPath();
       ctx.arc(x0 + i * gap, dy, 3.5, 0, Math.PI * 2);
@@ -4568,16 +4581,35 @@ const Battle = (() => {
     return true;
   }
   // 11/22-2: ふわりの白い輪郭（世界2・3の救出の旅。混み合っても見失わないように）: 絵の形を白くぬった影を、まわり8方向に少しずらして重ねる
-  const fuwariSil = [];
-  function drawFuwariEdge(frame, x, y, size) {
+  //   11/22-10: 色と太さを変えられる（世界3は濃い紫 2.5px）。色ごとに影の絵をとっておく
+  const fuwariSil = {};
+  function fuwariShape(frame, color) {
+    const img = fuwariImgs[frame - 1];
+    if (!img.complete || !img.naturalWidth) return null;
+    const key = color + frame;
+    let s = fuwariSil[key];
+    if (!s) {
+      s = fuwariSil[key] = document.createElement("canvas"); s.width = img.naturalWidth; s.height = img.naturalHeight;
+      const c = s.getContext("2d"); c.drawImage(img, 0, 0); c.globalCompositeOperation = "source-in"; c.fillStyle = color; c.fillRect(0, 0, s.width, s.height);
+    }
+    return s;
+  }
+  // 無敵タイムの虹色: 絵の形を、いまの色でぬって重ねる（色が毎回変わるので、1枚のキャンバスをぬり直す）
+  let tintCv = null;
+  function drawFuwariTint(frame, x, y, size, color) {
     const img = fuwariImgs[frame - 1];
     if (!img.complete || !img.naturalWidth) return;
-    let s = fuwariSil[frame - 1];
-    if (!s) {
-      s = fuwariSil[frame - 1] = document.createElement("canvas"); s.width = img.naturalWidth; s.height = img.naturalHeight;
-      const c = s.getContext("2d"); c.drawImage(img, 0, 0); c.globalCompositeOperation = "source-in"; c.fillStyle = "#ffffff"; c.fillRect(0, 0, s.width, s.height);
-    }
-    const d = BATTLE.fuwariEdge;
+    if (!tintCv) tintCv = document.createElement("canvas");
+    if (tintCv.width !== img.naturalWidth) { tintCv.width = img.naturalWidth; tintCv.height = img.naturalHeight; }
+    const c = tintCv.getContext("2d");
+    c.globalCompositeOperation = "source-over"; c.clearRect(0, 0, tintCv.width, tintCv.height); c.drawImage(img, 0, 0);
+    c.globalCompositeOperation = "source-in"; c.fillStyle = color; c.fillRect(0, 0, tintCv.width, tintCv.height);
+    ctx.drawImage(tintCv, x - size / 2, y - size / 2, size, size);
+  }
+  function drawFuwariEdge(frame, x, y, size, color, width) {
+    const s = fuwariShape(frame, color || "#ffffff");
+    if (!s) return;
+    const d = width || BATTLE.fuwariEdge;
     for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; ctx.drawImage(s, x - size / 2 + Math.cos(a) * d, y - size / 2 + Math.sin(a) * d, size, size); }
   }
   // 飛んでいるときのコマ: 1→2→3 を順に切り替える
@@ -4600,6 +4632,14 @@ const Battle = (() => {
     }
     const explore1 = sortieNo === 1;   // 発見の旅: 下のまん中で待つ小さなふわり（1のコマ）
     const glow = player.glow, fy = y + Math.sin(t * 3) * 2;
+    const w3 = worldDef.id === 3;
+    if (loadout === "shield" && !explore1) {   // 11/22-10: とくぎ「守りアップ」中は、ふわりのまわりに薄い盾の輪（世界の色・半透明）を常に
+      const S = BATTLE.skillLook.shieldRing, col = worldDef.color || "#3a9a48";
+      ctx.save(); ctx.globalAlpha = S.fill; ctx.fillStyle = col;
+      ctx.beginPath(); ctx.arc(x, fy, S.r, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = S.alpha + 0.1 * Math.sin(t * 3); ctx.strokeStyle = col; ctx.lineWidth = S.w; ctx.stroke();
+      ctx.restore();
+    }
     if (glow > 0) {   // ことばを助けた瞬間: 光って、2のコマ
       const gr = ctx.createRadialGradient(x, fy, 4, x, fy, 46);
       gr.addColorStop(0, `rgba(255,248,200,${Math.min(1, glow / 0.35)})`);
@@ -4610,10 +4650,22 @@ const Battle = (() => {
     if (player.inv > 0 && Math.floor(t * 12) % 2 === 0) ctx.globalAlpha = 0.4;
     const frame = typhoon ? 3 : glow > 0 && !explore1 ? 2 : explore1 ? 1 : fuwariFrame();
     const size = (explore1 ? BATTLE.fuwariExploreSize : BATTLE.fuwariSize) * (1 + glow * 0.5);
-    if (!explore1 && worldDef.id >= 2) drawFuwariEdge(frame, x, fy, size);   // 11/22-2: 世界2・3の救出の旅は白い輪郭（2px）
+    if (w3) {   // 11/22-10 決定C: 世界3は足元にやわらかい影（黒25%のだ円。ふちをぼかす）
+      const sy = y + size * 0.46, rx = size * 0.36, g = ctx.createRadialGradient(x, sy, 0, x, sy, rx);
+      g.addColorStop(0, `rgba(0,0,0,${BATTLE.fuwariShadow3.alpha})`); g.addColorStop(0.6, `rgba(0,0,0,${BATTLE.fuwariShadow3.alpha * 0.7})`); g.addColorStop(1, "rgba(0,0,0,0)");
+      const a0 = ctx.globalAlpha; ctx.globalAlpha = 1;
+      ctx.save(); ctx.translate(x, sy); ctx.scale(1, 0.32); ctx.translate(-x, -sy); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, sy, rx, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      ctx.globalAlpha = a0;
+    }
+    if (w3) drawFuwariEdge(frame, x, fy, size, BATTLE.fuwariEdge3.color, BATTLE.fuwariEdge3.w);   // 11/22-10: 世界3は救出の旅・発見の旅とも濃い紫の輪郭（2.5px）
+    else if (!explore1 && worldDef.id >= 2) drawFuwariEdge(frame, x, fy, size);   // 11/22-2: 世界2の救出の旅は白い輪郭（2px）
     if (!drawFuwariArt(frame, x, fy, size)) {   // 絵の読みこみ前は、白い四角
       ctx.fillStyle = "#fffdf7"; ctx.strokeStyle = "#c9b98f"; ctx.lineWidth = 2;
       roundRect(x - 18, fy - 16, 36, 32, 6); ctx.fill(); ctx.stroke();
+    } else if (guardT > 0 && Math.floor(t * BATTLE.skillLook.rainbow * 2) % 2 === 0) {   // 11/22-10: 無敵タイム中は虹色に点滅（色が回る）
+      const a0 = ctx.globalAlpha; ctx.globalAlpha = a0 * 0.6;
+      drawFuwariTint(frame, x, fy, size, `hsl(${Math.floor(t * 360) % 360},95%,60%)`);
+      ctx.globalAlpha = a0;
     }
     ctx.globalAlpha = 1;
     if (player.notice > 0) {   // 1回目の語句に反応した「！」
@@ -5528,6 +5580,37 @@ const Battle = (() => {
     ctx.beginPath(); ctx.arc(b.x, b.y, b.r + 6, 0, Math.PI * 2); ctx.stroke();
     ctx.restore();
   }
+  // 11/22-10 決定A: 必殺ワザ「パワー全開」中は画面の縁が赤く光る。「パワー全開」「無敵タイム」中は上に帯と残り秒数（切れる1秒前から点滅）
+  //   帯の場所: ふつうは上（y 58。ラストチャンスと同じ形）。お題の問題文が上に出ているときはその下、ラストチャンスの帯が出ているときはその下
+  function drawSkillActive() {
+    const L = BATTLE.skillLook;
+    if (boostT > 0) {
+      const a = L.edgeRed * Math.min(1, boostT / 0.3) * (0.85 + 0.15 * Math.sin(t * 6));
+      const rg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.42, W / 2, H / 2, Math.max(W, H) * 0.72);
+      rg.addColorStop(0, "rgba(235,40,30,0)"); rg.addColorStop(1, `rgba(235,40,30,${a})`);
+      ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
+    }
+    const list = [];
+    if (boostT > 0) list.push({ T: boostT, key: "boost", col: "rgba(214,52,30,0.93)" });
+    if (guardT > 0) list.push({ T: guardT, key: "guard", col: "rgba(200,138,12,0.93)" });
+    if (!list.length) return;
+    let y = 58;
+    if (odai && !(odai.intro > 0)) y = odaiTop() + 22;
+    if (lastT > 0) y = Math.max(y, 140);
+    ctx.save(); ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    for (const b of list) {
+      const blink = b.T <= L.blinkLast && Math.floor(t * 8) % 2 === 0;
+      const label = tx("skills.active." + b.key, { n: Math.ceil(b.T) });
+      const fs = 17; ctx.font = font(fs);
+      const tw = ctx.measureText(label).width;
+      ctx.globalAlpha = blink ? 0.3 : 1;
+      ctx.fillStyle = b.col; roundRect(W / 2 - tw / 2 - 14, y - fs * 0.75, tw + 28, fs * 1.5, fs * 0.75); ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = "#ffffff"; ctx.fillText(label, W / 2, y + 1);
+      y += fs * 1.5 + 6;
+    }
+    ctx.restore();
+  }
   function drawSkillButtons() {
     const bs = skillButtons();
     for (const b of bs) drawSkillButton(b);
@@ -5548,6 +5631,11 @@ const Battle = (() => {
       ctx.fillStyle = g2; ctx.beginPath(); ctx.arc(b.x, b.y, b.r * (1.6 + 1.0 * k), 0, Math.PI * 2); ctx.fill();
     }
     const pulse = full ? 0.5 + 0.5 * Math.sin(t * 6) : 0, r = b.r * (1 + pulse * 0.08);
+    if (loadout === "bomb" && !used) {   // 11/22-10: とくぎ「ゲージ2倍速」中は、ゲージの枠が光る（ゆっくり明るく暗く）
+      ctx.save(); ctx.shadowColor = BATTLE.skillLook.gaugeGlow; ctx.shadowBlur = 10 + 6 * Math.sin(t * 3);
+      ctx.strokeStyle = BATTLE.skillLook.gaugeGlow; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(b.x, b.y, r + 2, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+    }
     if (full) {
       const g = ctx.createRadialGradient(b.x, b.y, r * 0.6, b.x, b.y, r * 1.7);
       g.addColorStop(0, C + "88"); g.addColorStop(1, C + "00");

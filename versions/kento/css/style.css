@@ -1006,3 +1006,22 @@ button.ub.ub-s { width: auto; padding: 5px 12px 6px; font-size: 14px; }
 .card .pic.framed { border-radius: 0; background: none; }
 .quiz-slots .slot.framed:has(img) { border-color: transparent; background: none; border-radius: 0; }
 .fx-card.has-pic.framed { border-color: transparent; background: none; border-radius: 0; }
+
+/* 11/22-10 決定D: 結果の画面で次にすべきボタン（色や形はそのまま）。右上に小さな「おすすめ」の札、1.2秒でゆっくり脈打つ */
+#cards-retake.recommend { position: relative; overflow: visible; animation: recPulse 1.2s ease-in-out infinite; }
+#cards-retake .rec-badge { position: absolute; top: -10px; right: -6px; background: #f08a1e; color: #fff; font-size: 11px; font-weight: bold; line-height: 1; padding: 4px 7px; border-radius: 9px; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); pointer-events: none; white-space: nowrap; }
+@keyframes recPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+@media (prefers-reduced-motion: reduce) { #cards-retake.recommend { animation: none; } }
+
+/* 11/22-10 決定B: カード図鑑のボタンの「NEW」の札（赤・小さく）と、1回だけの軽いはずみ */
+#btn-zukan { position: relative; overflow: visible; }
+#btn-zukan .zk-new { position: absolute; top: -9px; right: -6px; background: #e03a3a; color: #fff; font-size: 10px; font-weight: bold; line-height: 1; padding: 3px 6px; border-radius: 8px; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); pointer-events: none; }
+#btn-zukan.zk-bounce { animation: zkBounce .7s ease-out 1; }
+@keyframes zkBounce { 0% { transform: translateY(0); } 30% { transform: translateY(-8px); } 55% { transform: translateY(0); } 75% { transform: translateY(-3px); } 100% { transform: translateY(0); } }
+/* ステージ1を初めてクリアしたあとの図鑑の案内（ゲームのチュートリアルと同じ形: 暗い幕に丸い穴、光る輪、ふわりのついた吹き出し） */
+#zukan-tip { position: fixed; inset: 0; z-index: 60; cursor: pointer; }
+#zukan-tip .zt-ring { position: fixed; border-radius: 50%; box-shadow: 0 0 0 9999px rgba(25,35,30,0.45); border: 3px solid #fff6b8; filter: drop-shadow(0 0 8px rgba(255,220,90,.9)); animation: ztRing 1.2s ease-in-out infinite; }
+#zukan-tip .zt-bubble { position: fixed; display: flex; align-items: center; gap: 8px; box-sizing: border-box; padding: 12px 14px; background: rgba(255,253,245,.98); border: 3px solid #9cbf7c; border-radius: 18px; }
+#zukan-tip .zt-bubble img { width: 40px; height: 40px; flex: none; }
+#zukan-tip .zt-bubble p { margin: 0; font-size: 15px; word-break: keep-all; font-weight: bold; color: #3e4a34; line-height: 1.5; }
+@keyframes ztRing { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }

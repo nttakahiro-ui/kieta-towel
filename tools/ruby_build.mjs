@@ -81,6 +81,8 @@ function annotate(text, place) {
 
 const plainWord = c => String(c).replace(/[（(][^）)]*[）)]/g, "").trim();
 const known = new Set(WORDS.map(w => w.word));
+// 11/22-10: ゲームはお題のはずれを「同じステージの120語」からさがす。ほかのステージの120語（ステージ1の「化学繊維」など）は読みがなくなっていたので、同じステージにない語はみな、はずれの読みの表に入れる
+const knownIn = (x, st) => WORDS.some(w => w.word === x && w.stage === st);
 const others = new Map();   // お題のはずれ（120語にない語）→ 出てくる場所。お題になるのは中ボス・大ボスだけ（ザコの選択肢は、クイズの選択肢としてだけ出る）
 for (const w of WORDS) {
   const at = `ステージ${w.stage}「${w.word}」`;
@@ -90,11 +92,11 @@ for (const w of WORDS) {
   if (w.bossQ) annotate(w.bossQ, at + "のお題の問い");
   if (w.odaiQuestion) annotate(w.odaiQuestion, at + "のお題の問い");
   const o = w.bossQ && w.bossMiss ? w.bossMiss : w.choices.length === 2 && plainWord(w.choices[0]) === w.word ? plainWord(w.choices[1]) : null;
-  if (o && !known.has(o) && w.role !== "zako") others.set(o, (others.get(o) || []).concat(at + "のお題のはずれ"));
+  if (o && !knownIn(o, w.stage) && w.role !== "zako") others.set(o, (others.get(o) || []).concat(at + "のお題のはずれ"));
 }
 for (const s of STAGES) {
-  for (const [k, a] of Object.entries(s.nextAsk || {})) for (const x of typeof a === "string" ? [a] : [a.prev, a.after]) if (x && !known.has(x)) others.set(x, (others.get(x) || []).concat(`ステージ${s.id}「${k}」の次は？`));
-  for (const x of s.bossOrder || []) if (!known.has(x)) others.set(x, (others.get(x) || []).concat(`ステージ${s.id}の順に`));
+  for (const [k, a] of Object.entries(s.nextAsk || {})) for (const x of typeof a === "string" ? [a] : [a.prev, a.after]) if (x && !knownIn(x, s.id)) others.set(x, (others.get(x) || []).concat(`ステージ${s.id}「${k}」の次は？`));
+  for (const x of s.bossOrder || []) if (!knownIn(x, s.id)) others.set(x, (others.get(x) || []).concat(`ステージ${s.id}の順に`));
 }
 const kanaOf = {};   // はずれのことば → 読み（ルビをつける語だけ）
 for (const [o, places] of others) {
@@ -118,8 +120,8 @@ for (const [s, v] of Object.entries(dictVotes)) {
 fs.writeFileSync(path.join(K, "data/ruby.js"),
   "// ふりがな（ルビ）の表。tools/ruby_build.mjs で作る（11/7-18）。手で直すときは docs/ふりがな一覧_1107.md も直す\n" +
   "//   text: 文 → [[位置, 文字数, 読み], ...]（漢字のかたまりごと）。dict: 語 → 同じ形（表にない文を組み立てたとき、語を探してつける）\n" +
-  "//   kana: お題のはずれの語（120語にない語）の読み\n" +
-  "window.RUBY = " + JSON.stringify({ text: textTable, dict, kana: kanaOf }) + ";\n");
+  "//   kana: お題のはずれの語（同じステージの120語にない語）の読み。easy: 小学4年生までに習う漢字（この字だけの語にはルビをつけない。11/22-10）\n" +
+  "window.RUBY = " + JSON.stringify({ text: textTable, dict, kana: kanaOf, easy: [...EASY].join("") }) + ";\n");
 
 const list = [...rows.values()].sort((a, b) => (a.src > b.src ? -1 : a.src < b.src ? 1 : 0) || a.surface.localeCompare(b.surface, "ja"));
 const md = ["# ふりがな一覧（11/7-18。検討版）", "",
@@ -132,5 +134,9 @@ const md = ["# ふりがな一覧（11/7-18。検討版）", "",
   ...list.map(r => `| ${r.surface} | ${r.reading} | ${r.src} | ${r.dict || ""} | ${[...r.places].slice(0, 6).join("、")}${r.places.size > 6 ? ` ほか${r.places.size - 6}か所` : ""} |`),
   "", "## 同じ語で読みが2つ以上になったもの", "", "文の表にない文（組み立てた文）では、多い方の読みを使う。", "",
   ...(conflicts.length ? conflicts.map(c => "- " + c) : ["- なし"]), ""];
+// 11/22-10: お題のはずれの語の一覧（同じステージの120語にない語。ゲームはこの読みを使う）
+md.push("## お題のはずれの語（11/22-10追加）", "", "中ボス・大ボスのお題に出る、はずれの語（同じステージの120語にない語）。ルビは正解と同じ決まり（小学4年生までに習わない漢字をふくむ語だけ）。", "",
+  "| 語 | ルビ | 読み | 出てくる場所 |", "|---|---|---|---|",
+  ...[...others].map(([o, pl]) => `| ${o} | ${hard(o) ? "つける" : "つけない"} | ${kanaOf[o] || ""} | ${[...new Set(pl)].join("、")} |`), "");
 fs.writeFileSync(path.join(ROOT, "docs/ふりがな一覧_1107.md"), md.join("\n"));
 console.log("語", list.length, "文", Object.keys(textTable).length, "はずれ", Object.keys(kanaOf).length, "/", others.size, "読めない", list.filter(r => r.src === "読めなかった").map(r => r.surface).join(","), "\n2つの読み", conflicts.join(" ; "));

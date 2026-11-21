@@ -30,7 +30,9 @@ const Save = (() => {
   // found: ステージごとの、発見の旅で見つけたことばの id（10/25-15。「救出の旅をもう一度」で使う。救出で10のことばすべて助けたら消す）
   // openingSeen: オープニングを見たか（10/31-6。記録がない最初の起動のときだけ自動で出す）
   // skill: 選んでいる必殺ワザ、skillsSeen: 「手に入れた！」の画面を見たワザ（10/31-10 試作）
-  let data = { cards: {}, cleared: {}, retake: {}, best: {}, hero: null, introSeen: false, openingSeen: false, world: 1, gemsSeen: {}, found: {}, glowHint: false, warpSeen: {}, skill: "clear", skillsSeen: {} };
+  let data = { cards: {}, cleared: {}, retake: {}, best: {}, hero: null, introSeen: false, openingSeen: false, world: 1, gemsSeen: {}, found: {}, glowHint: false, warpSeen: {}, skill: "clear", skillsSeen: {}, zukanSeen: 0, zukanBounce: 0, zukanTip: false };
+  // zukanSeen: カード図鑑を最後に開いたときのカードの数（これより多ければ図鑑のボタンに「NEW」。11/22-10）。zukanBounce: 「NEW」ではずませたときの数（1回だけ）
+  // zukanTip: 「集めたカードはここで見られるよ」の案内（false＝まだ、"pending"＝ステージ1を初めてクリアした・次にステージ一覧で出す、true＝出した）
   // localStorage が使えなくても落ちないようにする
   function load() {
     try {
@@ -52,6 +54,10 @@ const Save = (() => {
         data.found = d.found || {};
         data.skill = d.skill || "clear";
         data.skillsSeen = d.skillsSeen || {};
+        // 11/22-10: 前の記録には無い。いまの数を「見た」とする（前からあそんでいる人に NEW を出さない）。ステージ1をクリアずみなら案内も出さない
+        data.zukanSeen = d.zukanSeen != null ? d.zukanSeen : Object.keys(data.cards).length;
+        data.zukanBounce = d.zukanBounce != null ? d.zukanBounce : data.zukanSeen;
+        data.zukanTip = d.zukanTip != null ? d.zukanTip : !!data.best[1];
       }
     } catch (e) { /* 読めないときは空のまま */ }
   }
@@ -446,6 +452,7 @@ const Main = (() => {
     const prev = Save.data.best[stage.id] || { score: 0 };
     const newBest = !retake && st.score > prev.score;
     if (!retake) Save.data.best[stage.id] = { score: Math.max(prev.score, st.score) };
+    if (stage.id === 1 && !Save.data.zukanTip) Save.data.zukanTip = "pending";   // 11/22-10: ステージ1を初めてクリア → 次にステージ一覧へ戻ったとき、図鑑の案内
     Save.store();
     showScreen("cards");
     $("screen-cards").scrollTop = 0;
@@ -522,7 +529,9 @@ const Main = (() => {
     const wd = window.WORLDS.find(w => w.id === wid);
     $("stages-world-title").textContent = tx("worlds.title", { id: wd.id, name: wd.name });
     $("screen-stages").style.backgroundImage = `url(assets/bg_world${wd.id}.jpg)`;
-    $("btn-zukan").innerHTML = `${tx("zukan.button")}<small>${Save.cardCount()}/${window.WORDS.length}</small>`;   // 11/7-33: 数は2行目に小さく（3つ並べても入るように）   // 下の「タイトルへ」の横（10/25-20）
+    // 11/22-10 決定B: 新しいカードを取ってから図鑑をまだ開いていない間は、右上に赤い「NEW」の小さな札（新しく取ったときに1回だけ軽くはずむ）
+    const nCards = Save.cardCount(), isNew = nCards > (Save.data.zukanSeen || 0), bounce = isNew && nCards > (Save.data.zukanBounce || 0);
+    $("btn-zukan").innerHTML = `${tx("zukan.button")}<small>${Save.cardCount()}/${window.WORDS.length}</small>` + (isNew ? `<span class="zk-new">${tx("zukan.newBadge")}</span>` : "");   // 11/7-33: 数は2行目に小さく（3つ並べても入るように）   // 下の「タイトルへ」の横（10/25-20）
     // いちばん上に、今いる世界の帯の絵（11/1。前は台座の扇形）。宝石が枠にはまる。タップでレシピブックへ
     const litSet = RecipeBook.litIds(Save.data.cards);
     $("stages-lead").textContent = tx("recipeBook.lead");
@@ -587,6 +596,23 @@ const Main = (() => {
     });
     showScreen("stages");
     $("screen-stages").scrollTop = 0;
+    const zb = $("btn-zukan");
+    zb.classList.remove("zk-bounce");
+    if (bounce) { void zb.offsetWidth; zb.classList.add("zk-bounce"); Save.data.zukanBounce = nCards; Save.store(); }
+    if (Save.data.zukanTip === "pending") setTimeout(() => { if ($("screen-stages").classList.contains("active") && Save.data.zukanTip === "pending") zukanTip(); }, 450);
+  }
+  // 11/22-10 決定B: ステージ1を初めてクリアして一覧に戻ったとき1回だけ、「カード図鑑」のボタンを丸で囲んで吹き出し（ほかのチュートリアルと同じ形。タップで消える）
+  function zukanTip() {
+    Save.data.zukanTip = true; Save.store();
+    const b = $("btn-zukan").getBoundingClientRect();
+    if (!b.width) return;
+    const ov = document.createElement("div"); ov.id = "zukan-tip";
+    const cx = b.left + b.width / 2, cy = b.top + b.height / 2, r = Math.max(b.width, b.height) / 2 + 12;
+    const vw = window.innerWidth, bw = Math.min(vw - 32, 343);
+    ov.innerHTML = `<div class="zt-ring" style="left:${cx - r}px;top:${cy - r}px;width:${r * 2}px;height:${r * 2}px"></div>`
+      + `<div class="zt-bubble" style="left:${Math.max(16, Math.min(vw - 16 - bw, cx - bw / 2))}px;width:${bw}px;bottom:${window.innerHeight - (cy - r) + 16}px"><img src="assets/fuwari_1.png" alt=""><p>${Cards.phraseHTML(tx("zukan.tip"))}</p></div>`;
+    ov.addEventListener("click", () => ov.remove());
+    document.body.appendChild(ov);
   }
   // ワープの会話の演出（10/25-18）: その世界へ初めてワープするときだけ。約10秒、画面のどこをタップしても最後に飛ぶ。2回目からは下の短い光
   //   会話の文は texts.js の worlds.warpTalk、秒数はここの WARP_TALK
@@ -737,6 +763,7 @@ const Main = (() => {
   // 11/7-40 決定: 図鑑を開くと、まず「扉」（世界1〜3の大きなボタン。世界の色・帯の絵・集めた数・宝石の数）。いちばん上に合計点の札（緑）。
   //   今いる世界のボタンを少し強調。ボタンを押すと、その世界の4ステージ分のカード（上に「◀ 図鑑の扉へ」）
   function toZukan() {
+    Save.data.zukanSeen = Save.data.zukanBounce = Save.cardCount(); Save.store();   // 11/22-10: 図鑑を開いた → 「NEW」の札は消える
     Sound.play("zukan");   // カード図鑑はタイトルの曲（11/7-4）
     const here = Save.data.world || 1, lit = RecipeBook.litIds(Save.data.cards);
     const img = `<img class="zk-title-img" src="assets/zukan_title.png" alt="${tx("zukan.title")}">`;
