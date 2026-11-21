@@ -189,6 +189,7 @@ const BATTLE = {
   shellVeil: 0.22,             // 殻が語句の上にかかる濃さ（0〜1。読みやすさのため、うすく）
   // ステージ1の案内（10/21-2）。初めてそれが起きた瞬間にだけ、1〜2行で出す。文は data/texts.js の hints
   hintTime: 3.4,               // 案内を出す秒数
+  groundMarkHintAt: 1.5,       // 11/22-6（指摘49）: 世界2の発見の旅で、芽のマークの説明を出す時刻（秒）
   hintSlow: 1,                 // 案内を出すとき、ゆっくりにする秒数
   odaiHintExtra: 2,            // ステージ1の初回のお題（案内を添えるとき）、読む時間にさらに足す秒数（10/25-16 に1.5 → 2）
   odaiReadPerChar: 0.1,        // お題の問題文を読む時間: 1文字あたりの秒数（10/25-16。50文字なら 0.1×50＋1 ＝ 6秒）
@@ -200,7 +201,7 @@ const BATTLE = {
   shellNearDone: 0.2,          // 殻の残りがこの割合以下（ほどけるまでの8割まで光を当てた）になると、黄色く光る（あと少しの印。10/25-16）
   tutCloseAfter: 0.8,          // 紙芝居（デバッグ）の札を閉じられるまでの秒数
   // チュートリアル（11/7-20）: 止まる → ふわりの吹き出しで説明 → タップ → 1回やってみる → 「OK！」→ 再開。文は data/texts.js の lessons
-  lesson: { tapAfter: 0.6, okTime: 0.9, rearSpeed: 45, moveDist: 80 },   // tapAfter ＝ 説明が出てからタップを受けるまでの秒、okTime ＝「OK！」を出す秒、rearSpeed ＝ ステージ9の練習の虫の速さ（px/秒）、moveDist ＝「ふわりを動かそう」で動かす長さ（px）
+  lesson: { treeSpeed: 1.5, tapAfter: 0.6, okTime: 0.9, rearSpeed: 45, moveDist: 80 },   // treeSpeed ＝ ステージ1の木の「やってみる」の流れの速さの倍率（11/22-6: 1.5倍で7.5秒→5秒）、tapAfter ＝ 説明が出てからタップを受けるまでの秒、okTime ＝「OK！」を出す秒、rearSpeed ＝ ステージ9の練習の虫の速さ（px/秒）、moveDist ＝「ふわりを動かそう」で動かす長さ（px）
 
   // 旅の名前と表紙の文は data/texts.js の trips（10/21-1 に移した）
   // 本番の表紙（10/3-9）
@@ -297,6 +298,7 @@ const BATTLE = {
   gaugeHit: 8,                 //   被弾する（元気が減る）。中ボス・大ボスが出た瞬間は満タンになる
   skillButtonGap: 10,          // 左下の3つのボタンのあいだ（px）
   skillNameSize: 11,           // ボタンの上の名前の字の大きさ（px。11/22-1: 前は 9〜10。12 だと「パワー全開」と「無敵タイム」がくっつく。並びの上に1つだけ「必殺ワザ」を9pxで）
+  choiceSkill: { size: 11, right: 64 },   // 11/22-6（指摘54）: 選ぶ画面の下の必殺ワザの説明の字の大きさ（px）と、右にあける幅（一時停止のボタンの分）
   pickedTime: 0.6,             // とくぎを選んでから扉が出るまで（秒）。そのあいだ選んだ札の右上に「えらんだ」（11/22-1）
   foundLift: 18,               // 発見の旅の「見つけた！」を、ことばの上のはしからさらに上げる量（px。11/22-1）
   powerFxLift: 64,             // 「パワーアップ！」の高さ: ふわりの中心からの上げ幅（px。ふわりの高さ分。11/22-1。前は 110）
@@ -366,7 +368,8 @@ const EXPLORE_MOVES = {
   //   speed ＝ 漂う速さ（px/秒）、spin ＝ 回る速さ（ラジアン/秒）、maxOn ＝ 同時に漂う数の上限、gap ＝ 次のことばが出てくる間隔（秒）。くっつき・照らすは入れていない
   //   chars ＝ 同時に漂う数を「chars ÷ そのステージのことばの平均の文字数」（切り捨て、minOn〜maxOn）にする（10/31-12 決定: 長いことばのステージほど少なく。ステージ9・10 は5つ、11・12 は4つ）
   //   dim ＝ まっすぐでないことばの濃さ（10/31-12 決定: 薄くして、まっすぐになった金色のことばだけ浮き出るように）
-  space:   { box: true, space: true, speed: 24, spin: 0.55, align: Math.PI / 2, turn: 0.5, hold: 1, maxOn: 6, minOn: 3, chars: 26, gap: 1.2, dim: 0.35 },   // 10/31-14 決定: 易しく（回る速さ半分・判定60度・押さえると0.5秒で向き直る。前は spin 1.1・align 0.8）。11/7-8 決定: ねらえる時間を1.5倍に（判定 60度 → 90度。回る速さはそのまま）
+  //   11/22-6 決定（指摘93）: sepK・sepPad ＝ ことばどうしが重ならないための円（半径＝ことばの長さの半分×sepK＋sepPad の半分）、spawnTries ＝ 出る位置の候補の数（いちばん空いているところに出す）
+  space:   { box: true, space: true, sepK: 1, sepPad: 10, spawnTries: 24, speed: 24, spin: 0.55, align: Math.PI / 2, turn: 0.5, hold: 1, maxOn: 6, minOn: 3, chars: 26, gap: 1.2, dim: 0.35 },   // 10/31-14 決定: 易しく（回る速さ半分・判定60度・押さえると0.5秒で向き直る。前は spin 1.1・align 0.8）。11/7-8 決定: ねらえる時間を1.5倍に（判定 60度 → 90度。回る速さはそのまま）
 };
 
 // ===== 必殺ワザ（11/6-6 決定）: 3つ。名前と説明は texts.js の skills。最初から全部持っている
@@ -1159,6 +1162,7 @@ const Battle = (() => {
     if (choiceFree && opts.onFirstChoice) opts.onFirstChoice();   // 初めて選んだ（次からは10秒の時間制限）
     choiceFree = false;
     loadout = id;
+    try { if (typeof Save !== "undefined") { Save.data.loadout = id; Save.store(); } } catch (e) {}   // 11/22-6 決定（指摘55・56）: 選んだとくぎを覚えておき、次のステージの選ぶ画面で「えらび中」の印をつける
     if (id === "power") powerBonus = basePower() + 1;
     if (id === "shield") player.hp = maxHp();   // 守りアップ: 元気の上限が1.5倍（11/6-6）
     if (id === "bomb") gaugeMul = BATTLE.gaugeFastMul;   // ゲージ2倍速（11/6-6。前は「救出の旅の最初からゲージ満タン」）
@@ -1169,7 +1173,10 @@ const Battle = (() => {
   function choiceRects() {
     const a = choiceArtRect();
     if (a) {   // 絵があるときは、見本 sample_bg_start のボタンの位置（絵の幅の 11.5〜88.5%、高さの 45.8% から）
-      const bw = a.w * 0.77, bh = Math.max(62, a.h * 0.112), gap = a.h * 0.013, x = a.x + a.w * 0.115, y0 = a.y + a.h * 0.458;
+      const bw = a.w * 0.77, bh = Math.max(62, a.h * 0.112), gap = a.h * 0.013, x = a.x + a.w * 0.115;
+      // 11/22-6 決定（指摘54）: 下に必殺ワザ3つの説明を出す。入りきらなければ、ボタンを上へずらす
+      const need = choiceSkillBox().h + 10, room = H - 8 - (a.y + a.h * 0.458 + 3 * bh + 2 * gap);
+      const y0 = a.y + a.h * 0.458 - Math.max(0, need - room);
       return LOADOUTS.map((l, i) => ({ id: l.id, x, y: y0 + i * (bh + gap), w: bw, h: bh }));
     }
     const bw = Math.min(W - 48, 320), bh = 62, gap = 12, x = W / 2 - bw / 2, y0 = H * 0.42;
@@ -1548,7 +1555,7 @@ const Battle = (() => {
     player.hurt = Math.max(0, player.hurt - dt);
     player.red = Math.max(0, (player.red || 0) - dt);
     if (banner) { banner.t -= dt; if (banner.t <= 0) banner = null; }
-    const sc = frozen() ? 0 : scrollSpeed() * (evActive("reverse") ? -1 : 1) * convFast();   // 時間止めのあいだは地面も止まる。救出の旅の出来事「コンベアが逆」では、地面の流れが逆（上へ。10/31-13）
+    const sc = frozen() ? 0 : scrollSpeed() * (evActive("reverse") ? -1 : 1) * convFast() * (lesDo() && les.id === "tree" ? BATTLE.lesson.treeSpeed : 1);   // 11/22-6: 木のチュートリアルの「やってみる」は流れを速く（7.5秒→5秒）   // 時間止めのあいだは地面も止まる。救出の旅の出来事「コンベアが逆」では、地面の流れが逆（上へ。10/31-13）
 
     // 地面・雲の影・綿毛（奥行きのために、速さを変えて流す）
     for (const s of terrain) s.y += sc * dt;
@@ -1665,9 +1672,9 @@ const Battle = (() => {
       fillerTimer = BATTLE.fillerInterval / Math.max(0.1, dn) * rand(0.8, 1.2);
     }
 
-    // 自機の弾（自動で連射）
+    // 自機の弾（自動で連射）。11/22-6 決定（指摘59）: お題の問題文が出ている（読む時間の）あいだは撃たない。閉じたらまた撃つ
     shotTimer -= dt;
-    if (shotTimer <= 0) {
+    if (shotTimer <= 0 && !(odai && odai.intro > 0)) {
       // ふわりの段階で弾の数が増える
       // お題バトルの間もパワーの段は保つ（11/1 決定。前は正面1本だけ）。広がる角度だけ狭くして、正面寄りに
       const nk = odai ? BATTLE.odaiSpread : 1;
@@ -1899,7 +1906,7 @@ const Battle = (() => {
         if (f.layer !== "air" || f.hp <= 0 || f.delay > 0) continue;
         if (f.les && !(les && les.id === "s9rear")) continue;   // 練習の虫は、説明が出るまで玉が当たらない（11/7-28）
         f.orbCd = Math.max(0, (f.orbCd || 0) - dt);
-        const oi = f.orbCd <= 0 ? orbPos().findIndex(o => Math.hypot(o.x - f.x, o.y - f.y) < f.r + BATTLE.orbs.r) : -1;
+        const oi = f.orbCd <= 0 && !(odai && odai.intro > 0) ? orbPos().findIndex(o => Math.hypot(o.x - f.x, o.y - f.y) < f.r + BATTLE.orbs.r) : -1;
         if (oi >= 0 && f.type === "fuwaStar") {   // ふわふわ星は玉では倒れず、押し返される（11/7-31）
           const C = NEW_FOES.fuwaStar, a = Math.atan2(f.y - player.y, f.x - player.x);
           f.orbCd = BATTLE.orbs.cd; orbFlash[oi] = 0.3; Sound.se("boing"); f.pushT = C.pushT; f.pvx = Math.cos(a) * C.push; f.pvy = Math.sin(a) * C.push; f.flash = 0.12;
@@ -1948,7 +1955,7 @@ const Battle = (() => {
     const inObstacle = (x, y) => obs.some(o => !o.pinch && Math.hypot(x - o.x, y - o.y) < o.r);   // 出来事「はさまれる」の障害物は、通る道をせまくするだけ（光と弾はさえぎらない。11/1-3）
 
     // 雑魚に先に当たる（「雑魚のうしろ」の語句は、前の雑魚をどけないと弾が届かない）
-    for (const s of shots) {
+    if (!(odai && odai.intro > 0)) for (const s of shots) {   // 11/22-6（指摘59）: お題の問題文が出ているあいだは、当たり判定もしない
       let hit = false;
       if (inObstacle(s.x, s.y)) { s.y = -999; continue; }   // 木は弾をさえぎる
       for (const f of fillers) {
@@ -2382,7 +2389,7 @@ const Battle = (() => {
     if (seq) for (const e of enemies) if (e.pattern === "odai") { e.seqNo = seq.indexOf(e.word); e.dummy = true; e.num = 0; }   // 3つを順に: 正しい順のことばだけ削れる（orderHit）
     // お題のあいだは、雑魚と雑魚の弾を出さない（10/3-12）。始まる瞬間に画面の雑魚と弾を消す（殻から飛ぶ弾は、読む時間が終わってから）
     fillers.forEach(f => addPop(f.x, f.y, "#fff8d8", 0.8, f.layer === "ground"));
-    fillers = []; ebullets = []; odaiLater = [];
+    fillers = []; ebullets = []; odaiLater = []; shots = [];   // 11/22-6（指摘59）: 飛んでいる自機の弾も消す（問題文のあいだは弾を出さない）
     slow = odai.intro;   // 吸い込みと同じスロー。読む時間をつくる（10/25-16: 読む時間の長さに合わせる。前は最初のお題の案内でのばした分が消えていた）
     // （「お題だよ！」の一言は、問題文と重なるので出さない。説明はチュートリアルで。10/7-1）
     Sound.se("odai");
@@ -2782,9 +2789,16 @@ const Battle = (() => {
   }
   const boxLocked = b => b.lock && (exMove.keys > 0 ? explore.keys <= 0 : !explore.keyFound);   // かぎがなくて開けられない（11/22-5: ステージ7は持っているかぎの数で決まる）
   const boxCanOpen = b => b.fake || (!boxLocked(b) && (!exMove.open || boxFace(b) === 0));
+  // 11/22-6 決定（指摘49）: 世界2の発見の旅で、左の札の横の芽のマーク（救出の旅で地上に出ることば）の意味を、最初の1回だけ小さく出す
+  function groundMarkHint() {
+    if (!BATTLE.groundMark || !groundIds || !groundIds.size || hintCard || les || typeof TutSave === "undefined" || TutSave.load().groundMark) return;
+    TutSave.mark("groundMark");
+    hintCard = { text: tx("hints.groundMark"), t: BATTLE.hintTime + 1 };   // 発見の旅の上の小さな案内（順番待ちにはのせない）
+  }
   function updateBoxes(dt) {
     const ex = explore, mv = exMove, words = exploreWords();
     if (!ex.queue) boxSetup();
+    if (ex.t > BATTLE.groundMarkHintAt && !lessonOn("s5box")) groundMarkHint();
     evBanners();
     const dir = convDir(), md = lesDo() ? 0 : dt;   // チュートリアルの「やってみる」のあいだは、コンベアが止まる（押さえる時間は進む）
     ex.belt += dir * mv.speed * md;
@@ -4618,7 +4632,7 @@ const Battle = (() => {
     ctx.fillRect(0, 0, W, H);
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     if (sortieNo === 2 && sortieStep === "say") drawChoiceSay();
-    else if (sortieNo === 2 && sortieStep === "choice") { drawChoice(); drawPicked(); } else if (door) drawDoor();
+    else if (sortieNo === 2 && sortieStep === "choice") { drawChoice(); if (choiceArtRect()) drawChoiceSkills(); drawChoiceCurrent(); drawPicked(); } else if (door) drawDoor();
     ctx.restore();
   }
 
@@ -4791,17 +4805,45 @@ const Battle = (() => {
     const avg = ex.queue.reduce((a, b) => a + baseChars(b.word).length, 0) / Math.max(1, ex.queue.length);
     ex.maxOn = exMove.on || (exMove.chars ? Math.max(exMove.minOn || 1, Math.min(exMove.maxOn, Math.floor(exMove.chars / avg))) : exMove.maxOn);   // 同時に漂う数（長いことばのステージほど少なく）。11/1-2 決定: stages.js の explore.on で決める（9・10 は4つ、11・12 は3つ）
   }
+  // 11/22-6 決定（指摘93）: 世界3の回ることばは、回っても重ならないように、ことばの長さの半分（＋すき間）を半径とする円で、ぶつかりを見る
+  const spaceR = b => b.w / 2 * (exMove.sepK || 1) + (exMove.sepPad || 0) / 2;
+  function spaceSeparate(minX, maxX, minY, maxY) {
+    if (lesDo()) return;   // チュートリアルの「やってみる」のあいだは、ことばを動かさない
+    const live = explore.boxes.filter(b => !b.open);
+    for (let i = 0; i < live.length; i++) for (let j = i + 1; j < live.length; j++) {
+      const a = live[i], c = live[j], dx = c.x - a.x, dy = c.y - a.y, d = Math.hypot(dx, dy) || 0.01, min = spaceR(a) + spaceR(c);
+      if (d >= min) continue;
+      const nx = dx / d, ny = dy / d, push = min - d;
+      const ka = a.grab ? 0 : c.grab ? 1 : 0.5, kc = 1 - ka;   // 押さえていることばは動かさない
+      a.x -= nx * push * ka; a.y -= ny * push * ka; c.x += nx * push * kc; c.y += ny * push * kc;
+      const rv = (c.vx - a.vx) * nx + (c.vy - a.vy) * ny;   // 近づいているときだけ、ぶつかった向きの速さを入れかえる（はね返る）
+      if (rv < 0) { a.vx += rv * nx; a.vy += rv * ny; c.vx -= rv * nx; c.vy -= rv * ny; }
+    }
+    for (const b of live) {   // 押しもどしで画面の外へ出たら、中へもどす
+      b.x = Math.max(minX + b.w / 2, Math.min(maxX - b.w / 2, b.x));
+      b.y = Math.max(minY + b.h / 2, Math.min(maxY - b.h / 2, b.y));
+    }
+  }
   function updateSpace(dt) {
     const ex = explore, mv = exMove, words = exploreWords();
     if (!ex.queue) spaceSetup();
     const minX = stripRight() + 8, maxX = W - 8, minY = 96, maxY = H * 0.78;
     while (ex.queue.length && ex.t >= ex.nextBoxAt && ex.boxes.filter(b => !b.open).length < ex.maxOn) {
       const b = ex.queue.shift(), a = Math.random() * Math.PI * 2;
-      Object.assign(b, { x: rand(minX + b.w / 2, maxX - b.w / 2), y: rand(minY + b.h, maxY - b.h), vx: Math.cos(a) * mv.speed, vy: Math.sin(a) * mv.speed });
+      // 11/22-6 決定（指摘93）: 出る位置は、いま漂っていることばからいちばん離れたところ（候補を spawnTries 個えらんで、いちばん空いているもの）
+      let best = null, bestGap = -Infinity;
+      for (let k = 0; k < (mv.spawnTries || 1); k++) {
+        const x = rand(minX + b.w / 2, maxX - b.w / 2), y = rand(minY + b.h, maxY - b.h);
+        const gap = Math.min(Infinity, ...ex.boxes.filter(q => !q.open).map(q => Math.hypot(q.x - x, q.y - y) - spaceR(q) - spaceR(b)));
+        if (gap > bestGap) { bestGap = gap; best = { x, y }; }
+        if (gap === Infinity) break;
+      }
+      Object.assign(b, { x: best.x, y: best.y, vx: Math.cos(a) * mv.speed, vy: Math.sin(a) * mv.speed });
       ex.boxes.push(b);
       ex.nextBoxAt = ex.t + mv.gap;
     }
     if (ex.queue.length && ex.boxes.filter(b => !b.open).length >= ex.maxOn) ex.nextBoxAt = Math.max(ex.nextBoxAt, ex.t);   // いっぱいのあいだは、1つ見つかったらすぐ次を出す
+    spaceSeparate(minX, maxX, minY, maxY);   // 11/22-6（指摘93）: 漂うことばどうしが重ならないように、近づいたら押しもどして、はね返す
     let pressed = null, pressedD = 0;
     for (const b of ex.boxes) {
       if (b.open) { b.openT += dt; continue; }
@@ -5238,6 +5280,40 @@ const Battle = (() => {
     });
   }
 
+  // 11/22-6 決定（指摘54）: 選ぶ画面の下に、必殺ワザ3つの説明を小さくまとめる（見出し「必殺ワザ」と、1つにつき「名前：説明」。右下の一時停止のボタンにかからない幅）
+  function choiceSkillBox() {
+    ctx.save(); ctx.font = font(BATTLE.choiceSkill.size);
+    const w = W - 16 - BATTLE.choiceSkill.right, lines = SKILL_IDS.map(id => wrapText(`${tx("skills." + id + ".name")}：${tx("skills." + id + ".desc")}`, w - 20));
+    ctx.restore();
+    const lh = BATTLE.choiceSkill.size + 4, n = lines.reduce((m, l) => m + l.length, 0);
+    return { x: 16, w, lines, lh, h: 26 + n * lh + 8 };
+  }
+  function drawChoiceSkills() {
+    const b = choiceSkillBox(), y = H - 8 - b.h;
+    ctx.save();
+    ctx.fillStyle = "rgba(255,252,242,0.92)"; ctx.strokeStyle = tint("rgba(220,174,60,0.6)"); ctx.lineWidth = 1.5;
+    roundRect(b.x, y, b.w, b.h, 12); ctx.fill(); ctx.stroke();
+    ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    ctx.font = font(12); ctx.fillStyle = "#8a5a10"; ctx.fillText(tx("skills.head"), b.x + 10, y + 14);
+    ctx.font = font(BATTLE.choiceSkill.size); ctx.fillStyle = "#4b5e3a";
+    let yy = y + 26 + b.lh / 2;
+    b.lines.forEach(ls => ls.forEach((l, i) => { ctx.fillText(l, b.x + 10 + (i ? 12 : 0), yy); yy += b.lh; }));
+    ctx.restore();
+  }
+  // 11/22-6 決定（指摘55・56）: 前に選んだとくぎに「えらび中」の札（右上。選んだあとは「えらんだ」にかわる）
+  function drawChoiceCurrent() {
+    const id = typeof Save !== "undefined" && Save.data && Save.data.loadout;
+    const r = !picked && id && choiceRects().find(q => q.id === id);
+    if (!r) return;
+    ctx.save();
+    ctx.lineWidth = 4; ctx.strokeStyle = tint("#6f9a4a"); roundRect(r.x - 2, r.y - 2, r.w + 4, r.h + 4, 20); ctx.stroke();
+    ctx.font = font(12); const tw = ctx.measureText(tx("choice.current")).width + 16, th = 22;
+    ctx.translate(r.x + r.w - 10 - tw / 2, r.y + 2);
+    ctx.fillStyle = "#ffffff"; ctx.strokeStyle = tint("#6f9a4a"); ctx.lineWidth = 2;
+    roundRect(-tw / 2, -th / 2, tw, th, th / 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = tint("#4f7a36"); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(tx("choice.current"), 0, 1);
+    ctx.restore();
+  }
   // 選んだ札の右上の「えらんだ」（11/22-1）: 世界の色の札に白い字。ぽんと出る
   function drawPicked() {
     if (!picked) return;
