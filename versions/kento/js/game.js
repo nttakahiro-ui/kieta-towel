@@ -67,6 +67,7 @@ const BATTLE = {
   fillerAvoid: 90,             // 語句のまわり、この距離（px）には雑魚を出さない
   fillerFireScale: 1.5,         // 雑魚が撃つ間隔の倍率（大きいほど撃たない）
   seedScore: 200,             // 森の種（世界2・3も同じ役の回復アイテム）を取ったときの点（11/7-35 決定）。元気の回復は今のまま
+  lesSeedY: 0.4,              // 11/22-13 決定（指摘112）: ステージ1のチュートリアル「種を取る」の種は、倒した位置が高くても画面の上から40%の高さから落とす（ふわりが届く高さ。待たずに取れるように）
   dropRate: 0.15,              // 雑魚が「綿のたね」を落とす確率（0〜1）。雑魚が増えたので下げた
   popScale: 1.6,               // 雑魚を倒したときの花の大きさ
   healItem: 8,                 // 綿のたねで回復する体力
@@ -2592,7 +2593,7 @@ const Battle = (() => {
     // 11/7-30 不具合: チュートリアル「虫をやっつけると種が落ちる」のあとでも、種は15%でしか落ちず、出ないことが多かった。
     //   虫のチュートリアルのあと、種のチュートリアルがまだのあいだは、やっつけた虫が必ず種を落とす（画面に種がないとき）
     const lesSeed = hintShown.bug && lessonOn("seed") && !items.length;
-    if (lesSeed || Math.random() < BATTLE.dropRate) seedsDropped++, items.push({ x: Math.max(stripRight() + 14, Math.min(W - 14, f.x)), y: Math.min(f.y, H - 90), age: 0 });   // たねは、左の帯の下や画面の端に落ちないように（11/7-28）。下のボタンの帯の中にも生まれない（うしろから来た虫など。11/7-35）
+    if (lesSeed || Math.random() < BATTLE.dropRate) seedsDropped++, items.push({ x: Math.max(stripRight() + 14, Math.min(W - 14, f.x)), y: Math.min(lesSeed ? Math.max(f.y, H * BATTLE.lesSeedY) : f.y, H - 90), age: 0 });   // たねは、左の帯の下や画面の端に落ちないように（11/7-28）。下のボタンの帯の中にも生まれない（うしろから来た虫など。11/7-35）
   }
 
   // 地上の雑魚が割れる（11/7-23）: とがったかけらが回りながら飛び散り、光の粒も散る。音は「パリン」
