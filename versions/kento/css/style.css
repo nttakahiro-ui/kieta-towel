@@ -711,6 +711,17 @@ body { position: fixed; inset: 0; }
 .art-slot .gem-pic { height: var(--gh); width: auto; display: block; }
 .gem-hole { height: calc(var(--gh) * 1.14); width: auto; display: block; filter: brightness(0) blur(.5px); opacity: .32; }   /* くぼみ: 宝石の絵を黒くうすく、少し大きく */
 .gem-pic.ghost { filter: grayscale(1); opacity: .4; }   /* まだ取っていない宝石: 同じ絵を灰色・うすく（彩度0、不透明度40%） */
+/* 11/22-7: 取った宝石の輝き（鳥山さんの実機確認 ❷）。明るさ・彩度 +12%、外側に世界色（--gw）のやわらかい光（半径4px）、左上に白い小さな光の点、3.5秒に1回の小さなきらめき（--gd で宝石ごとにずらす） */
+.gem-lit { position: relative; display: inline-grid; place-items: center; vertical-align: middle; }
+.gem-lit > .gem-pic { grid-area: 1 / 1; filter: brightness(1.12) saturate(1.12) drop-shadow(0 0 4px var(--gw)); }
+.gem-lit::before { content: ""; position: absolute; left: 22%; top: 18%; width: 18%; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle, #fff 0 30%, rgba(255,255,255,.55) 45%, rgba(255,255,255,0) 70%); pointer-events: none; z-index: 1; }
+.gem-twk { position: absolute; left: 58%; top: -2%; width: 38%; aspect-ratio: 1; pointer-events: none; z-index: 1; opacity: 0;
+  background: linear-gradient(90deg, transparent 44%, #fff 50%, transparent 56%), linear-gradient(0deg, transparent 44%, #fff 50%, transparent 56%), radial-gradient(circle, #fff 0 12%, rgba(255,255,255,0) 40%);
+  animation: gemTwk 3.5s ease-in-out var(--gd, 0s) infinite; }
+@keyframes gemTwk { 0%, 82% { opacity: 0; transform: scale(.3) rotate(0deg); } 90% { opacity: 1; transform: scale(1) rotate(45deg); } 100% { opacity: 0; transform: scale(.4) rotate(90deg); } }
+.art-slot .gem-lit { height: var(--gh); aspect-ratio: 0.86; }
+.art-slot .gem-lit > .gem-pic, .wp-btn .wp-band .gem-lit > img { width: 100%; height: 100%; object-fit: contain; }
+.wp-btn .wp-band .gem-lit { height: 100%; }   /* ワープの帯は、まだの宝石（帯の img の決まりで枠いっぱい）と同じ大きさ */
 .gem-halo { width: 105%; height: 105%; border-radius: 50%; pointer-events: none; }
 .gem-next { width: 112%; aspect-ratio: 1; box-sizing: border-box; border: 2px solid #e0b03a; border-radius: 50%; animation: rbNext 1.2s ease-in-out .9s infinite both; }
 .world-gems:has(.art-band) { width: 100%; margin: 4px 0 0; }   /* ステージ一覧の上の帯は、画面の幅いっぱい */

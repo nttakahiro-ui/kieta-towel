@@ -186,6 +186,8 @@ const BATTLE = {
   hintAlpha: 0.6,              // きらっと光る強さ（0＝光らない〜1）
   bugEvery: 5,                 // 飾りの虫が横切る間隔（秒）
   // 2回目の旅: ことばを包む殻（10/3-11。役割で分ける: ザコ＝綿毛のまゆ、中ボス＝いばら、大ボス＝霧）。見た目はすべて仮
+  thornAlpha: [0.225, 0.25],   // 中ボスのいばら（文字にからむ草のつた）の濃さ [k が 0 のとき, k による増え分]。WORLD_LOOK に書いていない世界1・2はこれ（11/22-7: 文字が読みにくいので [0.45, 0.5] から半分に）
+  charEdgeOver: 4,             // 11/22-7: いばら・霧を描いたあと、文字の上にもう一度ふちを描く線の幅（4 ＝ 字の外へ2px）。WORLD_LOOK の textOver がある世界（世界3）はそちら
   shellVeil: 0.22,             // 殻が語句の上にかかる濃さ（0〜1。読みやすさのため、うすく）
   // ステージ1の案内（10/21-2）。初めてそれが起きた瞬間にだけ、1〜2行で出す。文は data/texts.js の hints
   hintTime: 3.4,               // 案内を出す秒数
@@ -395,11 +397,11 @@ const LOADOUT_VARS = { skill: "" };   // 持ち物「必殺ワザ」の説明の
 
 // ===== 世界ごとの殻・弾の色（10/31-10 試作。絵が来るまでの仮: 世界1の絵の色を変えただけ）。書いていない世界は世界1のまま
 //   thornWidth・thornAlpha ＝ いばらの太さ・濃さ（[k が 0 のとき, k による増え分]）。書いていない世界は世界1のまま
-//   textOver ＝ 1文字ずつの殻（いばら・霧）を描いたあと、文字をもう一度縁取りして上に描く（文字が殻にうもれないように）
+//   textOver ＝ 1文字ずつの殻（いばら・霧）を描いたあと、文字をもう一度縁取りして上に描く（文字が殻にうもれないように）。書いていない世界は BATTLE.charEdgeOver（11/22-7）
 const WORLD_LOOK = {
   2: { cocoon: "rgba(214,232,255,0.8)", fuzz: "#e4f0ff", mid: "#3f6a8f", boss: "#a8bcd8", bullet: { zako: "#1f5f8a", mid: "#2a3f9a", boss: "#2a2a6a", rim: "#bfe6ff" } },
   3: { cocoon: "rgba(238,226,255,0.8)", fuzz: "#f1e8ff", mid: "#8a70b0", boss: "#c4aee4", bullet: { zako: "#6a2a8a", mid: "#8a1f5a", boss: "#2a1a5a", rim: "#ffd6f6" },
-       thornWidth: 1.1, thornAlpha: [0.2, 0.3], textOver: 5 },   // 10/31-12 決定: 紫のいばらを細く薄く、文字はいばらの上にもう一度縁取りして描く（textOver ＝ その縁取りの太さ px）
+       thornWidth: 1.1, thornAlpha: [0.1, 0.15], textOver: 5 },   // 11/22-7: いばらの濃さを半分に（[0.2, 0.3] → [0.1, 0.15]）   // 10/31-12 決定: 紫のいばらを細く薄く、文字はいばらの上にもう一度縁取りして描く（textOver ＝ その縁取りの太さ px）
 };
 
 // ===== 必殺ワザのボタンの色（10/25-9）: ゲージがたまったら赤橙（画面のほかの場所に使っていない色）。たまっていないときは薄い色のまま
@@ -2775,7 +2777,7 @@ const Battle = (() => {
     }
     if (lessonOn("s5box")) { const i = list.findIndex(b => b.word); if (i > 0) list.unshift(list.splice(i, 1)[0]); }   // チュートリアルのときは、最初の箱にことばを入れる（11/7-20）
     ex.queue = list.map((b, i) => Object.assign(b, { w: mv.boxW, h: mv.boxH, hold: 0, open: false, openT: 0, out: false, wait: 0, phase: (i * 0.77) % 3, shake: 0, warnT: 0 }));
-    ex.boxes = []; ex.nextBoxAt = BATTLE.exploreFirst; ex.laneNo = 0; ex.belt = 0; ex.keyFound = false; ex.keys = mv.keys > 0 ? 0 : null;   // ex.keys ＝ 持っているかぎの数（11/22-5。ステージ7だけ。ほかは null）
+    ex.boxes = []; ex.nextBoxAt = BATTLE.exploreFirst; ex.laneNo = 0; ex.belt = 0; ex.keyFound = false; ex.keys = mv.keys > 0 ? 0 : null;   // ex.keys ＝ 持っているかぎの数（11/22-5。ステージ7・8（11/22-7）。ほかは null）
   }
   const laneY = i => H * exMove.lanes[i % exMove.lanes.length];
   // レーンごとの向き（11/7-30 決定: sides のとき、まん中のレーンは右から左へ。箱が左右の両方から出てくる）
@@ -4227,9 +4229,9 @@ const Battle = (() => {
     }
     ctx.restore();
   }
-  // 殻を描いたあと、文字をもう一度縁取りして上に描く（WORLD_LOOK の textOver がある世界だけ。10/31-12 世界3）
+  // 殻を描いたあと、文字をもう一度縁取りして上に描く（10/31-12 世界3。11/22-7 から全世界。太さは WORLD_LOOK の textOver か BATTLE.charEdgeOver）
   function textOverShell(ch, x, y, fillColor, alpha) {
-    const w = (WORLD_LOOK[worldDef.id] || {}).textOver;
+    const w = (WORLD_LOOK[worldDef.id] || {}).textOver || BATTLE.charEdgeOver;
     if (!w) return;
     ctx.save();
     ctx.globalAlpha = alpha; ctx.lineJoin = "round";
@@ -4257,7 +4259,7 @@ const Battle = (() => {
       ctx.fillStyle = SHELL.boss.color;
       ctx.beginPath(); ctx.ellipse(cx, cy, sz * 0.55, sz * 0.5, 0, 0, Math.PI * 2); ctx.fill();
     } else {                 // いばら: 文字にからむ、とげのあるつる
-      const lk = WORLD_LOOK[worldDef.id] || {}, ta = lk.thornAlpha || [0.45, 0.5];
+      const lk = WORLD_LOOK[worldDef.id] || {}, ta = lk.thornAlpha || BATTLE.thornAlpha;
       ctx.globalAlpha = ta[0] + ta[1] * k;
       ctx.strokeStyle = lk.mid || SHELL.mid.color; ctx.lineWidth = lk.thornWidth || 2; ctx.lineCap = "round";
       const n = k > 0.5 ? 2 : 1;

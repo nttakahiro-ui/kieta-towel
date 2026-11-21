@@ -10,15 +10,29 @@
 // 11/2: 制作側の見本（sample_bg_c01）の宝石に近い見た目に。盾の形（上が平ら、下がとがる）で、カットの面ごとに明るさを変え、白い光を足す（宝石の絵のファイルはまだないので図形）
 // 11/22-4 決定: 宝石は制作側の絵（docs/宝石/ の12枚）。外接枠で切り出して中央そろえ・同じ高さに縮めた assets/gems/gem_01〜12.png（番号＝ステージ）
 //   まだ取っていない宝石は、同じ絵を灰色・うすく（彩度0、不透明度40%）。color は使わない（光の玉・紙吹雪の色には stages.js の gem を使う）
-const GEM_PIC = { v: "1122-4", h: 1.86 };   // h: 前の図形の宝石と同じ高さ（size に対する倍率）
+const GEM_PIC = { v: "1122-4", h: 1.86,   // h: 前の図形の宝石と同じ高さ（size に対する倍率）
+  // 11/22-7（鳥山さんの実機確認 ❷）: 取った宝石に輝きを足す。明るさ・彩度 +12%、左上に白い小さな光の点、外側に世界色のやわらかい光（半径4px）、3.5秒に1回の小さなきらめき
+  //   明るさ・彩度・光の半径・きらめきの間隔は css/style.css の .gem-lit（ここの数は円い台座の SVG 用）
+  lit: 1.12, glowR: 4, twinkle: 3.5,
+  glow: { 1: "#86b35e", 2: "#5e8bb8", 3: "#9563b8" },   // 世界色（ステージ一覧の背景の上の色 --wc-top と同じ）
+};
 const gemSrc = stageId => `assets/gems/gem_${String(stageId).padStart(2, "0")}.png?v=${GEM_PIC.v}`;
-// HTML の <img>（ステージ一覧の行・本・帯）
-const gemImg = (stageId, lit, cls = "") => `<img class="gem-pic${lit ? "" : " ghost"}${cls ? " " + cls : ""}" src="${gemSrc(stageId)}" alt="" draggable="false">`;
+const gemWorld = stageId => ((window.STAGES || []).find(s => s.id === stageId) || {}).world || 1;
+const gemGlow = stageId => GEM_PIC.glow[gemWorld(stageId)] || GEM_PIC.glow[1];
+// HTML の <img>（ステージ一覧の行・本・帯）。取った宝石は .gem-lit で包んで、光の点ときらめきを重ねる（cls は包みのほうにつける）
+const gemImg = (stageId, lit, cls = "") => lit
+  ? `<span class="gem-lit${cls ? " " + cls : ""}" style="--gw:${gemGlow(stageId)};--gd:${-((stageId * 1.3) % GEM_PIC.twinkle).toFixed(1)}s"><img class="gem-pic" src="${gemSrc(stageId)}" alt="" draggable="false"><i class="gem-twk"></i></span>`
+  : `<img class="gem-pic ghost${cls ? " " + cls : ""}" src="${gemSrc(stageId)}" alt="" draggable="false">`;
 // SVG の中（円い台座。本の絵が読めないときだけ）。(0, 0) が中心、高さ size × 1.86
 const GEM_ART = (color, lit, size, stageId) => {
-  const h = size * GEM_PIC.h;
-  return (lit ? "" : `<defs><filter id="gemGray"><feColorMatrix type="saturate" values="0"/></filter></defs>`) +
-    `<image href="${gemSrc(stageId)}" x="${(-h / 2).toFixed(1)}" y="${(-h / 2).toFixed(1)}" width="${h.toFixed(1)}" height="${h.toFixed(1)}"${lit ? "" : ` filter="url(#gemGray)" opacity="0.4"`}/>`;
+  const h = size * GEM_PIC.h, img = f => `<image href="${gemSrc(stageId)}" x="${(-h / 2).toFixed(1)}" y="${(-h / 2).toFixed(1)}" width="${h.toFixed(1)}" height="${h.toFixed(1)}"${f}/>`;
+  if (!lit) return `<defs><filter id="gemGray"><feColorMatrix type="saturate" values="0"/></filter></defs>` + img(` filter="url(#gemGray)" opacity="0.4"`);
+  const id = `gemLit${stageId}`, k = GEM_PIC.lit, d = (h * 0.1).toFixed(1), sp = (h * 0.16).toFixed(1);
+  return `<defs><filter id="${id}" x="-30%" y="-30%" width="160%" height="160%"><feColorMatrix type="saturate" values="${k}"/><feComponentTransfer><feFuncR type="linear" slope="${k}"/><feFuncG type="linear" slope="${k}"/><feFuncB type="linear" slope="${k}"/></feComponentTransfer>` +
+    `<feDropShadow dx="0" dy="0" stdDeviation="${GEM_PIC.glowR / 2}" flood-color="${gemGlow(stageId)}"/></filter></defs>` + img(` filter="url(#${id})"`) +
+    `<circle cx="${(-h * 0.17).toFixed(1)}" cy="${(-h * 0.27).toFixed(1)}" r="${(h * 0.05).toFixed(1)}" fill="#fff" opacity="0.9"/>` +
+    `<path d="M0 -${sp} L${d * 0.25} -${d * 0.25} L${sp} 0 L${d * 0.25} ${d * 0.25} L0 ${sp} L-${d * 0.25} ${d * 0.25} L-${sp} 0 L-${d * 0.25} -${d * 0.25}Z" fill="#fff" transform="translate(${(h * 0.2).toFixed(1)},${(-h * 0.3).toFixed(1)})" opacity="0">` +
+    `<animate attributeName="opacity" values="0;0;1;0" keyTimes="0;0.86;0.93;1" dur="${GEM_PIC.twinkle}s" begin="${((stageId * 1.3) % GEM_PIC.twinkle).toFixed(1)}s" repeatCount="indefinite"/></path>`;
 };
 
 // ===== レシピ完成の演出の秒数（10/25-15。初めてそろったときだけ。合計5秒以内、タップで最後に飛ぶ） =====
