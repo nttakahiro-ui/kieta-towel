@@ -97,7 +97,8 @@ const BATTLE = {
   groundTextScale: 0.78,       // 地上のことばの文字の高さの倍率（少し平たくして、地面に貼りついて見えるように）
   fuwariEdge: 2,               // 11/22-2: 世界2・3の救出の旅で、ふわりのまわりに出す白い輪郭の太さ（px）
   darkExplore: 0.62,           // 11/22-2: 発見の旅の「照明が落ちる」の暗さ（前は0.84。箱の輪郭が読める程度）
-  openBob: { fill: "#ffd84a", edge: "#c89a10", amp: 3, speed: 7 },   // 11/22-2: 「あける」が出ている箱の色と、上下の揺れ（px・速さ）
+  openBob: { fill: "#ffd84a", edge: "#c89a10", amp: 3, speed: 7 },
+  keyBox: { fill: "#8fa2b6", edge: "#55687c", mark: "#f2c234", countY: 0.07 },   // 11/22-5（指摘86）: ステージ7のかぎマークの箱の色・かぎの色。countY ＝「かぎ ×N」の高さ（画面の高さの割合。上の一行の上）   // 11/22-2: 「あける」が出ている箱の色と、上下の揺れ（px・速さ）
   darkRescue: 0.6,             // 救出の旅の出来事「照明が落ちる」の暗さ（地面と地上のものだけ。発見の旅は0.84）
   powerStartW23: 1,            // 世界2・3のパワーの初期値の段（0 ＝ 1本、1 ＝ 2本。10/31-13 決定: 救出の旅を派手に。世界1は1本のまま）
   powerStartW3: 2,             // 世界3のパワーの初期値の段（2 ＝ 3本。パワーUPで4本。11/3-3 決定: 世界3を最初から1段強く）
@@ -2755,13 +2756,19 @@ const Battle = (() => {
   function boxSetup() {
     const mv = exMove, ex = explore;
     let list = shuffle(exploreWords().map(w => ({ word: w })).concat(Array.from({ length: mv.empty || 0 }, () => ({ word: null })), Array.from({ length: mv.fake || 0 }, () => ({ word: null, fake: true }))));   // にせOPEN（11/1-2）: 空箱で、いつも OPEN の面
-    if (mv.lock > 0) {   // 鍵つきの箱: ことばの箱から lock 個（いちばん前のものはのぞく）。鍵の箱は2番目に出す
+    if (mv.keys > 0) {   // 11/22-5 決定（指摘86。ステージ7）: かぎ入りの「？」の箱が keys 個。かぎマークの箱（ことばの箱から lock 個。いちばん前はのぞく）は、かぎ1本で1つ開く
+      list = list.concat(Array.from({ length: mv.keys }, () => ({ word: null, key: true })));
+      list = [list[0]].concat(shuffle(list.slice(1)));
+      shuffle(list.slice(1).filter(b => b.word)).slice(0, mv.lock).forEach(b => (b.lock = true));
+      const fk = list.findIndex(b => b.key), fl = list.findIndex(b => b.lock);   // 最初のかぎは、最初のかぎマークの箱より前に出す
+      if (fl >= 0 && fk > fl) { const t = list[fk]; list[fk] = list[fl]; list[fl] = t; }
+    } else if (mv.lock > 0) {   // 鍵つきの箱: ことばの箱から lock 個（いちばん前のものはのぞく）。鍵の箱は2番目に出す
       shuffle(list.slice(1).filter(b => b.word)).slice(0, mv.lock).forEach(b => (b.lock = true));
       list.splice(1, 0, { word: null, key: true });
     }
     if (lessonOn("s5box")) { const i = list.findIndex(b => b.word); if (i > 0) list.unshift(list.splice(i, 1)[0]); }   // チュートリアルのときは、最初の箱にことばを入れる（11/7-20）
     ex.queue = list.map((b, i) => Object.assign(b, { w: mv.boxW, h: mv.boxH, hold: 0, open: false, openT: 0, out: false, wait: 0, phase: (i * 0.77) % 3, shake: 0, warnT: 0 }));
-    ex.boxes = []; ex.nextBoxAt = BATTLE.exploreFirst; ex.laneNo = 0; ex.belt = 0; ex.keyFound = false;
+    ex.boxes = []; ex.nextBoxAt = BATTLE.exploreFirst; ex.laneNo = 0; ex.belt = 0; ex.keyFound = false; ex.keys = mv.keys > 0 ? 0 : null;   // ex.keys ＝ 持っているかぎの数（11/22-5。ステージ7だけ。ほかは null）
   }
   const laneY = i => H * exMove.lanes[i % exMove.lanes.length];
   // レーンごとの向き（11/7-30 決定: sides のとき、まん中のレーンは右から左へ。箱が左右の両方から出てくる）
@@ -2773,7 +2780,8 @@ const Battle = (() => {
     const mv = exMove, cyc = mv.openTime + 3 * mv.faceTime, ph = (explore.t + b.phase * cyc / 3) % cyc;
     return ph < mv.openTime ? 0 : 1 + Math.min(2, Math.floor((ph - mv.openTime) / mv.faceTime));
   }
-  const boxCanOpen = b => b.fake || (!(b.lock && !explore.keyFound) && (!exMove.open || boxFace(b) === 0));
+  const boxLocked = b => b.lock && (exMove.keys > 0 ? explore.keys <= 0 : !explore.keyFound);   // かぎがなくて開けられない（11/22-5: ステージ7は持っているかぎの数で決まる）
+  const boxCanOpen = b => b.fake || (!boxLocked(b) && (!exMove.open || boxFace(b) === 0));
   function updateBoxes(dt) {
     const ex = explore, mv = exMove, words = exploreWords();
     if (!ex.queue) boxSetup();
@@ -2814,7 +2822,7 @@ const Battle = (() => {
       if (b !== pressed || (lessonOn("s5box") && !les)) { b.hold = 0; continue; }   // チュートリアルの説明の前は、まだ開かない（11/7-20）
       if (!boxCanOpen(b)) {
         b.hold = 0;
-        if (b.lock && !ex.keyFound && b.warnT <= 0) { b.shake = 0.3; b.warnT = 1.5; floats.push({ x: b.x, y: b.y - b.h / 2 - 10, text: tx("box.locked"), big: false, age: 0 }); Sound.se("boing"); }
+        if (boxLocked(b) && b.warnT <= 0) { b.shake = 0.3; b.warnT = 1.5; floats.push({ x: b.x, y: b.y - b.h / 2 - 10, text: tx(mv.keys > 0 ? "box.noKey" : "box.locked"), big: false, age: 0 }); Sound.se("boing"); }
         continue;
       }
       b.hold += dt;
@@ -2827,6 +2835,7 @@ const Battle = (() => {
   function openBox(b) {
     const ex = explore;
     b.open = true; b.openT = 0; moved = true;
+    if (b.lock && exMove.keys > 0) ex.keys = Math.max(0, ex.keys - 1);   // 11/22-5: かぎを1本使う
     if (b.word) {
       const size = isShortWord(b.word) ? Math.round(BATTLE.fontSize.zako * BATTLE.shortScale) : BATTLE.fontSize.zako;
       ctx.font = font(size);
@@ -2834,6 +2843,7 @@ const Battle = (() => {
       findWord(b.d);
     } else if (b.key) {
       ex.keyFound = true;
+      if (exMove.keys > 0) ex.keys++;   // 11/22-5: かぎを1本拾う
       floats.push({ x: b.x, y: b.y - b.h / 2 - 10, text: tx("box.key"), big: true, found: true, age: 0 });
       Sound.se("power");
     } else {
@@ -4863,6 +4873,14 @@ const Battle = (() => {
   }
 
   // ===== 世界2の発見の旅「箱」の画面（10/31-10 試作。箱とコンベアは仮の図形） =====
+  // かぎの印（11/22-5）: (x, y) が中心、横はおよそ 44×k px。左に輪、右へ軸と歯
+  function drawKeyMark(x, y, k, color) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(k, k);
+    ctx.strokeStyle = "rgba(70,50,10,0.55)"; ctx.fillStyle = color; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(-12, 0, 10, 0, Math.PI * 2); ctx.arc(-12, 0, 4.5, 0, Math.PI * 2, true); ctx.fill("evenodd"); ctx.stroke();
+    ctx.beginPath(); ctx.rect(-2.5, -3.5, 26, 7); ctx.rect(13, 3.5, 4.5, 7); ctx.rect(19.5, 3.5, 4.5, 9); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
   function drawBox(b) {
     const face = b.fake ? 0 : exMove.open ? boxFace(b) : -1;   // にせOPEN は、いつも OPEN の面
     const hot = face === 0 && !b.open;   // 11/22-2: 「あける」が出ている箱は明るい黄色にして、上下に小さく揺らす
@@ -4870,7 +4888,8 @@ const Battle = (() => {
     const squash = exMove.open && !b.open ? 1 - 0.12 * Math.abs(Math.sin(((explore.t + b.phase) % 1) * Math.PI)) * (face > 0 ? 1 : 0) : 1;
     ctx.save(); ctx.translate(x, y); ctx.scale(1, squash);
     ctx.fillStyle = "rgba(30,30,40,0.25)"; roundRect(-w / 2 + 4, -h / 2 + 8, w, h, 8); ctx.fill();   // 影
-    ctx.fillStyle = hot ? BATTLE.openBob.fill : "#c9955a"; ctx.strokeStyle = hot ? BATTLE.openBob.edge : "#8a6232"; ctx.lineWidth = 2;
+    const keyLock = b.lock && exMove.keys > 0;   // 11/22-5: かぎマークの箱（ステージ7）は青みの灰色、まん中に大きな金色のかぎ
+    ctx.fillStyle = hot ? BATTLE.openBob.fill : keyLock ? BATTLE.keyBox.fill : "#c9955a"; ctx.strokeStyle = hot ? BATTLE.openBob.edge : keyLock ? BATTLE.keyBox.edge : "#8a6232"; ctx.lineWidth = 2;
     roundRect(-w / 2, -h / 2, w, h, 8); ctx.fill(); ctx.stroke();
     if (b.open) {   // ふたが開いている
       ctx.fillStyle = "#6a4a28"; roundRect(-w / 2 + 6, -h / 2 + 4, w - 12, 14, 4); ctx.fill();
@@ -4886,8 +4905,9 @@ const Battle = (() => {
         ctx.fillStyle = "#ffffff"; ctx.font = font(16); ctx.fillText(tx("box.boxOpen"), 0, 1);   // 11/22-1: 「OPEN」→「あける」
       } else if (face > 0) {   // ほかの面（回っている）
         ctx.fillStyle = "rgba(90,60,30,0.55)"; ctx.font = font(22); ctx.fillText("↻", 0, 4);
-      } else { ctx.fillStyle = "rgba(90,60,30,0.6)"; ctx.font = font(26); ctx.fillText("？", 0, 4); }
-      if (b.lock && !ex.keyFound) {   // 鍵（南京錠）
+      } else if (keyLock) drawKeyMark(0, 2, 1, BATTLE.keyBox.mark);
+      else { ctx.fillStyle = "rgba(90,60,30,0.6)"; ctx.font = font(26); ctx.fillText("？", 0, 4); }
+      if (b.lock && !ex.keyFound && !keyLock) {   // 鍵（南京錠）
         ctx.strokeStyle = "#5a5f6a"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(w / 2 - 14, h / 2 - 22, 6, Math.PI, 0); ctx.stroke();
         ctx.fillStyle = "#8a909c"; roundRect(w / 2 - 22, h / 2 - 22, 16, 13, 3); ctx.fill();
       }
@@ -4932,7 +4952,8 @@ const Battle = (() => {
       // 11/22-2: 暗いあいだも箱の形と鍵の印が読めるように、うすく輪郭を重ねる（前は暗さ0.84で箱が見えなかった）
       if (ex.boxes) for (const b of ex.boxes) if (!b.out && !b.open) {
         ctx.save(); ctx.translate(b.x, b.y); ctx.strokeStyle = "rgba(255,236,190,0.55)"; ctx.lineWidth = 2; roundRect(-b.w / 2, -b.h / 2, b.w, b.h, 8); ctx.stroke();
-        if (b.lock && !ex.keyFound) { ctx.strokeStyle = "rgba(220,226,236,0.85)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(b.w / 2 - 14, b.h / 2 - 22, 6, Math.PI, 0); ctx.stroke(); ctx.fillStyle = "rgba(200,206,218,0.85)"; roundRect(b.w / 2 - 22, b.h / 2 - 22, 16, 13, 3); ctx.fill(); }
+        if (b.lock && exMove.keys > 0) { ctx.globalAlpha = 0.7; drawKeyMark(0, 2, 1, BATTLE.keyBox.mark); ctx.globalAlpha = 1; }   // 11/22-5: かぎマークもうすく見える
+        else if (b.lock && !ex.keyFound) { ctx.strokeStyle = "rgba(220,226,236,0.85)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(b.w / 2 - 14, b.h / 2 - 22, 6, Math.PI, 0); ctx.stroke(); ctx.fillStyle = "rgba(200,206,218,0.85)"; roundRect(b.w / 2 - 22, b.h / 2 - 22, 16, 13, 3); ctx.fill(); }
         ctx.restore();
       }
     }
@@ -4963,11 +4984,21 @@ const Battle = (() => {
       ctx.font = font(16); ctx.lineWidth = 5; ctx.strokeStyle = "#ffffff";
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
       const hy = H * 0.14;
-      const ht = tx(exMove.space ? "space.moveHint" : exMove.open ? "box.openHint" : exMove.lock ? "box.lockHint" : "box.moveHint");   // ステージごとの1行（6 OPEN／7 鍵。10/31-10 試作）
+      const ht = tx(exMove.space ? "space.moveHint" : exMove.keys > 0 ? "box.keyHint" : exMove.open ? "box.openHint" : exMove.lock ? "box.lockHint" : "box.moveHint");   // ステージごとの1行（6 OPEN／7 鍵。10/31-10 試作）
       const hx = (stripRight() + W) / 2, hw = W - stripRight() - 12;   // 11/22-1: 左の札にかからないよう、札の右の空きのまん中に。入らなければ字を小さく
-      for (let fs = 16; fs > 12 && ctx.measureText(ht).width > hw; ) { fs -= 1; ctx.font = font(fs); }
-      if (!hintCard) { ctx.strokeText(ht, hx, hy); ctx.fillStyle = "#3f4f6a"; ctx.fillText(ht, hx, hy); }
+      const hl = ht.split("\n");   // 11/22-5: \n で行を分ける（ステージ7の案内は2行）
+      for (let fs = 16; fs > 12 && Math.max(...hl.map(l => ctx.measureText(l).width)) > hw; ) { fs -= 1; ctx.font = font(fs); }
+      if (!hintCard) hl.forEach((l, i) => { const ly = hy + (i - (hl.length - 1) / 2) * 20; ctx.strokeText(l, hx, ly); ctx.fillStyle = "#3f4f6a"; ctx.fillText(l, hx, ly); });
       ctx.globalAlpha = 1;
+    }
+    if (explore.keys != null && state === "play") {   // 11/22-5 決定（指摘86）: 持っているかぎの数「かぎ ×N」を上の案内の帯にずっと出す（上の一行の上・時計の左。時間オーバー・出来事の帯や、箱の上に出る字と重ならないように）
+      const kx = (stripRight() + W) / 2, ky = H * BATTLE.keyBox.countY, kt = tx("box.keyCount", { n: explore.keys });
+      ctx.save(); ctx.font = font(17); ctx.textAlign = "left"; ctx.textBaseline = "middle";
+      const tw = ctx.measureText(kt).width, bw = tw + 46, bx = kx - bw / 2;
+      ctx.fillStyle = "rgba(255,252,240,0.92)"; ctx.strokeStyle = BATTLE.keyBox.edge; ctx.lineWidth = 2; roundRect(bx, ky - 15, bw, 30, 15); ctx.fill(); ctx.stroke();
+      drawKeyMark(bx + 19, ky, 0.5, BATTLE.keyBox.mark);
+      ctx.fillStyle = "#3f4f6a"; ctx.fillText(kt, bx + 36, ky + 1);
+      ctx.restore();
     }
     if (banner) drawBanner();
     if (hintCard) drawHintCard();
