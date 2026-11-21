@@ -941,3 +941,7 @@ button.wdeco:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--wc-d
 .white-flash.off { opacity: 0; transition: opacity .45s ease-in; }
 /* 11/7-45 決定: ワープのボタンはステージ4つの下、下の帯（合計・カード図鑑・タイトルへ）の上 */
 .stages-warps { margin: 4px 0 0; }
+
+/* 11/22-1: クリアしたステージの札の「クリア！」（宝石の左の空き。世界の色に白い字） */
+.stage-row .marks { width: auto; min-width: 30px; gap: 6px; }
+.stage-row .row-clear { font-size: 10.5px; font-weight: bold; line-height: 1; padding: 4px 7px; border-radius: 999px; background: var(--green); color: #fff; white-space: nowrap; }

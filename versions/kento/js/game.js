@@ -14,6 +14,7 @@
 
 // ===== 調整用の数値（速さ・弾の量・硬さなど）はここにまとめる =====
 const WORD_EDGE = 4;   // 11/7-42: 空のことばの白いふち（線の幅8）が字の外へ出る太さ。ふりがなはこの外がわ＋4px に置く
+const FOUND_COLOR = "#FF8C00";   // 発見の旅の「見つけた！」の字の色（白いふち。11/22-1。前は世界の緑）
 const BATTLE = {
   // --- 台本（2周＋大ボス） ---
   roundInterval1: 3.2,         // 探検（出撃1）で語句が出てくる間隔（秒）
@@ -291,6 +292,11 @@ const BATTLE = {
   gaugeWord: 24,               //   ことばを1つ取り戻す
   gaugeHit: 8,                 //   被弾する（元気が減る）。中ボス・大ボスが出た瞬間は満タンになる
   skillButtonGap: 10,          // 左下の3つのボタンのあいだ（px）
+  skillNameSize: 11,           // ボタンの上の名前の字の大きさ（px。11/22-1: 前は 9〜10。12 だと「パワー全開」と「無敵タイム」がくっつく。並びの上に1つだけ「必殺ワザ」を9pxで）
+  pickedTime: 0.6,             // とくぎを選んでから扉が出るまで（秒）。そのあいだ選んだ札の右上に「えらんだ」（11/22-1）
+  foundLift: 18,               // 発見の旅の「見つけた！」を、ことばの上のはしからさらに上げる量（px。11/22-1）
+  powerFxLift: 64,             // 「パワーアップ！」の高さ: ふわりの中心からの上げ幅（px。ふわりの高さ分。11/22-1。前は 110）
+  powerFxWordGap: 96,          // 助けたことばの大きな表示が出ているときは、画面の高さ45%（その中心）からこれだけ下より上には出さない（px。11/22-1）
   // とくぎ（11/6-6 決定。出撃前に1つ選ぶ。そのステージのあいだだけ）: パワーアップ＝光が1段上から（世界1は2本、世界3は4本）／守りアップ／ゲージ2倍速
   guardHpMul: 1.5,             // 守りアップ: 元気の上限の倍率
   guardInvMul: 1.5,            // 守りアップ: 被弾したあとの無敵の秒数の倍率
@@ -678,7 +684,11 @@ const Battle = (() => {
     e.preventDefault();
     if (paused) { resume(); return; }
     if (tut) { if (tut.t >= BATTLE.tutCloseAfter) closeTut(); return; }
-    if (les && les.step === "say") { if (les.t >= BATTLE.lesson.tapAfter) { les.step = "do"; les.t = 0; Sound.se("item"); } return; }   // 説明をタップ → やってみる
+    if (les && les.step === "say") {   // 説明をタップ → やってみる
+      if (les.t < BATTLE.lesson.tapAfter) return;
+      les.step = "do"; les.t = 0; Sound.se("item");
+      if (!les.hold) return;   // 11/22-1: 押し続ける説明（ステージ5の箱・ステージ9のことば）は、最初の押しで吹き出しを閉じて、そのまま押し続けられる
+    }
     if (les && les.step === "ok") return;
     if (!player) return;
     if (state === "sortie") {   // 旅の画面: 選ぶ（救出の旅だけ）→ 表紙をタップ → カウント
@@ -687,9 +697,9 @@ const Battle = (() => {
           const rect = canvas.getBoundingClientRect();
           const px = e.clientX - rect.left, py = e.clientY - rect.top;
           const c = choiceRects().find(r => px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h);
-          if (!c) return;   // 選ぶまで出撃しない（10秒で「つよい弾」）
+          if (!c || picked) return;   // 選ぶまで出撃しない（10秒で「つよい弾」）
           chooseLoadout(c.id);
-          openDoor();   // 選んだら扉へ
+          picked = { id: c.id, t: BATTLE.pickedTime };   // 11/22-1: 選んだ札の右上に「えらんだ」を0.6秒出してから扉へ（前はすぐ扉）
         } else if (sortieStep === "door" && door) {
           const rect = canvas.getBoundingClientRect();
           if (!Door.tap(door, e.clientX - rect.left, e.clientY - rect.top)) return;   // 押したら光が広がって出発（文字が出る前のタップは受けない）
@@ -784,7 +794,7 @@ const Battle = (() => {
     msgQ = []; msgGap = 0; msgWasBusy = false;
     choiceFree = !!opts.firstChoice;
     tut = null; les = null; hintOpts = opts.hints || null; hintShown = {}; hintCard = null; bombHinted = false; bombFlash = 0; powerFx = null; wrongFx = null; againFx = null; extraUsed = false; extraRound = false; lastT = 0; seedsGot = 0; seedsDropped = 0; lcQueue = []; lcWords = [];
-    stripFlash = 0; sortieStep = "choice"; freed = [];
+    stripFlash = 0; sortieStep = "choice"; freed = []; picked = null;
     explore = { t: 0, next: 0, nextAt: BATTLE.exploreFirst, again: [], list: [], bugs: [], bugT: 2, endT: 0, flies: [], streaks: [] };
     {
       const se = (opts.stage && opts.stage.explore) || {}, type = EXPLORE_MOVES[se.move] ? se.move : "drift";
@@ -825,7 +835,8 @@ const Battle = (() => {
       if (it.guide) startGuide({ kind: "gate", gx, tree: a });
     } else {
       const o = addObstacle(W * (it.x || 0.5), it.r || 50);
-      if (it.guide) {
+      if (it.guide && lessonOn("tree")) o.lesTree = true;   // 11/22-1: ステージ1の木は、止めて木を丸で囲むチュートリアル（見えるところまで来たら。2回目からは前の案内）
+      else if (it.guide) {
         // よける向き: 木から遠いほう（画面のはしに寄りすぎるなら反対）
         let dir = o.x >= player.x ? -1 : 1;
         if (player.x + dir * 90 < 40 || player.x + dir * 90 > W - 40) dir = -dir;
@@ -846,9 +857,10 @@ const Battle = (() => {
   // ===== チュートリアル（11/7-20）=====
   // ステージ1・5・9で、初めてのときだけ。止まる → ふわりの吹き出しで説明（2行以内）→ タップ → 1回やってみる（ほかは止まったまま）→ できたら「OK！」→ 再開
   // 見た記録は hints の mark（main.js。版ごと）。「OK！」まで行ったら見たことにする。おさらい（all）のときは全部出す
+  let picked = null;          // とくぎを選んだ印「えらんだ」{ id, t }（11/22-1。0.6秒のあと扉へ）
   let rescueLesWait = false;   // 救出の旅の始まりのチュートリアルを、扉の光が消えるのを待って出す（11/7-28）
   const LES_TOP = 48;   // 上の帯（元気・点数）の下。チュートリアルの吹き出しと、やる相手はこれより下（11/7-28）
-  const LESSON_STAGE = { binoMove: 1, rescueStart: 1, shell: 1, bug: 1, seed: 1, odai: 1, choice: 1, boost: 1, s2guard: 2, s5box: 5, s5ground: 5, s5boss: 5, s9spin: 9, s9rear: 9 };   // 11/7-24: s5mid（中ボスの前）は s5boss（大ボスの前）に。s9mid はやめた
+  const LESSON_STAGE = { binoMove: 1, rescueStart: 1, lives: 1, tree: 1, shell: 1, bug: 1, seed: 1, odai: 1, choice: 1, boost: 1, s2guard: 2, s5box: 5, s5ground: 5, s5boss: 5, s9spin: 9, s9rear: 9 };   // 11/7-24: s5mid（中ボスの前）は s5boss（大ボスの前）に。s9mid はやめた
   function lessonOn(id) {
     if (!hintOpts || hintShown[id] || !opts.stage || LESSON_STAGE[id] !== opts.stage.id) return false;
     return !!(hintOpts.all || !(hintOpts.seen && hintOpts.seen[id]));
@@ -870,7 +882,11 @@ const Battle = (() => {
     if (L.step === "ok") { if (L.t >= BATTLE.lesson.okTime) endLesson(); return; }
     if (L.step !== "do") return;
     if (player) { L.dist += Math.hypot(player.x - L.lx, player.y - L.ly); L.lx = player.x; L.ly = player.y; }
-    if (L.done(L)) { L.step = "ok"; L.t = 0; if (hintOpts && hintOpts.mark) hintOpts.mark(L.id); Sound.se("correct"); }
+    if (L.done(L)) {
+      if (hintOpts && hintOpts.mark) hintOpts.mark(L.id);
+      if (L.noOk) { endLesson(); return; }   // 11/22-1: とくぎの選択は「OK！」を出さない
+      L.step = "ok"; L.t = 0; Sound.se("correct");
+    }
   }
   function endLesson() {
     les = null;
@@ -1009,10 +1025,11 @@ const Battle = (() => {
   const fireRamp = () => Math.max(0.1, (BATTLE.ramp[phase] || BATTLE.ramp.round2).fire);
   // ===== 世界2・3の試作（10/31-10） =====
   const skillName = id => tx(`skills.${id}.name`);
+  const moveHintKey = () => (opts.stage && opts.stage.weather && opts.stage.weather.kind === "wind" ? "rescue.windHint" : "rescue.moveHint");   // 11/22-1: 風の回（ステージ3）は風の文
   const basePower = () => (worldDef.id >= 3 ? BATTLE.powerStartW3 : worldDef.id >= 2 ? BATTLE.powerStartW23 : 0);   // パワーの初期値の段（10/31-13 決定: 世界2・3は1段上の2本から。パワーUPでさらに1段）
   const maxHp = () => BATTLE.playerMaxHp * (loadout === "shield" ? BATTLE.guardHpMul : 1);   // 元気の上限（守りアップで1.5倍。11/6-6）
   const lesDo = () => !!(les && les.step === "do");   // チュートリアルの「やってみる」のあいだ（11/7-20）
-  const frozen = () => stopT > 0 || (lesDo() && phase !== "round1");   // 救出の旅のチュートリアルの「やってみる」のあいだも、敵・弾・台本・虫は止まる（やってみる相手だけ動く）   // 時間止めのあいだ（敵・弾・ことば・コンベアが止まる）
+  const frozen = () => stopT > 0 || (lesDo() && phase !== "round1" && les.id !== "tree");   // 11/22-1: 木のチュートリアルの「やってみる」は、地面と木が流れる（よけるため）   // 救出の旅のチュートリアルの「やってみる」のあいだも、敵・弾・台本・虫は止まる（やってみる相手だけ動く）   // 時間止めのあいだ（敵・弾・ことば・コンベアが止まる）
   // 出来事（stages.js の event: { kind, sortie, at, dur }）がいま起きているか。sortie 1 ＝ 発見の旅の時刻、2 ＝ 救出の旅の時刻
   //   同じ出来事を発見の旅と救出の旅の両方に書いてよい（10/31-13 決定: ステージ6〜8は救出の旅でも1回）。救出の旅の出来事は、お題のあいだは起こさない（時刻も進めない）
   const evOn = e => { const tt = e.sortie === 1 ? (phase === "round1" && explore ? explore.t : -1) : (phase !== "round1" && !odai ? rescueT : -1); return tt >= e.at && tt < e.at + e.dur; };
@@ -1470,7 +1487,8 @@ const Battle = (() => {
     if (tut) { tut.t += realDt; return; }   // チュートリアルの案内のあいだは止まる
     if (les) { lessonStep(realDt); if (les && les.step !== "do") return; }   // チュートリアル（11/7-20）: 説明と「OK！」のあいだは全部止まる
     if (state === "sortie") {   // 出撃の画面のあいだは止まっている
-      if (sortieNo === 2 && sortieStep === "choice" && !les && lessonOn("choice")) lesson("choice", { done: () => loadout !== null });   // チュートリアル: とくぎの選択 → 1つ選ぶ（11/7-26。ステージ1の初回）
+      if (sortieNo === 2 && sortieStep === "choice" && !les && lessonOn("choice")) lesson("choice", { noOk: true, done: () => loadout !== null });   // 11/22-1: 「OK！」は出さない（選んだ札の「えらんだ」で示す）
+      if (picked && !les) { picked.t -= realDt; if (picked.t <= 0) { picked = null; openDoor(); } }   // チュートリアル: とくぎの選択 → 1つ選ぶ（11/7-26。ステージ1の初回）
       // （持ち物選択の時間制限は、10/25-14 になくした。選ぶまで待つ）
       if (sortieStep === "door" && door && Door.step(door, realDt, sortieNo === 1 ? "explore" : "rescue", W, H)) {   // 押して光が広がりきった（10秒で自動）
         door = null; doorFade = BATTLE.doorFade;
@@ -1479,6 +1497,7 @@ const Battle = (() => {
       return;
     }
     doorFade = Math.max(0, doorFade - realDt);
+    if (!les && !rescueLesWait && doorFade <= 0 && state === "play" && phase !== "round1" && !lessonOn("rescueStart") && lessonOn("lives")) lesson("lives", { target: { x: 184, y: 22, w: 84, h: 26 }, done: () => true });   // 11/22-1: 上のタオルの絵3つ（残りの回数）を丸で囲んで説明。やることはないので、タップで「OK！」
     if (rescueLesWait && doorFade <= 0) { rescueLesWait = false; lesson("rescueStart", { target: player, done: L => L.dist >= BATTLE.lesson.moveDist }); }   // やる相手（ふわり）に光る輪
     // 本番が始まったら、コクピットの枠が外れていく
     stripFlash = Math.max(0, stripFlash - realDt);
@@ -1912,6 +1931,7 @@ const Battle = (() => {
     // 障害物: 地面といっしょに流れる。自機がふれると被弾して、外へ押し出される
     for (const o of obs) {
       o.y += sc * dt;
+      if (o.lesTree && !les && o.y > H * 0.24) { o.lesTree = false; lesson("tree", { target: o, ty: o.y, done: () => !obs.includes(o) || o.y - o.r > player.y + 16 }); }   // 11/22-1: 木が見えた → 止めて説明 → よけて木が通りすぎたら「OK！」
       const d = Math.hypot(player.x - o.x, player.y - o.y), min = o.r + 16;
       if (d < min) {
         if (player.inv <= 0 && !showWord && !(odai && odai.intro > 0)) hurt();
@@ -2781,7 +2801,7 @@ const Battle = (() => {
       const entering = dir > 0 ? b.x - b.w / 2 < stripRight() + 6 : b.x + b.w / 2 > W - 6;   // まだ全部は見えていない箱は、チュートリアルのあいだも入ってくる
       b.x += dir * mv.speed * (entering ? dt : md);
       b.y = laneY(b.lane);
-      if (b.word && !b.open && !entering) { const n0 = reacted; lesson("s5box", { ty: b.y, target: b, done: () => reacted > n0 }); }   // チュートリアル: 最初の箱が全部見えた → 止めて説明 → 押さえて開ける（11/7-20）
+      if (b.word && !b.open && !entering) { const n0 = reacted; lesson("s5box", { hold: true, ty: b.y, target: b, done: () => reacted > n0 }); }   // チュートリアル: 最初の箱が全部見えた → 止めて説明 → 押さえて開ける（11/7-20）
       if (b.open) { b.openT += dt; continue; }
       if ((dir > 0 && b.x - b.w / 2 > W) || (dir < 0 && b.x + b.w / 2 < 0)) { b.out = true; b.wait = mv.wait; b.hold = 0; continue; }
       if (press && !pressed && Math.abs(press.x - b.x) < b.w / 2 + 6 && Math.abs(press.y - b.y) < b.h / 2 + 6 && b.x > stripRight() && b.x < W) pressed = b;
@@ -2834,7 +2854,7 @@ const Battle = (() => {
     reacted++;
     found.add(d.word.id); foundAt[d.word.id] = t;
     score += BATTLE.scoreWord;
-    floats.push({ x: fitX(d.x, d.w), y: d.y - d.size, text: tx("explore.found"), big: false, found: true, age: 0 });
+    floats.push({ x: fitX(d.x, d.w), y: d.y - d.size - BATTLE.foundLift, text: tx("explore.found"), big: false, found: true, age: 0 });   // 11/22-1: ことばの名前と重ならないように上へ
     Sound.se("shine");
   }
 
@@ -3241,7 +3261,7 @@ const Battle = (() => {
       ctx.font = font(fl.xl ? 26 : fl.kana ? 22 : (fl.big ? 18 : 12));   // xl: 地上の雑魚を倒した「＋100」（11/7-23）
       ctx.lineWidth = fl.seed ? 6 : 4; ctx.strokeStyle = fl.seed ? "#fff6c8" : "#ffffff";
       ctx.strokeText(fl.text, fl.x, fl.y - fl.age * 30);
-      ctx.fillStyle = fl.seed ? "#e8541e" : fl.wrong ? "#b05068" : (fl.found ? tint("#6f9a4a") : (fl.kana ? "#5d6b4c" : (fl.big ? "#c98a1e" : "#8a9a78")));   // 砕けた文字の読みは、ふりがなの色
+      ctx.fillStyle = fl.seed ? "#e8541e" : fl.wrong ? "#b05068" : (fl.found ? FOUND_COLOR : (fl.kana ? "#5d6b4c" : (fl.big ? "#c98a1e" : "#8a9a78")));   // 砕けた文字の読みは、ふりがなの色
       ctx.fillText(fl.text, fl.x, fl.y - fl.age * 30);
     }
     ctx.globalAlpha = 1;
@@ -3257,9 +3277,9 @@ const Battle = (() => {
       ctx.font = font(16);
       ctx.lineWidth = 5; ctx.strokeStyle = "#ffffff"; ctx.lineJoin = "round";
       const hy = player.y + 54 > H - 92 ? player.y - 56 : player.y + 54;   // 下のボタンの帯にかかるときは、ふわりの上に（11/7-28）
-      if (!hintCard && !rewindGuide) ctx.strokeText(tx("rescue.moveHint"), W / 2, hy);   // 案内が出ているあいだは出さない（同じことを2か所に書かない）
+      if (!hintCard && !rewindGuide) ctx.strokeText(tx(moveHintKey()), W / 2, hy);   // 案内が出ているあいだは出さない（同じことを2か所に書かない）
       ctx.fillStyle = tint("#48693a");
-      if (!hintCard && !rewindGuide) ctx.fillText(tx("rescue.moveHint"), W / 2, hy);
+      if (!hintCard && !rewindGuide) ctx.fillText(tx(moveHintKey()), W / 2, hy);
       ctx.globalAlpha = 1;
     }
     if (state === "play" && phase !== "round1") drawGravArrows();   // 11/7-37
@@ -3448,11 +3468,17 @@ const Battle = (() => {
 
   // 「パワーアップ！」（10/25-9）: 大きく、ぽんと出て、少し上がりながら消える
   //   10/25-11: 助けたことばの大きな表示（画面の中ほど）と重ならないよう、自機の上に出す（パワーアップは、ことばを助けた瞬間に起きるので）
+  // 11/22-1: ふわりの少し上（ふわりの高さ分だけ上）。助けたことばの大きな表示（画面のまん中）と重なるときは、その下に
+  function powerFxY() {
+    let y = Math.min(player.y, H - 80) - BATTLE.powerFxLift;
+    if (showWord) y = Math.max(y, H * 0.45 + BATTLE.powerFxWordGap);
+    return Math.min(y, H - 60);
+  }
   function drawPowerFx() {
     const k = powerFx.age / BATTLE.powerFxTime, pop = k < 0.15 ? 0.6 + k / 0.15 * 0.55 : 1.15 - Math.min(1, (k - 0.15) / 0.2) * 0.15;
     ctx.save();
     ctx.globalAlpha = Math.min(1, (1 - k) * 3);
-    ctx.translate(W / 2, Math.min(player.y, H - 80) - 110 - k * 30); ctx.scale(pop, pop);
+    ctx.translate(W / 2, powerFxY() - k * 30); ctx.scale(pop, pop);
     ctx.font = font(44); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
     if (powerFx.top) {   // 4段目（11/1-4）: ふつうより大きく（画面の幅に収まるまで）、金色、光の輪
       const big = Math.min(1.35, (W - 24) / ((ctx.measureText(tx("rescue.powerUp")).width + 20) * pop));
@@ -4565,7 +4591,7 @@ const Battle = (() => {
     ctx.fillRect(0, 0, W, H);
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     if (sortieNo === 2 && sortieStep === "say") drawChoiceSay();
-    else if (sortieNo === 2 && sortieStep === "choice") drawChoice(); else if (door) drawDoor();
+    else if (sortieNo === 2 && sortieStep === "choice") { drawChoice(); drawPicked(); } else if (door) drawDoor();
     ctx.restore();
   }
 
@@ -4687,7 +4713,7 @@ const Battle = (() => {
       ctx.font = font(fl.big ? 18 : 14);
       ctx.lineWidth = 4; ctx.strokeStyle = "#ffffff";
       ctx.strokeText(fl.text, fl.x, fl.y - fl.age * 30);
-      ctx.fillStyle = fl.found ? tint("#6f9a4a") : "#c98a1e";
+      ctx.fillStyle = fl.found ? FOUND_COLOR : "#c98a1e";   // 11/22-1: 「見つけた！」はオレンジ（白いふち）
       ctx.fillText(fl.text, fl.x, fl.y - fl.age * 30);
     }
     ctx.globalAlpha = 1;
@@ -4754,7 +4780,7 @@ const Battle = (() => {
       if (b.open) { b.openT += dt; continue; }
       const md = lesDo() ? 0 : dt;   // チュートリアルの「やってみる」のあいだは、ことばは動かない（回るのは続く）
       b.x += b.vx * md; b.y += b.vy * md; if (!b.grab) b.ang += b.spin * dt;
-      { const n0 = reacted; lesson("s9spin", { ty: b.y, target: b, done: () => reacted > n0 }); }   // チュートリアル: 最初のことばが出た → 向きを直して見つける（11/7-20）   // 押さえているあいだは回らない
+      { const n0 = reacted; lesson("s9spin", { hold: true, ty: b.y, target: b, done: () => reacted > n0 }); }   // チュートリアル: 最初のことばが出た → 向きを直して見つける（11/7-20）   // 押さえているあいだは回らない
       if (b.x - b.w / 2 < minX) { b.x = minX + b.w / 2; b.vx = Math.abs(b.vx); }
       if (b.x + b.w / 2 > maxX) { b.x = maxX - b.w / 2; b.vx = -Math.abs(b.vx); }
       if (b.y - b.h / 2 < minY) { b.y = minY + b.h / 2; b.vy = Math.abs(b.vy); }
@@ -4839,7 +4865,7 @@ const Battle = (() => {
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
       if (face === 0) {   // 「OPEN」の面
         ctx.fillStyle = "#3f9a5a"; roundRect(-w * 0.36, -h * 0.2, w * 0.72, h * 0.42, 6); ctx.fill();
-        ctx.fillStyle = "#ffffff"; ctx.font = font(16); ctx.fillText("OPEN", 0, 1);
+        ctx.fillStyle = "#ffffff"; ctx.font = font(16); ctx.fillText(tx("box.boxOpen"), 0, 1);   // 11/22-1: 「OPEN」→「あける」
       } else if (face > 0) {   // ほかの面（回っている）
         ctx.fillStyle = "rgba(90,60,30,0.55)"; ctx.font = font(22); ctx.fillText("↻", 0, 4);
       } else { ctx.fillStyle = "rgba(90,60,30,0.6)"; ctx.font = font(26); ctx.fillText("？", 0, 4); }
@@ -4891,7 +4917,7 @@ const Battle = (() => {
       ctx.font = font(fl.big ? 18 : 15);
       ctx.lineWidth = 4; ctx.strokeStyle = "#ffffff";
       ctx.strokeText(fl.text, fl.x, fl.y - fl.age * 30);
-      ctx.fillStyle = fl.found ? tint("#6f9a4a") : "#8a6a4a";
+      ctx.fillStyle = fl.found ? FOUND_COLOR : "#8a6a4a";
       ctx.fillText(fl.text, fl.x, fl.y - fl.age * 30);
     }
     ctx.globalAlpha = 1;
@@ -4912,7 +4938,9 @@ const Battle = (() => {
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
       const hy = H * 0.14;
       const ht = tx(exMove.space ? "space.moveHint" : exMove.open ? "box.openHint" : exMove.lock ? "box.lockHint" : "box.moveHint");   // ステージごとの1行（6 OPEN／7 鍵。10/31-10 試作）
-      if (!hintCard) { ctx.strokeText(ht, W / 2, hy); ctx.fillStyle = "#3f4f6a"; ctx.fillText(ht, W / 2, hy); }
+      const hx = (stripRight() + W) / 2, hw = W - stripRight() - 12;   // 11/22-1: 左の札にかからないよう、札の右の空きのまん中に。入らなければ字を小さく
+      for (let fs = 16; fs > 12 && ctx.measureText(ht).width > hw; ) { fs -= 1; ctx.font = font(fs); }
+      if (!hintCard) { ctx.strokeText(ht, hx, hy); ctx.fillStyle = "#3f4f6a"; ctx.fillText(ht, hx, hy); }
       ctx.globalAlpha = 1;
     }
     if (banner) drawBanner();
@@ -4949,9 +4977,13 @@ const Battle = (() => {
     if (L.step === "say" || (L.step === "do" && !odai)) {
       const say = L.step === "say", a = say ? Math.min(1, L.t / 0.2) : 1;
       ctx.globalAlpha = a;
-      if (say) { ctx.fillStyle = "rgba(25,35,30,0.45)"; ctx.fillRect(0, 0, W, H); }
-      const tg = L.target;
-      if (tg && tg.x !== undefined && !(tg.hp <= 0) && !tg.open && !tg.got && !tg.found) {   // やってみる相手を、光る輪で示す
+      const tg = L.target, ringOn = tg && tg.x !== undefined && !(tg.hp <= 0) && !tg.open && !tg.got && !tg.found;
+      if (say) {   // 11/22-1: 暗い幕は、丸で囲んだ所だけ切り抜く（丸の中は元の明るさ）
+        ctx.fillStyle = "rgba(25,35,30,0.45)"; ctx.beginPath(); ctx.rect(0, 0, W, H);
+        if (ringOn) ctx.arc(tg.x, tg.y, ringR(tg) * (1 + 0.08 * Math.sin(performance.now() / 160)), 0, Math.PI * 2, true);
+        ctx.fill("evenodd");
+      }
+      if (ringOn) {   // やってみる相手を、光る輪で示す
         const r = ringR(tg) * (1 + 0.08 * Math.sin(performance.now() / 160));
         ctx.save(); ctx.globalAlpha = a * 0.95; ctx.strokeStyle = "#fff6b8"; ctx.lineWidth = 4; ctx.shadowColor = "rgba(255,220,90,0.9)"; ctx.shadowBlur = 14;
         ctx.beginPath(); ctx.arc(tg.x, tg.y, r, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
@@ -4965,7 +4997,7 @@ const Battle = (() => {
       if (say && L.t >= BATTLE.lesson.tapAfter) {
         ctx.globalAlpha = 0.6 + Math.sin(performance.now() / 250) * 0.4;
         ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.font = font(15); ctx.fillStyle = tint("#6f9a4a");
-        ctx.fillText(tx("lessons.tap"), W / 2, py + ph - 20);
+        ctx.fillText(tx(L.hold ? "lessons.tapHold" : "lessons.tap"), W / 2, py + ph - 20);
       }
     } else if (L.step === "ok") {
       const k = Math.min(1, L.t / 0.25), sc = k < 1 ? 0.4 + 0.9 * k : 1.3 - 0.3 * Math.min(1, (L.t - 0.25) / 0.15);
@@ -5149,6 +5181,20 @@ const Battle = (() => {
     });
   }
 
+  // 選んだ札の右上の「えらんだ」（11/22-1）: 世界の色の札に白い字。ぽんと出る
+  function drawPicked() {
+    if (!picked) return;
+    const r = choiceRects().find(q => q.id === picked.id);
+    if (!r) return;
+    const k = Math.min(1, (BATTLE.pickedTime - picked.t) / 0.12), sc = 0.6 + 0.4 * k;
+    ctx.save();
+    ctx.font = font(12); const tw = ctx.measureText(tx("choice.picked")).width + 16, th = 22;
+    ctx.translate(r.x + r.w - 10 - tw / 2, r.y + 2); ctx.scale(sc, sc);
+    ctx.fillStyle = tint("#6f9a4a"); ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2;
+    roundRect(-tw / 2, -th / 2, tw, th, th / 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#ffffff"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(tx("choice.picked"), 0, 1);
+    ctx.restore();
+  }
   function drawChoice() {
     const art = choiceArtRect();
     if (art) { drawChoiceArt(art); return; }   // 絵が読めなかったら、下の今までの見た目
@@ -5315,7 +5361,14 @@ const Battle = (() => {
     ctx.restore();
   }
   function drawSkillButtons() {
-    for (const b of skillButtons()) drawSkillButton(b);
+    const bs = skillButtons();
+    for (const b of bs) drawSkillButton(b);
+    // 11/22-1: 3つの並びの上に1つだけ小さく「必殺ワザ」
+    const f = bs[0], l = bs[bs.length - 1], hy = f.y - f.r - 27;
+    ctx.save(); ctx.font = font(9); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
+    ctx.lineWidth = 3; ctx.strokeStyle = "#ffffff"; ctx.strokeText(tx("skills.head"), (f.x + l.x) / 2, hy);
+    ctx.fillStyle = "#7a8a68"; ctx.fillText(tx("skills.head"), (f.x + l.x) / 2, hy);
+    ctx.restore();
   }
   function drawSkillButton(b) {
     const used = b.id === "rewind" && (rewindUsed || lastT > 0), full = gauge >= 100 && !used, [C, rim] = SKILL_COLORS[b.id];
@@ -5359,15 +5412,11 @@ const Battle = (() => {
     } else { ctx.save(); ctx.translate(b.x, b.y); drawRewindArrow(b.r * 0.48, full ? "#ffffff" : used ? "#888888" : C, 4); ctx.restore(); }
     // 上の名前（使った巻き戻しは「使った」）
     const label = used ? tx("skills.used") : skillName(b.id);
-    ctx.font = font(full ? 10 : 9); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
-    const ly = b.y - r - (full ? 9 : 7);
+    ctx.font = font(BATTLE.skillNameSize); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";   // 11/22-1: 名前を大きく（前は 9〜10px）
+    const ly = b.y - b.r - 11;
     ctx.lineWidth = 3; ctx.strokeStyle = "#ffffff"; ctx.strokeText(label, b.x, ly);
     ctx.fillStyle = full ? C : "#7a8a68"; ctx.fillText(label, b.x, ly);
-    if (b.id === "rewind" && !used) {   // 下に小さく「はじめから」（11/7-9 決定）
-      ctx.font = font(9); const sy = b.y + b.r + 9;
-      ctx.lineWidth = 3; ctx.strokeText(tx("skills.rewindSub"), b.x, sy);
-      ctx.fillStyle = full ? C : "#7a8a68"; ctx.fillText(tx("skills.rewindSub"), b.x, sy);
-    }
+    // （巻き戻しの下の「はじめから」は、11/22-1 にやめた）
     ctx.restore();
   }
 

@@ -549,7 +549,7 @@ const Main = (() => {
       // 11/7-39 決定: 宝石は枠の右端（縦の中央）。まだないステージは、うすい宝石の影
       const marks = document.createElement("span"); marks.className = "marks";
       const lit = litSet.has(s.id);
-      marks.innerHTML = `<svg class="row-gem${lit ? "" : " ghost"}" viewBox="-22 -22 44 44">${GEM_ART(s.gem, lit, 19, s.id)}</svg>`;   // 宝石があれば宝石の絵（11/7-19: 「10のことば」「ステージクリア」の札はやめた。クリアした枠が光るのはそのまま）
+      marks.innerHTML = (b ? `<span class="row-clear">${tx("stagesTag.cleared")}</span>` : "") + `<svg class="row-gem${lit ? "" : " ghost"}" viewBox="-22 -22 44 44">${GEM_ART(s.gem, lit, 19, s.id)}</svg>`;   // 宝石があれば宝石の絵（11/7-19: 「10のことば」「ステージクリア」の札はやめた。クリアした枠が光るのはそのまま）
       main.append(nm, sub);   // 枠は2行（ステージ名／カード ○/10　最高 ○点）。11/7-39: 宝石は3行目をやめて右端に
       row.append(no, main, marks);
       if (open) row.addEventListener("click", () => { Sound.se("start"); selectStage(s.id); toBattle(); });
@@ -671,7 +671,7 @@ const Main = (() => {
   // 1行の文（「——」は前の語につけて、行の頭に来ないように。11/7-30）: 「男の子「…」」の形なら、話す人の名前を小さく色つきに。改行はことばのかたまりの途中でしない
   function opLineHTML(l) {
     const ph = t => Cards.phraseHTML(Ruby.inline(t))   /* 「洗（あら）った」のかっこ書きは、漢字の上のルビに（11/7-30） */.replace(/([\u4e00-\u9fff々]|<\/ruby><\/span>)<wbr>(?=[ぁ-ん（])/g, "$1").replace(/([^\s<>;])(―+|—+)/g, '<span class="rbw">$1$2</span>');   // 「——」は前の1字とくっつける   // 漢字と、そのあとの送りがな・ふりがなのあいだでは折り返さない
-    const m = l.match(/^([^「」、。！？\s]{1,6})(「[\s\S]*」)$/);
+    const m = l.match(/^([^「」、。！？\s（）]{1,6}(?:（[ぁ-んー]+）)?)(「[\s\S]*」)$/);   // 11/22-1: 名前にふりがなのかっこ書きがあっても（「美容師（びようし）」）話す人の名前に
     return m ? `<p><span class="op-who">${ph(m[1])}</span>${ph(m[2])}</p>` : `<p>${ph(l)}</p>`;
   }
   // 絵と文の置き方: 文がクリーム色の場所から下に入るように、絵の大きさを決める。文字は17px（10/31-8。前は17〜12px）
