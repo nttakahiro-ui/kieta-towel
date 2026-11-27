@@ -1100,3 +1100,14 @@ button.ub.ub-s { width: auto; padding: 5px 12px 6px; font-size: 14px; }
 .fx-card.has-pic { flex-direction: column; justify-content: flex-start; align-items: stretch; padding: 3px; gap: 1px; overflow: hidden; }
 .fx-card.has-pic .pic-frame { position: relative; padding: 0; background: #fffdf7; width: 100%; flex: none; border-width: 1.5px; border-radius: 5px; }
 .fx-card.has-pic span:not(.pic-frame) { position: static; width: auto; padding: 0; background: none; font-size: 9px; font-weight: bold; line-height: 1.15; }
+
+/* ===== 11/27-4（指摘122の再調整）: タイトルの下の5つのボタンは主張を弱める =====
+   クリーム色（もどる系と同じ）・こげ茶の字・13px・ふち1px・影2px。世界の色では変えない（どの世界でも同じ）。
+   高さは 28.5px → 22.6px（2割低く）、2段のあいだ 6px → 3px。下からの位置を 14.8px 上げて、スタートとのあいだは前のまま */
+#screen-title.art .title-links { bottom: calc(max(6px, env(safe-area-inset-bottom)) + 14.8px); gap: 3px 6px; }
+#screen-title.art .title-links button.title-ub { font-size: 13px; line-height: 1.2; padding: 2px 9px 3px; border-radius: 10px;
+  color: #5a4526; text-shadow: 0 1px 0 rgba(255,255,255,.7);
+  background: linear-gradient(180deg, #fffaea 0%, #f1e5c4 62%, #d8c391 140%);
+  border: 1px solid #b59a62; box-shadow: 0 2px 0 #b59a62, 0 3px 5px rgba(0,0,0,.10), inset 0 0 0 1px rgba(255,255,255,.4); }
+#screen-title.art .title-links button.title-ub::before { opacity: .5; border-radius: 8px 8px 40% 40% / 8px 8px 10px 10px; }
+#screen-title.art .title-links button.title-ub:active { transform: translateY(2px); box-shadow: 0 0 0 #b59a62, 0 1px 2px rgba(0,0,0,.10), inset 0 0 0 1px rgba(255,255,255,.4); }
