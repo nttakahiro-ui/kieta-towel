@@ -695,35 +695,27 @@ const Main = (() => {
   }
 
   // ===== オープニング（10/31-6）: 絵1枚＋その下の文の11画面。タップで次へ、右上の「とばす」、最後のあとはタイトルへ =====
-  const OP_ART = 1672 / 941;   // 絵の縦横比
+  const OP_ART = 1137 / 640;   // 絵の縦横比（11/27-6: 24枚とも 640×1137）
   const STORY_FONT = 15, STORY_LH = 1.4, STORY_BAND_LH = 21;   // 11/27-1e: オープニング・エンディング共通の字の大きさと行間（帯の行の高さ 15×1.4）
-  // ===== 11/27-5 決定: めくっても絵の枠と白地（文の場所）が動かない（オープニング・エンディング共通） =====
-  //   白地の上辺は全画面で同じ線: 画面の幅いっぱいの絵（入らなければ高さに合わせた絵）の高さ × STORY_LINE。この線より上が「絵の枠」、下が「文の場所」
-  //   絵は枠に合わせて拡大縮小する: 上を基準に、絵の中の白地の始まり（STORY_CREAM。1枚ずつ測った値）がちょうど線に来る大きさ。横は画面の幅いっぱい（はみ出す分は左右均等に切る）
-  //   線は絵の中の白地の始まりのいちばん低い値（エンディング 0.77 ＝ 決定の値。オープニング 0.775 ＝ 画面8）なので、どの絵も画面の幅より細くならない
-  //   ナレーションの帯・「タップで次へ」「○/13」「とばす」の位置も全画面で同じ。文が白地に入らない画面は、文を分けて次のタップに回す（文は変えない）
-  const STORY_LINE = { op: 0.775, ed: 0.77 };
-  // 絵の中の白地の始まり（絵の高さに対する割合。11/27-5 に、下から行ごとに白地の色かを見て測った）
-  const STORY_CREAM = {
-    op: [0.770, 0.738, 0.748, 0.747, 0.771, 0.746, 0.746, 0.775, 0.758, 0.742, 0.726],                  // op_01〜op_11
-    ed: [0.748, 0.717, 0.754, 0.737, 0.718, 0.703, 0.715, 0.769, 0.763, 0.718, 0.724, 0.721, 0.736],    // e01〜e13
-  };
+  // ===== 11/27-6 決定: 絵は表示時に拡大縮小せず、あらかじめ同じ型に切った画像にする（オープニング・エンディング共通） =====
+  //   型: 640×1137 の JPEG。上から0〜77%が絵、77%〜100%が白地（全部同じクリーム色 #fcf5e8 ＝ 画面の地の色）。作り方は docs/story_images.py
+  //   表示は、この画像を枠（画面の幅いっぱい。入らなければ高さに合わせる）にそのまま置くだけ。画面ごとの拡大縮小・左右のぼかし埋めはしない
+  //   画面の幅が広いときの左右の余白は、画面の地の色（白地と同じクリーム色）
+  //   絵の枠・白地・帯・「タップで次へ」「○/13」「とばす」の位置は、全画面で同じpx
+  const STORY_LINE = 0.77;     // 白地の上辺（絵の高さに対する割合）
+  const STORY_BAND_ROWS = { op: 3, ed: 2 };   // 11/27-6 決定: ナレーションの帯の高さ（行の数。行の高さ 15px×1.4）。行が少ない画面でも高さは同じ
   const STORY_TALK_MAX = 3;    // 1回に出す会話は3つまで（11/27-1b・11/27-1e）
   // 枠と白地の位置（画面の大きさだけで決まる。どの画面でも同じ）
-  function storyGeo(sc, kind) {
+  function storyGeo(sc) {
     const W = sc.clientWidth, H = sc.clientHeight;
     let iw = W, ih = W * OP_ART;
     if (ih > H) { ih = H; iw = H / OP_ART; }
-    const line = Math.round(ih * STORY_LINE[kind] * 10) / 10;
-    return { W, H, line, left: (W - iw) / 2, iw, tw: Math.min(iw, 520) - 24 };
+    const line = Math.round(ih * STORY_LINE * 10) / 10;
+    return { W, H, line, left: (W - iw) / 2, iw, ih, tw: Math.min(iw, 520) - 24 };
   }
-  // 絵を枠に合わせる（上を基準に、絵の白地の始まりを線に）
-  function storyFit(g, kind, n, img, blur, paper) {
-    const c = STORY_CREAM[kind][n] || STORY_LINE[kind];
-    const h = g.line / c, w = h / OP_ART;
-    Object.assign(img.style, { width: `${w}px`, height: `${h}px`, left: `${(g.W - w) / 2}px`, top: "0px" });
-    blur.style.height = `${g.line}px`;
-    blur.style.display = w < g.W - 2 ? "" : "none";   // 絵が画面の幅より細いとき（横に広い画面）だけ、左右をぼかした絵で埋める
+  // 絵を枠にそのまま置く（11/27-6。絵ごとの拡大縮小はしない）
+  function storyPlace(g, img, paper) {
+    Object.assign(img.style, { width: `${g.iw}px`, height: `${g.ih}px`, left: `${g.left}px`, top: "0px" });
     paper.style.top = `${g.line}px`;
   }
   // 会話の高さを測る（白地の幅・字の大きさで）
@@ -754,7 +746,7 @@ const Main = (() => {
   const OP_FOOT = 40;          // 下の「タップで次へ」「○/11」の場所
   function opChunks(lines) {
     const narr = lines.filter(l => !OP_WHO.test(l)), talk = lines.filter(l => OP_WHO.test(l));
-    const sc = $("screen-opening"), g = storyGeo(sc, "op"), txt = $("op-text");
+    const sc = $("screen-opening"), g = storyGeo(sc), txt = $("op-text");
     Object.assign(txt.style, { width: `${g.tw}px`, fontSize: `${STORY_FONT}px`, lineHeight: String(STORY_LH) });
     const room = g.H - OP_FOOT - (g.line + 6);   // 11/27-5: 白地の高さ（線から下、下の文字の上まで）
     return storySplit(talk, gr => storyTextH(txt, gr.map(opLineHTML).join("")) <= room + 0.5)
@@ -768,16 +760,16 @@ const Main = (() => {
     const m = l.match(OP_WHO);
     return m ? `<p><span class="ed-who">${opHTML(m[1])}</span>${opHTML(m[2])}</p>` : `<p>${opHTML(l)}</p>`;
   }
-  // 11/27-5: 絵の枠と白地は全画面で同じ（storyGeo）。文の量で絵の大きさを変えない（前は文に合わせて絵を小さくしていた）
+  // 11/27-5・11/27-6: 絵の枠と白地は全画面で同じ（storyGeo）。文の量で絵の大きさを変えない
   function layoutOpening() {
     const sc = $("screen-opening"), txt = $("op-text");
     if (!sc.clientWidth || !sc.clientHeight) return;
-    const g = storyGeo(sc, "op");
+    const g = storyGeo(sc);
     Object.assign(txt.style, { width: `${g.tw}px`, fontSize: `${STORY_FONT}px`, lineHeight: String(STORY_LH), top: `${g.line + 6}px` });
-    storyFit(g, "op", opIdx, $("op-img"), $("op-blur"), $("op-paper"));
+    storyPlace(g, $("op-img"), $("op-paper"));
     const band = $("op-band");
     Object.assign(band.style, { left: `${g.left}px`, width: `${g.iw}px`, fontSize: `${STORY_FONT}px`, lineHeight: `${STORY_BAND_LH}px` });
-    storyBand(band, opParts[opPart].narr.map(opHTML));
+    storyBand(band, opParts[opPart].narr.map(opHTML), STORY_BAND_ROWS.op);
     const r = txt.getBoundingClientRect(), s0 = sc.getBoundingClientRect();
     return { fit: r.bottom - s0.top <= g.H - OP_FOOT + 0.5, over: Math.round(r.bottom - s0.top - (g.H - OP_FOOT)) };
   }
@@ -790,7 +782,6 @@ const Main = (() => {
     img.style.visibility = "";
     img.onerror = () => { img.style.visibility = "hidden"; };   // 絵が読めなくても、文は読める
     img.src = opSrc(i);
-    $("op-blur").style.backgroundImage = `url(${opSrc(i)})`;
     opParts = opChunks(list[i]);
     $("op-page").textContent = `${i + 1}/${list.length}`;   // 数字は絵の枚数のまま
     showOpeningPart(0);
@@ -813,7 +804,7 @@ const Main = (() => {
         const r = showOpeningPart(k), band = $("op-band");
         out.push(Object.assign({ screen: i + 1, part: k + 1, narr: p.narr.length, talk: p.talk.length, rows: band.children.length,
           bandBottom: Math.round(band.getBoundingClientRect().bottom), textTop: Math.round($("op-text").getBoundingClientRect().top),
-          rowsText: [...band.children].map(e => e.textContent.slice(0, 12) + `(${Math.round((e.clientHeight - 10) / STORY_BAND_LH)}行)`) }, r, fn ? { x: fn() } : {}));
+          lines: +band.dataset.lines || 0 }, r, fn ? { x: fn() } : {}));
       });
     });
     return out;
@@ -852,7 +843,7 @@ const Main = (() => {
       if (!s || s.scene !== l.scene) scenes.push(s = { scene: l.scene, img: l.img, narr: [], talk: [] });
       (l.who ? s.talk : s.narr).push(l);
     }
-    const sc = $("screen-story"), g = storyGeo(sc, "ed"), txt = $("ed-text");
+    const sc = $("screen-story"), g = storyGeo(sc), txt = $("ed-text");
     Object.assign(txt.style, { width: `${g.tw}px`, fontSize: `${ED_FONT}px`, lineHeight: String(STORY_LH) });
     const room = foot => g.H - foot - (g.line + 6);
     scenes.forEach((s, si) => {
@@ -864,37 +855,36 @@ const Main = (() => {
   }
   // 11/27-1c 決定: 会話は文字単位でふつうに折り返す（語のまとまりで改行を止める処理 Cards.phraseHTML は使わない。ルビは漢字のかたまりの上につくので、そのかたまりの中では折り返さない）
   const edTalkHTML = l => `<p><span class="ed-who">${Ruby.html(l.who)}</span>「${Ruby.html(l.text)}」</p>`;
-  // ===== 11/27-1e: ナレーションの帯（オープニング・エンディング共通） =====
-  //   全部を続けて1本に。2行をこえるときは、文の切れ目で段に分ける（最大3段）。分け方は、どの段も2行以内になるいちばん少ない段の数で、
-  //   その中でいちばん長い段の行が少ない分け方（3段でも2行をこえるときは、いちばん長い段がいちばん短くなる分け方）。11/27-1b のシーン12の2段（2本＋1本）と同じ結果
-  //   出るときは左から右へのワイプ（11/27-1f。CSS の .ed-band-row。0.5秒・端は24pxぼかす。段が複数なら上から0.15秒ずつずらす）。帯はタップを受けないので、途中でも次へ進める
-  function storyBand(box, texts) {   // texts: ルビつきの HTML の文
+  // ===== ナレーションの帯（オープニング・エンディング共通） =====
+  //   11/27-6 決定: 帯は高さを固定した1つの箱（オープニング3行分、エンディング2行分）。上辺の位置も固定。文は帯の左上から。
+  //   地の文がいくつもあるときも、同じ箱の中に行として入れる（段ごとに別の帯にしない）。分け方は、行の数がいちばん少なくなる分け方
+  //   （同じ行の数なら、文の切れ目で改行する分け方。最大3つに分ける）。行が少ない画面でも帯の高さは変えない
+  //   出るときは左から右へのワイプ（11/27-1f。CSS の .ed-band-row。0.5秒・端は24pxぼかす。行のまとまりが複数なら上から0.15秒ずつずらす）。帯はタップを受けないので、途中でも次へ進める
+  function storyBand(box, texts, rows) {   // texts: ルビつきの HTML の文。rows: 帯の高さ（行の数）
     box.style.display = texts.length ? "" : "none";
-    if (!texts.length) { box.innerHTML = ""; return; }
-    const draw = rows => {
-      box.innerHTML = rows.map((r, j) => `<div class="ed-band-row" style="animation-delay:${(j * 0.15).toFixed(2)}s">${r.join("　")}</div>`).join("");
-      return Math.max(...[...box.children].map(e => Math.round((e.clientHeight - 10) / STORY_BAND_LH)));
+    box.style.minHeight = `${rows * STORY_BAND_LH + 10}px`;   // 上下の内側の余白 5px ずつ。決めた行の数をこえる画面（11/27-6 の時点でオープニング画面5・10、エンディングのシーン12）は、文を切らないよう帯がのびる（報告して相談中）
+    if (!texts.length) { box.innerHTML = ""; box.dataset.lines = 0; return; }
+    const draw = parts => {
+      box.innerHTML = parts.map((r, j) => `<div class="ed-band-row" style="animation-delay:${(j * 0.15).toFixed(2)}s">${r.join("　")}</div>`).join("");
+      return [...box.children].reduce((t, e) => t + Math.round(e.clientHeight / STORY_BAND_LH), 0);
     };
     const n = texts.length, cuts = k => k === 1 ? [[]] : k === 2 ? [...Array(n - 1)].map((_, i) => [i + 1]) : [].concat(...[...Array(n - 2)].map((_, i) => [...Array(n - 2 - i)].map((_, j) => [i + 1, i + 2 + j])));
     const part = c => [0, ...c, n].slice(0, -1).map((x, i) => texts.slice(x, [...c, n][i]));
     let best = null;
-    for (let k = 1; k <= Math.min(3, n); k++) {
-      for (const c of cuts(k)) { const m = draw(part(c)); if (!best || m < best.m) best = { m, c }; }
-      if (best.m <= 2) break;
-    }
-    draw(part(best.c));
+    for (let k = 1; k <= Math.min(3, n); k++) for (const c of cuts(k)) { const m = draw(part(c)); if (!best || m <= best.m) best = { m, c }; }
+    box.dataset.lines = draw(part(best.c));   // 確かめ用: 行の数（帯の行の数をこえたら報告する）
     [...box.children].forEach(e => e.addEventListener("animationend", () => e.classList.add("open")));
   }
-  // 11/27-5: 絵の枠と白地は全画面で同じ（storyGeo）。絵は枠に合わせて拡大縮小（storyFit）。会話は白地の上辺から下
+  // 11/27-5・11/27-6: 絵の枠と白地は全画面で同じ（storyGeo）。絵は枠にそのまま置く（storyPlace）。会話は白地の上辺から下
   function layoutStory() {
     const sc = $("screen-story"), txt = $("ed-text"), pg = edList[edIdx];
     if (!sc.clientWidth || !sc.clientHeight || !pg) return {};
-    const g = storyGeo(sc, "ed");
-    storyFit(g, "ed", edImg - 1, $("ed-img"), $("ed-blur"), $("ed-paper"));
+    const g = storyGeo(sc);
+    storyPlace(g, $("ed-img"), $("ed-paper"));
     Object.assign(txt.style, { width: `${g.tw}px`, fontSize: `${ED_FONT}px`, lineHeight: String(STORY_LH), top: `${g.line + 6}px` });   // 11/27-1c: 左右の余白は12pxずつ
     const band = $("ed-band");
     Object.assign(band.style, { left: `${g.left}px`, width: `${g.iw}px`, fontSize: `${STORY_FONT}px`, lineHeight: `${STORY_BAND_LH}px` });   // 11/27-1e: 帯の字も15px・行間1.4（21px）
-    storyBand(band, pg.narr.map(l => Ruby.html(l.text)));
+    storyBand(band, pg.narr.map(l => Ruby.html(l.text)), STORY_BAND_ROWS.ed);
     const last = edIdx === edList.length - 1, reserve = last ? ED_FOOT_LAST : ED_FOOT;
     const r = txt.getBoundingClientRect(), s0 = sc.getBoundingClientRect();
     return { fit: r.bottom - s0.top <= g.H - reserve + 0.5, over: Math.round(r.bottom - s0.top - (g.H - reserve)) };
@@ -910,7 +900,6 @@ const Main = (() => {
       img.style.visibility = "";
       img.onerror = () => { img.style.visibility = "hidden"; };
       img.src = edSrc(edImg);
-      $("ed-blur").style.backgroundImage = `url(${edSrc(edImg)})`;
       $("ed-page").textContent = `${edImg}/13`;   // 絵の枚数のまま（2画面に分けたシーンは同じ数が続く）
       const song = edImg >= ED_TITLE_FROM ? "title" : "ending";
       if (song !== edSong) { edSong = song; Sound.play(song); }
@@ -924,7 +913,7 @@ const Main = (() => {
     return layoutStory();
   }
   // 確かめ用: 全部の画面が白地に入るか
-  window.__edFit = fn => { showScreen("story"); edList = edPages(); edImg = 0; const out = edList.map((p, i) => Object.assign({ scene: p.scene, talk: p.talk.length }, showStoryPage(i), fn ? { x: fn(i) } : {})); return out; };
+  window.__edFit = fn => { showScreen("story"); edList = edPages(); edImg = 0; const out = edList.map((p, i) => Object.assign({ scene: p.scene, talk: p.talk.length }, showStoryPage(i), { lines: +$("ed-band").dataset.lines || 0 }, fn ? { x: fn(i) } : {})); return out; };
   function toStory() {
     $("ed-skip").textContent = tx("ending.skip");
     $("ed-go").textContent = tx("ending.toTitle");

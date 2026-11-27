@@ -1119,3 +1119,10 @@ button.ub.ub-s { width: auto; padding: 5px 12px 6px; font-size: 14px; }
 .op-foot > span:first-child { position: absolute; right: calc(50% + 7px); white-space: nowrap; }
 .op-foot > span:last-child { position: absolute; left: calc(50% + 7px); white-space: nowrap; }
 .op-text p:last-child { margin-bottom: 0; }   /* 11/27-5: 最後の文の下の余白は白地の高さに数えない（見た目は同じ） */
+/* 11/27-6 決定: ナレーションの帯は高さを固定した1つの箱（高さは main.js の storyBand。オープニング3行分・エンディング2行分）。文は帯の左上から。
+   地の文がいくつもあっても同じ箱の中に行として入れる（段ごとに別の帯にしない）。帯の色・字・ワイプは前と同じ */
+.ed-band { box-sizing: border-box; display: block; gap: 0; background: rgba(0,0,0,.4); padding: 5px 12px; }
+.ed-band-row { background: none; padding: 0; }
+/* 11/27-6: 帯の中のルビは行の高さを広げない（行の間かくを 15px×1.4 にそろえ、帯の高さを固定するため）。ルビは漢字の真上に重ねて置く */
+.ed-band ruby { display: inline-block; position: relative; }
+.ed-band rt { position: absolute; left: -2em; right: -2em; bottom: 100%; margin-bottom: -2px; text-align: center; white-space: nowrap; }
