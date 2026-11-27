@@ -862,10 +862,11 @@ const Main = (() => {
   //   11/27-6 決定: 帯は高さを固定した1つの箱（オープニング3行分、エンディング2行分）。上辺の位置も固定。文は帯の左上から。
   //   地の文がいくつもあるときも、同じ箱の中に行として入れる（段ごとに別の帯にしない）。分け方は、行の数がいちばん少なくなる分け方
   //   （同じ行の数なら、文の切れ目で改行する分け方。最大3つに分ける）。行が少ない画面でも帯の高さは変えない
-  //   出るときは左から右へのワイプ（11/27-1f。CSS の .ed-band-row。0.5秒・端は24pxぼかす。行のまとまりが複数なら上から0.15秒ずつずらす）。帯はタップを受けないので、途中でも次へ進める
+  //   出るときは左から右へのワイプ（11/27-1f。CSS の .ed-band-row。0.9秒・端は24pxぼかす。行のまとまりが複数なら上から0.25秒ずつずらす。11/28-1 で0.5→0.9秒・0.15→0.25秒）。帯はタップを受けないので、途中でも次へ進める
+  const STORY_WIPE = 0.9, STORY_WIPE_STEP = 0.25, STORY_TALK_GAP = 1.0;   // 11/28-1: ワイプ0.9秒（CSS の band-wipe と同じ）・段のずれ0.25秒・ワイプ後から会話までの間1.0秒
   function storyBandBest(box, texts) {   // いちばん行の少ない分け方を帯に描いて、その行の数を返す
     const draw = parts => {
-      box.innerHTML = parts.map((r, j) => `<div class="ed-band-row" style="animation-delay:${(j * 0.15).toFixed(2)}s">${r.join("　")}</div>`).join("");
+      box.innerHTML = parts.map((r, j) => `<div class="ed-band-row" style="animation-delay:${(j * STORY_WIPE_STEP).toFixed(2)}s">${r.join("　")}</div>`).join("");
       return [...box.children].reduce((t, e) => t + Math.round(e.clientHeight / STORY_BAND_LH), 0);
     };
     const n = texts.length, cuts = k => k === 1 ? [[]] : k === 2 ? [...Array(n - 1)].map((_, i) => [i + 1]) : [].concat(...[...Array(n - 2)].map((_, i) => [...Array(n - 2 - i)].map((_, j) => [i + 1, i + 2 + j])));
@@ -900,7 +901,7 @@ const Main = (() => {
     return out;
   }
   // 11/27-7 決定: ナレーションを読んでから会話に進めるよう、帯のワイプが終わってから会話を出す
-  //   帯が新しく出る回: ワイプ（0.5秒＋行のまとまりのずれ 0.15秒ずつ）が終わって0.3秒後に、会話を0.3秒でふわっと出す。帯のない回は会話をすぐ出す
+  //   帯が新しく出る回: ワイプ（0.9秒＋行のまとまりのずれ 0.25秒ずつ）が終わって1.0秒後に（11/28-1）、会話を0.3秒でふわっと出す。帯のない回は会話をすぐ出す
   //   会話が出る前（帯のワイプ中も）にタップされたら、動きを飛ばしてその回の全部を出す（次へは進まない）。もう一度タップで次へ
   const storyWait = {};
   function storyTalkIn(kind, txt, band) {
@@ -910,7 +911,7 @@ const Main = (() => {
     if (!rows) { w.busy = false; txt.style.visibility = ""; txt.classList.remove("in"); void txt.offsetWidth; txt.classList.add("in"); return; }
     w.busy = true; w.txt = txt; w.band = band;
     txt.classList.remove("in"); txt.style.visibility = "hidden";
-    w.timer = setTimeout(() => { w.busy = false; txt.style.visibility = ""; void txt.offsetWidth; txt.classList.add("in"); }, (0.5 + 0.15 * (rows - 1) + 0.3) * 1000);
+    w.timer = setTimeout(() => { w.busy = false; txt.style.visibility = ""; void txt.offsetWidth; txt.classList.add("in"); }, (STORY_WIPE + STORY_WIPE_STEP * (rows - 1) + STORY_TALK_GAP) * 1000);
   }
   function storySkip(kind) {   // 動きの途中なら全部を出して true（そのタップでは次へ進まない）
     const w = storyWait[kind];
