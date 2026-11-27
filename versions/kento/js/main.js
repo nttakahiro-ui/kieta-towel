@@ -778,7 +778,7 @@ const Main = (() => {
   const ED_CREAM = [0, 0.749, 0.727, 0.763, 0.746, 0.728, 0.713, 0.722, 0.779, 0.773, 0.727, 0.724, 0.721, 0.743];
   // 2画面に分けるシーン（会話の数。375×667 と 390×844 で、3つが白地に入らなかったシーン。11/27-1b に測った）
   const ED_SPLIT = { "6": [2, 2], "8": [2, 1], "9A": [2, 1], "12": [2, 1] };   // 375×667 で 8・9A・12（最後の画面はボタンの場所も）が入らなかった。6 は会話が4つ
-  const ED_FONT = 14, ED_LH = 1.4;
+  const ED_FONT = 14, ED_LH = 1.4, ED_BAND_FONT = 15;   // 会話 14px・行間1.4。ナレーションの帯は15px（11/27-1c）
   const ED_TITLE_FROM = 8;     // この絵の番号（シーン8）から title の曲
   const edSrc = n => `assets/ending/e${String(n).padStart(2, "0")}.jpg`;
   const edPre = {};
@@ -799,7 +799,8 @@ const Main = (() => {
     return pages;
   }
   const edPh = t => Cards.phraseHTML(t);
-  const edTalkHTML = l => `<p><span class="ed-who">${edPh(l.who)}</span>「${edPh(l.text)}」</p>`;
+  // 11/27-1c 決定: 会話は文字単位でふつうに折り返す（語のまとまりで改行を止める処理 Cards.phraseHTML は使わない。ルビは漢字のかたまりの上につくので、そのかたまりの中では折り返さない）
+  const edTalkHTML = l => `<p><span class="ed-who">${Ruby.html(l.who)}</span>「${Ruby.html(l.text)}」</p>`;
   // ナレーションの帯: 続けて1本。2行をこえたら2段（前半と後半）
   function edBand(narr, width) {
     const box = $("ed-band");
@@ -807,6 +808,7 @@ const Main = (() => {
     if (!narr.length) { box.innerHTML = ""; return; }
     const one = list => `<div class="ed-band-row">${list.map(l => edPh(l.text)).join("　")}</div>`;
     box.innerHTML = one(narr);
+    box.classList.remove("in"); void box.offsetWidth; box.classList.add("in");   // 11/27-1c: 0.4秒でふわっと現れる
     const row = box.firstChild, lines = Math.round((row.clientHeight - 10) / (ED_FONT * ED_LH));
     if (lines > 2 && narr.length > 1) { const h = Math.ceil(narr.length / 2); box.innerHTML = one(narr.slice(0, h)) + one(narr.slice(h)); }
   }
@@ -820,10 +822,10 @@ const Main = (() => {
     Object.assign(img.style, { width: `${iw}px`, height: `${ih}px`, left: `${left}px` });
     $("ed-blur").style.height = `${ih * ED_CREAM[edImg]}px`;
     $("ed-blur").style.display = iw < W - 2 ? "" : "none";
-    const tw = Math.min(iw, 520) - 32;
+    const tw = Math.min(iw, 520) - 24;   // 11/27-1c: 左右の余白を4pxずつ減らした（前は −32）
     Object.assign(txt.style, { width: `${tw}px`, fontSize: `${ED_FONT}px`, lineHeight: String(ED_LH), top: `${ih * ED_CREAM[edImg] + 6}px` });
     const band = $("ed-band");
-    Object.assign(band.style, { left: `${left}px`, width: `${iw}px`, fontSize: `${ED_FONT}px`, lineHeight: String(ED_LH) });
+    Object.assign(band.style, { left: `${left}px`, width: `${iw}px`, fontSize: `${ED_BAND_FONT}px`, lineHeight: `${ED_FONT * ED_LH}px` });   // 11/27-1c: 帯の字は15px。行の高さは前のまま（帯の高さを変えない）
     edBand(pg.narr, iw);
     const last = edIdx === edList.length - 1, reserve = last ? 84 : 32;   // 下の「タップで次へ」（最後は「タイトルへ」のボタン）の場所
     const r = txt.getBoundingClientRect(), s0 = sc.getBoundingClientRect();

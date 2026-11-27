@@ -768,7 +768,11 @@ body { position: fixed; inset: 0; }
 .ed-text .ed-who { font-weight: bold; color: #8a6420; margin-right: .3em; }   /* 話す人の名前（文頭に色つき。名前の行は別に取らない） */
 /* 11/27-1b: ナレーションは絵の上部に細い半透明の帯（黒30%・白い字14px）。2行をこえるときは2段 */
 .ed-band { position: absolute; top: max(52px, calc(env(safe-area-inset-top) + 46px)); z-index: 1; display: flex; flex-direction: column; gap: 4px; pointer-events: none; }
-.ed-band-row { background: rgba(0,0,0,.3); color: #fff; padding: 5px 14px; text-align: center; text-shadow: 0 1px 2px rgba(0,0,0,.35); }
+.ed-band-row { background: rgba(0,0,0,.4); color: #fff; padding: 5px 14px; text-align: center; }   /* 11/27-1c: 黒30%→40%、字は15px（main.js）。黒いふちはつけない */
+.ed-band.in { animation: ed-band-in .4s ease-out both; }
+@keyframes ed-band-in { from { opacity: 0; } to { opacity: 1; } }
+/* 11/27-1c 決定: 会話は文字単位でふつうに折り返す。「、」「。」「」」「！」「？」「…」は行頭に来ない（line-break: strict） */
+.ed-text { word-break: normal; overflow-wrap: normal; line-break: strict; }
 .ed-band-row rt { color: #fff; }
 .ed-tap { animation: op-blink 1.6s ease-in-out infinite; }
 .ed-go { position: absolute; left: 50%; transform: translateX(-50%); bottom: max(34px, calc(env(safe-area-inset-bottom) + 24px)); z-index: 2; font-size: 19px; padding: 10px 34px; white-space: nowrap; }   /* 最後のセリフの「タイトルへ」。最後の絵では、文の下にこのボタンの場所をあける（layoutStory） */
