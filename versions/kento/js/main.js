@@ -749,8 +749,9 @@ const Main = (() => {
     const sc = $("screen-opening"), g = storyGeo(sc), txt = $("op-text");
     Object.assign(txt.style, { width: `${g.tw}px`, fontSize: `${STORY_FONT}px`, lineHeight: String(STORY_LH) });
     const room = g.H - OP_FOOT - (g.line + 6);   // 11/27-5: 白地の高さ（線から下、下の文字の上まで）
-    return storySplit(talk, gr => storyTextH(txt, gr.map(opLineHTML).join("")) <= room + 0.5)
-      .map((t, j) => ({ narr: j ? [] : narr, talk: t }));
+    const bands = storyBandGroups($("op-band"), g, narr, opHTML, STORY_BAND_ROWS.op);   // 11/27-7: 帯に入らない地の文は次のタップへ
+    const talks = storySplit(talk, gr => storyTextH(txt, gr.map(opLineHTML).join("")) <= room + 0.5);
+    return storyParts(bands, talks);
   }
   // 11/27-1e: ルビをつけた文（「洗（あら）った」のかっこ書きは漢字の上のルビに。11/7-30）。「——」は前の1字とくっつけて行の頭に来ないように（11/7-30）
   //   改行はエンディングと同じ: 文字単位でふつうに折り返す（語のまとまりで止めない）。禁則は CSS の line-break: strict
@@ -791,9 +792,10 @@ const Main = (() => {
     opPart = k;
     const txt = $("op-text");
     txt.innerHTML = opParts[k].talk.map(opLineHTML).join("");
-    txt.classList.remove("in"); void txt.offsetWidth; txt.classList.add("in");
     $("op-tap").textContent = tx(k + 1 < opParts.length ? "opening.more" : "opening.tap");
-    return layoutOpening();
+    const r = layoutOpening();
+    storyTalkIn("op", txt, $("op-band"));   // 11/27-7: 帯があれば、ワイプが終わってから会話
+    return r;
   }
   // 確かめ用（11/27-1e・11/27-5）: オープニングの全部の回が入るか、帯の段の数・会話の数
   window.__opFit = fn => {   // fn: 各回で呼ぶ確かめの関数（結果は x に）
@@ -848,8 +850,9 @@ const Main = (() => {
     const room = foot => g.H - foot - (g.line + 6);
     scenes.forEach((s, si) => {
       const lastScene = si === scenes.length - 1;
-      storySplit(s.talk, (gr, lastGroup) => storyTextH(txt, gr.map(edTalkHTML).join("")) <= room(lastScene && lastGroup ? ED_FOOT_LAST : ED_FOOT) + 0.5)
-        .forEach((t, j) => pages.push({ scene: s.scene, img: s.img, narr: j === 0 ? s.narr : [], talk: t }));
+      const bands = storyBandGroups($("ed-band"), g, s.narr, l => Ruby.html(l.text), STORY_BAND_ROWS.ed);   // 11/27-7: 帯に入らない地の文は次のタップへ
+      const talks = storySplit(s.talk, (gr, lastGroup) => storyTextH(txt, gr.map(edTalkHTML).join("")) <= room(lastScene && lastGroup ? ED_FOOT_LAST : ED_FOOT) + 0.5);
+      storyParts(bands, talks).forEach(p => pages.push(Object.assign({ scene: s.scene, img: s.img }, p)));
     });
     return pages;
   }
@@ -860,10 +863,7 @@ const Main = (() => {
   //   地の文がいくつもあるときも、同じ箱の中に行として入れる（段ごとに別の帯にしない）。分け方は、行の数がいちばん少なくなる分け方
   //   （同じ行の数なら、文の切れ目で改行する分け方。最大3つに分ける）。行が少ない画面でも帯の高さは変えない
   //   出るときは左から右へのワイプ（11/27-1f。CSS の .ed-band-row。0.5秒・端は24pxぼかす。行のまとまりが複数なら上から0.15秒ずつずらす）。帯はタップを受けないので、途中でも次へ進める
-  function storyBand(box, texts, rows) {   // texts: ルビつきの HTML の文。rows: 帯の高さ（行の数）
-    box.style.display = texts.length ? "" : "none";
-    box.style.minHeight = `${rows * STORY_BAND_LH + 10}px`;   // 上下の内側の余白 5px ずつ。決めた行の数をこえる画面（11/27-6 の時点でオープニング画面5・10、エンディングのシーン12）は、文を切らないよう帯がのびる（報告して相談中）
-    if (!texts.length) { box.innerHTML = ""; box.dataset.lines = 0; return; }
+  function storyBandBest(box, texts) {   // いちばん行の少ない分け方を帯に描いて、その行の数を返す
     const draw = parts => {
       box.innerHTML = parts.map((r, j) => `<div class="ed-band-row" style="animation-delay:${(j * 0.15).toFixed(2)}s">${r.join("　")}</div>`).join("");
       return [...box.children].reduce((t, e) => t + Math.round(e.clientHeight / STORY_BAND_LH), 0);
@@ -872,8 +872,53 @@ const Main = (() => {
     const part = c => [0, ...c, n].slice(0, -1).map((x, i) => texts.slice(x, [...c, n][i]));
     let best = null;
     for (let k = 1; k <= Math.min(3, n); k++) for (const c of cuts(k)) { const m = draw(part(c)); if (!best || m <= best.m) best = { m, c }; }
-    box.dataset.lines = draw(part(best.c));   // 確かめ用: 行の数（帯の行の数をこえたら報告する）
+    return draw(part(best.c));
+  }
+  function storyBand(box, texts, rows) {   // texts: ルビつきの HTML の文。rows: 帯の高さ（行の数）
+    box.style.display = texts.length ? "" : "none";
+    box.style.height = `${rows * STORY_BAND_LH + 10}px`;   // 上下の内側の余白 5px ずつ。11/27-7: 高さは固定（入らない文は storyBandGroups で次のタップに回してある）
+    if (!texts.length) { box.innerHTML = ""; box.dataset.lines = 0; return; }
+    box.dataset.lines = storyBandBest(box, texts);   // 確かめ用: 行の数
     [...box.children].forEach(e => e.addEventListener("animationend", () => e.classList.add("open")));
+  }
+  // 11/27-7 決定: 帯の高さは固定のまま。帯に入らない地の文は次のタップで帯を入れ替えて出す（文の切れ目で区切る。順番はそのまま）
+  function storyBandGroups(box, g, items, html, rows) {
+    Object.assign(box.style, { display: "", left: `${g.left}px`, width: `${g.iw}px`, fontSize: `${STORY_FONT}px`, lineHeight: `${STORY_BAND_LH}px` });
+    const groups = []; let cur = [];
+    for (const it of items) {
+      if (cur.length && storyBandBest(box, cur.concat(it).map(html)) > rows) { groups.push(cur); cur = []; }
+      cur.push(it);
+    }
+    if (cur.length) groups.push(cur);
+    box.innerHTML = "";
+    return groups;
+  }
+  // 回の一覧: 帯の入れ替えの回（会話なし）→ 帯の最後の回で会話の1つめ → 会話の続き（帯なし）
+  function storyParts(bands, talks) {
+    const out = bands.slice(0, -1).map(b => ({ narr: b, talk: [] }));
+    talks.forEach((t, j) => out.push({ narr: j ? [] : (bands[bands.length - 1] || []), talk: t }));
+    return out;
+  }
+  // 11/27-7 決定: ナレーションを読んでから会話に進めるよう、帯のワイプが終わってから会話を出す
+  //   帯が新しく出る回: ワイプ（0.5秒＋行のまとまりのずれ 0.15秒ずつ）が終わって0.3秒後に、会話を0.3秒でふわっと出す。帯のない回は会話をすぐ出す
+  //   会話が出る前（帯のワイプ中も）にタップされたら、動きを飛ばしてその回の全部を出す（次へは進まない）。もう一度タップで次へ
+  const storyWait = {};
+  function storyTalkIn(kind, txt, band) {
+    const w = storyWait[kind] || (storyWait[kind] = {});
+    clearTimeout(w.timer);
+    const rows = band.style.display === "none" ? 0 : band.children.length;
+    if (!rows) { w.busy = false; txt.style.visibility = ""; txt.classList.remove("in"); void txt.offsetWidth; txt.classList.add("in"); return; }
+    w.busy = true; w.txt = txt; w.band = band;
+    txt.classList.remove("in"); txt.style.visibility = "hidden";
+    w.timer = setTimeout(() => { w.busy = false; txt.style.visibility = ""; void txt.offsetWidth; txt.classList.add("in"); }, (0.5 + 0.15 * (rows - 1) + 0.3) * 1000);
+  }
+  function storySkip(kind) {   // 動きの途中なら全部を出して true（そのタップでは次へ進まない）
+    const w = storyWait[kind];
+    if (!w || !w.busy) return false;
+    clearTimeout(w.timer); w.busy = false;
+    [...w.band.children].forEach(e => { e.style.animation = "none"; e.classList.add("open"); });
+    w.txt.style.visibility = ""; w.txt.classList.remove("in");
+    return true;
   }
   // 11/27-5・11/27-6: 絵の枠と白地は全画面で同じ（storyGeo）。絵は枠にそのまま置く（storyPlace）。会話は白地の上辺から下
   function layoutStory() {
@@ -906,11 +951,12 @@ const Main = (() => {
     }
     const txt = $("ed-text");
     txt.innerHTML = pg.talk.map(edTalkHTML).join("");
-    txt.classList.remove("in"); void txt.offsetWidth; txt.classList.add("in");
     const last = i === edList.length - 1;
     $("ed-tap").textContent = last ? "" : tx("ending.tap");
     $("ed-go").classList.toggle("hidden", !last);
-    return layoutStory();
+    const r = layoutStory();
+    storyTalkIn("ed", txt, $("ed-band"));   // 11/27-7: 帯があれば、ワイプが終わってから会話
+    return r;
   }
   // 確かめ用: 全部の画面が白地に入るか
   window.__edFit = fn => { showScreen("story"); edList = edPages(); edImg = 0; const out = edList.map((p, i) => Object.assign({ scene: p.scene, talk: p.talk.length }, showStoryPage(i), { lines: +$("ed-band").dataset.lines || 0 }, fn ? { x: fn(i) } : {})); return out; };
@@ -1126,6 +1172,7 @@ const Main = (() => {
     $("btn-zukan-back").addEventListener("click", toStages);
     // オープニング（10/31-6）
     $("screen-opening").addEventListener("click", () => {
+      if (storySkip("op")) return;   // 11/27-7: 帯のワイプ・会話の出る途中なら、全部を出すだけ
       if (opPart + 1 < opParts.length) showOpeningPart(opPart + 1);   // 同じ絵で文の続き
       else if (opIdx + 1 < window.TEXTS.opening.screens.length) showOpeningPage(opIdx + 1); else endOpening();
     });
@@ -1133,7 +1180,7 @@ const Main = (() => {
     $("btn-opening").textContent = tx("opening.link");
     $("btn-opening").addEventListener("click", toOpening);
     // エンディング（11/27-1）: 画面をタップで次のセリフ。最後のセリフでは「タイトルへ」だけ
-    $("screen-story").addEventListener("click", () => { if (edIdx + 1 < edList.length) showStoryPage(edIdx + 1); });
+    $("screen-story").addEventListener("click", () => { if (storySkip("ed")) return; if (edIdx + 1 < edList.length) showStoryPage(edIdx + 1); });   // 11/27-7: 動きの途中なら全部を出すだけ
     $("ed-skip").addEventListener("click", e => { e.stopPropagation(); endStory(); });
     $("ed-go").addEventListener("click", e => { e.stopPropagation(); endStory(); });
     $("btn-ending").textContent = tx("ending.link");
