@@ -32,7 +32,7 @@ function align(surface, reading) {
 
 const tokenizer = await new Promise((ok, ng) => kuromoji.builder({ dicPath: path.join(path.dirname(require.resolve("kuromoji")), "../dict") }).build((e, t) => e ? ng(e) : ok(t)));
 // 辞書がまちがえる・読めない語（手で入れた読み）。一覧では「手で入れた」と出る
-const MANUAL = { "吸水速乾": "きゅうすいそっかん", "綿あめ": "わたあめ", "後染め": "あとぞめ", "強撚糸": "きょうねんし", "後晒し": "あとざらし", "日本独特": "にほんどくとく", "混打綿": "こんだめん", "混綿": "こんめん", "梳綿": "そめん" };
+const MANUAL = { "吸水速乾": "きゅうすいそっかん", "綿あめ": "わたあめ", "後染め": "あとぞめ", "強撚糸": "きょうねんし", "後晒し": "あとざらし", "日本独特": "にほんどくとく", "混打綿": "こんだめん", "混綿": "こんめん", "梳綿": "そめん", "虹色": "にじいろ" };   // 11/27-1: 虹色（辞書は「にじしょく」）
 const byWord = [...WORDS.map(w => ({ word: w.word, kana: w.kana, src: "120語の kana" })), ...Object.entries(MANUAL).map(([word, kana]) => ({ word, kana, src: "手で入れた" }))]
   .sort((a, b) => b.word.length - a.word.length);
 
@@ -107,6 +107,8 @@ for (const [o, places] of others) {
 // 画面の文（texts.js の結果・お題・クイズ）と、quiz.js・cards.js に書いてある文
 const walk = (o, p) => typeof o === "string" ? annotate(o, "画面の文 " + p) : o && typeof o === "object" && Object.entries(o).forEach(([k, v]) => walk(v, p + "." + k));
 for (const k of ["results", "odaiForm", "quiz", "lessons", "hints"]) walk(TEXTS[k], k);   // lessons・hints はチュートリアルの吹き出し（11/7-20）
+// 11/27-1: エンディングのセリフ（シーンごと）と話す人の名前
+for (const l of (TEXTS.ending && TEXTS.ending.lines) || []) { annotate(l.text, `エンディング シーン${l.scene}`); if (l.who) annotate(l.who, `エンディング シーン${l.scene}の話す人`); }
 for (const s of ["時間切れ！ 正解は", "正解は", "クイズで不正解。あとで受け直せる", "旅で助けられなかった。もう一度あそんで助けよう", "ベスト更新！", "ランク："]) annotate(s, "画面の文（quiz.js・cards.js）");
 // 文の組み立てで使う語の表（120語の名前など。文の表にない文に使う）
 for (const w of WORDS) if (hard(w.word)) { const v = (dictVotes[w.word] ||= {}); (v[hira(w.kana)] ||= { n: 0, spans: align(w.word, w.kana) }).n += 100; }

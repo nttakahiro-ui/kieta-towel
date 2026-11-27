@@ -761,6 +761,12 @@ body { position: fixed; inset: 0; }
 .op-foot { position: absolute; left: 0; right: 0; bottom: max(10px, env(safe-area-inset-bottom)); display: flex; justify-content: center; gap: 14px; font-size: 13px; color: #b0883a; }
 .op-foot #op-tap { animation: op-blink 1.6s ease-in-out infinite; }
 .op-skip { position: absolute; top: max(10px, env(safe-area-inset-top)); right: 10px; z-index: 2; font-family: var(--font); font-size: 14px; color: #5d4a22; background: rgba(255,250,236,.88); border: 1.5px solid #e0c58a; border-radius: 999px; padding: 5px 14px; cursor: pointer; }
+/* エンディング（11/27-1・指摘94）: オープニングと同じ見た目（.op-*）。1回に出すのはセリフ1つ。ナレーションは話す人の名前なしの帯 */
+#screen-story { background: #fcf5e8; overflow: hidden; padding: 0; cursor: pointer; }
+#screen-story.active { display: block; }
+.ed-text p.ed-narr { margin: 0; padding: .45em .9em; text-align: center; color: #5d4416; background: linear-gradient(90deg, rgba(236,214,160,0), rgba(236,214,160,.55) 14%, rgba(236,214,160,.55) 86%, rgba(236,214,160,0)); border-top: 1.5px solid rgba(200,160,80,.45); border-bottom: 1.5px solid rgba(200,160,80,.45); }
+.ed-tap { animation: op-blink 1.6s ease-in-out infinite; }
+.ed-go { position: absolute; left: 50%; transform: translateX(-50%); bottom: max(34px, calc(env(safe-area-inset-bottom) + 24px)); z-index: 2; font-size: 19px; padding: 10px 34px; white-space: nowrap; }   /* 最後のセリフの「タイトルへ」。最後の絵では、文の下にこのボタンの場所をあける（layoutStory） */
 @keyframes op-blink { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
 
 /* カードの絵（11/6-6）: 語句の上に正方形の絵。いちばん大きくて 160px（絵のファイルはその2倍の 320px） */
@@ -780,7 +786,7 @@ body { position: fixed; inset: 0; }
 body[data-world="2"] { --green: #4a729a; --green-dark: #3a5169; --green-light: #c6d8eb; --q-ok: #d3e2f2; --w-top: #dce8f3; --w-line: #b4c6d9; --w-line2: #e4ecf3; --w-gray: #68798a; --w-frame: #b6cbe0; --w-link: #909ca8; }
 body[data-world="3"] { --green: #794a9a; --green-dark: #553a69; --green-light: #dcc6eb; --q-ok: #e5d3f2; --w-top: #e9dcf3; --w-line: #cab4d9; --w-line2: #ede4f3; --w-gray: #7c688a; --w-frame: #ceb6e0; --w-link: #9e90a8; }
 /* 世界によらない画面とカードは、いつも世界1の緑（11/7-16 決定: カード図鑑のカード・タイトル・レシピブックは共通。オープニング・主人公えらび・エンディングも共通） */
-#screen-title, #screen-zukan, #screen-recipebook, #screen-ending, #screen-opening, #screen-intro, #screen-hero, .card {
+#screen-title, #screen-zukan, #screen-recipebook, #screen-ending, #screen-opening, #screen-story, #screen-intro, #screen-hero, .card {
   --green: #6f9a4a; --green-dark: #48693a; --green-light: #dcebc6; --q-ok: #e5f2d3; --w-top: #eaf3dc; --w-line: #c9d9b4; --w-line2: #eef3e4; --w-gray: #7a8a68; --w-frame: #cfe0b6; --w-link: #a0a890;
 }
 /* 取り逃しの減点（11/7-10）: 点数の上に赤く */

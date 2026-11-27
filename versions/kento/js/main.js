@@ -30,7 +30,7 @@ const Save = (() => {
   // found: ステージごとの、発見の旅で見つけたことばの id（10/25-15。「救出の旅をもう一度」で使う。救出で10のことばすべて助けたら消す）
   // openingSeen: オープニングを見たか（10/31-6。記録がない最初の起動のときだけ自動で出す）
   // skill: 選んでいる必殺ワザ、skillsSeen: 「手に入れた！」の画面を見たワザ（10/31-10 試作）
-  let data = { cards: {}, cleared: {}, retake: {}, best: {}, hero: null, introSeen: false, openingSeen: false, world: 1, gemsSeen: {}, found: {}, glowHint: false, warpSeen: {}, skill: "clear", skillsSeen: {}, zukanSeen: 0, zukanBounce: 0, zukanTip: false };
+  let data = { cards: {}, cleared: {}, retake: {}, best: {}, hero: null, introSeen: false, openingSeen: false, endingSeen: false, world: 1, gemsSeen: {}, found: {}, glowHint: false, warpSeen: {}, skill: "clear", skillsSeen: {}, zukanSeen: 0, zukanBounce: 0, zukanTip: false };
   // zukanSeen: カード図鑑を最後に開いたときのカードの数（これより多ければ図鑑のボタンに「NEW」。11/22-10）。zukanBounce: 「NEW」ではずませたときの数（1回だけ）
   // zukanTip: 「集めたカードはここで見られるよ」の案内（false＝まだ、"pending"＝ステージ1を初めてクリアした・次にステージ一覧で出す、true＝出した）
   // localStorage が使えなくても落ちないようにする
@@ -49,6 +49,7 @@ const Save = (() => {
         data.hero = d.hero || null;
         data.introSeen = !!d.introSeen;
         data.openingSeen = !!d.openingSeen;
+        data.endingSeen = !!d.endingSeen;   // 11/27-1: エンディングを一度見たか（見たらタイトルに「エンディングを見る」）
         data.world = d.world || 1;
         data.gemsSeen = d.gemsSeen || {};
         data.found = d.found || {};
@@ -490,7 +491,7 @@ const Main = (() => {
     Save.store();
     showScreen("recipe");
     Cards.showRecipe({ stage, words, lit, isNew, heroSrc: heroSrc("joy"), hint: "",
-      onNext: () => showNewSkill(() => (isNew && lit.size >= 12 ? toEnding() : toStages())) });   // 新しい必殺ワザは、宝石ができた画面のすぐあと（10/31-10 試作）
+      onNext: () => showNewSkill(() => (isNew && lit.size >= 12 ? toStory() : toStages())) });   // 11/27-1: 12個そろったら紙芝居のエンディング（前の toEnding の1画面は呼ばない。コードは残す）   // 新しい必殺ワザは、宝石ができた画面のすぐあと（10/31-10 試作）
   }
   // レシピブック（ステージ一覧から）: 宝石をタップすると、どのステージか・レシピ名が出る
   function toRecipeBook() {
@@ -767,6 +768,75 @@ const Main = (() => {
     if (Save.data.introSeen) toTitle(); else showScreen("intro");   // 最初の起動では、このあと目的の画面と主人公選び（終わるとタイトルへ）
   }
 
+  // ===== エンディング（11/27-1 決定・指摘94）: オープニングと同じ紙芝居。1画面に絵1枚＋セリフ1つ =====
+  //   タップで次のセリフ。そのシーンのセリフが終わったら次の絵。自動では進めない。右上の「とばす」。最後のセリフで「タイトルへ」のボタン
+  //   文は texts.js の ending.lines（シナリオのまま。ふりがなは data/ruby.js）。話す人は who（"" はナレーション: 名前なしの帯）
+  //   曲: シーン1〜7 は recipe（1回だけ）、シーン8〜12 は title（くり返し）。切りかえは Sound.play の場面転換（0.3秒で小さく → 0.4秒の無音）
+  const ED_CREAM = 0.77;       // 絵の上からこの割合より下が、セリフを置く白地（エンディングの13枚で測ると 0.70〜0.77。いちばん下の 0.77 に合わせた）
+  const ED_TITLE_FROM = 8;     // この絵の番号（シーン8）から title の曲
+  const edSrc = n => `assets/ending/e${String(n).padStart(2, "0")}.jpg`;
+  const edPre = {};
+  function edPreload(n) { if (n >= 1 && n <= 13 && !edPre[n]) edPre[n] = Object.assign(new Image(), { src: edSrc(n) }); }
+  let edIdx = 0, edImg = 0, edSong = "";
+  function edLineHTML(l) {
+    const ph = t => Cards.phraseHTML(t);
+    if (!l.who) return `<p class="ed-narr">${ph(l.text)}</p>`;
+    return `<p><span class="op-who">${ph(l.who)}</span>「${ph(l.text)}」</p>`;
+  }
+  // 絵と文の置き方（オープニングと同じ）: 同じ絵のあいだは絵の大きさを変えない。その絵でいちばん長いセリフに合わせる
+  function layoutStory() {
+    const sc = $("screen-story"), W = sc.clientWidth, H = sc.clientHeight, img = $("ed-img"), txt = $("ed-text");
+    if (!W || !H) return;
+    const tw = Math.min(W, 520) - 36, foot = edImg === 13 ? 100 : 40;   // 最後の絵は「タイトルへ」のボタンの場所もあける
+    txt.style.width = `${tw}px`; txt.style.fontSize = "17px";
+    const now = txt.innerHTML;
+    let th = 0;
+    for (const l of window.TEXTS.ending.lines) if (l.img === edImg) { txt.innerHTML = edLineHTML(l); th = Math.max(th, txt.scrollHeight); }
+    txt.innerHTML = now;
+    const ih = Math.max(Math.min(W * OP_ART, (H - th - foot - 10) / ED_CREAM), H * 0.4), iw = ih / OP_ART;
+    Object.assign(img.style, { width: `${iw}px`, height: `${ih}px`, left: `${(W - iw) / 2}px` });
+    $("ed-blur").style.height = `${ih * ED_CREAM}px`;
+    $("ed-blur").style.display = iw < W - 2 ? "" : "none";
+    txt.style.top = `${ih * ED_CREAM + 8}px`;
+  }
+  function showStoryLine(i) {
+    const list = window.TEXTS.ending.lines, l = list[i];
+    edIdx = i;
+    if (l.img !== edImg) {   // 次の絵
+      edImg = l.img;
+      edPreload(edImg + 1); edPreload(edImg + 2);
+      const img = $("ed-img");
+      img.classList.remove("in"); void img.offsetWidth; img.classList.add("in");
+      img.style.visibility = "";
+      img.onerror = () => { img.style.visibility = "hidden"; };
+      img.src = edSrc(edImg);
+      $("ed-blur").style.backgroundImage = `url(${edSrc(edImg)})`;
+      $("ed-page").textContent = `${edImg}/13`;
+      const song = edImg >= ED_TITLE_FROM ? "title" : "ending";
+      if (song !== edSong) { edSong = song; Sound.play(song); }
+    }
+    const txt = $("ed-text");
+    txt.innerHTML = edLineHTML(l);
+    txt.classList.remove("in"); void txt.offsetWidth; txt.classList.add("in");
+    const last = i === list.length - 1;
+    $("ed-tap").textContent = last ? "" : tx("ending.tap");
+    $("ed-go").classList.toggle("hidden", !last);
+    layoutStory();
+  }
+  function toStory() {
+    $("ed-skip").textContent = tx("ending.skip");
+    $("ed-go").textContent = tx("ending.toTitle");
+    edImg = 0; edSong = "";
+    edPreload(1); edPreload(2);
+    showScreen("story");
+    showStoryLine(0);
+  }
+  function endStory() {
+    Save.data.endingSeen = true; Save.store();
+    $("btn-ending").classList.remove("hidden");
+    toTitle();
+  }
+
   // カード図鑑（10/22-1）: 今いる世界の、ステージごとの10枚。持っているカードは語句と一言メモ、ないものは「？」
   // 12ステージの最高得点の合計（11/7-31）
   function totalChip() { return `<span class="lb">${tx("results.totalLabel")}</span><b>${totalBest().toLocaleString()}<small>点</small></b>`; }   // 救出の旅の「スコア」の札と同じ見た目（11/7-32）
@@ -970,6 +1040,14 @@ const Main = (() => {
     $("op-skip").addEventListener("click", e => { e.stopPropagation(); endOpening(); });
     $("btn-opening").textContent = tx("opening.link");
     $("btn-opening").addEventListener("click", toOpening);
+    // エンディング（11/27-1）: 画面をタップで次のセリフ。最後のセリフでは「タイトルへ」だけ
+    $("screen-story").addEventListener("click", () => { if (edIdx + 1 < window.TEXTS.ending.lines.length) showStoryLine(edIdx + 1); });
+    $("ed-skip").addEventListener("click", e => { e.stopPropagation(); endStory(); });
+    $("ed-go").addEventListener("click", e => { e.stopPropagation(); endStory(); });
+    $("btn-ending").textContent = tx("ending.link");
+    $("btn-ending").classList.toggle("hidden", !Save.data.endingSeen);   // 一度見たあとだけ
+    $("btn-ending").addEventListener("click", toStory);
+    window.addEventListener("resize", () => { if ($("screen-story").classList.contains("active")) layoutStory(); });
     window.addEventListener("resize", () => { if ($("screen-opening").classList.contains("active")) layoutOpening(); });
     opPreload(0);   // 1枚目はタイトルといっしょに読む
     $("btn-hero").textContent = window.TEXTS.intro.rechoose;
@@ -1048,7 +1126,8 @@ const Main = (() => {
     titleCounts();
     showTuneTag();
     // 記録がない最初の起動のときは、オープニングから（10/31-6）→ 目的の画面 → 主人公選び → タイトル
-    if (!Save.data.openingSeen && !Save.data.introSeen && !Save.cardCount()) toOpening();
+    if (/[?&]ending\b/.test(window.location.search)) toStory();   // 11/27-1: 確かめ用。?ending でエンディングを直接出す（記録は「見た」になる）
+    else if (!Save.data.openingSeen && !Save.data.introSeen && !Save.cardCount()) toOpening();
     else showScreen(Save.data.introSeen ? "title" : "intro");   // 初めて開いたときは、目的の画面から
   }
 

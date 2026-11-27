@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap">
-  <link rel="stylesheet" href="css/style.css?v=140">
+  <link rel="stylesheet" href="css/style.css?v=141">
 </head>
 <body>
   <div id="app">
@@ -23,6 +23,15 @@
       <div id="op-text" class="op-text"></div>
       <div id="op-foot" class="op-foot"><span id="op-tap"></span><span id="op-page"></span></div>
       <button id="op-skip" class="op-skip"></button>
+    </section>
+    <!-- エンディング（11/27-1 決定・指摘94）: オープニングと同じ紙芝居。絵13枚・セリフ51。ステージ12で宝石が12個そろった直後と、タイトルの「エンディングを見る」から -->
+    <section id="screen-story" class="screen">
+      <div id="ed-blur" class="op-blur"></div>
+      <img id="ed-img" class="op-img" alt="">
+      <div id="ed-text" class="op-text ed-text"></div>
+      <div id="ed-foot" class="op-foot"><span id="ed-tap" class="ed-tap"></span><span id="ed-page"></span></div>
+      <button id="ed-go" class="btn btn-main ed-go hidden"></button>
+      <button id="ed-skip" class="op-skip"></button>
     </section>
     <!-- 目的の画面（ゲームを初めて開いたときだけ。10/21-2） -->
     <section id="screen-intro" class="screen">
@@ -51,7 +60,7 @@
     <section id="screen-title" class="screen art">
       <div class="title-box">
         <img id="title-bg" class="title-art-only title-bg" src="assets/title_bg.jpg" alt="">
-        <p class="title-sub">11/22 検討版</p>
+        <p class="title-sub">11/27 検討版</p>
         <img id="title-logo" class="title-art-only title-logo" src="assets/title_logo.png" alt="消えたタオルと白い記憶 〜消えたレシピを探す旅〜">
         <h1 class="title-main">消えたタオルと<br>白い記憶</h1>
         <p class="title-catch">〜消えたレシピを探す旅〜</p>
@@ -67,6 +76,7 @@
           <button id="btn-hero" class="link-btn"></button>
           <button id="btn-reset" class="link-btn">記録を消す</button>
           <button id="btn-opening" class="link-btn"></button>
+          <button id="btn-ending" class="link-btn hidden"></button>
         </div>
         <button id="btn-tune" class="link-btn hidden">調整パネル</button>
       </div>
@@ -289,17 +299,17 @@
   <!-- 横向きのとき -->
   <div id="rotate"><div><div class="rotate-icon"></div><p>縦にしてね</p></div></div>
 
-  <script src="data/words.js?v=140"></script>
-  <script src="data/stages.js?v=140"></script>
-  <script src="data/texts.js?v=140"></script>
-  <script src="data/ruby.js?v=140"></script>
-  <script src="js/ruby.js?v=140"></script>
-  <script src="js/audio.js?v=140"></script>
-  <script src="js/door.js?v=140"></script>
-  <script src="js/game.js?v=140"></script>
-  <script src="js/quiz.js?v=140"></script>
-  <script src="js/cards.js?v=140"></script>
-  <script src="js/recipebook.js?v=140"></script>
-  <script src="js/main.js?v=140"></script>
+  <script src="data/words.js?v=141"></script>
+  <script src="data/stages.js?v=141"></script>
+  <script src="data/texts.js?v=141"></script>
+  <script src="data/ruby.js?v=141"></script>
+  <script src="js/ruby.js?v=141"></script>
+  <script src="js/audio.js?v=141"></script>
+  <script src="js/door.js?v=141"></script>
+  <script src="js/game.js?v=141"></script>
+  <script src="js/quiz.js?v=141"></script>
+  <script src="js/cards.js?v=141"></script>
+  <script src="js/recipebook.js?v=141"></script>
+  <script src="js/main.js?v=141"></script>
 </body>
 </html>
