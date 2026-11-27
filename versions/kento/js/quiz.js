@@ -70,8 +70,7 @@ const Quiz = (() => {
   function fillSlot(d, w) {
     d.innerHTML = "";
     const src = Cards.artSrc(w);
-    d.classList.toggle("framed", Cards.framed(w));   // 11/22-3: ステージ5〜12の絵はふちが絵の中にある
-    if (src) { const im = document.createElement("img"); im.alt = ""; im.src = src; im.onerror = () => { im.remove(); fillText(d, w); }; d.appendChild(im); }
+    if (src) d.appendChild(Cards.picFrame(src, true, () => fillText(d, w)));   // 11/27-3（指摘134）: 図鑑と同じ枠つきの正方形の絵（左右を切らない）
     else fillText(d, w);
   }
   function fillText(d, w) { const t = document.createElement("span"); t.className = "t"; t.textContent = w.word.replace(/\([^)]*\)/g, "").slice(0, 4); d.appendChild(t); }

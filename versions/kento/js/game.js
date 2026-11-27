@@ -171,6 +171,7 @@ const BATTLE = {
   // 出来事「うしろから虫の群れ」「はさまれる」「風」「風が逆」「霧」（11/1-3 決定。全世界）
   rearSwarm: { n: 4, warn: 1.5 },   // うしろ（画面の下）から上がってくる虫の数と、先に下のはしに「！」を出す秒数
   pinchGap: 0.3,                // はさまれる: 左右の障害物のあいだの道の幅（画面の幅に対する割合）
+  pinchGapW2: 0.4,              // 11/27-3（指摘117）: 世界2（機械の柱）の「はさまれる」の道の幅（柱と柱のあいだ約138px。ふわりの絵の幅62pxの2倍以上。前は 0.3 で約101px）
   fogTopEvent: 0.45,            // 出来事「霧」: 画面の上からこの割合までが霧（ふだんの霧は fogTop）
   fastConveyor: 2,              // 出来事「コンベアが急に速くなる」: 地面と動く地上のことば・地上の雑魚の速さの倍率（11/1-2 決定）
   meteorGap: 0.45, meteorSpeed: 300,   // 出来事「流星雨」: 上から流れ星の弾が落ちてくる間隔（秒）と速さ（px/秒）（10/31-10 試作）               // 世界3: 雑魚の群れのうち、うしろ（画面の下）から来る割合（10/31-10 試作）
@@ -1092,7 +1093,7 @@ const Battle = (() => {
       const C = BATTLE.rearSwarm;
       for (let i = 0; i < C.n; i++) { const x = stripRight() + 30 + (W - stripRight() - 60) * (i + 0.5) / C.n + rand(-14, 14); spawnFiller("ghost", x, H + 30 + (i % 2) * 40, { bx: 0, rear: true, delay: C.warn }); }
     } else if (e.kind === "pinch") {
-      const L = stripRight(), gx = L + (W - L) * rand(0.35, 0.65), half = W * BATTLE.pinchGap / 2;
+      const L = stripRight(), gx = L + (W - L) * rand(0.35, 0.65), half = W * (worldDef.id === 2 ? BATTLE.pinchGapW2 : BATTLE.pinchGap) / 2;
       const rl = Math.max(30, (gx - half) / 2), rr = Math.max(30, (W - gx - half) / 2);
       const kind = worldDef.id === 2 ? "pillar" : worldDef.id === 3 ? "star" : "tree";
       addObstacle(gx - half - rl, rl + 6, kind).pinch = true;
@@ -4179,7 +4180,7 @@ const Battle = (() => {
       if (plate && p.maxHp) { later.push({ p, ch, x: x + wob, y: py }); continue; }
       ctx.globalAlpha = alpha;
       ctx.shadowColor = "rgba(255,214,90,0.9)"; ctx.shadowBlur = 12;
-      ctx.lineWidth = 8; ctx.strokeStyle = wrongBlink(e) ? "#ff6b6b" : e.flash > 0 ? "#fff6c8" : (theme.wordStroke || "#fff6d8");
+      ctx.lineWidth = 8; ctx.strokeStyle = wrongBlink(e) ? "#ff6b6b" : (theme.wordStroke || "#fff6d8");   // 11/27-3（指摘125）: 当たったときにふちの色を変えるのはやめた（ゆれだけ。ステージ3の茶色いふちだけ点滅して見えていた）
       ctx.strokeText(ch, x + wob, py);
       ctx.shadowBlur = 0;
       ctx.fillStyle = fillColor; ctx.fillText(ch, x + wob, py);
@@ -4203,7 +4204,7 @@ const Battle = (() => {
       for (const q of later) {
         ctx.globalAlpha = alpha;
         ctx.shadowColor = "rgba(255,214,90,0.9)"; ctx.shadowBlur = 12;
-        ctx.lineWidth = 8; ctx.strokeStyle = wrongBlink(e) ? "#ff6b6b" : e.flash > 0 ? "#fff6c8" : (theme.wordStroke || "#fff6d8");
+        ctx.lineWidth = 8; ctx.strokeStyle = wrongBlink(e) ? "#ff6b6b" : (theme.wordStroke || "#fff6d8");
         ctx.strokeText(q.ch, q.x, q.y);
         ctx.shadowBlur = 0;
         ctx.fillStyle = fillColor; ctx.fillText(q.ch, q.x, q.y);
@@ -4350,7 +4351,7 @@ const Battle = (() => {
       ctx.shadowColor = `rgba(255,255,230,${f})`; ctx.shadowBlur = 26;
     }
     ctx.lineWidth = WORD_EDGE * 2;
-    ctx.strokeStyle = wrongBlink(e) ? "#ff6b6b" : e.flash > 0 ? "#fff6c8" : (theme.wordStroke || (e.last ? "#fff6d8" : "#ffffff"));   // 縁取りの色は時間帯で変えられる（ちがうことばは赤く点滅）
+    ctx.strokeStyle = wrongBlink(e) ? "#ff6b6b" : (theme.wordStroke || (e.last ? "#fff6d8" : "#ffffff"));   // 縁取りの色は時間帯で変えられる（ちがうことばは赤く点滅）
     if (e.parts) {
       for (const p of e.parts) if (!p.broken) ctx.strokeText(p.ch, x + p.ox, y);
     } else {

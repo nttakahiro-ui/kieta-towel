@@ -1087,3 +1087,16 @@ button.ub.ub-s { width: auto; padding: 5px 12px 6px; font-size: 14px; }
 /* 135: ワープの会話のセリフ枠は、全画面とも行き先の世界の色（世界2は青、世界3は紫）。前はふわりの文がだいだい色、主人公の文だけ var(--green) だった */
 .wt-bubble[data-w="2"], .wt-bubble[data-w="2"].hero { border-color: #4a729a; }
 .wt-bubble[data-w="3"], .wt-bubble[data-w="3"].hero { border-color: #794a9a; }
+
+/* ===== 11/27-3（指摘133・134）: カードの絵の枠を120枚そろえる ===== */
+/* 枠（茶色 #B08860・2px・角丸）はコードで描く。絵は縁を4%内側に切る（108.7%で出して、まわりを隠す） */
+.pic-frame { display: block; position: relative; overflow: hidden; box-sizing: border-box; aspect-ratio: 1 / 1; border: 2px solid #B08860; border-radius: 10px; background: #fffdf7; }
+.pic.pic-frame > img { position: absolute; inset: auto; max-width: none; left: -4.35%; top: -4.35%; width: 108.7%; height: 108.7%; object-fit: cover; display: block; }
+.card .pic.pic-frame { background: #fffdf7; }
+/* クイズの上の帯: 枠いっぱいに入れず、正方形の絵を枠の中ほどに（左右を切らない） */
+.quiz-slots .slot:has(.pic-frame) { border-color: transparent; background: none; display: flex; align-items: center; }
+.quiz-slots .slot .pic-frame { width: 100%; border-width: 1.5px; border-radius: 4px; }
+/* 宝石の演出のカード: 上に枠つきの正方形の絵、下に名前 */
+.fx-card.has-pic { flex-direction: column; justify-content: flex-start; align-items: stretch; padding: 3px; gap: 1px; overflow: hidden; }
+.fx-card.has-pic .pic-frame { position: relative; padding: 0; background: #fffdf7; width: 100%; flex: none; border-width: 1.5px; border-radius: 5px; }
+.fx-card.has-pic span:not(.pic-frame) { position: static; width: auto; padding: 0; background: none; font-size: 9px; font-weight: bold; line-height: 1.15; }

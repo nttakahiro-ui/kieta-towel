@@ -32,13 +32,20 @@ const Cards = (() => {
     f.append(q, t);
     return f;
   }
+  // 11/27-3（指摘133・134）: カードの絵は120枚とも同じ枠（茶色 #B08860・2px・角丸）をコードで描き、絵は縁を4%内側に切って正方形で出す
+  //   （絵の中にふちがある・ない・角が白い、がまちまちだったので。図鑑・カードを見る・クイズの帯・正解のカード・宝石の演出で同じ）
+  function picFrame(src, eager, onFail) {
+    const f = document.createElement("span"); f.className = "pic pic-frame";
+    const im = document.createElement("img"); im.alt = ""; im.decoding = "async"; if (!eager) im.loading = "lazy";   // 図鑑は1度に40枚。見える所から読む
+    im.src = src;
+    im.onerror = () => { f.remove(); if (onFail) onFail(); };
+    f.appendChild(im);
+    return f;
+  }
   function artEl(w, eager) {
     const src = artSrc(w);
     if (!src) return null;
-    const im = document.createElement("img"); im.className = "pic" + (framed(w) ? " framed" : ""); im.alt = ""; im.decoding = "async"; if (!eager) im.loading = "lazy";   // 図鑑は1度に40枚。見える所から読む
-    im.src = src;
-    im.onerror = () => im.remove();
-    return im;
+    return picFrame(src, eager);
   }
   // カードの見出し（語句）の div。漢字を含む語句には、上に小さく kana 欄のふりがな（11/1。本文にはつけない）
   function wordEl(w) {
@@ -149,10 +156,13 @@ const Cards = (() => {
     // 救出の旅をはじめからやり直す（10/25-14。11/7-30: 「クイズをもう一度」（または「次へ」）の上に、いつも出す）。
     //   取り逃したことばがあるときは強い色にして、上に「取り逃したことばがあるよ」
     const rs = $("cards-rescue"), miss = !!(notHelped.length && o.onRescue);
+    // 11/27-3（指摘132）: 取り逃したことばがあるときは「次へ」を出さない（次のステージへはステージ一覧から行ける）。上のボタンは「取り逃したことばを探しに行く」。
+    //   まちがえた問題があるときの「クイズをもう一度」はそのまま出す
+    if (miss && !(wrong.length && o.onRetake)) rb.classList.add("hidden");
     rs.classList.toggle("hidden", !o.onRescue);
     // 11/22-2: 色はいつも世界の色（前は取り逃しがあるとだいだい色）。取り逃しは上の赤い一言で知らせる
     $("cards-miss-note").textContent = tx("results.missNote"); $("cards-miss-note").classList.toggle("hidden", !miss);
-    rs.textContent = tx("results.rescueButton"); rs.onclick = () => o.onRescue && o.onRescue();
+    rs.textContent = tx(miss ? "results.rescueMissButton" : "results.rescueButton"); rs.onclick = () => o.onRescue && o.onRescue();
     const qb = $("cards-quit");
     qb.textContent = tx("results.quitButton");
     qb.onclick = () => o.onTitle();
@@ -286,7 +296,7 @@ const Cards = (() => {
     const cards = (o.words || []).slice(0, 10).map((w, i) => {
       const c = document.createElement("div"); c.className = "fx-card";
       const src = artSrc(w);   // 11/22-2: カードの絵も出す（前は語句の字だけ）
-      if (src) { const im = document.createElement("img"); im.alt = ""; im.src = src; im.onerror = () => { im.remove(); c.classList.remove("has-pic"); }; c.appendChild(im); c.classList.add("has-pic"); if (framed(w)) c.classList.add("framed"); }
+      if (src) { c.appendChild(picFrame(src, true, () => c.classList.remove("has-pic"))); c.classList.add("has-pic"); }   // 11/27-3（指摘133）: 枠つきの正方形の絵、名前はその下
       const nm = document.createElement("span"); nm.textContent = w.word; c.appendChild(nm);
       const side = i % 4, r = Math.random();
       const sx = side === 0 ? -40 : side === 1 ? box.width + 40 : r * box.width, sy = side < 2 ? r * box.height : side === 2 ? -50 : box.height + 50;
@@ -335,5 +345,5 @@ const Cards = (() => {
     };
   }
 
-  return { showCards, showRecipe, showShort, phraseHTML, wordEl, artEl, artSrc, preloadArt, names, framed, missMarks };
+  return { showCards, showRecipe, showShort, phraseHTML, wordEl, artEl, picFrame, artSrc, preloadArt, names, framed, missMarks };
 })();
