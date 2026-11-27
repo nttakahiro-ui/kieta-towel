@@ -1111,3 +1111,11 @@ button.ub.ub-s { width: auto; padding: 5px 12px 6px; font-size: 14px; }
   border: 1px solid #b59a62; box-shadow: 0 2px 0 #b59a62, 0 3px 5px rgba(0,0,0,.10), inset 0 0 0 1px rgba(255,255,255,.4); }
 #screen-title.art .title-links button.title-ub::before { opacity: .5; border-radius: 8px 8px 40% 40% / 8px 8px 10px 10px; }
 #screen-title.art .title-links button.title-ub:active { transform: translateY(2px); box-shadow: 0 0 0 #b59a62, 0 1px 2px rgba(0,0,0,.10), inset 0 0 0 1px rgba(255,255,255,.4); }
+
+/* ===== 11/27-5: オープニング・エンディングの白地（文の場所）。上辺は全画面で同じ線（main.js の storyGeo）。色は絵の白地と画面の地のまま（印だけ） ===== */
+.story-paper { position: absolute; left: 0; right: 0; bottom: 0; pointer-events: none; }
+/* 11/27-5: 「タップで次へ ▶」と「○/13」の位置を固定（字の長さで動かない）。まん中から左右に7pxずつ */
+.op-foot { display: block; height: 1.4em; }
+.op-foot > span:first-child { position: absolute; right: calc(50% + 7px); white-space: nowrap; }
+.op-foot > span:last-child { position: absolute; left: calc(50% + 7px); white-space: nowrap; }
+.op-text p:last-child { margin-bottom: 0; }   /* 11/27-5: 最後の文の下の余白は白地の高さに数えない（見た目は同じ） */

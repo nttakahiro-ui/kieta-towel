@@ -696,20 +696,69 @@ const Main = (() => {
 
   // ===== オープニング（10/31-6）: 絵1枚＋その下の文の11画面。タップで次へ、右上の「とばす」、最後のあとはタイトルへ =====
   const OP_ART = 1672 / 941;   // 絵の縦横比
-  const OP_CREAM = 0.785;      // 絵の上からこの割合より下は、文を置くクリーム色の場所
   const STORY_FONT = 15, STORY_LH = 1.4, STORY_BAND_LH = 21;   // 11/27-1e: オープニング・エンディング共通の字の大きさと行間（帯の行の高さ 15×1.4）
+  // ===== 11/27-5 決定: めくっても絵の枠と白地（文の場所）が動かない（オープニング・エンディング共通） =====
+  //   白地の上辺は全画面で同じ線: 画面の幅いっぱいの絵（入らなければ高さに合わせた絵）の高さ × STORY_LINE。この線より上が「絵の枠」、下が「文の場所」
+  //   絵は枠に合わせて拡大縮小する: 上を基準に、絵の中の白地の始まり（STORY_CREAM。1枚ずつ測った値）がちょうど線に来る大きさ。横は画面の幅いっぱい（はみ出す分は左右均等に切る）
+  //   線は絵の中の白地の始まりのいちばん低い値（エンディング 0.77 ＝ 決定の値。オープニング 0.775 ＝ 画面8）なので、どの絵も画面の幅より細くならない
+  //   ナレーションの帯・「タップで次へ」「○/13」「とばす」の位置も全画面で同じ。文が白地に入らない画面は、文を分けて次のタップに回す（文は変えない）
+  const STORY_LINE = { op: 0.775, ed: 0.77 };
+  // 絵の中の白地の始まり（絵の高さに対する割合。11/27-5 に、下から行ごとに白地の色かを見て測った）
+  const STORY_CREAM = {
+    op: [0.770, 0.738, 0.748, 0.747, 0.771, 0.746, 0.746, 0.775, 0.758, 0.742, 0.726],                  // op_01〜op_11
+    ed: [0.748, 0.717, 0.754, 0.737, 0.718, 0.703, 0.715, 0.769, 0.763, 0.718, 0.724, 0.721, 0.736],    // e01〜e13
+  };
+  const STORY_TALK_MAX = 3;    // 1回に出す会話は3つまで（11/27-1b・11/27-1e）
+  // 枠と白地の位置（画面の大きさだけで決まる。どの画面でも同じ）
+  function storyGeo(sc, kind) {
+    const W = sc.clientWidth, H = sc.clientHeight;
+    let iw = W, ih = W * OP_ART;
+    if (ih > H) { ih = H; iw = H / OP_ART; }
+    const line = Math.round(ih * STORY_LINE[kind] * 10) / 10;
+    return { W, H, line, left: (W - iw) / 2, iw, tw: Math.min(iw, 520) - 24 };
+  }
+  // 絵を枠に合わせる（上を基準に、絵の白地の始まりを線に）
+  function storyFit(g, kind, n, img, blur, paper) {
+    const c = STORY_CREAM[kind][n] || STORY_LINE[kind];
+    const h = g.line / c, w = h / OP_ART;
+    Object.assign(img.style, { width: `${w}px`, height: `${h}px`, left: `${(g.W - w) / 2}px`, top: "0px" });
+    blur.style.height = `${g.line}px`;
+    blur.style.display = w < g.W - 2 ? "" : "none";   // 絵が画面の幅より細いとき（横に広い画面）だけ、左右をぼかした絵で埋める
+    paper.style.top = `${g.line}px`;
+  }
+  // 会話の高さを測る（白地の幅・字の大きさで）
+  function storyTextH(txt, html) { const keep = txt.innerHTML; txt.innerHTML = html; const h = txt.scrollHeight; txt.innerHTML = keep; return h; }
+  // 会話を、白地に入る回に分ける: いちばん少ない回の数で。同じ回の数なら、数がなるべくそろう分け方（同じなら前の回が多め）。1回に3つまで
+  function storySplit(lines, fits) {
+    const n = lines.length;
+    if (!n) return [[]];
+    const parts = (a, k) => k === 1 ? [[n - a]] : [].concat(...[1, 2, 3].filter(s => a + s < n).map(s => parts(a + s, k - 1).map(r => [s, ...r])));
+    for (let k = Math.ceil(n / STORY_TALK_MAX); k <= n; k++) {
+      const cands = parts(0, k).filter(z => z.every(s => s >= 1 && s <= STORY_TALK_MAX))
+        .sort((x, y) => (Math.max(...x) - Math.min(...x)) - (Math.max(...y) - Math.min(...y)) || y[0] - x[0]);
+      for (const sizes of cands) {
+        const groups = []; let a = 0; for (const s of sizes) { groups.push(lines.slice(a, a + s)); a += s; }
+        if (groups.every((gr, j) => fits(gr, j === k - 1))) return groups;
+      }
+    }
+    return lines.map(l => [l]);
+  }
+
   const opSrc = i => `assets/op_${String(i + 1).padStart(2, "0")}.jpg`;
   const opPre = [];
   function opPreload(i) { if (i < window.TEXTS.opening.screens.length && !opPre[i]) opPre[i] = Object.assign(new Image(), { src: opSrc(i) }); }
   let opIdx = 0, opPart = 0, opParts = [];
   // 11/27-1e 決定: 話す人の名前のない文（地の文）は、エンディングと同じ帯（絵の上部）に。会話だけを白地に、1回に3つまで（こえたら次のタップ。文は変えない）
   //   帯はその絵の最初の回だけ。会話のない絵（画面5）は帯だけ
-  const OP_TALK_MAX = 3;
   const OP_WHO = /^([^「」、。！？\s（）]{1,6}(?:（[ぁ-んー]+）)?)(「[\s\S]*」)$/;   // 11/22-1: 名前にふりがなのかっこ書きがあっても（「美容師（びようし）」）話す人の名前に
+  const OP_FOOT = 40;          // 下の「タップで次へ」「○/11」の場所
   function opChunks(lines) {
-    const narr = lines.filter(l => !OP_WHO.test(l)), talk = lines.filter(l => OP_WHO.test(l)), out = [];
-    for (let k = 0; k < talk.length || !out.length; k += OP_TALK_MAX) out.push({ narr: out.length ? [] : narr, talk: talk.slice(k, k + OP_TALK_MAX) });
-    return out;
+    const narr = lines.filter(l => !OP_WHO.test(l)), talk = lines.filter(l => OP_WHO.test(l));
+    const sc = $("screen-opening"), g = storyGeo(sc, "op"), txt = $("op-text");
+    Object.assign(txt.style, { width: `${g.tw}px`, fontSize: `${STORY_FONT}px`, lineHeight: String(STORY_LH) });
+    const room = g.H - OP_FOOT - (g.line + 6);   // 11/27-5: 白地の高さ（線から下、下の文字の上まで）
+    return storySplit(talk, gr => storyTextH(txt, gr.map(opLineHTML).join("")) <= room + 0.5)
+      .map((t, j) => ({ narr: j ? [] : narr, talk: t }));
   }
   // 11/27-1e: ルビをつけた文（「洗（あら）った」のかっこ書きは漢字の上のルビに。11/7-30）。「——」は前の1字とくっつけて行の頭に来ないように（11/7-30）
   //   改行はエンディングと同じ: 文字単位でふつうに折り返す（語のまとまりで止めない）。禁則は CSS の line-break: strict
@@ -719,28 +768,18 @@ const Main = (() => {
     const m = l.match(OP_WHO);
     return m ? `<p><span class="ed-who">${opHTML(m[1])}</span>${opHTML(m[2])}</p>` : `<p>${opHTML(l)}</p>`;
   }
-  // 絵と文の置き方: 文がクリーム色の場所から下に入るように、絵の大きさを決める。11/27-1e: 文字は15px・行間1.4（エンディングと同じ。前は17px・1.6）。白地の左右の余白は12px
+  // 11/27-5: 絵の枠と白地は全画面で同じ（storyGeo）。文の量で絵の大きさを変えない（前は文に合わせて絵を小さくしていた）
   function layoutOpening() {
-    const sc = $("screen-opening"), W = sc.clientWidth, H = sc.clientHeight, img = $("op-img"), txt = $("op-text");
-    if (!W || !H) return;
-    const tw = Math.min(W, 520) - 24, foot = 40;
-    Object.assign(txt.style, { width: `${tw}px`, fontSize: `${STORY_FONT}px`, lineHeight: String(STORY_LH) });
-    // 同じ絵のあいだは絵の大きさを変えない: その画面でいちばん長い回の文に合わせる
-    const now = txt.innerHTML;
-    let th = 0;
-    for (const part of opParts) { txt.innerHTML = part.talk.map(opLineHTML).join(""); th = Math.max(th, part.talk.length ? txt.scrollHeight : 0); }
-    txt.innerHTML = now;
-    const ih = Math.max(Math.min(W * OP_ART, (H - th - foot - 10) / OP_CREAM), H * 0.4);
-    const iw = ih / OP_ART, left = (W - iw) / 2;
-    Object.assign(img.style, { width: `${iw}px`, height: `${ih}px`, left: `${left}px` });
-    $("op-blur").style.height = `${ih * OP_CREAM}px`;
-    $("op-blur").style.display = iw < W - 2 ? "" : "none";   // 絵が画面の幅より細いときだけ、左右をぼかした絵で埋める
-    txt.style.top = `${ih * OP_CREAM + 6}px`;
+    const sc = $("screen-opening"), txt = $("op-text");
+    if (!sc.clientWidth || !sc.clientHeight) return;
+    const g = storyGeo(sc, "op");
+    Object.assign(txt.style, { width: `${g.tw}px`, fontSize: `${STORY_FONT}px`, lineHeight: String(STORY_LH), top: `${g.line + 6}px` });
+    storyFit(g, "op", opIdx, $("op-img"), $("op-blur"), $("op-paper"));
     const band = $("op-band");
-    Object.assign(band.style, { left: `${left}px`, width: `${iw}px`, fontSize: `${STORY_FONT}px`, lineHeight: `${STORY_BAND_LH}px` });
+    Object.assign(band.style, { left: `${g.left}px`, width: `${g.iw}px`, fontSize: `${STORY_FONT}px`, lineHeight: `${STORY_BAND_LH}px` });
     storyBand(band, opParts[opPart].narr.map(opHTML));
     const r = txt.getBoundingClientRect(), s0 = sc.getBoundingClientRect();
-    return { fit: r.bottom - s0.top <= H - foot + 0.5, over: Math.round(r.bottom - s0.top - (H - foot)), img: Math.round(ih) };
+    return { fit: r.bottom - s0.top <= g.H - OP_FOOT + 0.5, over: Math.round(r.bottom - s0.top - (g.H - OP_FOOT)) };
   }
   function showOpeningPage(i) {
     const list = window.TEXTS.opening.screens;
@@ -765,7 +804,7 @@ const Main = (() => {
     $("op-tap").textContent = tx(k + 1 < opParts.length ? "opening.more" : "opening.tap");
     return layoutOpening();
   }
-  // 確かめ用（11/27-1e）: オープニングの全部の回が入るか、帯の段の数・会話の数
+  // 確かめ用（11/27-1e・11/27-5）: オープニングの全部の回が入るか、帯の段の数・会話の数
   window.__opFit = fn => {   // fn: 各回で呼ぶ確かめの関数（結果は x に）
     showScreen("opening"); const out = [];
     window.TEXTS.opening.screens.forEach((_, i) => {
@@ -792,34 +831,35 @@ const Main = (() => {
 
   // ===== エンディング（11/27-1 決定・指摘94。11/27-1b で画面の分け方を作り直し）: 紙芝居。絵の下の白地に会話、絵の上部にナレーションの帯 =====
   //   11/27-1b 決定: めくる回数は20回以内。字の大きさは全画面で固定（14px・行間1.4）。絵は白地（下3分の1）以外を隠さない（ナレーションの細い帯だけ上にのせる）
-  //   1画面 ＝ そのシーンの会話3つまで（白地に。話す人の名前は文頭に色つき）。3つが白地に入らないシーンだけ2画面（ED_SPLIT）。同じ絵が続く
+  //   1画面 ＝ そのシーンの会話3つまで（白地に。話す人の名前は文頭に色つき）。白地に入らないシーンは、なるべく同じ数ずつに分ける（11/27-5 から、その場で測って決める）
   //   ナレーションは、そのシーンの最初の画面で、絵の上部に半透明の黒い帯（白い字）。いくつもあれば続けて1本の帯に。2行をこえるときは帯を2段に
   //   文は texts.js の ending.lines（シナリオのまま。ふりがなは data/ruby.js）。話す人は who（"" はナレーション）
   //   曲: シーン1〜7 は recipe（1回だけ）、シーン8〜12 は title（くり返し）。切りかえは Sound.play の場面転換（0.3秒で小さく → 0.4秒の無音）
-  // 白地の始まり（絵の高さに対する割合）。13枚を1枚ずつ測った値に 0.01 の余白
-  const ED_CREAM = [0, 0.749, 0.727, 0.763, 0.746, 0.728, 0.713, 0.722, 0.779, 0.773, 0.727, 0.724, 0.721, 0.743];
-  // 2画面に分けるシーン（会話の数。375×667 と 390×844 で、3つが白地に入らなかったシーン。11/27-1b に測った）
-  const ED_SPLIT = { "6": [2, 2], "8": [2, 1], "9A": [2, 1], "12": [2, 1] };   // 375×667 で 8・9A・12（最後の画面はボタンの場所も）が入らなかった。6 は会話が4つ
   // 11/27-1e 決定: オープニングとエンディングの字は15px・行間1.4にそろえる。ただしエンディングは画面数が20をこえるなら14pxのまま
-  //   → 15px にすると 375×667 でシーン1・2・3・9B の会話3つが白地に入らず（20・2・29・10px はみ出す）、2画面に分けると21画面になるので、エンディングの会話は14pxのまま（帯は15px）
+  //   → 15px にすると 375×667 で21画面になるので、エンディングの会話は14pxのまま（帯は15px）
   const ED_FONT = 14;
   const ED_TITLE_FROM = 8;     // この絵の番号（シーン8）から title の曲
+  const ED_FOOT = 32, ED_FOOT_LAST = 84;   // 下の「タップで次へ」の場所。最後の画面は「タイトルへ」のボタンの場所（ボタンは文の下、白地の中）
   const edSrc = n => `assets/ending/e${String(n).padStart(2, "0")}.jpg`;
   const edPre = {};
   function edPreload(n) { if (n >= 1 && n <= 13 && !edPre[n]) edPre[n] = Object.assign(new Image(), { src: edSrc(n) }); }
   let edIdx = 0, edImg = 0, edSong = "", edList = [];
-  // 画面の一覧: シーンごとに会話を ED_SPLIT（なければ全部）で分ける。ナレーションはそのシーンの最初の画面に
+  // 画面の一覧: シーンごとに会話を白地に入る回に分ける（storySplit）。ナレーションはそのシーンの最初の画面に。最後のシーンの最後の回は「タイトルへ」の場所も空ける
   function edPages() {
-    const split = window.__edSplit || ED_SPLIT, scenes = [], pages = [];
+    const scenes = [], pages = [];
     for (const l of window.TEXTS.ending.lines) {
       let s = scenes[scenes.length - 1];
       if (!s || s.scene !== l.scene) scenes.push(s = { scene: l.scene, img: l.img, narr: [], talk: [] });
       (l.who ? s.talk : s.narr).push(l);
     }
-    for (const s of scenes) {
-      let k = 0;
-      (split[s.scene] || [s.talk.length]).forEach((n, j) => { pages.push({ scene: s.scene, img: s.img, narr: j === 0 ? s.narr : [], talk: s.talk.slice(k, k + n) }); k += n; });
-    }
+    const sc = $("screen-story"), g = storyGeo(sc, "ed"), txt = $("ed-text");
+    Object.assign(txt.style, { width: `${g.tw}px`, fontSize: `${ED_FONT}px`, lineHeight: String(STORY_LH) });
+    const room = foot => g.H - foot - (g.line + 6);
+    scenes.forEach((s, si) => {
+      const lastScene = si === scenes.length - 1;
+      storySplit(s.talk, (gr, lastGroup) => storyTextH(txt, gr.map(edTalkHTML).join("")) <= room(lastScene && lastGroup ? ED_FOOT_LAST : ED_FOOT) + 0.5)
+        .forEach((t, j) => pages.push({ scene: s.scene, img: s.img, narr: j === 0 ? s.narr : [], talk: t }));
+    });
     return pages;
   }
   // 11/27-1c 決定: 会話は文字単位でふつうに折り返す（語のまとまりで改行を止める処理 Cards.phraseHTML は使わない。ルビは漢字のかたまりの上につくので、そのかたまりの中では折り返さない）
@@ -845,24 +885,19 @@ const Main = (() => {
     draw(part(best.c));
     [...box.children].forEach(e => e.addEventListener("animationend", () => e.classList.add("open")));
   }
-  // 絵は画面の幅いっぱい（高さが入らなければ高さに合わせる）。文の大きさで絵を変えない。会話は白地の始まりから下（絵の下の画面の地も同じ色）
+  // 11/27-5: 絵の枠と白地は全画面で同じ（storyGeo）。絵は枠に合わせて拡大縮小（storyFit）。会話は白地の上辺から下
   function layoutStory() {
-    const sc = $("screen-story"), W = sc.clientWidth, H = sc.clientHeight, img = $("ed-img"), txt = $("ed-text"), pg = edList[edIdx];
-    if (!W || !H || !pg) return {};
-    let iw = W, ih = W * OP_ART;
-    if (ih > H) { ih = H; iw = H / OP_ART; }
-    const left = (W - iw) / 2;
-    Object.assign(img.style, { width: `${iw}px`, height: `${ih}px`, left: `${left}px` });
-    $("ed-blur").style.height = `${ih * ED_CREAM[edImg]}px`;
-    $("ed-blur").style.display = iw < W - 2 ? "" : "none";
-    const tw = Math.min(iw, 520) - 24;   // 11/27-1c: 左右の余白を4pxずつ減らした（前は −32）
-    Object.assign(txt.style, { width: `${tw}px`, fontSize: `${ED_FONT}px`, lineHeight: String(STORY_LH), top: `${ih * ED_CREAM[edImg] + 6}px` });
+    const sc = $("screen-story"), txt = $("ed-text"), pg = edList[edIdx];
+    if (!sc.clientWidth || !sc.clientHeight || !pg) return {};
+    const g = storyGeo(sc, "ed");
+    storyFit(g, "ed", edImg - 1, $("ed-img"), $("ed-blur"), $("ed-paper"));
+    Object.assign(txt.style, { width: `${g.tw}px`, fontSize: `${ED_FONT}px`, lineHeight: String(STORY_LH), top: `${g.line + 6}px` });   // 11/27-1c: 左右の余白は12pxずつ
     const band = $("ed-band");
-    Object.assign(band.style, { left: `${left}px`, width: `${iw}px`, fontSize: `${STORY_FONT}px`, lineHeight: `${STORY_BAND_LH}px` });   // 11/27-1e: 帯の字も15px・行間1.4（21px）
+    Object.assign(band.style, { left: `${g.left}px`, width: `${g.iw}px`, fontSize: `${STORY_FONT}px`, lineHeight: `${STORY_BAND_LH}px` });   // 11/27-1e: 帯の字も15px・行間1.4（21px）
     storyBand(band, pg.narr.map(l => Ruby.html(l.text)));
-    const last = edIdx === edList.length - 1, reserve = last ? 84 : 32;   // 下の「タップで次へ」（最後は「タイトルへ」のボタン）の場所
+    const last = edIdx === edList.length - 1, reserve = last ? ED_FOOT_LAST : ED_FOOT;
     const r = txt.getBoundingClientRect(), s0 = sc.getBoundingClientRect();
-    return { fit: r.bottom - s0.top <= H - reserve + 0.5, over: Math.round(r.bottom - s0.top - (H - reserve)) };
+    return { fit: r.bottom - s0.top <= g.H - reserve + 0.5, over: Math.round(r.bottom - s0.top - (g.H - reserve)) };
   }
   function showStoryPage(i) {
     const pg = edList[i];
@@ -888,14 +923,15 @@ const Main = (() => {
     $("ed-go").classList.toggle("hidden", !last);
     return layoutStory();
   }
-  // 確かめ用: 全部の画面が白地に入るか（window.__edSplit で分け方を変えて測れる）
-  window.__edFit = fn => { edList = edPages(); edImg = 0; showScreen("story"); const out = edList.map((p, i) => Object.assign({ scene: p.scene, talk: p.talk.length }, showStoryPage(i), fn ? { x: fn(i) } : {})); return out; };
+  // 確かめ用: 全部の画面が白地に入るか
+  window.__edFit = fn => { showScreen("story"); edList = edPages(); edImg = 0; const out = edList.map((p, i) => Object.assign({ scene: p.scene, talk: p.talk.length }, showStoryPage(i), fn ? { x: fn(i) } : {})); return out; };
   function toStory() {
     $("ed-skip").textContent = tx("ending.skip");
     $("ed-go").textContent = tx("ending.toTitle");
-    edList = edPages(); edImg = 0; edSong = "";
+    edImg = 0; edSong = "";
     edPreload(1); edPreload(2);
     showScreen("story");
+    edList = edPages();   // 11/27-5: 画面の大きさで白地の高さが決まるので、画面を出してから分ける
     showStoryPage(0);
   }
   function endStory() {
