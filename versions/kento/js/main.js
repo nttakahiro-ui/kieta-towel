@@ -903,22 +903,36 @@ const Main = (() => {
   // 11/27-7 決定: ナレーションを読んでから会話に進めるよう、帯のワイプが終わってから会話を出す
   //   帯が新しく出る回: ワイプ（0.9秒＋行のまとまりのずれ 0.25秒ずつ）が終わって1.0秒後に（11/28-1）、会話を0.3秒でふわっと出す。帯のない回は会話をすぐ出す
   //   会話が出る前（帯のワイプ中も）にタップされたら、動きを飛ばしてその回の全部を出す（次へは進まない）。もう一度タップで次へ
+  //   11/28-2 決定: 同じ画面の中の会話（2〜3つ）は一度に出さず、1つずつ順に出す（タップの回数は変えない）。
+  //   1つ目が0.3秒でふわっと出たあと0.7秒置いて2つ目、さらに0.7秒置いて3つ目（帯のない回も、1つ目はすぐ・以降は同じ間隔）。
+  //   会話が全部出る前のタップは、残りをすぐ全部出す（次へは進まない）
+  const STORY_TALK_FADE = 0.3, STORY_TALK_NEXT = 0.7;   // 11/28-2: 0.7秒は仮
   const storyWait = {};
   function storyTalkIn(kind, txt, band) {
     const w = storyWait[kind] || (storyWait[kind] = {});
     clearTimeout(w.timer);
     const rows = band.style.display === "none" ? 0 : band.children.length;
-    if (!rows) { w.busy = false; txt.style.visibility = ""; txt.classList.remove("in"); void txt.offsetWidth; txt.classList.add("in"); return; }
-    w.busy = true; w.txt = txt; w.band = band;
-    txt.classList.remove("in"); txt.style.visibility = "hidden";
-    w.timer = setTimeout(() => { w.busy = false; txt.style.visibility = ""; void txt.offsetWidth; txt.classList.add("in"); }, (STORY_WIPE + STORY_WIPE_STEP * (rows - 1) + STORY_TALK_GAP) * 1000);
+    const ps = [...txt.children];
+    w.txt = txt; w.band = band; w.ps = ps;
+    txt.classList.remove("in"); txt.style.visibility = "";
+    ps.forEach(e => { e.classList.remove("talk-in"); e.style.visibility = "hidden"; });
+    let i = 0;
+    const step = () => {
+      const e = ps[i++];
+      if (e) { e.style.visibility = ""; void e.offsetWidth; e.classList.add("talk-in"); }
+      w.busy = i < ps.length;
+      if (w.busy) w.timer = setTimeout(step, (STORY_TALK_FADE + STORY_TALK_NEXT) * 1000);
+    };
+    w.busy = true;
+    if (!rows) step();
+    else w.timer = setTimeout(step, (STORY_WIPE + STORY_WIPE_STEP * (rows - 1) + STORY_TALK_GAP) * 1000);
   }
   function storySkip(kind) {   // 動きの途中なら全部を出して true（そのタップでは次へ進まない）
     const w = storyWait[kind];
     if (!w || !w.busy) return false;
     clearTimeout(w.timer); w.busy = false;
     [...w.band.children].forEach(e => { e.style.animation = "none"; e.classList.add("open"); });
-    w.txt.style.visibility = ""; w.txt.classList.remove("in");
+    w.ps.forEach(e => { if (e.style.visibility === "hidden") { e.style.visibility = ""; e.classList.remove("talk-in"); } });
     return true;
   }
   // 11/27-5・11/27-6: 絵の枠と白地は全画面で同じ（storyGeo）。絵は枠にそのまま置く（storyPlace）。会話は白地の上辺から下

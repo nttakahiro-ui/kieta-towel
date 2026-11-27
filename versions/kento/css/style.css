@@ -1126,3 +1126,4 @@ button.ub.ub-s { width: auto; padding: 5px 12px 6px; font-size: 14px; }
 /* 11/27-6: 帯の中のルビは行の高さを広げない（行の間かくを 15px×1.4 にそろえ、帯の高さを固定するため）。ルビは漢字の真上に重ねて置く */
 .ed-band ruby { display: inline-block; position: relative; }
 .ed-band rt { position: absolute; left: -2em; right: -2em; bottom: 100%; margin-bottom: -2px; text-align: center; white-space: nowrap; }
+.ed-text p.talk-in { animation: op-in .3s ease-out both; }   /* 11/28-2: 会話は1つずつ0.3秒でふわっと（main.js の STORY_TALK_FADE と同じ） */
