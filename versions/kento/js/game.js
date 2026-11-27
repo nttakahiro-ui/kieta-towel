@@ -108,8 +108,10 @@ const BATTLE = {
   //   gaugeGlow: とくぎ「ゲージ2倍速」中、必殺ワザのボタンの枠を光らせる。edgeRed: 必殺ワザ「パワー全開」中の画面の縁の赤
   //   rainbow: 「無敵タイム」中のふわりの虹色の点滅（1秒に何回）。blinkLast: 帯を点滅させる残り秒。rewindTime: 巻き戻しの白い光の秒数（前は1.2秒の青白い光）
   skillLook: { powerShot: { scale: 1.18, shot: "#1f5fc8", halo: "rgba(120,170,250,0.55)" }, shieldRing: { r: 36, w: 2.5, alpha: 0.5, fill: 0.1 },
-    gaugeGlow: "#ffc84a", edgeRed: 0.38, rainbow: 5, blinkLast: 1, rewindTime: 0.5 },
-  darkExplore: 0.62,           // 11/22-2: 発見の旅の「照明が落ちる」の暗さ（前は0.84。箱の輪郭が読める程度）
+    gaugeGlow: "#ffc84a", edgeRed: 0.38, rainbow: 5, blinkLast: 1, rewindTime: 0.5,
+    boostGold: "#F3C34B", boostInk: "#5A3E1B", boostRing: { r: 40, w: 4 } },   // 11/27-2（指摘130）: パワー全開の帯の色と字の色、ふわりのまわりの金色の輪（edgeRed は使っていない）
+  darkExplore: 0.50,           // 11/27-2（指摘116）: 発見の旅の「照明が落ちる」の暗さ。0.62→0.50（11/22-2 に 0.84→0.62）
+  darkText: "#E07A1F",         // 11/27-2（指摘116）: 照明が消えているあいだの、案内（「みつけた！」「かぎ！」など）とことばの字の色（白ふち2px）
   openBob: { fill: "#ffd84a", edge: "#c89a10", amp: 3, speed: 7 },
   keyBox: { fill: "#8fa2b6", edge: "#55687c", mark: "#f2c234", countY: 0.07 },   // 11/22-5（指摘86）: ステージ7のかぎマークの箱の色・かぎの色。countY ＝「かぎ ×N」の高さ（画面の高さの割合。上の一行の上）   // 11/22-2: 「あける」が出ている箱の色と、上下の揺れ（px・速さ）
   darkRescue: 0.6,             // 救出の旅の出来事「照明が落ちる」の暗さ（地面と地上のものだけ。発見の旅は0.84）
@@ -4645,6 +4647,16 @@ const Battle = (() => {
       ctx.globalAlpha = S.alpha + 0.1 * Math.sin(t * 3); ctx.strokeStyle = col; ctx.lineWidth = S.w; ctx.stroke();
       ctx.restore();
     }
+    if (boostT > 0 && !explore1) {   // 11/27-2（指摘130）: パワー全開中は、ふわりのまわりに金色の光の輪（ゆっくり明るさが上下）
+      const R = BATTLE.skillLook.boostRing, p = 0.75 + 0.25 * Math.sin(t * 5);
+      ctx.save();
+      const gg = ctx.createRadialGradient(x, fy, R.r * 0.55, x, fy, R.r * 1.35);
+      gg.addColorStop(0, "rgba(243,195,75,0)"); gg.addColorStop(0.55, `rgba(243,195,75,${0.35 * p})`); gg.addColorStop(1, "rgba(243,195,75,0)");
+      ctx.fillStyle = gg; ctx.beginPath(); ctx.arc(x, fy, R.r * 1.35, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = p; ctx.strokeStyle = BATTLE.skillLook.boostGold; ctx.lineWidth = R.w; ctx.shadowColor = "rgba(255,210,80,0.95)"; ctx.shadowBlur = 12;
+      ctx.beginPath(); ctx.arc(x, fy, R.r, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
     if (glow > 0) {   // ことばを助けた瞬間: 光って、2のコマ
       const gr = ctx.createRadialGradient(x, fy, 4, x, fy, 46);
       gr.addColorStop(0, `rgba(255,248,200,${Math.min(1, glow / 0.35)})`);
@@ -5111,15 +5123,26 @@ const Battle = (() => {
         else if (b.lock && !ex.keyFound) { ctx.strokeStyle = "rgba(220,226,236,0.85)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(b.w / 2 - 14, b.h / 2 - 22, 6, Math.PI, 0); ctx.stroke(); ctx.fillStyle = "rgba(200,206,218,0.85)"; roundRect(b.w / 2 - 22, b.h / 2 - 22, 16, 13, 3); ctx.fill(); }
         ctx.restore();
       }
+      // 11/27-2（指摘116）: 開いた箱から出たことばは、暗い幕の上にもう一度、濃いオレンジ（白ふち2px）で
+      if (ex.boxes) for (const b of ex.boxes) if (!b.out && b.open && b.d) {
+        const k = Math.min(1, b.openT / 1.2), a = Math.max(0, 1 - Math.max(0, k - 0.6) / 0.4);
+        if (a <= 0) continue;
+        ctx.save(); ctx.globalAlpha = a; ctx.font = font(b.d.size); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
+        const tx0 = fitX(b.x, b.d.w), ty0 = b.y - b.h * 0.3 - k * 40, wd = b.d.word.word;
+        ctx.lineWidth = 4; ctx.strokeStyle = "#ffffff"; ctx.strokeText(wd, tx0, ty0);
+        ctx.fillStyle = BATTLE.darkText; ctx.fillText(wd, tx0, ty0);
+        ctx.restore();
+      }
     }
     drawPlayer();
     ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.lineJoin = "round";
+    const darkNow = evActive("dark");
     for (const fl of floats) {
       ctx.globalAlpha = Math.max(0, 1 - fl.age / 0.9);
       ctx.font = font(fl.big ? 18 : 15);
       ctx.lineWidth = 4; ctx.strokeStyle = "#ffffff";
       ctx.strokeText(fl.text, fl.x, fl.y - fl.age * 30);
-      ctx.fillStyle = fl.found ? FOUND_COLOR : "#8a6a4a";
+      ctx.fillStyle = darkNow ? BATTLE.darkText : fl.found ? FOUND_COLOR : "#8a6a4a";   // 11/27-2（指摘116）: 照明が消えているあいだは濃いオレンジ
       ctx.fillText(fl.text, fl.x, fl.y - fl.age * 30);
     }
     ctx.globalAlpha = 1;
@@ -5189,6 +5212,8 @@ const Battle = (() => {
 
   // チュートリアル（11/7-20）の絵: 説明のあいだは画面をうす暗くして、まん中にふわりと吹き出し（ふりがなつき）と「タップでやってみよう！」。
   //   やってみるあいだは、上に同じ文を小さく（お題のときは問題文と重なるので出さない）。できたら、まん中に「OK！」（扉と同じデコ文字・世界の色）
+  // 11/27-2（指摘128）: 救出の旅で、ふわりを動かしてやる説明（「指でふわりを動かしてみよう！」）。lives（タップでOK）・boost（ボタンを押す）・choice（とくぎを選ぶ）と発見の旅の説明は「タップでやってみよう！」などのまま
+  const LES_MOVE = new Set(["rescueStart", "shell", "bug", "seed", "tree", "odai", "s5ground", "s5boss", "s9rear"]);
   function drawLesson() {
     const L = les;
     ctx.save();
@@ -5216,7 +5241,7 @@ const Battle = (() => {
       if (say && L.t >= BATTLE.lesson.tapAfter) {
         ctx.globalAlpha = 0.6 + Math.sin(performance.now() / 250) * 0.4;
         ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.font = font(15); ctx.fillStyle = tint("#6f9a4a");
-        ctx.fillText(tx(L.hold ? "lessons.tapHold" : "lessons.tap"), W / 2, py + ph - 20);
+        ctx.fillText(tx(L.hold ? "lessons.tapHold" : LES_MOVE.has(L.id) ? "lessons.tapMove" : "lessons.tap"), W / 2, py + ph - 20);
       }
     } else if (L.step === "ok") {
       const k = Math.min(1, L.t / 0.25), sc = k < 1 ? 0.4 + 0.9 * k : 1.3 - 0.3 * Math.min(1, (L.t - 0.25) / 0.15);
@@ -5617,14 +5642,9 @@ const Battle = (() => {
   //   帯の場所: ふつうは上（y 58。ラストチャンスと同じ形）。お題の問題文が上に出ているときはその下、ラストチャンスの帯が出ているときはその下
   function drawSkillActive() {
     const L = BATTLE.skillLook;
-    if (boostT > 0) {
-      const a = L.edgeRed * Math.min(1, boostT / 0.3) * (0.85 + 0.15 * Math.sin(t * 6));
-      const rg = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.42, W / 2, H / 2, Math.max(W, H) * 0.72);
-      rg.addColorStop(0, "rgba(235,40,30,0)"); rg.addColorStop(1, `rgba(235,40,30,${a})`);
-      ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
-    }
+    // 11/27-2（指摘130）: 画面の縁の赤い光はやめた（時間が迫っているように見えるため）。帯は金色（#F3C34B）にこげ茶の字。ふわりのまわりに金色の光の輪（drawPlayer）
     const list = [];
-    if (boostT > 0) list.push({ T: boostT, key: "boost", col: "rgba(214,52,30,0.93)" });
+    if (boostT > 0) list.push({ T: boostT, key: "boost", col: L.boostGold, ink: L.boostInk });
     if (guardT > 0) list.push({ T: guardT, key: "guard", col: "rgba(200,138,12,0.93)" });
     if (!list.length) return;
     let y = 58;
@@ -5639,7 +5659,7 @@ const Battle = (() => {
       ctx.globalAlpha = blink ? 0.3 : 1;
       ctx.fillStyle = b.col; roundRect(W / 2 - tw / 2 - 14, y - fs * 0.75, tw + 28, fs * 1.5, fs * 0.75); ctx.fill();
       ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.lineWidth = 2; ctx.stroke();
-      ctx.fillStyle = "#ffffff"; ctx.fillText(label, W / 2, y + 1);
+      ctx.fillStyle = b.ink || "#ffffff"; ctx.fillText(label, W / 2, y + 1);
       y += fs * 1.5 + 6;
     }
     ctx.restore();
@@ -5686,7 +5706,7 @@ const Battle = (() => {
     // まん中の絵: パワー全開＝上向きの太い矢印、無敵タイム＝星（どちらも使っているあいだは残りの秒数）、巻き戻し＝左回りの矢印
     if (b.id === "boost") {
       ctx.save(); ctx.translate(b.x, b.y); ctx.fillStyle = full ? "#ffffff" : C;
-      if (boostT > 0) { ctx.font = font(18); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(String(Math.ceil(boostT)), 0, 1); }
+      if (boostT > 0) { ctx.font = font(18); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = BATTLE.skillLook.boostInk; ctx.fillText(String(Math.ceil(boostT)), 0, 1); }   // 11/27-2（指摘130）: 残り秒数の字はこげ茶
       else {
         const a = b.r * 0.55, w = b.r * 0.22;
         ctx.beginPath(); ctx.moveTo(0, -a); ctx.lineTo(a * 0.8, -a * 0.1); ctx.lineTo(w, -a * 0.1); ctx.lineTo(w, a * 0.75); ctx.lineTo(-w, a * 0.75); ctx.lineTo(-w, -a * 0.1); ctx.lineTo(-a * 0.8, -a * 0.1); ctx.closePath(); ctx.fill();

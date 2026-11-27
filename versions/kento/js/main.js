@@ -542,6 +542,8 @@ const Main = (() => {
     $("stages-total").innerHTML = totalChip();   // 合計点の札（11/7-31 決定: 12ステージの最高得点の合計。11/7-33: 下の帯の左。押せない）
     const box = $("stages-list");
     box.innerHTML = "";
+    // 11/27-2（指摘126）: 次に遊ぶステージ（今いる世界で、まだクリアしていない最初のステージ）の行に、だいだい色の太い枠。1つだけ。全部クリア済みなら付けない
+    const nextSt = worldStages(wid).find(s => (s.open || openAll) && !Save.data.best[s.id]);
     worldStages(wid).forEach(s => {
       const row = document.createElement("button");
       const open = s.open || openAll;   // デバッグ: すべてのステージを開く
@@ -557,6 +559,7 @@ const Main = (() => {
       else sub.textContent = tx("worlds.notReady");
       // 10/25-17: 印はやめた。クリアした（救出の旅を最後まで終えた）ステージは枠が光り「ステージクリア」。カードが10枚そろったステージは「10のことば」と宝石の絵（10/25-19）
       if (b) row.classList.add("cleared");
+      if (nextSt && s.id === nextSt.id) row.classList.add("next-up");
       // 11/7-39 決定: 宝石は枠の右端（縦の中央）。まだないステージは、うすい宝石の影
       const marks = document.createElement("span"); marks.className = "marks";
       const lit = litSet.has(s.id);
@@ -577,7 +580,8 @@ const Main = (() => {
       if (wd2) {
         const open = dir === "prev" || worldDone(wid) || openAll;
         const b = document.createElement("button");
-        b.className = "wp-btn wdeco" + (open ? "" : " locked"); b.dataset.w = to; b.disabled = !open;
+        const ready = dir === "next" && worldDone(wid);   // 11/27-2（指摘127）: この世界の4ステージが全部そろった → 次の世界へのボタンの光を強く
+        b.className = "wp-btn wdeco" + (open ? "" : " locked") + (ready ? " ready" : ""); b.dataset.w = to; b.disabled = !open;
         // 11/22-2: 帯の絵は切らずに全部見せる（前は高さ24pxで上下が切れていた）。
         //   宝石は帯の枠にはまった形で出す（上の帯と同じ。その世界でできた宝石だけ）。前の右はしの大きな宝石のアイコンはやめた
         b.innerHTML = `<span class="wp-txt">${dir === "prev" ? "◀ " : ""}${tx("worlds.warpTo", { id: to })}${dir === "next" ? " ▶" : ""}</span>`
@@ -586,9 +590,9 @@ const Main = (() => {
         RecipeBook.renderBand(b.querySelector(".wp-band"), { lit: litSet, world: to });
         if (open) b.addEventListener("click", () => { Sound.se("start"); warpTo(to); });
         slot.appendChild(b);
-        if (open) for (let i = 0; i < 8; i++) {   // まわりに小さな光の粒がゆっくり舞う（常に）
+        if (open) for (let i = 0; i < (ready ? 16 : 8); i++) {   // まわりに小さな光の粒がゆっくり舞う（常に）。11/27-2: 全部そろったときは2倍の16
           const sp = document.createElement("i"); sp.className = "wp-spark";
-          const P = [[8, -4], [38, -6], [72, -3], [98, 30], [90, 104], [50, 106], [14, 103], [1, 45]][i];   // ボタンのふちのまわり（上・右・下・左）
+          const P = [[8, -4], [38, -6], [72, -3], [98, 30], [90, 104], [50, 106], [14, 103], [1, 45], [23, -5], [55, -5], [88, -2], [99, 70], [70, 105], [32, 105], [2, 80], [0, 12]][i];   // ボタンのふちのまわり（上・右・下・左）。9こ目からは、そのあいだ
           sp.style.left = `${P[0]}%`; sp.style.top = `${P[1]}%`; sp.style.animationDelay = `${-(i * 0.71).toFixed(2)}s`; sp.style.animationDuration = `${3.2 + (i % 3) * 0.7}s`;
           slot.appendChild(sp);
         }
@@ -644,7 +648,7 @@ const Main = (() => {
     let page = -1, ready = false, departed = false;
     const show = i => {   // i 画面目を出す（文は一度に全部）
       page = i; const ln = talk[i];
-      bubble.textContent = ln.text; bubble.classList.toggle("hero", ln.who === "hero"); bubble.classList.add("on");
+      bubble.textContent = ln.text; bubble.classList.toggle("hero", ln.who === "hero"); bubble.dataset.w = id; bubble.classList.add("on");   // 11/27-2（指摘135）: 枠の色は行き先の世界の色（話す人で変えない）
       hero.src = heroSrc(ln.who === "hero" ? "point" : "think");   // 主人公が話すときは「指さす」
       next.textContent = tx(i === talk.length - 1 ? "worlds.warpTalk.talkGo" : "worlds.warpTalk.talkNext"); next.classList.add("on");
       ready = true;
@@ -971,7 +975,7 @@ const Main = (() => {
           const m = document.createElement("div"); m.className = "m"; m.innerHTML = Cards.phraseHTML(w.memo);
           const art = Cards.artEl(w); if (art) { c.appendChild(art); c.classList.add("has-pic"); }   // カードの絵（11/6-6）
           c.append(wd, m);
-        } else { c.className = "card empty"; c.textContent = tx("zukan.empty"); }
+        } else { c.className = "card empty"; c.appendChild(Cards.missMarks()); }   // 11/27-2（指摘131）: 絵の場所に大きな「？」と、右上に「未獲得」の札（前は「？」の字だけ・薄い点線の枠）
         list.appendChild(c);
       });
       if (head === h) sec.append(h, rc, list); else sec.append(head, list);

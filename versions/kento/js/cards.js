@@ -24,6 +24,14 @@ const Cards = (() => {
   // クイズの前に、そのステージの10枚の絵を先に読んでおく（11/7-27。正解したときにすぐ出るように）
   const preloaded = [];
   function preloadArt(ws) { ws.forEach(w => { const src = artSrc(w); if (!src) return; const im = new Image(); im.decoding = "async"; im.src = src; preloaded.push(im); }); if (preloaded.length > 60) preloaded.splice(0, preloaded.length - 60); }
+  // 11/27-2（指摘131）: まだ持っていないカードの印（絵の場所の大きな「？」と、右上の「未獲得」の札）。カードを見る画面と図鑑で同じ
+  function missMarks() {
+    const f = document.createDocumentFragment();
+    const q = document.createElement("div"); q.className = "pic-q"; q.textContent = "？";
+    const t = document.createElement("span"); t.className = "miss-tag"; t.textContent = tx("results.missTag");
+    f.append(q, t);
+    return f;
+  }
   function artEl(w, eager) {
     const src = artSrc(w);
     if (!src) return null;
@@ -194,6 +202,7 @@ const Cards = (() => {
       const wd = wordEl(w);
       const m = document.createElement("div"); m.className = "m"; m.innerHTML = phraseHTML(w.memo);
       const art = owned && artEl(w); if (art) { c.appendChild(art); c.classList.add("has-pic"); }   // 絵（持っているカードだけ。11/6-6）
+      if (!owned) c.appendChild(missMarks());   // 11/27-2（指摘131）: 取り逃し・未獲得のカードは、絵の場所に大きな「？」と、右上に「未獲得」の札
       c.append(wd, m);
       // まだカードになっていない語句には、理由を出す
       if (!owned) {
@@ -201,7 +210,8 @@ const Cards = (() => {
         if (wrongIds.includes(w.id)) { why.innerHTML = phraseHTML("クイズで不正解。あとで受け直せる"); c.classList.add("wrong"); }
         else if (missedIds.includes(w.id)) { why.innerHTML = phraseHTML("旅で助けられなかった。もう一度あそんで助けよう"); c.classList.add("lost"); }
         else why.textContent = "まだ";
-        c.appendChild(why);
+        const again = document.createElement("div"); again.className = "why again"; again.innerHTML = phraseHTML(tx("results.missWhere"));   // 11/27-2（指摘129）: どこで受け直せるか
+        c.append(why, again);
       }
       if (o.newIds && o.newIds.includes(w.id)) {
         const nb = document.createElement("span"); nb.className = "new"; nb.textContent = "NEW";
@@ -247,7 +257,7 @@ const Cards = (() => {
     const show = (el, on) => { el.classList.toggle("fx-hide", !on); el.classList.toggle("fx-show", on); };
     $("recipe-fuwari").classList.toggle("hidden", !o.isNew);
     const finalBook = pop => {
-      RecipeBook.renderBook(book, { lit: all, drop: pop ? o.stage.id : null, dropClass: "rb-pop", next: nextId });
+      RecipeBook.renderBook(book, { lit: all, drop: pop ? o.stage.id : null, dropClass: "rb-pop" });   // 11/27-2（指摘124）: 次の宝石の場所の点滅する輪は出さない（「次へ」のボタンで行き先はわかる）
       if (pop) { book.classList.remove("flash"); void book.offsetWidth; book.classList.add("flash"); }
     };
     if (!o.isNew) {   // 2回目からは、光った台座が出るだけ（今まで通り）
@@ -325,5 +335,5 @@ const Cards = (() => {
     };
   }
 
-  return { showCards, showRecipe, showShort, phraseHTML, wordEl, artEl, artSrc, preloadArt, names, framed };
+  return { showCards, showRecipe, showShort, phraseHTML, wordEl, artEl, artSrc, preloadArt, names, framed, missMarks };
 })();

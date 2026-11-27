@@ -1051,3 +1051,39 @@ button.ub.ub-s { width: auto; padding: 5px 12px 6px; font-size: 14px; }
 .wt-next.on { opacity: 1; animation: wtNext 1.4s ease-in-out infinite; }
 @keyframes wtNext { 0%, 100% { opacity: 1; } 50% { opacity: .7; } }
 .warp-talk { cursor: pointer; }
+
+/* ===== 11/27-2（指摘113〜135） ===== */
+/* 113: クイズで答えたあとの「次へ」（.ub）を左右中央に（前は左寄せの枠の中で左に寄っていた） */
+.quiz-feedback .ub { display: block; margin: 0 auto; }
+/* 114: 結果画面の「カード ○/10　取り逃し ○こ　種 ○こ」の帯。「逃」のルビで背の高くなった札だけ下に落ちていたので、字の並びの線（ベースライン）でそろえる */
+.rank-line { align-items: baseline; }
+/* 122: タイトルの「スタート」以外の押せるもの（音・主人公を選びなおす・記録を消す・オープニングを見る・エンディングを見る）を、立体の世界色の小さい型（.ub.ub-s・14px）に。
+   「音が出ます」の下に、1行目3つ・2行目2つ（左右中央）。Safari の下のバー（safe-area）より上 */
+#screen-title.art .title-links { top: auto; bottom: max(6px, env(safe-area-inset-bottom)); display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 6px; padding: 0 8px; }
+#screen-title.art .title-links button.title-ub { width: auto; margin: 0; font-size: 14px; padding: 3px 9px 4px; }
+#screen-title.art .title-links button.title-ub.hidden { display: none; }
+/* 123: 図鑑で左に寄っていた字を左右中央に。カードの名前と読みがな、ステージの見出し（世界2・3）、世界の行（合計点の札があっても画面の中央に）。説明文は文章なので左寄せのまま。「◀ 図鑑の扉へ」は今のまま */
+.zukan-stage .card .w { text-align: center; }
+.zukan-stage > h3, .zukan-stage > .rc { text-align: center; }   /* 世界2・3のステージの見出しと「宝石：〜」（世界1は絵の見出しなので今のまま） */
+.zk-sub-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; }
+.zk-sub-row > small { grid-column: 2; text-align: center; }
+.zk-sub-row .score-chip { grid-column: 3; justify-self: end; }
+/* 126: 次に遊ぶステージの行に、だいだい色（#F5A623）の太い枠（3px）。枠が太くなった分、内側の余白を1px減らして大きさは変えない */
+.stage-row.next-up { border: 3px solid #F5A623; padding: 6px 9px 6px 11px; }
+/* 127: 世界の4ステージが全部そろったとき、次の世界へのワープボタン（.ready）は、光の粒を2倍（main.js）にし、1.5秒ごとに明るさが上下する */
+.wp-btn.ready { animation: wpReady 1.5s ease-in-out infinite; }
+@keyframes wpReady { 0%, 100% { filter: brightness(1); box-shadow: 0 4px 0 var(--wc-dark), 0 0 6px 1px rgba(255,214,90,.5); } 50% { filter: brightness(1.28); box-shadow: 0 4px 0 var(--wc-dark), 0 0 18px 6px rgba(255,214,90,.95); } }
+@media (prefers-reduced-motion: reduce) { .wp-btn.ready { animation: none; } }
+/* 129・131: まだ持っていないカード（カードを見る画面と図鑑）。薄くするのをやめてくっきり。絵の場所に大きな「？」、右上に「未獲得」の札。説明文はこげ茶（#5A3E1B） */
+.card.miss, .card.miss.wrong, .card.miss.lost, .zukan-stage .card.empty { opacity: 1; }
+.card.miss, .zukan-stage .card.empty { position: relative; }
+.card.miss, .zukan-stage .card.empty { border-style: solid; border-color: #cdb98f; box-shadow: 0 3px 0 var(--cream-dark); }   /* 点線の枠もやめて、くっきり */
+.card.miss.wrong { border-color: var(--rose); }
+.card .pic-q { display: flex; align-items: center; justify-content: center; width: 100%; max-width: 160px; aspect-ratio: 1 / 1; margin: 0 auto 6px; border-radius: 10px; background: #f3ead4; border: 2px dashed #c9b48a; box-sizing: border-box; font-size: 64px; font-weight: bold; line-height: 1; color: #a88a55; }
+.card .miss-tag { position: absolute; top: -8px; right: -6px; z-index: 1; background: #7a6a55; color: #fff; font-size: 11px; font-weight: bold; line-height: 1.3; padding: 2px 8px; border-radius: 999px; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+.card.miss .why, .card.miss.wrong .why, .card.miss.lost .why { color: #5A3E1B; }
+.card.miss .why.again { margin-top: 4px; font-weight: bold; }
+.zukan-stage .card.empty { color: inherit; text-align: center; }
+/* 135: ワープの会話のセリフ枠は、全画面とも行き先の世界の色（世界2は青、世界3は紫）。前はふわりの文がだいだい色、主人公の文だけ var(--green) だった */
+.wt-bubble[data-w="2"], .wt-bubble[data-w="2"].hero { border-color: #4a729a; }
+.wt-bubble[data-w="3"], .wt-bubble[data-w="3"].hero { border-color: #794a9a; }
