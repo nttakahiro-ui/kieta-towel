@@ -806,7 +806,7 @@ const Main = (() => {
     const box = $("ed-band");
     box.style.display = narr.length ? "" : "none";
     if (!narr.length) { box.innerHTML = ""; return; }
-    const one = list => `<div class="ed-band-row">${list.map(l => edPh(l.text)).join("　")}</div>`;
+    const one = list => `<div class="ed-band-row">${list.map(l => Ruby.html(l.text)).join("　")}</div>`;   // 11/27-1d: 会話と同じく文字単位で折り返す（語のまとまりで止めない）
     box.innerHTML = one(narr);
     box.classList.remove("in"); void box.offsetWidth; box.classList.add("in");   // 11/27-1c: 0.4秒でふわっと現れる
     const row = box.firstChild, lines = Math.round((row.clientHeight - 10) / (ED_FONT * ED_LH));
