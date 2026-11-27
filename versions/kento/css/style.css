@@ -769,8 +769,13 @@ body { position: fixed; inset: 0; }
 /* 11/27-1b: ナレーションは絵の上部に細い半透明の帯（黒30%・白い字14px）。2行をこえるときは2段 */
 .ed-band { position: absolute; top: max(52px, calc(env(safe-area-inset-top) + 46px)); z-index: 1; display: flex; flex-direction: column; gap: 4px; pointer-events: none; }
 .ed-band-row { background: rgba(0,0,0,.4); color: #fff; padding: 5px 12px; text-align: left; word-break: normal; overflow-wrap: normal; line-break: strict; }   /* 11/27-1d: 左寄せ（2行目も左端から）。内側の余白は左右12px。折り返しと禁則は会話と同じ */   /* 11/27-1c: 黒30%→40%、字は15px（main.js）。黒いふちはつけない */
-.ed-band.in { animation: ed-band-in .4s ease-out both; }
-@keyframes ed-band-in { from { opacity: 0; } to { opacity: 1; } }
+/* 11/27-1e 決定: 帯が出るときはブラインド（オープニング・エンディング共通。前の0.4秒のふわっとはやめた）。帯を高さ6pxの細い帯に分けた形で、
+   どの細い帯も上の端から下へ0.6秒かけて開き、字も帯と一緒に現れる。段が複数なら上の段から0.2秒ずつずらす（main.js の animation-delay）。開き終わったら止まる */
+@property --blind { syntax: "<length>"; inherits: false; initial-value: 6px; }
+.ed-band-row { --blind: 6px; -webkit-mask-image: repeating-linear-gradient(to bottom, #000 0 var(--blind), transparent var(--blind) 6px); mask-image: repeating-linear-gradient(to bottom, #000 0 var(--blind), transparent var(--blind) 6px); animation: band-blind .6s linear both; }
+.ed-band-row.open { -webkit-mask-image: none; mask-image: none; }
+@keyframes band-blind { from { --blind: 0px; } to { --blind: 6px; } }
+@media (prefers-reduced-motion: reduce) { .ed-band-row { animation: none; -webkit-mask-image: none; mask-image: none; } }
 /* 11/27-1c 決定: 会話は文字単位でふつうに折り返す。「、」「。」「」」「！」「？」「…」は行頭に来ない（line-break: strict） */
 .ed-text { word-break: normal; overflow-wrap: normal; line-break: strict; }
 .ed-band-row rt { color: #fff; }

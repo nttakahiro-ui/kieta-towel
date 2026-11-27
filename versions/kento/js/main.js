@@ -693,46 +693,50 @@ const Main = (() => {
   // ===== オープニング（10/31-6）: 絵1枚＋その下の文の11画面。タップで次へ、右上の「とばす」、最後のあとはタイトルへ =====
   const OP_ART = 1672 / 941;   // 絵の縦横比
   const OP_CREAM = 0.785;      // 絵の上からこの割合より下は、文を置くクリーム色の場所
+  const STORY_FONT = 15, STORY_LH = 1.4, STORY_BAND_LH = 21;   // 11/27-1e: オープニング・エンディング共通の字の大きさと行間（帯の行の高さ 15×1.4）
   const opSrc = i => `assets/op_${String(i + 1).padStart(2, "0")}.jpg`;
   const opPre = [];
   function opPreload(i) { if (i < window.TEXTS.opening.screens.length && !opPre[i]) opPre[i] = Object.assign(new Image(), { src: opSrc(i) }); }
   let opIdx = 0, opPart = 0, opParts = [];
-  // 1回に出す文（10/31-8）: 3段落・80字まで。こえるときは段落の切れ目で分ける（文は削らない）。字数にふりがなの「（よみ）」は数えない
-  const OP_MAX = { lines: 3, chars: 80 };
+  // 11/27-1e 決定: 話す人の名前のない文（地の文）は、エンディングと同じ帯（絵の上部）に。会話だけを白地に、1回に3つまで（こえたら次のタップ。文は変えない）
+  //   帯はその絵の最初の回だけ。会話のない絵（画面5）は帯だけ
+  const OP_TALK_MAX = 3;
+  const OP_WHO = /^([^「」、。！？\s（）]{1,6}(?:（[ぁ-んー]+）)?)(「[\s\S]*」)$/;   // 11/22-1: 名前にふりがなのかっこ書きがあっても（「美容師（びようし）」）話す人の名前に
   function opChunks(lines) {
-    const len = l => [...l.replace(/（[ぁ-ゖー]+）/g, "")].length;
-    const out = []; let cur = [], n = 0;
-    for (const l of lines) {
-      if (cur.length && (cur.length >= OP_MAX.lines || n + len(l) > OP_MAX.chars)) { out.push(cur); cur = []; n = 0; }
-      cur.push(l); n += len(l);
-    }
-    if (cur.length) out.push(cur);
+    const narr = lines.filter(l => !OP_WHO.test(l)), talk = lines.filter(l => OP_WHO.test(l)), out = [];
+    for (let k = 0; k < talk.length || !out.length; k += OP_TALK_MAX) out.push({ narr: out.length ? [] : narr, talk: talk.slice(k, k + OP_TALK_MAX) });
     return out;
   }
-  // 1行の文（「——」は前の語につけて、行の頭に来ないように。11/7-30）: 「男の子「…」」の形なら、話す人の名前を小さく色つきに。改行はことばのかたまりの途中でしない
+  // 11/27-1e: ルビをつけた文（「洗（あら）った」のかっこ書きは漢字の上のルビに。11/7-30）。「——」は前の1字とくっつけて行の頭に来ないように（11/7-30）
+  //   改行はエンディングと同じ: 文字単位でふつうに折り返す（語のまとまりで止めない）。禁則は CSS の line-break: strict
+  const opHTML = t => Ruby.html(Ruby.inline(t)).replace(/([^\s<>;])(―+|—+)/g, '<span class="rbw">$1$2</span>');
+  // 会話: 話す人の名前は文頭に色つき（エンディングと同じ。名前のあとは白地の幅いっぱいで、字下げなし）
   function opLineHTML(l) {
-    const ph = t => Cards.phraseHTML(Ruby.inline(t))   /* 「洗（あら）った」のかっこ書きは、漢字の上のルビに（11/7-30） */.replace(/([\u4e00-\u9fff々]|<\/ruby><\/span>)<wbr>(?=[ぁ-ん（])/g, "$1").replace(/([^\s<>;])(―+|—+)/g, '<span class="rbw">$1$2</span>');   // 「——」は前の1字とくっつける   // 漢字と、そのあとの送りがな・ふりがなのあいだでは折り返さない
-    const m = l.match(/^([^「」、。！？\s（）]{1,6}(?:（[ぁ-んー]+）)?)(「[\s\S]*」)$/);   // 11/22-1: 名前にふりがなのかっこ書きがあっても（「美容師（びようし）」）話す人の名前に
-    return m ? `<p><span class="op-who">${ph(m[1])}</span>${ph(m[2])}</p>` : `<p>${ph(l)}</p>`;
+    const m = l.match(OP_WHO);
+    return m ? `<p><span class="ed-who">${opHTML(m[1])}</span>${opHTML(m[2])}</p>` : `<p>${opHTML(l)}</p>`;
   }
-  // 絵と文の置き方: 文がクリーム色の場所から下に入るように、絵の大きさを決める。文字は17px（10/31-8。前は17〜12px）
+  // 絵と文の置き方: 文がクリーム色の場所から下に入るように、絵の大きさを決める。11/27-1e: 文字は15px・行間1.4（エンディングと同じ。前は17px・1.6）。白地の左右の余白は12px
   function layoutOpening() {
     const sc = $("screen-opening"), W = sc.clientWidth, H = sc.clientHeight, img = $("op-img"), txt = $("op-text");
     if (!W || !H) return;
-    const tw = Math.min(W, 520) - 36, foot = 40;
-    txt.style.width = `${tw}px`;
-    txt.style.fontSize = "17px";
+    const tw = Math.min(W, 520) - 24, foot = 40;
+    Object.assign(txt.style, { width: `${tw}px`, fontSize: `${STORY_FONT}px`, lineHeight: String(STORY_LH) });
     // 同じ絵のあいだは絵の大きさを変えない: その画面でいちばん長い回の文に合わせる
     const now = txt.innerHTML;
     let th = 0;
-    for (const part of opParts) { txt.innerHTML = part.map(opLineHTML).join(""); th = Math.max(th, txt.scrollHeight); }
+    for (const part of opParts) { txt.innerHTML = part.talk.map(opLineHTML).join(""); th = Math.max(th, part.talk.length ? txt.scrollHeight : 0); }
     txt.innerHTML = now;
     const ih = Math.max(Math.min(W * OP_ART, (H - th - foot - 10) / OP_CREAM), H * 0.4);
-    const iw = ih / OP_ART;
-    Object.assign(img.style, { width: `${iw}px`, height: `${ih}px`, left: `${(W - iw) / 2}px` });
+    const iw = ih / OP_ART, left = (W - iw) / 2;
+    Object.assign(img.style, { width: `${iw}px`, height: `${ih}px`, left: `${left}px` });
     $("op-blur").style.height = `${ih * OP_CREAM}px`;
     $("op-blur").style.display = iw < W - 2 ? "" : "none";   // 絵が画面の幅より細いときだけ、左右をぼかした絵で埋める
     txt.style.top = `${ih * OP_CREAM + 6}px`;
+    const band = $("op-band");
+    Object.assign(band.style, { left: `${left}px`, width: `${iw}px`, fontSize: `${STORY_FONT}px`, lineHeight: `${STORY_BAND_LH}px` });
+    storyBand(band, opParts[opPart].narr.map(opHTML));
+    const r = txt.getBoundingClientRect(), s0 = sc.getBoundingClientRect();
+    return { fit: r.bottom - s0.top <= H - foot + 0.5, over: Math.round(r.bottom - s0.top - (H - foot)), img: Math.round(ih) };
   }
   function showOpeningPage(i) {
     const list = window.TEXTS.opening.screens;
@@ -752,11 +756,25 @@ const Main = (() => {
   function showOpeningPart(k) {
     opPart = k;
     const txt = $("op-text");
-    txt.innerHTML = opParts[k].map(opLineHTML).join("");
+    txt.innerHTML = opParts[k].talk.map(opLineHTML).join("");
     txt.classList.remove("in"); void txt.offsetWidth; txt.classList.add("in");
     $("op-tap").textContent = tx(k + 1 < opParts.length ? "opening.more" : "opening.tap");
-    layoutOpening();
+    return layoutOpening();
   }
+  // 確かめ用（11/27-1e）: オープニングの全部の回が入るか、帯の段の数・会話の数
+  window.__opFit = fn => {   // fn: 各回で呼ぶ確かめの関数（結果は x に）
+    showScreen("opening"); const out = [];
+    window.TEXTS.opening.screens.forEach((_, i) => {
+      showOpeningPage(i);
+      opParts.forEach((p, k) => {
+        const r = showOpeningPart(k), band = $("op-band");
+        out.push(Object.assign({ screen: i + 1, part: k + 1, narr: p.narr.length, talk: p.talk.length, rows: band.children.length,
+          bandBottom: Math.round(band.getBoundingClientRect().bottom), textTop: Math.round($("op-text").getBoundingClientRect().top),
+          rowsText: [...band.children].map(e => e.textContent.slice(0, 12) + `(${Math.round((e.clientHeight - 10) / STORY_BAND_LH)}行)`) }, r, fn ? { x: fn() } : {}));
+      });
+    });
+    return out;
+  };
   function toOpening() {
     $("op-skip").textContent = tx("opening.skip");
     showScreen("opening");
@@ -778,7 +796,9 @@ const Main = (() => {
   const ED_CREAM = [0, 0.749, 0.727, 0.763, 0.746, 0.728, 0.713, 0.722, 0.779, 0.773, 0.727, 0.724, 0.721, 0.743];
   // 2画面に分けるシーン（会話の数。375×667 と 390×844 で、3つが白地に入らなかったシーン。11/27-1b に測った）
   const ED_SPLIT = { "6": [2, 2], "8": [2, 1], "9A": [2, 1], "12": [2, 1] };   // 375×667 で 8・9A・12（最後の画面はボタンの場所も）が入らなかった。6 は会話が4つ
-  const ED_FONT = 14, ED_LH = 1.4, ED_BAND_FONT = 15;   // 会話 14px・行間1.4。ナレーションの帯は15px（11/27-1c）
+  // 11/27-1e 決定: オープニングとエンディングの字は15px・行間1.4にそろえる。ただしエンディングは画面数が20をこえるなら14pxのまま
+  //   → 15px にすると 375×667 でシーン1・2・3・9B の会話3つが白地に入らず（20・2・29・10px はみ出す）、2画面に分けると21画面になるので、エンディングの会話は14pxのまま（帯は15px）
+  const ED_FONT = 14;
   const ED_TITLE_FROM = 8;     // この絵の番号（シーン8）から title の曲
   const edSrc = n => `assets/ending/e${String(n).padStart(2, "0")}.jpg`;
   const edPre = {};
@@ -798,19 +818,28 @@ const Main = (() => {
     }
     return pages;
   }
-  const edPh = t => Cards.phraseHTML(t);
   // 11/27-1c 決定: 会話は文字単位でふつうに折り返す（語のまとまりで改行を止める処理 Cards.phraseHTML は使わない。ルビは漢字のかたまりの上につくので、そのかたまりの中では折り返さない）
   const edTalkHTML = l => `<p><span class="ed-who">${Ruby.html(l.who)}</span>「${Ruby.html(l.text)}」</p>`;
-  // ナレーションの帯: 続けて1本。2行をこえたら2段（前半と後半）
-  function edBand(narr, width) {
-    const box = $("ed-band");
-    box.style.display = narr.length ? "" : "none";
-    if (!narr.length) { box.innerHTML = ""; return; }
-    const one = list => `<div class="ed-band-row">${list.map(l => Ruby.html(l.text)).join("　")}</div>`;   // 11/27-1d: 会話と同じく文字単位で折り返す（語のまとまりで止めない）
-    box.innerHTML = one(narr);
-    box.classList.remove("in"); void box.offsetWidth; box.classList.add("in");   // 11/27-1c: 0.4秒でふわっと現れる
-    const row = box.firstChild, lines = Math.round((row.clientHeight - 10) / (ED_FONT * ED_LH));
-    if (lines > 2 && narr.length > 1) { const h = Math.ceil(narr.length / 2); box.innerHTML = one(narr.slice(0, h)) + one(narr.slice(h)); }
+  // ===== 11/27-1e: ナレーションの帯（オープニング・エンディング共通） =====
+  //   全部を続けて1本に。2行をこえるときは、文の切れ目で段に分ける（最大3段）。分け方は、どの段も2行以内になるいちばん少ない段の数で、
+  //   その中でいちばん長い段の行が少ない分け方（3段でも2行をこえるときは、いちばん長い段がいちばん短くなる分け方）。11/27-1b のシーン12の2段（2本＋1本）と同じ結果
+  //   出るときはブラインド（CSS の .ed-band-row。細い帯に分けた形で0.6秒かけて開く。段が複数なら上から0.2秒ずつずらす）。帯はタップを受けないので、途中でも次へ進める
+  function storyBand(box, texts) {   // texts: ルビつきの HTML の文
+    box.style.display = texts.length ? "" : "none";
+    if (!texts.length) { box.innerHTML = ""; return; }
+    const draw = rows => {
+      box.innerHTML = rows.map((r, j) => `<div class="ed-band-row" style="animation-delay:${(j * 0.2).toFixed(1)}s">${r.join("　")}</div>`).join("");
+      return Math.max(...[...box.children].map(e => Math.round((e.clientHeight - 10) / STORY_BAND_LH)));
+    };
+    const n = texts.length, cuts = k => k === 1 ? [[]] : k === 2 ? [...Array(n - 1)].map((_, i) => [i + 1]) : [].concat(...[...Array(n - 2)].map((_, i) => [...Array(n - 2 - i)].map((_, j) => [i + 1, i + 2 + j])));
+    const part = c => [0, ...c, n].slice(0, -1).map((x, i) => texts.slice(x, [...c, n][i]));
+    let best = null;
+    for (let k = 1; k <= Math.min(3, n); k++) {
+      for (const c of cuts(k)) { const m = draw(part(c)); if (!best || m < best.m) best = { m, c }; }
+      if (best.m <= 2) break;
+    }
+    draw(part(best.c));
+    [...box.children].forEach(e => e.addEventListener("animationend", () => e.classList.add("open")));
   }
   // 絵は画面の幅いっぱい（高さが入らなければ高さに合わせる）。文の大きさで絵を変えない。会話は白地の始まりから下（絵の下の画面の地も同じ色）
   function layoutStory() {
@@ -823,10 +852,10 @@ const Main = (() => {
     $("ed-blur").style.height = `${ih * ED_CREAM[edImg]}px`;
     $("ed-blur").style.display = iw < W - 2 ? "" : "none";
     const tw = Math.min(iw, 520) - 24;   // 11/27-1c: 左右の余白を4pxずつ減らした（前は −32）
-    Object.assign(txt.style, { width: `${tw}px`, fontSize: `${ED_FONT}px`, lineHeight: String(ED_LH), top: `${ih * ED_CREAM[edImg] + 6}px` });
+    Object.assign(txt.style, { width: `${tw}px`, fontSize: `${ED_FONT}px`, lineHeight: String(STORY_LH), top: `${ih * ED_CREAM[edImg] + 6}px` });
     const band = $("ed-band");
-    Object.assign(band.style, { left: `${left}px`, width: `${iw}px`, fontSize: `${ED_BAND_FONT}px`, lineHeight: `${ED_FONT * ED_LH}px` });   // 11/27-1c: 帯の字は15px。行の高さは前のまま（帯の高さを変えない）
-    edBand(pg.narr, iw);
+    Object.assign(band.style, { left: `${left}px`, width: `${iw}px`, fontSize: `${STORY_FONT}px`, lineHeight: `${STORY_BAND_LH}px` });   // 11/27-1e: 帯の字も15px・行間1.4（21px）
+    storyBand(band, pg.narr.map(l => Ruby.html(l.text)));
     const last = edIdx === edList.length - 1, reserve = last ? 84 : 32;   // 下の「タップで次へ」（最後は「タイトルへ」のボタン）の場所
     const r = txt.getBoundingClientRect(), s0 = sc.getBoundingClientRect();
     return { fit: r.bottom - s0.top <= H - reserve + 0.5, over: Math.round(r.bottom - s0.top - (H - reserve)) };
@@ -856,7 +885,7 @@ const Main = (() => {
     return layoutStory();
   }
   // 確かめ用: 全部の画面が白地に入るか（window.__edSplit で分け方を変えて測れる）
-  window.__edFit = () => { edList = edPages(); edImg = 0; showScreen("story"); const out = edList.map((p, i) => Object.assign({ scene: p.scene, talk: p.talk.length }, showStoryPage(i))); return out; };
+  window.__edFit = fn => { edList = edPages(); edImg = 0; showScreen("story"); const out = edList.map((p, i) => Object.assign({ scene: p.scene, talk: p.talk.length }, showStoryPage(i), fn ? { x: fn(i) } : {})); return out; };
   function toStory() {
     $("ed-skip").textContent = tx("ending.skip");
     $("ed-go").textContent = tx("ending.toTitle");
