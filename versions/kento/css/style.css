@@ -772,7 +772,7 @@ body { position: fixed; inset: 0; }
 /* 11/27-1f 決定: 帯が出るときは「左から右へのワイプ」（オープニング・エンディング共通。11/27-1e のブラインドはやめた）。帯と字が左端から右へ0.5秒で現れる。
    現れる端は24pxの幅でやわらかくぼかす（mask の linear-gradient: 左が不透明・右が透明の境を動かす）。段が複数なら上の段から0.25秒ずつずらす（11/28-1）（main.js の animation-delay）。出終わったら mask を外す */
 @property --wipe { syntax: "<length-percentage>"; inherits: false; initial-value: calc(100% + 24px); }
-.ed-band-row { --wipe: calc(100% + 24px); -webkit-mask-image: linear-gradient(to right, #000 calc(var(--wipe) - 24px), transparent var(--wipe)); mask-image: linear-gradient(to right, #000 calc(var(--wipe) - 24px), transparent var(--wipe)); animation: band-wipe .9s linear both;   /* 11/28-1: 0.5秒→0.9秒（main.js の STORY_WIPE と同じ） */ }
+.ed-band-row { --wipe: calc(100% + 24px); -webkit-mask-image: linear-gradient(to right, #000 calc(var(--wipe) - 24px), transparent var(--wipe)); mask-image: linear-gradient(to right, #000 calc(var(--wipe) - 24px), transparent var(--wipe)); animation: band-wipe 1.2s linear both;   /* 11/28-3: 0.9秒→1.2秒（11/28-1 で0.5→0.9）（main.js の STORY_WIPE と同じ） */ }
 .ed-band-row.open { -webkit-mask-image: none; mask-image: none; }
 @keyframes band-wipe { from { --wipe: 0%; } to { --wipe: calc(100% + 24px); } }
 @media (prefers-reduced-motion: reduce) { .ed-band-row { animation: none; -webkit-mask-image: none; mask-image: none; } }
@@ -1126,4 +1126,4 @@ button.ub.ub-s { width: auto; padding: 5px 12px 6px; font-size: 14px; }
 /* 11/27-6: 帯の中のルビは行の高さを広げない（行の間かくを 15px×1.4 にそろえ、帯の高さを固定するため）。ルビは漢字の真上に重ねて置く */
 .ed-band ruby { display: inline-block; position: relative; }
 .ed-band rt { position: absolute; left: -2em; right: -2em; bottom: 100%; margin-bottom: -2px; text-align: center; white-space: nowrap; }
-.ed-text p.talk-in { animation: op-in .3s ease-out both; }   /* 11/28-2: 会話は1つずつ0.3秒でふわっと（main.js の STORY_TALK_FADE と同じ） */
+.ed-text p.talk-in { animation: op-in .4s ease-out both; }   /* 11/28-3: 会話は1つずつ0.4秒でふわっと（main.js の STORY_TALK_FADE と同じ） */
