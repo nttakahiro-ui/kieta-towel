@@ -823,12 +823,12 @@ const Main = (() => {
   // ===== 11/27-1e: ナレーションの帯（オープニング・エンディング共通） =====
   //   全部を続けて1本に。2行をこえるときは、文の切れ目で段に分ける（最大3段）。分け方は、どの段も2行以内になるいちばん少ない段の数で、
   //   その中でいちばん長い段の行が少ない分け方（3段でも2行をこえるときは、いちばん長い段がいちばん短くなる分け方）。11/27-1b のシーン12の2段（2本＋1本）と同じ結果
-  //   出るときはブラインド（CSS の .ed-band-row。細い帯に分けた形で0.6秒かけて開く。段が複数なら上から0.2秒ずつずらす）。帯はタップを受けないので、途中でも次へ進める
+  //   出るときは左から右へのワイプ（11/27-1f。CSS の .ed-band-row。0.5秒・端は24pxぼかす。段が複数なら上から0.15秒ずつずらす）。帯はタップを受けないので、途中でも次へ進める
   function storyBand(box, texts) {   // texts: ルビつきの HTML の文
     box.style.display = texts.length ? "" : "none";
     if (!texts.length) { box.innerHTML = ""; return; }
     const draw = rows => {
-      box.innerHTML = rows.map((r, j) => `<div class="ed-band-row" style="animation-delay:${(j * 0.2).toFixed(1)}s">${r.join("　")}</div>`).join("");
+      box.innerHTML = rows.map((r, j) => `<div class="ed-band-row" style="animation-delay:${(j * 0.15).toFixed(2)}s">${r.join("　")}</div>`).join("");
       return Math.max(...[...box.children].map(e => Math.round((e.clientHeight - 10) / STORY_BAND_LH)));
     };
     const n = texts.length, cuts = k => k === 1 ? [[]] : k === 2 ? [...Array(n - 1)].map((_, i) => [i + 1]) : [].concat(...[...Array(n - 2)].map((_, i) => [...Array(n - 2 - i)].map((_, j) => [i + 1, i + 2 + j])));
