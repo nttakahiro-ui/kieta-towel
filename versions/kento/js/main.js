@@ -768,42 +768,72 @@ const Main = (() => {
     if (Save.data.introSeen) toTitle(); else showScreen("intro");   // 最初の起動では、このあと目的の画面と主人公選び（終わるとタイトルへ）
   }
 
-  // ===== エンディング（11/27-1 決定・指摘94）: オープニングと同じ紙芝居。1画面に絵1枚＋セリフ1つ =====
-  //   タップで次のセリフ。そのシーンのセリフが終わったら次の絵。自動では進めない。右上の「とばす」。最後のセリフで「タイトルへ」のボタン
-  //   文は texts.js の ending.lines（シナリオのまま。ふりがなは data/ruby.js）。話す人は who（"" はナレーション: 名前なしの帯）
+  // ===== エンディング（11/27-1 決定・指摘94。11/27-1b で画面の分け方を作り直し）: 紙芝居。絵の下の白地に会話、絵の上部にナレーションの帯 =====
+  //   11/27-1b 決定: めくる回数は20回以内。字の大きさは全画面で固定（14px・行間1.4）。絵は白地（下3分の1）以外を隠さない（ナレーションの細い帯だけ上にのせる）
+  //   1画面 ＝ そのシーンの会話3つまで（白地に。話す人の名前は文頭に色つき）。3つが白地に入らないシーンだけ2画面（ED_SPLIT）。同じ絵が続く
+  //   ナレーションは、そのシーンの最初の画面で、絵の上部に半透明の黒い帯（白い字）。いくつもあれば続けて1本の帯に。2行をこえるときは帯を2段に
+  //   文は texts.js の ending.lines（シナリオのまま。ふりがなは data/ruby.js）。話す人は who（"" はナレーション）
   //   曲: シーン1〜7 は recipe（1回だけ）、シーン8〜12 は title（くり返し）。切りかえは Sound.play の場面転換（0.3秒で小さく → 0.4秒の無音）
-  const ED_CREAM = 0.77;       // 絵の上からこの割合より下が、セリフを置く白地（エンディングの13枚で測ると 0.70〜0.77。いちばん下の 0.77 に合わせた）
+  // 白地の始まり（絵の高さに対する割合）。13枚を1枚ずつ測った値に 0.01 の余白
+  const ED_CREAM = [0, 0.749, 0.727, 0.763, 0.746, 0.728, 0.713, 0.722, 0.779, 0.773, 0.727, 0.724, 0.721, 0.743];
+  // 2画面に分けるシーン（会話の数。375×667 と 390×844 で、3つが白地に入らなかったシーン。11/27-1b に測った）
+  const ED_SPLIT = { "6": [2, 2], "8": [2, 1], "9A": [2, 1], "12": [2, 1] };   // 375×667 で 8・9A・12（最後の画面はボタンの場所も）が入らなかった。6 は会話が4つ
+  const ED_FONT = 14, ED_LH = 1.4;
   const ED_TITLE_FROM = 8;     // この絵の番号（シーン8）から title の曲
   const edSrc = n => `assets/ending/e${String(n).padStart(2, "0")}.jpg`;
   const edPre = {};
   function edPreload(n) { if (n >= 1 && n <= 13 && !edPre[n]) edPre[n] = Object.assign(new Image(), { src: edSrc(n) }); }
-  let edIdx = 0, edImg = 0, edSong = "";
-  function edLineHTML(l) {
-    const ph = t => Cards.phraseHTML(t);
-    if (!l.who) return `<p class="ed-narr">${ph(l.text)}</p>`;
-    return `<p><span class="op-who">${ph(l.who)}</span>「${ph(l.text)}」</p>`;
+  let edIdx = 0, edImg = 0, edSong = "", edList = [];
+  // 画面の一覧: シーンごとに会話を ED_SPLIT（なければ全部）で分ける。ナレーションはそのシーンの最初の画面に
+  function edPages() {
+    const split = window.__edSplit || ED_SPLIT, scenes = [], pages = [];
+    for (const l of window.TEXTS.ending.lines) {
+      let s = scenes[scenes.length - 1];
+      if (!s || s.scene !== l.scene) scenes.push(s = { scene: l.scene, img: l.img, narr: [], talk: [] });
+      (l.who ? s.talk : s.narr).push(l);
+    }
+    for (const s of scenes) {
+      let k = 0;
+      (split[s.scene] || [s.talk.length]).forEach((n, j) => { pages.push({ scene: s.scene, img: s.img, narr: j === 0 ? s.narr : [], talk: s.talk.slice(k, k + n) }); k += n; });
+    }
+    return pages;
   }
-  // 絵と文の置き方（オープニングと同じ）: 同じ絵のあいだは絵の大きさを変えない。その絵でいちばん長いセリフに合わせる
+  const edPh = t => Cards.phraseHTML(t);
+  const edTalkHTML = l => `<p><span class="ed-who">${edPh(l.who)}</span>「${edPh(l.text)}」</p>`;
+  // ナレーションの帯: 続けて1本。2行をこえたら2段（前半と後半）
+  function edBand(narr, width) {
+    const box = $("ed-band");
+    box.style.display = narr.length ? "" : "none";
+    if (!narr.length) { box.innerHTML = ""; return; }
+    const one = list => `<div class="ed-band-row">${list.map(l => edPh(l.text)).join("　")}</div>`;
+    box.innerHTML = one(narr);
+    const row = box.firstChild, lines = Math.round((row.clientHeight - 10) / (ED_FONT * ED_LH));
+    if (lines > 2 && narr.length > 1) { const h = Math.ceil(narr.length / 2); box.innerHTML = one(narr.slice(0, h)) + one(narr.slice(h)); }
+  }
+  // 絵は画面の幅いっぱい（高さが入らなければ高さに合わせる）。文の大きさで絵を変えない。会話は白地の始まりから下（絵の下の画面の地も同じ色）
   function layoutStory() {
-    const sc = $("screen-story"), W = sc.clientWidth, H = sc.clientHeight, img = $("ed-img"), txt = $("ed-text");
-    if (!W || !H) return;
-    const tw = Math.min(W, 520) - 36, foot = edImg === 13 ? 100 : 40;   // 最後の絵は「タイトルへ」のボタンの場所もあける
-    txt.style.width = `${tw}px`; txt.style.fontSize = "17px";
-    const now = txt.innerHTML;
-    let th = 0;
-    for (const l of window.TEXTS.ending.lines) if (l.img === edImg) { txt.innerHTML = edLineHTML(l); th = Math.max(th, txt.scrollHeight); }
-    txt.innerHTML = now;
-    const ih = Math.max(Math.min(W * OP_ART, (H - th - foot - 10) / ED_CREAM), H * 0.4), iw = ih / OP_ART;
-    Object.assign(img.style, { width: `${iw}px`, height: `${ih}px`, left: `${(W - iw) / 2}px` });
-    $("ed-blur").style.height = `${ih * ED_CREAM}px`;
+    const sc = $("screen-story"), W = sc.clientWidth, H = sc.clientHeight, img = $("ed-img"), txt = $("ed-text"), pg = edList[edIdx];
+    if (!W || !H || !pg) return {};
+    let iw = W, ih = W * OP_ART;
+    if (ih > H) { ih = H; iw = H / OP_ART; }
+    const left = (W - iw) / 2;
+    Object.assign(img.style, { width: `${iw}px`, height: `${ih}px`, left: `${left}px` });
+    $("ed-blur").style.height = `${ih * ED_CREAM[edImg]}px`;
     $("ed-blur").style.display = iw < W - 2 ? "" : "none";
-    txt.style.top = `${ih * ED_CREAM + 8}px`;
+    const tw = Math.min(iw, 520) - 32;
+    Object.assign(txt.style, { width: `${tw}px`, fontSize: `${ED_FONT}px`, lineHeight: String(ED_LH), top: `${ih * ED_CREAM[edImg] + 6}px` });
+    const band = $("ed-band");
+    Object.assign(band.style, { left: `${left}px`, width: `${iw}px`, fontSize: `${ED_FONT}px`, lineHeight: String(ED_LH) });
+    edBand(pg.narr, iw);
+    const last = edIdx === edList.length - 1, reserve = last ? 84 : 32;   // 下の「タップで次へ」（最後は「タイトルへ」のボタン）の場所
+    const r = txt.getBoundingClientRect(), s0 = sc.getBoundingClientRect();
+    return { fit: r.bottom - s0.top <= H - reserve + 0.5, over: Math.round(r.bottom - s0.top - (H - reserve)) };
   }
-  function showStoryLine(i) {
-    const list = window.TEXTS.ending.lines, l = list[i];
+  function showStoryPage(i) {
+    const pg = edList[i];
     edIdx = i;
-    if (l.img !== edImg) {   // 次の絵
-      edImg = l.img;
+    if (pg.img !== edImg) {   // 次の絵
+      edImg = pg.img;
       edPreload(edImg + 1); edPreload(edImg + 2);
       const img = $("ed-img");
       img.classList.remove("in"); void img.offsetWidth; img.classList.add("in");
@@ -811,25 +841,27 @@ const Main = (() => {
       img.onerror = () => { img.style.visibility = "hidden"; };
       img.src = edSrc(edImg);
       $("ed-blur").style.backgroundImage = `url(${edSrc(edImg)})`;
-      $("ed-page").textContent = `${edImg}/13`;
+      $("ed-page").textContent = `${edImg}/13`;   // 絵の枚数のまま（2画面に分けたシーンは同じ数が続く）
       const song = edImg >= ED_TITLE_FROM ? "title" : "ending";
       if (song !== edSong) { edSong = song; Sound.play(song); }
     }
     const txt = $("ed-text");
-    txt.innerHTML = edLineHTML(l);
+    txt.innerHTML = pg.talk.map(edTalkHTML).join("");
     txt.classList.remove("in"); void txt.offsetWidth; txt.classList.add("in");
-    const last = i === list.length - 1;
+    const last = i === edList.length - 1;
     $("ed-tap").textContent = last ? "" : tx("ending.tap");
     $("ed-go").classList.toggle("hidden", !last);
-    layoutStory();
+    return layoutStory();
   }
+  // 確かめ用: 全部の画面が白地に入るか（window.__edSplit で分け方を変えて測れる）
+  window.__edFit = () => { edList = edPages(); edImg = 0; showScreen("story"); const out = edList.map((p, i) => Object.assign({ scene: p.scene, talk: p.talk.length }, showStoryPage(i))); return out; };
   function toStory() {
     $("ed-skip").textContent = tx("ending.skip");
     $("ed-go").textContent = tx("ending.toTitle");
-    edImg = 0; edSong = "";
+    edList = edPages(); edImg = 0; edSong = "";
     edPreload(1); edPreload(2);
     showScreen("story");
-    showStoryLine(0);
+    showStoryPage(0);
   }
   function endStory() {
     Save.data.endingSeen = true; Save.store();
@@ -1041,7 +1073,7 @@ const Main = (() => {
     $("btn-opening").textContent = tx("opening.link");
     $("btn-opening").addEventListener("click", toOpening);
     // エンディング（11/27-1）: 画面をタップで次のセリフ。最後のセリフでは「タイトルへ」だけ
-    $("screen-story").addEventListener("click", () => { if (edIdx + 1 < window.TEXTS.ending.lines.length) showStoryLine(edIdx + 1); });
+    $("screen-story").addEventListener("click", () => { if (edIdx + 1 < edList.length) showStoryPage(edIdx + 1); });
     $("ed-skip").addEventListener("click", e => { e.stopPropagation(); endStory(); });
     $("ed-go").addEventListener("click", e => { e.stopPropagation(); endStory(); });
     $("btn-ending").textContent = tx("ending.link");
