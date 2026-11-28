@@ -863,10 +863,11 @@ const Main = (() => {
   //   地の文がいくつもあるときも、同じ箱の中に行として入れる（段ごとに別の帯にしない）。分け方は、行の数がいちばん少なくなる分け方
   //   （同じ行の数なら、文の切れ目で改行する分け方。最大3つに分ける）。行が少ない画面でも帯の高さは変えない
   //   出るときは左から右へのワイプ（11/27-1f。CSS の .ed-band-row。1.2秒・端は24pxぼかす。行のまとまりが複数なら上から0.33秒ずつずらす。11/28-3 で1.2秒・0.33秒）。帯はタップを受けないので、途中でも次へ進める
-  const STORY_WIPE = 1.2, STORY_WIPE_STEP = 0.33, STORY_TALK_GAP = 0.5;   // 11/28-3: ワイプ1.2秒（CSS の band-wipe と同じ）・段のずれ0.33秒。11/28-4: ワイプ後から会話までの間0.5秒（11/28-3 は1.3）（11/28-1 は0.9・0.25・1.0）
+  //   11/28-5 決定: 文が複数あるときは、帯全体を一度にワイプせず、文を1本ずつ順に左から右へワイプで出す（折り返した文は2行まとめて1回）。帯の箱は先に出しておく
+  const STORY_WIPE = 0.9, STORY_WIPE_STEP = 0.2, STORY_TALK_GAP = 0.5;   // 11/28-5: 文1本のワイプ0.9秒（CSS の .ed-band-s と同じ）・文と文の間0.2秒・最後の文のあと会話まで0.5秒   // 11/28-3: ワイプ1.2秒（CSS の band-wipe と同じ）・段のずれ0.33秒。11/28-4: ワイプ後から会話までの間0.5秒（11/28-3 は1.3）（11/28-1 は0.9・0.25・1.0）
   function storyBandBest(box, texts) {   // いちばん行の少ない分け方を帯に描いて、その行の数を返す
     const draw = parts => {
-      box.innerHTML = parts.map((r, j) => `<div class="ed-band-row" style="animation-delay:${(j * STORY_WIPE_STEP).toFixed(2)}s">${r.join("　")}</div>`).join("");
+      box.innerHTML = parts.map((r, j) => `<div class="ed-band-row">${r.map(t => `<span class="ed-band-s">${t}</span>`).join("　")}</div>`).join("");
       return [...box.children].reduce((t, e) => t + Math.round(e.clientHeight / STORY_BAND_LH), 0);
     };
     const n = texts.length, cuts = k => k === 1 ? [[]] : k === 2 ? [...Array(n - 1)].map((_, i) => [i + 1]) : [].concat(...[...Array(n - 2)].map((_, i) => [...Array(n - 2 - i)].map((_, j) => [i + 1, i + 2 + j])));
@@ -880,7 +881,10 @@ const Main = (() => {
     box.style.height = `${rows * STORY_BAND_LH + 10}px`;   // 上下の内側の余白 5px ずつ。11/27-7: 高さは固定（入らない文は storyBandGroups で次のタップに回してある）
     if (!texts.length) { box.innerHTML = ""; box.dataset.lines = 0; return; }
     box.dataset.lines = storyBandBest(box, texts);   // 確かめ用: 行の数
-    [...box.children].forEach(e => e.addEventListener("animationend", () => e.classList.add("open")));
+    box.querySelectorAll(".ed-band-s").forEach((e, k) => {   // 11/28-5: 文ごとに順に（0.9秒＋0.2秒ずつずらす）
+      e.style.animationDelay = `${(k * (STORY_WIPE + STORY_WIPE_STEP)).toFixed(2)}s`;
+      e.addEventListener("animationend", () => e.classList.add("open"));
+    });
   }
   // 11/27-7 決定: 帯の高さは固定のまま。帯に入らない地の文は次のタップで帯を入れ替えて出す（文の切れ目で区切る。順番はそのまま）
   function storyBandGroups(box, g, items, html, rows) {
@@ -901,7 +905,7 @@ const Main = (() => {
     return out;
   }
   // 11/27-7 決定: ナレーションを読んでから会話に進めるよう、帯のワイプが終わってから会話を出す
-  //   帯が新しく出る回: ワイプ（1.2秒＋行のまとまりのずれ 0.33秒ずつ）が終わって0.5秒後に（11/28-4）、会話を0.4秒でふわっと出す。帯のない回は会話をすぐ出す
+  //   帯が新しく出る回: ワイプ（文1本0.9秒、文と文の間0.2秒。11/28-5）が終わって0.5秒後に（11/28-4）、会話を0.4秒でふわっと出す。帯のない回は会話をすぐ出す
   //   会話が出る前（帯のワイプ中も）にタップされたら、動きを飛ばしてその回の全部を出す（次へは進まない）。もう一度タップで次へ
   //   11/28-2 決定: 同じ画面の中の会話（2〜3つ）は一度に出さず、1つずつ順に出す（タップの回数は変えない）。
   //   1つ目が0.4秒でふわっと出たあと0.9秒置いて2つ目、さらに0.9秒置いて3つ目（11/28-3）（帯のない回も、1つ目はすぐ・以降は同じ間隔）。
@@ -911,7 +915,7 @@ const Main = (() => {
   function storyTalkIn(kind, txt, band) {
     const w = storyWait[kind] || (storyWait[kind] = {});
     clearTimeout(w.timer);
-    const rows = band.style.display === "none" ? 0 : band.children.length;
+    const rows = band.style.display === "none" ? 0 : band.querySelectorAll(".ed-band-s").length;   // 11/28-5: 文の数
     const ps = [...txt.children];
     w.txt = txt; w.band = band; w.ps = ps;
     txt.classList.remove("in"); txt.style.visibility = "";
@@ -925,13 +929,13 @@ const Main = (() => {
     };
     w.busy = true;
     if (!rows) step();
-    else w.timer = setTimeout(step, (STORY_WIPE + STORY_WIPE_STEP * (rows - 1) + STORY_TALK_GAP) * 1000);
+    else w.timer = setTimeout(step, (STORY_WIPE * rows + STORY_WIPE_STEP * (rows - 1) + STORY_TALK_GAP) * 1000);
   }
   function storySkip(kind) {   // 動きの途中なら全部を出して true（そのタップでは次へ進まない）
     const w = storyWait[kind];
     if (!w || !w.busy) return false;
     clearTimeout(w.timer); w.busy = false;
-    [...w.band.children].forEach(e => { e.style.animation = "none"; e.classList.add("open"); });
+    w.band.querySelectorAll(".ed-band-s").forEach(e => { e.style.animation = "none"; e.classList.add("open"); });
     w.ps.forEach(e => { if (e.style.visibility === "hidden") { e.style.visibility = ""; e.classList.remove("talk-in"); } });
     return true;
   }

@@ -1127,3 +1127,9 @@ button.ub.ub-s { width: auto; padding: 5px 12px 6px; font-size: 14px; }
 .ed-band ruby { display: inline-block; position: relative; }
 .ed-band rt { position: absolute; left: -2em; right: -2em; bottom: 100%; margin-bottom: -2px; text-align: center; white-space: nowrap; }
 .ed-text p.talk-in { animation: op-in .4s ease-out both; }   /* 11/28-3: 会話は1つずつ0.4秒でふわっと（main.js の STORY_TALK_FADE と同じ） */
+/* 11/28-5: 帯は箱を先に出し、文を1本ずつ順にワイプ（文1本0.9秒。ずらしは main.js）。折り返した文は各行を同時に（box-decoration-break: clone）。
+   上の余白（padding-top。行の高さは変わらない）は、ふりがなもワイプの中に入れるため */
+.ed-band-row { animation: none; -webkit-mask-image: none; mask-image: none; }
+.ed-band-s { --wipe: calc(100% + 24px); padding-top: .8em; -webkit-box-decoration-break: clone; box-decoration-break: clone; -webkit-mask-image: linear-gradient(to right, #000 calc(var(--wipe) - 24px), transparent var(--wipe)); mask-image: linear-gradient(to right, #000 calc(var(--wipe) - 24px), transparent var(--wipe)); animation: band-wipe .9s linear both; }
+.ed-band-s.open { -webkit-mask-image: none; mask-image: none; }
+@media (prefers-reduced-motion: reduce) { .ed-band-s { animation: none; -webkit-mask-image: none; mask-image: none; } }
